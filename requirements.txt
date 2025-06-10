@@ -1,6 +1,6 @@
 pdfplumber==0.10.3
 beautifulsoup4==4.12.2
-requests==2.32.2
+requests==2.32.4
 python-magic==0.4.27
 colorama==0.4.6
 tqdm==4.66.3

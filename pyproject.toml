@@ -3,16 +3,16 @@ requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "iocparser"
+name = "iocparser-tool"
 version = "1.0.0"
 description = "A tool for extracting Indicators of Compromise from security reports"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "Marc Rivero", email = ""}
+    {name = "Marc Rivero"}
 ]
 maintainers = [
-    {name = "Marc Rivero", email = ""}
+    {name = "Marc Rivero"}
 ]
 keywords = ["security", "ioc", "malware", "threat-intelligence", "pdf", "html", "parser"]
 classifiers = [
@@ -38,9 +38,11 @@ dependencies = [
     "python-magic>=0.4.0",
     "requests>=2.25.0",
     "tqdm>=4.60.0",
-    "pdfminer.six>=20201018",
+    "pdfplumber>=0.10.0",
     "beautifulsoup4>=4.9.0",
     "lxml>=4.6.0",
+    "regex>=2023.0.0",
+    "pdfminer.six>=20201018",
 ]
 
 [project.optional-dependencies]

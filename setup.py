@@ -15,7 +15,7 @@ def read_requirements():
         return [line.strip() for line in fh if line.strip() and not line.startswith("#")]
 
 setup(
-    name="iocparser",
+    name="iocparser-tool",
     version="1.0.0",
     author="Marc Rivero",
     author_email="",

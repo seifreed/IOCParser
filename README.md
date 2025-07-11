@@ -32,7 +32,7 @@ Version: 1.0.0
 ### From PyPI (Recommended)
 
 ```bash
-pip install iocparser
+pip install iocparser-tool
 ```
 
 ### From Source

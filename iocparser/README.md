@@ -7,7 +7,7 @@ Author: Marc Rivero | @seifreed
 ## Installation
 
 ```bash
-pip install iocparser
+pip install iocparser-tool
 ```
 
 ## Using as a Library

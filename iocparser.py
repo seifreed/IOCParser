@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
 IOCParser - A tool for extracting Indicators of Compromise from security reports
@@ -12,4 +11,4 @@ Author: Marc Rivero | @seifreed
 from iocparser.main import main
 
 if __name__ == "__main__":
-    main() 
+    main()

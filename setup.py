@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
-from setuptools import setup, find_packages
-import os
+
+from setuptools import find_packages, setup
+
 
 # Read the README file
 def read_readme():
-    with open("README.md", "r", encoding="utf-8") as fh:
+    with open("README.md", encoding="utf-8") as fh:
         return fh.read()
 
 # Read requirements
 def read_requirements():
-    with open("requirements.txt", "r", encoding="utf-8") as fh:
+    with open("requirements.txt", encoding="utf-8") as fh:
         return [line.strip() for line in fh if line.strip() and not line.startswith("#")]
 
 setup(
     name="iocparser-tool",
-    version="1.0.0",
+    version="1.0.1",
     author="Marc Rivero",
     author_email="",
     description="A tool for extracting Indicators of Compromise from security reports",
@@ -70,4 +70,4 @@ setup(
     keywords="security, ioc, malware, threat-intelligence, pdf, html, parser",
     license="MIT",
     zip_safe=False,
-) 
+)

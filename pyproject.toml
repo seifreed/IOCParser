@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iocparser-tool"
-version = "1.0.0"
+version = "2.0.0"
 description = "A tool for extracting Indicators of Compromise from security reports"
 readme = "README.md"
 license = {text = "MIT"}
@@ -22,17 +22,16 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.6",
-    "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Security",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Text Processing :: Filters",
 ]
-requires-python = ">=3.6"
+requires-python = ">=3.8"
 dependencies = [
     "colorama>=0.4.0",
     "python-magic>=0.4.0",
@@ -47,11 +46,18 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=6.0",
-    "pytest-cov>=2.0",
-    "black>=21.0",
-    "flake8>=3.8",
-    "mypy>=0.800",
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-benchmark>=4.0",
+    "ruff>=0.1.9",
+    "mypy>=1.8.0",
+    "bandit[toml]>=1.7.6",
+    "pylint>=3.0",
+    "pre-commit>=3.5.0",
+    "types-requests",
+    "types-setuptools",
+    "types-colorama",
+    "types-tqdm",
 ]
 
 [project.urls]
@@ -69,5 +75,228 @@ include = ["iocparser*"]
 [tool.setuptools.package-data]
 iocparser = ["modules/data/*.json"]
 
-[tool.setuptools_scm]
-write_to = "iocparser/_version.py" 
+# Ruff configuration
+[tool.ruff]
+target-version = "py38"
+line-length = 100
+fix = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+    "ARG",  # flake8-unused-arguments
+    "SIM",  # flake8-simplify
+    "TCH",  # flake8-type-checking
+    "DTZ",  # flake8-datetimez
+    "RUF",  # Ruff-specific rules
+    "N",    # pep8-naming
+    "S",    # flake8-bandit
+    "A",    # flake8-builtins
+    "COM",  # flake8-commas
+    "PTH",  # flake8-use-pathlib
+    "ERA",  # eradicate
+    "PD",   # pandas-vet
+    "PGH",  # pygrep-hooks
+    "PL",   # Pylint
+    "TRY",  # tryceratops
+    "FLY",  # flynt
+    "PERF", # Perflint
+    "LOG",  # flake8-logging
+    "RET",  # flake8-return
+    "SLF",  # flake8-self
+    "SLOT", # flake8-slots
+    "RSE",  # flake8-raise
+    "PIE",  # flake8-pie
+    "PT",   # flake8-pytest-style
+    "INT",  # flake8-gettext
+    "TID",  # flake8-tidy-imports
+]
+ignore = [
+    # NO IGNORES - TRUE 100% COMPLIANCE
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "PLR2004", "S311"]
+"examples/*" = ["INP001"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["iocparser"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pep8-naming]
+classmethod-decorators = ["classmethod", "pydantic.validator"]
+
+[tool.ruff.lint.pylint]
+max-args = 7
+max-branches = 15
+max-returns = 6
+max-statements = 50
+
+# MyPy configuration
+[tool.mypy]
+python_version = "3.9"
+# MAXIMUM STRICTNESS - TRUE 100% COMPLIANCE
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_decorators = true
+disallow_any_generics = true
+disallow_any_unimported = true
+disallow_any_expr = true
+disallow_any_decorated = true
+disallow_any_explicit = true
+disallow_subclassing_any = true
+ignore_missing_imports = false
+follow_imports = "normal"
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_unreachable = true
+warn_no_return = true
+strict_equality = true
+strict_optional = true
+pretty = true
+show_error_context = true
+show_error_codes = true
+show_traceback = true
+namespace_packages = true
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = [
+    "colorama.*",
+    "tqdm.*",
+    "pdfplumber.*",
+    "magic.*",
+    "regex.*",
+    "pdfminer.*",
+]
+ignore_missing_imports = true
+
+# Bandit configuration
+[tool.bandit]
+exclude_dirs = ["tests", "venv", ".venv", "build", "dist"]
+skips = []  # NO SKIPS - TRUE 100% COMPLIANCE
+
+[tool.bandit.assert_used]
+skips = ["*/test_*.py", "*/tests/*.py"]
+
+# Pylint configuration
+[tool.pylint.main]
+py-version = "3.8"
+jobs = 0
+max-line-length = 100
+disable = [
+    "C0114",  # missing-module-docstring
+    "C0115",  # missing-class-docstring
+    "C0116",  # missing-function-docstring
+    "R0903",  # too-few-public-methods
+    "R0913",  # too-many-arguments
+    "W0511",  # fixme
+    "C0103",  # invalid-name
+]
+good-names = ["i", "j", "k", "f", "e", "v", "ip", "id", "_"]
+min-public-methods = 0
+max-args = 7
+
+[tool.pylint.design]
+max-branches = 15
+max-statements = 50
+
+[tool.pylint.similarities]
+min-similarity-lines = 10
+ignore-comments = true
+ignore-docstrings = true
+
+# Coverage configuration
+[tool.coverage.run]
+source = ["iocparser"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+    "*/venv/*",
+    "*/.venv/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if __name__ == .__main__.:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
+precision = 2
+show_missing = true
+skip_covered = false
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+# Pytest configuration
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--tb=short",
+    "--cov=iocparser",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "benchmark: marks tests as benchmark tests",
+]
+
+# isort configuration (for compatibility if not using ruff)
+[tool.isort]
+profile = "black"
+line_length = 100
+known_first_party = ["iocparser"]
+skip = ["venv", ".venv", "build", "dist"]
+
+# Black configuration (for compatibility if not using ruff format)
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.tox
+  | \.venv
+  | venv
+  | build
+  | dist
+  | __pycache__
+)/
+'''

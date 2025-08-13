@@ -1,0 +1,88 @@
+SECURITY INCIDENT REPORT
+========================
+Date: 2024-01-15
+Incident ID: INC-2024-0042
+
+Executive Summary
+-----------------
+A sophisticated malware campaign has been detected targeting financial institutions. 
+The attack leverages multiple vectors and shows signs of APT involvement.
+
+Technical Analysis
+------------------
+
+1. Initial Compromise
+   - Phishing email sent from attacker@malicious-domain.com
+   - Malicious attachment: invoice_2024.pdf (SHA256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855)
+   - Dropper MD5: 5f4dcc3b5aa765d61d8327deb882cf99
+
+2. Command & Control Infrastructure
+   - Primary C2 server: 185.220.101.45
+   - Secondary C2: evil-command.net (resolves to 192.168.1.100)
+   - Backup domain: backup.malware-c2.org
+   - Uses HTTPS on port 443: https://evil-command.net/beacon.php
+   - Alternative protocols observed on 10.0.0.50:8080
+
+3. Malware Characteristics
+   - Creates mutex: Global\SystemUpdateMutex
+   - Registers service: MalwareUpdateService
+   - Drops files to: C:\Windows\Temp\update.exe
+   - Additional payload: C:\Users\Public\Documents\helper.dll
+   - Linux variant found at: /tmp/.hidden/backdoor.sh
+
+4. Registry Modifications
+   - Persistence key: HKLM\Software\Microsoft\Windows\CurrentVersion\Run
+   - Additional key: HKEY_CURRENT_USER\Software\Classes\malware
+
+5. Network Indicators
+   - User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) BotClient/1.0
+   - IPv6 C2: 2001:0db8:85a3:0000:0000:8a2e:0370:7334
+   - MAC address of infected host: 00:1B:44:11:3A:B7
+   - AS Number: AS13335
+
+6. Vulnerability Exploited
+   - CVE-2021-44228 (Log4Shell)
+   - MITRE ATT&CK Techniques: T1055, T1566.001
+
+7. Cryptocurrency Addresses
+   - Bitcoin wallet: 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa
+   - Ethereum: 0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb4
+   - Monero: 48ju2dwsRu3rJEMVPD6MNaT2BQNYdZBYHJYZ8F8nPRX2SHPVQgUCYGtjfUNz7KT5RjXrXkz9r7pPp8TpWaStXN7L7Wkn1zP
+
+8. Additional Hashes
+   - SHA1: 356a192b7913b04c54574d18c28d46e6395428ab
+   - SHA512: cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e
+   - SSDeep: 768:C7tsNKI7aU8Y1O5wjNHDwLxQJidNG3qGqDRTRT:CtsI7aUwjNQidNG3GqDRT
+
+9. Named Pipes and IPC
+   - Named pipe: \\.\pipe\MalwarePipe
+   - Another pipe: \\.\pipe\C2Communication
+
+10. Authentication Token
+    - JWT found: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+
+YARA Rule for Detection
+------------------------
+rule MalwareDetection {
+    meta:
+        description = "Detects the malware variant"
+    strings:
+        $a = "SystemUpdateMutex"
+        $b = "evil-command.net"
+    condition:
+        any of them
+}
+
+Recommendations
+---------------
+1. Block all listed IP addresses and domains at the firewall
+2. Search for listed file hashes in your environment
+3. Monitor for the listed registry keys and services
+4. Update systems to patch CVE-2021-44228
+
+Contact Information
+-------------------
+SOC Team: soc@company.com
+Incident Response: incident.response@company.org
+
+END OF REPORT

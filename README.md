@@ -3,7 +3,7 @@
 A tool for extracting Indicators of Compromise (IOCs) from security reports in HTML, PDF, and plain text formats.
 
 Author: Marc Rivero | @seifreed  
-Version: 2.0.0
+Version: 4.0.0
 
 ## Features
 

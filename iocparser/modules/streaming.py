@@ -9,19 +9,12 @@ Author: Marc Rivero | @seifreed
 import io
 import mmap
 from collections import defaultdict
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import (
     BinaryIO,
-    Callable,
-    Dict,
-    Iterator,
-    List,
-    Optional,
-    Set,
     TextIO,
-    Tuple,
-    Union,
     cast,
 )
 
@@ -46,7 +39,7 @@ class StreamingIOCExtractor:
         chunk_size: int = 1024 * 1024,  # 1MB chunks by default
         overlap: int = 1024,  # 1KB overlap to catch IOCs on boundaries
         defang: bool = True,
-        progress_callback: Optional[Callable[[int], None]] = None,
+        progress_callback: Callable[[int], None] | None = None,
     ):
         """
         Initialize the streaming extractor.
@@ -63,9 +56,9 @@ class StreamingIOCExtractor:
         self.progress_callback = progress_callback
 
         # Track IOCs to avoid duplicates
-        self.seen_iocs: Dict[str, Set[str]] = defaultdict(set)
+        self.seen_iocs: dict[str, set[str]] = defaultdict(set)
 
-    def _decode_chunk(self, data: Union[bytes, str]) -> str:
+    def _decode_chunk(self, data: bytes | str) -> str:
         """
         Decode bytes to string if needed.
 
@@ -76,13 +69,13 @@ class StreamingIOCExtractor:
             Decoded string
         """
         if isinstance(data, bytes):
-            return data.decode('utf-8', errors='ignore')
+            return data.decode("utf-8", errors="ignore")
         return data
 
     def _accumulate_iocs(
         self,
-        target: Dict[str, List[str]],
-        source: Dict[str, List[str]],
+        target: dict[str, list[str]],
+        source: dict[str, list[str]],
     ) -> None:
         """
         Accumulate IOCs from source into target dictionary.
@@ -96,7 +89,7 @@ class StreamingIOCExtractor:
 
     def _read_chunks(
         self,
-        file_obj: Union[BinaryIO, TextIO],
+        file_obj: BinaryIO | TextIO,
         is_text: bool = True,
     ) -> Iterator[str]:
         """
@@ -131,7 +124,7 @@ class StreamingIOCExtractor:
             if previous_chunk_tail:
                 chunk = previous_chunk_tail + chunk
 
-            bytes_read += len(chunk.encode('utf-8', errors='ignore'))
+            bytes_read += len(chunk.encode("utf-8", errors="ignore"))
 
             # Report progress if callback provided
             if self.progress_callback and total_size:
@@ -141,12 +134,12 @@ class StreamingIOCExtractor:
             yield chunk
 
             # Save tail for overlap with next chunk
-            previous_chunk_tail = chunk[-self.overlap:] if len(chunk) > self.overlap else chunk
+            previous_chunk_tail = chunk[-self.overlap :] if len(chunk) > self.overlap else chunk
 
     def _deduplicate_iocs(
         self,
-        new_iocs: Dict[str, List[str]],
-    ) -> Dict[str, List[str]]:
+        new_iocs: dict[str, list[str]],
+    ) -> dict[str, list[str]]:
         """
         Remove duplicate IOCs that have been seen before.
 
@@ -156,14 +149,14 @@ class StreamingIOCExtractor:
         Returns:
             Deduplicated IOCs
         """
-        result: Dict[str, List[str]] = deduplicate_iocs_with_state(new_iocs, self.seen_iocs)
+        result: dict[str, list[str]] = deduplicate_iocs_with_state(new_iocs, self.seen_iocs)
         return result
 
     def extract_from_file(
         self,
-        file_path: Union[str, Path],
+        file_path: str | Path,
         yield_chunks: bool = False,
-    ) -> Union[Dict[str, List[str]], Iterator[Dict[str, List[str]]]]:
+    ) -> dict[str, list[str]] | Iterator[dict[str, list[str]]]:
         """
         Extract IOCs from a file using streaming.
 
@@ -185,10 +178,10 @@ class StreamingIOCExtractor:
         # Reset seen IOCs for new file
         self.seen_iocs.clear()
 
-        all_iocs: Dict[str, List[str]] = defaultdict(list)
+        all_iocs: dict[str, list[str]] = defaultdict(list)
 
         try:
-            with file_path.open(encoding='utf-8', errors='ignore') as f:
+            with file_path.open(encoding="utf-8", errors="ignore") as f:
                 for chunk in self._read_chunks(f, is_text=True):
                     # Extract IOCs from chunk
                     chunk_iocs = self.extractor.extract_all(chunk)
@@ -214,9 +207,9 @@ class StreamingIOCExtractor:
 
     def extract_from_stream(
         self,
-        stream: Union[BinaryIO, TextIO],
+        stream: BinaryIO | TextIO,
         is_text: bool = True,
-    ) -> Iterator[Dict[str, List[str]]]:
+    ) -> Iterator[dict[str, list[str]]]:
         """
         Extract IOCs from a stream in real-time.
 
@@ -244,8 +237,8 @@ class StreamingIOCExtractor:
 
     def extract_from_mmap(
         self,
-        file_path: Union[str, Path],
-    ) -> Dict[str, List[str]]:
+        file_path: str | Path,
+    ) -> dict[str, list[str]]:
         """
         Extract IOCs using memory-mapped file for very large files.
 
@@ -267,38 +260,40 @@ class StreamingIOCExtractor:
 
         # Reset seen IOCs
         self.seen_iocs.clear()
-        all_iocs: Dict[str, List[str]] = defaultdict(list)
+        all_iocs: dict[str, list[str]] = defaultdict(list)
 
         try:
-            with file_path.open('rb') as f, \
-                 mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mmapped_file:
-                    file_size = len(mmapped_file)
-                    offset = 0
+            with (
+                file_path.open("rb") as f,
+                mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mmapped_file,
+            ):
+                file_size = len(mmapped_file)
+                offset = 0
 
-                    while offset < file_size:
-                        # Calculate chunk boundaries
-                        chunk_end = min(offset + self.chunk_size, file_size)
+                while offset < file_size:
+                    # Calculate chunk boundaries
+                    chunk_end = min(offset + self.chunk_size, file_size)
 
-                        # Read chunk
-                        chunk = self._decode_chunk(mmapped_file[offset:chunk_end])
+                    # Read chunk
+                    chunk = self._decode_chunk(mmapped_file[offset:chunk_end])
 
-                        # Add overlap from next chunk if not at end
-                        if chunk_end < file_size:
-                            overlap_end = min(chunk_end + self.overlap, file_size)
-                            chunk += self._decode_chunk(mmapped_file[chunk_end:overlap_end])
+                    # Add overlap from next chunk if not at end
+                    if chunk_end < file_size:
+                        overlap_end = min(chunk_end + self.overlap, file_size)
+                        chunk += self._decode_chunk(mmapped_file[chunk_end:overlap_end])
 
-                        # Extract and accumulate IOCs
-                        chunk_iocs = self.extractor.extract_all(chunk)
-                        unique_iocs = self._deduplicate_iocs(chunk_iocs)
-                        self._accumulate_iocs(all_iocs, unique_iocs)
+                    # Extract and accumulate IOCs
+                    chunk_iocs = self.extractor.extract_all(chunk)
+                    unique_iocs = self._deduplicate_iocs(chunk_iocs)
+                    self._accumulate_iocs(all_iocs, unique_iocs)
 
-                        # Progress callback
-                        if self.progress_callback:
-                            progress = int((chunk_end / file_size) * 100)
-                            self.progress_callback(progress)
+                    # Progress callback
+                    if self.progress_callback:
+                        progress = int((chunk_end / file_size) * 100)
+                        self.progress_callback(progress)
 
-                        # Move to next chunk
-                        offset = chunk_end
+                    # Move to next chunk
+                    offset = chunk_end
 
         except Exception:
             logger.exception("Error in memory-mapped extraction")
@@ -332,9 +327,9 @@ class ParallelStreamingExtractor:
 
     def extract_from_files(
         self,
-        file_paths: List[Union[str, Path]],
-        progress_callback: Optional[Callable[[int], None]] = None,
-    ) -> Dict[str, Dict[str, List[str]]]:
+        file_paths: list[str | Path],
+        progress_callback: Callable[[int], None] | None = None,
+    ) -> dict[str, dict[str, list[str]]]:
         """
         Extract IOCs from multiple files in parallel using streaming.
 
@@ -345,13 +340,13 @@ class ParallelStreamingExtractor:
         Returns:
             Dictionary mapping file paths to their extracted IOCs
         """
-        results: Dict[str, Dict[str, List[str]]] = {}
+        results: dict[str, dict[str, list[str]]] = {}
         total_files = len(file_paths)
         completed_files = 0
 
         def process_file(
-            file_path: Union[str, Path],
-        ) -> Tuple[str, Union[Dict[str, List[str]], Iterator[Dict[str, List[str]]]]]:
+            file_path: str | Path,
+        ) -> tuple[str, dict[str, list[str]] | Iterator[dict[str, list[str]]]]:
             """Process a single file."""
             extractor = StreamingIOCExtractor(
                 chunk_size=self.chunk_size,
@@ -362,8 +357,7 @@ class ParallelStreamingExtractor:
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             # Submit all tasks
             future_to_file = {
-                executor.submit(process_file, file_path): file_path
-                for file_path in file_paths
+                executor.submit(process_file, file_path): file_path for file_path in file_paths
             }
 
             # Process completed tasks
@@ -394,12 +388,12 @@ class ParallelStreamingExtractor:
 
 # Example usage and utility functions
 def extract_iocs_from_large_file(
-    file_path: Union[str, Path],
+    file_path: str | Path,
     chunk_size: int = 1024 * 1024,
     defang: bool = True,
     use_mmap: bool = False,
-    progress_callback: Optional[Callable[[int], None]] = None,
-) -> Dict[str, List[str]]:
+    progress_callback: Callable[[int], None] | None = None,
+) -> dict[str, list[str]]:
     """
     Convenience function to extract IOCs from a large file.
 
@@ -422,14 +416,14 @@ def extract_iocs_from_large_file(
     if use_mmap:
         return extractor.extract_from_mmap(file_path)
     result = extractor.extract_from_file(file_path, yield_chunks=False)
-    return cast("Dict[str, List[str]]", result)
+    return cast("dict[str, list[str]]", result)
 
 
 def stream_iocs_from_file(
-    file_path: Union[str, Path],
+    file_path: str | Path,
     chunk_size: int = 1024 * 1024,
     defang: bool = True,
-) -> Iterator[Dict[str, List[str]]]:
+) -> Iterator[dict[str, list[str]]]:
     """
     Stream IOCs from a file as they're found.
 
@@ -447,4 +441,4 @@ def stream_iocs_from_file(
     )
 
     result = extractor.extract_from_file(file_path, yield_chunks=True)
-    yield from cast("Iterator[Dict[str, List[str]]]", result)
+    yield from cast("Iterator[dict[str, list[str]]]", result)

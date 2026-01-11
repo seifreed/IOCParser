@@ -40,7 +40,7 @@ class FileParser(ABC):
         self.file_path = file_path
 
         # Verify the file exists if it's not a URL
-        if not file_path.startswith(('http://', 'https://')) and not Path(self.file_path).is_file():
+        if not file_path.startswith(("http://", "https://")) and not Path(self.file_path).is_file():
             raise FileExistenceError(self.file_path)
 
     @abstractmethod
@@ -107,17 +107,17 @@ class HTMLParser(FileParser):
 
         try:
             # Check if it's a URL or a local file
-            if self.file_path.startswith(('http://', 'https://')):
+            if self.file_path.startswith(("http://", "https://")):
                 response = requests.get(self.file_path, timeout=30)
                 response.raise_for_status()  # Ensure request was successful
                 content = response.text
             else:
-                with Path(self.file_path).open(encoding='utf-8', errors='ignore') as f:
+                with Path(self.file_path).open(encoding="utf-8", errors="ignore") as f:
                     content = f.read()
 
             # Check if the content looks like a URL instead of HTML
             content_starts_with_url = content.strip().startswith(
-                ('http://', 'https://', 'hxxp://', 'hxxps://'),
+                ("http://", "https://", "hxxp://", "hxxps://"),
             )
             is_short_content = len(content.strip().splitlines()) < MAX_URL_CONTENT_LINES
             if content_starts_with_url and is_short_content:
@@ -125,17 +125,17 @@ class HTMLParser(FileParser):
                 return content.strip()
 
             # Parse the HTML with BeautifulSoup
-            soup = BeautifulSoup(content, 'html.parser')
+            soup = BeautifulSoup(content, "html.parser")
 
             # Remove scripts and styles that we're not interested in
-            for tag in soup(['script', 'style', 'meta', 'noscript', 'head']):
+            for tag in soup(["script", "style", "meta", "noscript", "head"]):
                 tag.decompose()
 
             # Get the text
-            text = soup.get_text(separator=' ', strip=True)
+            text = soup.get_text(separator=" ", strip=True)
 
             # Clean multiple whitespaces and return
-            return re.sub(r'\s+', ' ', text)
+            return re.sub(r"\s+", " ", text)
 
         except requests.exceptions.RequestException as e:
             raise URLAccessError(str(e)) from e
@@ -145,9 +145,9 @@ class HTMLParser(FileParser):
 
 # Extension to parser mapping
 EXTENSION_PARSERS: dict[str, type[FileParser]] = {
-    '.pdf': PDFParser,
-    '.html': HTMLParser,
-    '.htm': HTMLParser,
+    ".pdf": PDFParser,
+    ".html": HTMLParser,
+    ".htm": HTMLParser,
 }
 
 
@@ -167,7 +167,7 @@ def get_parser(file_path: str) -> FileParser:
             return parser_class(file_path)
 
     # For URLs without recognized extension, default to HTML
-    if file_path.startswith(('http://', 'https://')):
+    if file_path.startswith(("http://", "https://")):
         return HTMLParser(file_path)
 
     raise UnsupportedFileTypeError(file_path)

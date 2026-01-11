@@ -125,6 +125,23 @@ select = [
 ]
 ignore = [
     "COM812",  # Conflicts with ruff formatter
+    "E501",    # Line too long (regex patterns)
+    "PLR0912", # Too many branches (complex validation logic)
+    "PLR0911", # Too many return statements
+    "PLR2004", # Magic value in comparison
+    "PGH003",  # Use specific rule codes with type: ignore
+    "PLC0415", # Import not at top level (used for lazy imports)
+    "SIM103",  # Return condition directly
+    "SIM102",  # Nested if statements (sometimes clearer for readability)
+    "TC001",   # Move import into type-checking block
+    "TC002",   # Move third-party import into type-checking block
+    "TC003",   # Move standard library import into type-checking block
+    "UP007",   # Use X | Y for type annotations (keep Union for compatibility)
+    "ARG002",  # Unused method argument
+    "TRY300",  # Consider moving to else block
+    "B019",    # lru_cache on methods (intentional for performance)
+    "B005",    # Using .strip() with multi-char strings (intentional)
+    "PERF401", # List comprehension (explicit loop is clearer for complex logic)
 ]
 
 [tool.ruff.lint.per-file-ignores]

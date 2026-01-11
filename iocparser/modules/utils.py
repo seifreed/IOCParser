@@ -6,12 +6,10 @@ Shared utilities for IOCParser modules.
 Author: Marc Rivero | @seifreed
 """
 
-from typing import Dict, List, Set, Union
-
 
 def deduplicate_iocs(
-    iocs: Dict[str, List[Union[str, Dict[str, str]]]],
-) -> Dict[str, List[Union[str, Dict[str, str]]]]:
+    iocs: dict[str, list[str | dict[str, str]]],
+) -> dict[str, list[str | dict[str, str]]]:
     """
     Remove duplicate IOCs while preserving order.
 
@@ -21,11 +19,11 @@ def deduplicate_iocs(
     Returns:
         Dictionary with deduplicated IOC lists
     """
-    deduplicated: Dict[str, List[Union[str, Dict[str, str]]]] = {}
+    deduplicated: dict[str, list[str | dict[str, str]]] = {}
 
     for ioc_type, ioc_list in iocs.items():
-        unique_items: List[Union[str, Dict[str, str]]] = []
-        seen_keys: Set[str] = set()
+        unique_items: list[str | dict[str, str]] = []
+        seen_keys: set[str] = set()
 
         for item in ioc_list:
             key = str(sorted(item.items())) if isinstance(item, dict) else str(item)
@@ -39,9 +37,9 @@ def deduplicate_iocs(
 
 
 def deduplicate_iocs_with_state(
-    new_iocs: Dict[str, List[str]],
-    seen_iocs: Dict[str, Set[str]],
-) -> Dict[str, List[str]]:
+    new_iocs: dict[str, list[str]],
+    seen_iocs: dict[str, set[str]],
+) -> dict[str, list[str]]:
     """
     Remove duplicate IOCs using external state tracking.
 
@@ -55,7 +53,7 @@ def deduplicate_iocs_with_state(
     Returns:
         Dictionary containing only the unique IOCs not seen before
     """
-    unique_iocs: Dict[str, List[str]] = {}
+    unique_iocs: dict[str, list[str]] = {}
 
     for ioc_type, ioc_list in new_iocs.items():
         unique = []

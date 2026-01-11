@@ -108,7 +108,7 @@ class DownloadError(NetworkError):
 NetworkDownloadError = DownloadError
 
 
-def UnexpectedDownloadError(url: str, reason: str) -> DownloadError:
+def UnexpectedDownloadError(url: str, reason: str) -> DownloadError:  # noqa: N802
     """Create a DownloadError with unexpected error type (for backward compatibility)."""
     return DownloadError(url, reason, error_type="unexpected")
 

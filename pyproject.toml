@@ -190,6 +190,8 @@ module = [
     "magic.*",
     "regex.*",
     "pdfminer.*",
+    "requests.*",
+    "bs4.*",
 ]
 ignore_missing_imports = true
 

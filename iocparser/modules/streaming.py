@@ -156,7 +156,8 @@ class StreamingIOCExtractor:
         Returns:
             Deduplicated IOCs
         """
-        return deduplicate_iocs_with_state(new_iocs, self.seen_iocs)
+        result: Dict[str, List[str]] = deduplicate_iocs_with_state(new_iocs, self.seen_iocs)
+        return result
 
     def extract_from_file(
         self,

@@ -44,6 +44,13 @@ from iocparser.modules.warninglists import MISPWarningLists
 if __name__ == "__main__":
     init(autoreset=True)
 
+# Colorama color constants (typed to avoid Any issues with strict mypy)
+COLOR_CYAN: str = str(Fore.CYAN)
+COLOR_RED: str = str(Fore.RED)
+COLOR_YELLOW: str = str(Fore.YELLOW)
+COLOR_GREEN: str = str(Fore.GREEN)
+STYLE_RESET: str = str(Style.RESET_ALL)
+
 # Constants
 VERSION = "1.0.1"
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
@@ -137,7 +144,7 @@ def validate_file_size(file_path: Path, max_size: int = MAX_FILE_SIZE) -> None:
 
 def banner() -> None:
     """Display the tool banner."""
-    print(f"""{Fore.CYAN}
+    print(f"""{COLOR_CYAN}
 ╔═══════════════════════════════════════════════╗
 ║                                               ║
 ║              IOC Parser v{VERSION}                ║
@@ -147,7 +154,7 @@ def banner() -> None:
 ║       Author: Marc Rivero | @seifreed         ║
 ║                                               ║
 ╚═══════════════════════════════════════════════╝
-{Style.RESET_ALL}""")
+{STYLE_RESET}""")
 
 
 def detect_file_type_by_mime(file_type: str) -> str | None:
@@ -362,13 +369,12 @@ def print_warning_lists(warnings: dict[str, list[dict[str, str]]]) -> None:
     logger.warning("IOCs found that might be false positives according to MISP warning lists:")
 
     for ioc_type, type_warnings in warnings.items():
-        print(f"\n{Fore.YELLOW}IOCs of type {ioc_type} with warnings:{Style.RESET_ALL}")
+        print(f"\n{COLOR_YELLOW}IOCs of type {ioc_type} with warnings:{STYLE_RESET}")
         for warning in type_warnings:
             print(
-                f"  {Fore.RED}- {warning['value']} - "
-                f"List: {warning['warning_list']}{Style.RESET_ALL}",
+                f"  {COLOR_RED}- {warning['value']} - List: {warning['warning_list']}{STYLE_RESET}",
             )
-            print(f"    {Fore.YELLOW}Description: {warning['description']}{Style.RESET_ALL}")
+            print(f"    {COLOR_YELLOW}Description: {warning['description']}{STYLE_RESET}")
 
 
 def process_file(
@@ -568,7 +574,7 @@ def handle_misp_init() -> None:
         categories[category].append(list_id)
 
     for category, lists in sorted(categories.items()):
-        print(f"{Fore.CYAN}  {category.capitalize()}: {len(lists)} lists{Style.RESET_ALL}")
+        print(f"{COLOR_CYAN}  {category.capitalize()}: {len(lists)} lists{STYLE_RESET}")
 
 
 def process_multiple_files_input(
@@ -684,7 +690,7 @@ def display_results(
 
     for ioc_type, ioc_list in normal_iocs.items():
         if ioc_list:
-            print(f"    {Fore.CYAN}- {ioc_type}: {len(ioc_list)}{Style.RESET_ALL}")
+            print(f"    {COLOR_CYAN}- {ioc_type}: {len(ioc_list)}{STYLE_RESET}")
 
     if warning_iocs:
         print_warning_lists(warning_iocs)

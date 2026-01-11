@@ -124,7 +124,7 @@ select = [
     "TID",  # flake8-tidy-imports
 ]
 ignore = [
-    # NO IGNORES - TRUE 100% COMPLIANCE
+    "COM812",  # Conflicts with ruff formatter
 ]
 
 [tool.ruff.lint.per-file-ignores]

@@ -47,7 +47,7 @@ if __name__ == "__main__":
 # Constants
 VERSION = "1.0.1"
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
-MAX_URL_SIZE = 50 * 1024 * 1024    # 50MB for URLs
+MAX_URL_SIZE = 50 * 1024 * 1024  # 50MB for URLs
 REQUEST_TIMEOUT = 30  # seconds
 MAX_WORKERS = 4  # for parallel processing
 MAX_FILENAME_LENGTH = 50  # Maximum filename length
@@ -109,10 +109,10 @@ class ProcessingOptions:
     def from_args(cls, args: argparse.Namespace) -> "ProcessingOptions":
         """Create ProcessingOptions from command line arguments."""
         return cls(
-            file_type=get_optional_str_arg(args, 'type'),
-            defang=not get_bool_arg(args, 'no_defang'),
-            check_warnings=not get_bool_arg(args, 'no_check_warnings'),
-            force_update=get_bool_arg(args, 'force_update'),
+            file_type=get_optional_str_arg(args, "type"),
+            defang=not get_bool_arg(args, "no_defang"),
+            check_warnings=not get_bool_arg(args, "no_check_warnings"),
+            force_update=get_bool_arg(args, "force_update"),
         )
 
 
@@ -166,17 +166,17 @@ def detect_file_type_by_extension(file_path: Path) -> str:
     """Detect file type from file extension."""
     ext = file_path.suffix.lower()
     extension_map = {
-        '.pdf': 'pdf',
-        '.html': 'html',
-        '.htm': 'html',
-        '.xml': 'html',
-        '.txt': 'text',
-        '.log': 'text',
-        '.md': 'text',
-        '.csv': 'text',
-        '.json': 'text',
+        ".pdf": "pdf",
+        ".html": "html",
+        ".htm": "html",
+        ".xml": "html",
+        ".txt": "text",
+        ".log": "text",
+        ".md": "text",
+        ".csv": "text",
+        ".json": "text",
     }
-    return extension_map.get(ext, 'text')
+    return extension_map.get(ext, "text")
 
 
 def detect_file_type(file_path: Path) -> str:
@@ -204,7 +204,7 @@ def detect_file_type(file_path: Path) -> str:
         # Special case for text/plain with HTML-like extensions
         if "text/plain" in file_type.lower():
             ext = file_path.suffix.lower()
-            if ext in ['.html', '.htm', '.xml']:
+            if ext in [".html", ".htm", ".xml"]:
                 return "html"
     except Exception as e:
         logger.warning(f"Error detecting file type: {e!s}, falling back to extension")
@@ -220,6 +220,7 @@ def _validate_url(url: str) -> ParseResult:
         raise InvalidURLError(url)
     return parsed_url
 
+
 def _check_content_size(content_length: str | None) -> None:
     """Check if content size exceeds limit."""
     if content_length and int(content_length) > MAX_URL_SIZE:
@@ -229,23 +230,27 @@ def _check_content_size(content_length: str | None) -> None:
             "URL content",
         )
 
+
 def _generate_temp_filename(parsed_url: ParseResult, content_type: str) -> str:
     """Generate filename with appropriate extension."""
-    file_name = Path(parsed_url.path).name or parsed_url.netloc.replace('.', '_')
+    file_name = Path(parsed_url.path).name or parsed_url.netloc.replace(".", "_")
 
-    if 'application/pdf' in content_type and not file_name.endswith('.pdf'):
-        file_name += '.pdf'
-    elif 'text/html' in content_type and not file_name.endswith(('.html', '.htm')):
-        file_name += '.html'
+    if "application/pdf" in content_type and not file_name.endswith(".pdf"):
+        file_name += ".pdf"
+    elif "text/html" in content_type and not file_name.endswith((".html", ".htm")):
+        file_name += ".html"
 
     return file_name
 
+
 def _download_with_size_check(
-    response: requests.Response, temp_file: Path, max_size: int,
+    response: requests.Response,
+    temp_file: Path,
+    max_size: int,
 ) -> int:
     """Download content with size checking."""
     downloaded_size = 0
-    with temp_file.open('wb') as f:
+    with temp_file.open("wb") as f:
         for chunk in response.iter_content(chunk_size=8192):
             if chunk:
                 downloaded_size += len(chunk)
@@ -255,6 +260,7 @@ def _download_with_size_check(
                     raise DownloadSizeError(max_size / 1024 / 1024)
                 f.write(chunk)
     return downloaded_size
+
 
 def download_url_to_temp(url: str, timeout: int = REQUEST_TIMEOUT) -> Path:
     """
@@ -282,14 +288,14 @@ def download_url_to_temp(url: str, timeout: int = REQUEST_TIMEOUT) -> Path:
         response.raise_for_status()
 
         # Check content size
-        _check_content_size(response.headers.get('Content-Length'))
+        _check_content_size(response.headers.get("Content-Length"))
 
         # Create temporary directory
-        temp_dir = Path(__file__).parent.parent / 'temp'
+        temp_dir = Path(__file__).parent.parent / "temp"
         temp_dir.mkdir(exist_ok=True)
 
         # Generate filename
-        content_type = response.headers.get('Content-Type', '').lower()
+        content_type = response.headers.get("Content-Type", "").lower()
         file_name = _generate_temp_filename(parsed_url, content_type)
         temp_file = temp_dir / file_name
 
@@ -322,15 +328,15 @@ def get_output_filename(input_source: str, is_json: bool = False) -> str:
     """
     base_name: str
     # Handle URLs
-    if input_source.startswith(('http://', 'https://')):
+    if input_source.startswith(("http://", "https://")):
         url_parts = urlparse(input_source)
         base_name = url_parts.netloc
-        if url_parts.path and url_parts.path != '/':
-            path_parts = url_parts.path.strip('/').split('/')
+        if url_parts.path and url_parts.path != "/":
+            path_parts = url_parts.path.strip("/").split("/")
             if path_parts[-1]:
-                base_name += '_' + path_parts[-1]
+                base_name += "_" + path_parts[-1]
         # Clean invalid filename characters
-        base_name = re.sub(r'[^\w\-\.]', '_', base_name)
+        base_name = re.sub(r"[^\w\-\.]", "_", base_name)
     else:
         # Handle files
         base_name = Path(input_source).stem
@@ -339,7 +345,7 @@ def get_output_filename(input_source: str, is_json: bool = False) -> str:
     if len(base_name) > MAX_FILENAME_LENGTH:
         base_name = base_name[:MAX_FILENAME_LENGTH]
 
-    extension = '.json' if is_json else '.txt'
+    extension = ".json" if is_json else ".txt"
     return f"{base_name}_iocs{extension}"
 
 
@@ -408,7 +414,7 @@ def process_file(
             text_content = html_parser.extract_text()
         else:
             # Plain text file
-            with file_path.open(encoding='utf-8', errors='ignore') as f:
+            with file_path.open(encoding="utf-8", errors="ignore") as f:
                 text_content = f.read()
             logger.debug(f"Read {len(text_content)} characters from text file")
 
@@ -416,9 +422,7 @@ def process_file(
         extractor = IOCExtractor(defang=defang)
         raw_iocs: dict[str, list[str]] = extractor.extract_all(text_content)
         # Convert to Union type for compatibility with warning list processing
-        iocs: dict[str, list[str | dict[str, str]]] = {
-            k: list(v) for k, v in raw_iocs.items()
-        }
+        iocs: dict[str, list[str | dict[str, str]]] = {k: list(v) for k, v in raw_iocs.items()}
 
         # Check against warning lists
         if check_warnings:
@@ -489,7 +493,8 @@ def process_multiple_files(
             except Exception:
                 logger.exception(f"Failed to process {file_path}")
                 empty_result: tuple[
-                    dict[str, list[str | dict[str, str]]], dict[str, list[dict[str, str]]],
+                    dict[str, list[str | dict[str, str]]],
+                    dict[str, list[dict[str, str]]],
                 ] = ({}, {})
                 results[str(file_path)] = empty_result
 
@@ -506,35 +511,38 @@ def create_argument_parser() -> argparse.ArgumentParser:
     input_group = parser.add_mutually_exclusive_group()
     input_group.add_argument("-f", "--file", help="Path to the file to analyze")
     input_group.add_argument("-u", "--url", help="URL of the report to analyze")
-    input_group.add_argument("-m", "--multiple", nargs='+', help="Multiple files to analyze")
+    input_group.add_argument("-m", "--multiple", nargs="+", help="Multiple files to analyze")
     input_group.add_argument("url_direct", nargs="?", help="Direct URL as positional argument")
 
     parser.add_argument("-o", "--output", help="Output file path (use - for stdout)")
-    parser.add_argument("-t", "--type", choices=["pdf", "html", "text"],
-                      help="Force specific file type")
+    parser.add_argument(
+        "-t", "--type", choices=["pdf", "html", "text"], help="Force specific file type"
+    )
     parser.add_argument("--json", action="store_true", help="Output in JSON format")
     parser.add_argument("--no-defang", action="store_true", help="Disable automatic defanging")
-    parser.add_argument("--no-check-warnings", action="store_true",
-                      help="Don't check against MISP warning lists")
-    parser.add_argument("--force-update", action="store_true",
-                      help="Force update of MISP warning lists")
-    parser.add_argument("--init", action="store_true",
-                      help="Initialize MISP warning lists")
+    parser.add_argument(
+        "--no-check-warnings", action="store_true", help="Don't check against MISP warning lists"
+    )
+    parser.add_argument(
+        "--force-update", action="store_true", help="Force update of MISP warning lists"
+    )
+    parser.add_argument("--init", action="store_true", help="Initialize MISP warning lists")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
     parser.add_argument("--debug", action="store_true", help="Enable debug output")
     parser.add_argument("--log-file", help="Path to log file")
     parser.add_argument("--version", action="version", version=f"IOCParser v{VERSION}")
-    parser.add_argument("--parallel", type=int, default=1,
-                      help="Number of parallel workers for multiple files")
+    parser.add_argument(
+        "--parallel", type=int, default=1, help="Number of parallel workers for multiple files"
+    )
 
     return parser
 
 
 def setup_application(args: argparse.Namespace) -> None:
     """Set up logging and display banner."""
-    debug = get_bool_arg(args, 'debug')
-    verbose = get_bool_arg(args, 'verbose')
-    log_file_path = get_optional_str_arg(args, 'log_file')
+    debug = get_bool_arg(args, "debug")
+    verbose = get_bool_arg(args, "verbose")
+    log_file_path = get_optional_str_arg(args, "log_file")
 
     log_level = logging.DEBUG if debug else (logging.INFO if verbose else logging.WARNING)
     log_file = Path(log_file_path) if log_file_path else None
@@ -554,9 +562,7 @@ def handle_misp_init() -> None:
     # Show available list categories
     categories: dict[str, list[str]] = {}
     for list_id, wlist in warning_lists.warning_lists.items():
-        category = (
-            str(wlist.get('name', '')).split(' ')[0].lower() if 'name' in wlist else 'other'
-        )
+        category = str(wlist.get("name", "")).split(" ")[0].lower() if "name" in wlist else "other"
         if category not in categories:
             categories[category] = []
         categories[category].append(list_id)
@@ -569,7 +575,7 @@ def process_multiple_files_input(
     args: argparse.Namespace,
 ) -> tuple[dict[str, list[str | dict[str, str]]], dict[str, list[dict[str, str]]], str]:
     """Process multiple files input."""
-    multiple_files = get_list_arg(args, 'multiple')
+    multiple_files = get_list_arg(args, "multiple")
     file_paths = [Path(f) for f in multiple_files]
 
     # Validate all files exist
@@ -578,7 +584,7 @@ def process_multiple_files_input(
             logger.error(f"File not found: {file_path}")
             sys.exit(1)
 
-    parallel_workers = get_int_arg(args, 'parallel', default=1)
+    parallel_workers = get_int_arg(args, "parallel", default=1)
     logger.info(f"Processing {len(file_paths)} files with {parallel_workers} workers")
 
     opts = ProcessingOptions.from_args(args)
@@ -616,9 +622,9 @@ def process_single_input(
     args: argparse.Namespace,
 ) -> tuple[dict[str, list[str | dict[str, str]]], dict[str, list[dict[str, str]]], str]:
     """Process single file or URL input."""
-    file_arg = get_optional_str_arg(args, 'file')
-    url_arg = get_optional_str_arg(args, 'url')
-    url_direct_arg = get_optional_str_arg(args, 'url_direct')
+    file_arg = get_optional_str_arg(args, "file")
+    url_arg = get_optional_str_arg(args, "url")
+    url_direct_arg = get_optional_str_arg(args, "url_direct")
 
     if file_arg:
         input_source = Path(file_arg)
@@ -658,7 +664,7 @@ def process_single_input(
         sys.exit(1)
     finally:
         # Clean up temporary file if from URL
-        if is_from_url and input_source.exists() and 'temp' in str(input_source):
+        if is_from_url and input_source.exists() and "temp" in str(input_source):
             try:
                 input_source.unlink()
                 logger.debug("Temporary file deleted")
@@ -693,8 +699,8 @@ def save_output(
     input_display: str,
 ) -> None:
     """Format and save output."""
-    use_json = get_bool_arg(args, 'json')
-    output_path = get_optional_str_arg(args, 'output')
+    use_json = get_bool_arg(args, "json")
+    output_path = get_optional_str_arg(args, "output")
 
     formatter: JSONFormatter | TextFormatter
     if use_json:
@@ -725,10 +731,10 @@ def save_output(
 def has_input_args(args: argparse.Namespace) -> bool:
     """Check if any input arguments are provided."""
     return bool(
-        get_optional_str_arg(args, 'file')
-        or get_optional_str_arg(args, 'url')
-        or get_optional_str_arg(args, 'url_direct')
-        or get_list_arg(args, 'multiple'),
+        get_optional_str_arg(args, "file")
+        or get_optional_str_arg(args, "url")
+        or get_optional_str_arg(args, "url_direct")
+        or get_list_arg(args, "multiple"),
     )
 
 
@@ -741,7 +747,7 @@ def main() -> None:
         setup_application(args)
 
         # Handle initialization or force update request
-        if get_bool_arg(args, 'init') or get_bool_arg(args, 'force_update'):
+        if get_bool_arg(args, "init") or get_bool_arg(args, "force_update"):
             handle_misp_init()
             return
 
@@ -752,7 +758,7 @@ def main() -> None:
             sys.exit(1)
 
         # Process input based on type
-        if get_list_arg(args, 'multiple'):
+        if get_list_arg(args, "multiple"):
             normal_iocs, warning_iocs, input_display = process_multiple_files_input(args)
         else:
             normal_iocs, warning_iocs, input_display = process_single_input(args)

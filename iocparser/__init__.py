@@ -18,17 +18,18 @@ from iocparser.modules.warninglists import MISPWarningLists
 
 # Export main functionality for library use
 __all__ = [
-    'HTMLParser',
-    'IOCExtractor',
-    'JSONFormatter',
-    'MISPWarningLists',
-    'PDFParser',
-    'TextFormatter',
-    'detect_file_type',
-    'extract_iocs_from_file',
-    'extract_iocs_from_text',
-    'get_output_filename',
+    "HTMLParser",
+    "IOCExtractor",
+    "JSONFormatter",
+    "MISPWarningLists",
+    "PDFParser",
+    "TextFormatter",
+    "detect_file_type",
+    "extract_iocs_from_file",
+    "extract_iocs_from_text",
+    "get_output_filename",
 ]
+
 
 def extract_iocs_from_file(
     file_path: str | Path,
@@ -68,11 +69,12 @@ def extract_iocs_from_file(
         text_content = parser_html.extract_text()
     else:  # text or unknown format
         # For plain text files, simply read the content
-        with file_pathobj.open(encoding='utf-8', errors='ignore') as f:
+        with file_pathobj.open(encoding="utf-8", errors="ignore") as f:
             text_content = f.read()
 
     # Process the text content
     return extract_iocs_from_text(text_content, check_warnings, force_update, defang)
+
 
 def extract_iocs_from_text(
     text_content: str,

@@ -35,12 +35,13 @@ dependencies = [
     "colorama>=0.4.6",
     "python-magic>=0.4.27",
     "requests>=2.32.5",
+    "urllib3>=2.6.3",
     "tqdm>=4.67.1",
     "pdfplumber>=0.11.9",
     "beautifulsoup4>=4.14.3",
     "lxml>=6.0.2",
     "regex>=2025.11.3",
-    "pdfminer.six==20251230",
+    "pdfminer.six>=20251230",
 ]
 
 [project.optional-dependencies]

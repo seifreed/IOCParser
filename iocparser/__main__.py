@@ -817,7 +817,7 @@ def has_input_args(args: argparse.Namespace) -> bool:
     )
 
 
-def main() -> None:
+if __name__ == "__main__":
     """Main function."""
     try:
         parser = create_argument_parser()
@@ -894,7 +894,3 @@ def main() -> None:
     except Exception as e:
         logger.error(f"Unexpected error: {e!s}", exc_info=True)
         sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()

@@ -471,6 +471,11 @@ class TestGetOutputFilename:
         result = get_output_filename("data.txt", is_json=True)
         assert result == "data_iocs.json"
 
+    def test_get_output_filename_stix_format(self) -> None:
+        """Test output filename generation with STIX format."""
+        result = get_output_filename("data.txt", output_format="stix")
+        assert result == "data_iocs.stix.json"
+
     def test_get_output_filename_url(self) -> None:
         """Test output filename generation from URL."""
         result = get_output_filename("https://example.com/report.pdf")

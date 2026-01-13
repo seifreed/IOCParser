@@ -16,7 +16,7 @@ def read_requirements():
 
 setup(
     name="iocparser-tool",
-    version="1.0.1",
+    version="5.0.0",
     author="Marc Rivero",
     author_email="",
     description="A tool for extracting Indicators of Compromise from security reports",

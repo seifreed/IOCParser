@@ -17,7 +17,7 @@ from typing import Dict, List, Union
 
 import pytest
 
-from iocparser.modules.output_formatter import JSONFormatter, TextFormatter
+from iocparser.modules.output_formatter import JSONFormatter, STIXFormatter, TextFormatter
 
 
 class TestJSONFormatter:
@@ -982,11 +982,53 @@ class TestFormatterIntegration:
             loaded_content = output_file.read_text(encoding='utf-8')
 
             # Assert
-            assert '# Indicators of Compromise' in loaded_content
-            assert '## Domains' in loaded_content
-            assert 'example.com' in loaded_content
-            assert '## Vulnerabilities (CVEs)' in loaded_content
-            assert 'CVE-2021-1234' in loaded_content
+        assert '# Indicators of Compromise' in loaded_content
+        assert '## Domains' in loaded_content
+        assert 'example.com' in loaded_content
+        assert '## Vulnerabilities (CVEs)' in loaded_content
+        assert 'CVE-2021-1234' in loaded_content
+
+
+class TestSTIXFormatter:
+    """Tests for STIXFormatter output."""
+
+    def test_stix_bundle_contains_indicators(self) -> None:
+        """STIX formatter should produce a bundle with refanged indicators."""
+        data: Dict[str, List[Union[str, Dict[str, str]]]] = {
+            "domains": ["example[.]com"],
+            "md5": [{"type": "md5", "value": "5f4dcc3b5aa765d61d8327deb882cf99"}],
+            "urls": ["hxxp://malicious.example[.]com/path"],
+        }
+        warning_iocs: Dict[str, List[Dict[str, str]]] = {
+            "domains": [
+                {"value": "benign[.]com", "warning_list": "majestic", "description": "top sites"},
+            ],
+        }
+
+        formatter = STIXFormatter(data, warning_iocs=warning_iocs, source="unit-test")
+
+        result = formatter.format()
+        parsed = json.loads(result)
+
+        assert parsed["type"] == "bundle"
+        indicators = [obj for obj in parsed.get("objects", []) if obj.get("type") == "indicator"]
+        assert indicators
+
+        patterns = {obj["pattern"] for obj in indicators}
+        labels_sets = {tuple(obj.get("labels", [])) for obj in indicators}
+        indicator_types_sets = {tuple(obj.get("indicator_types", [])) for obj in indicators}
+
+        assert "[domain-name:value = 'example.com']" in patterns
+        assert "[url:value = 'http://malicious.example.com/path']" in patterns
+        assert labels_sets == {()}  # labels omitted for strictness
+        assert indicator_types_sets == {("unknown",)}
+
+        warning_indicator = next(
+            (obj for obj in indicators if obj.get("pattern") == "[domain-name:value = 'benign.com']"),
+            None,
+        )
+        if warning_indicator:
+            assert warning_indicator.get("x_warning_list") == "majestic"
 
 
 if __name__ == "__main__":

@@ -145,6 +145,14 @@ class MISPWarningLists:
         # OPTIMIZATION: Pre-process lists for faster lookups
         self._preprocess_lists()
 
+    def _reset_cache_files(self) -> None:
+        """Remove cache files when they are corrupted."""
+        for cache_path in (self.cache_file, self.cache_metadata_file):
+            try:
+                cache_path.unlink(missing_ok=True)
+            except Exception as cleanup_error:
+                logger.debug(f"Could not remove cache file {cache_path}: {cleanup_error}")
+
     def _load_or_update_lists(self) -> None:
         """Load lists from cache or update them if necessary"""
         # Check if cache exists and its age
@@ -168,8 +176,12 @@ class MISPWarningLists:
                         self.warning_lists = cast("dict[str, WarningListDict]", loaded_data)
                     logger.info(f"Loaded {len(self.warning_lists)} MISP warning lists from cache")
                     return
+            except json.JSONDecodeError as e:
+                logger.warning(f"Cache is corrupted (JSON decode error): {e}. Resetting cache.")
+                self._reset_cache_files()
             except Exception as e:
                 logger.warning(f"Failed to load cache: {e!s}")
+                self._reset_cache_files()
 
         # If we get here, we need to update the lists
         self._update_warning_lists()

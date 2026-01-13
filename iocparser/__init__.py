@@ -7,13 +7,13 @@ Author: Marc Rivero | @seifreed
 from pathlib import Path
 from typing import cast
 
-__version__ = "1.0.1"
+__version__ = "5.0.0"
 
 from iocparser.main import detect_file_type, get_output_filename
 from iocparser.modules.exceptions import FileExistenceError
 from iocparser.modules.extractor import IOCExtractor
 from iocparser.modules.file_parser import HTMLParser, PDFParser
-from iocparser.modules.output_formatter import JSONFormatter, TextFormatter
+from iocparser.modules.output_formatter import JSONFormatter, STIXFormatter, TextFormatter
 from iocparser.modules.warninglists import MISPWarningLists
 
 # Export main functionality for library use
@@ -21,6 +21,7 @@ __all__ = [
     "HTMLParser",
     "IOCExtractor",
     "JSONFormatter",
+    "STIXFormatter",
     "MISPWarningLists",
     "PDFParser",
     "TextFormatter",

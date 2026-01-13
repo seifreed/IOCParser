@@ -8,3 +8,4 @@ beautifulsoup4>=4.14.3
 lxml>=6.0.2
 regex>=2025.11.3
 pdfminer.six>=20251230
+stix2>=3.0.1

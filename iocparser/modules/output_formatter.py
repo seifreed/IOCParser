@@ -8,8 +8,13 @@ Author: Marc Rivero | @seifreed
 
 import json
 from abc import ABC, abstractmethod
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import ClassVar, Union
+from typing import Callable, ClassVar, Iterable, Union
+
+from stix2 import Bundle, Indicator
+
+from iocparser.modules.warninglists import MISPWarningLists
 
 # Type aliases for complex return types
 JSONValue = Union[list[str | dict[str, str]], dict[str, list[dict[str, str]]], list[str]]
@@ -254,3 +259,135 @@ class TextFormatter(OutputFormatter):
                 f.write(self.format())
         except Exception as e:
             print(f"Error saving text file: {e!s}")
+
+
+class STIXFormatter(OutputFormatter):
+    """Format IOCs as a STIX 2.1 bundle of Indicators."""
+
+    # Mapping of IOC type to pattern builder
+    PATTERN_BUILDERS: ClassVar[dict[str, Callable[[str], str | None]]] = {}
+
+    def __init__(
+        self,
+        data: dict[str, list[str | dict[str, str]]],
+        warning_iocs: dict[str, list[dict[str, str]]] | None = None,
+        source: str | None = None,
+    ) -> None:
+        super().__init__(data, warning_iocs)
+        self.source = source or "iocparser"
+        self.now = datetime.now(timezone.utc)
+
+        if not self.PATTERN_BUILDERS:
+            self._init_pattern_builders()
+
+    @staticmethod
+    def _init_pattern_builders() -> None:
+        """Initialize mapping of IOC types to STIX pattern builders."""
+
+        def _escape(value: str) -> str:
+            return value.replace("\\", "\\\\").replace("'", "\\'")
+
+        def _refang(value: str) -> str:
+            cleaned = value
+            for search, replacement in MISPWarningLists.DEFANG_CLEANERS:
+                cleaned = cleaned.replace(search, replacement)
+            return cleaned
+
+        def _builder(pattern: str) -> Callable[[str], str]:
+            return lambda v: pattern.format(value=_escape(_refang(v)))
+
+        STIXFormatter.PATTERN_BUILDERS = {
+            "domains": _builder("[domain-name:value = '{value}']"),
+            "hosts": _builder("[domain-name:value = '{value}']"),
+            "ips": _builder("[ipv4-addr:value = '{value}']"),
+            "ipv6": _builder("[ipv6-addr:value = '{value}']"),
+            "urls": _builder("[url:value = '{value}']"),
+            "emails": _builder("[email-addr:value = '{value}']"),
+            "md5": _builder("[file:hashes.'MD5' = '{value}']"),
+            "sha1": _builder("[file:hashes.'SHA-1' = '{value}']"),
+            "sha256": _builder("[file:hashes.'SHA-256' = '{value}']"),
+            "sha512": _builder("[file:hashes.'SHA-512' = '{value}']"),
+            "filenames": _builder("[file:name = '{value}']"),
+            "filepaths": _builder("[file:path = '{value}']"),
+            "cves": _builder("[vulnerability:name = '{value}']"),
+        }
+
+    def _iter_iocs(self) -> Iterable[tuple[str, str, bool, dict[str, str] | None]]:
+        """Yield IOC entries with their type and warning status."""
+        for ioc_type, values in self.data.items():
+            for value in values:
+                if isinstance(value, dict):
+                    val = value.get("value")
+                else:
+                    val = str(value)
+                if val:
+                    yield ioc_type, val, False, None
+
+        for ioc_type, warnings in self.warning_iocs.items():
+            for warning in warnings:
+                val = warning.get("value")
+                if val:
+                    yield ioc_type, val, True, warning
+
+    def _build_indicator(
+        self,
+        ioc_type: str,
+        value: str,
+        is_warning: bool,
+        warning_info: dict[str, str] | None,
+    ) -> Indicator | None:
+        """Create a STIX Indicator for a given IOC."""
+        builder = self.PATTERN_BUILDERS.get(ioc_type)
+        if not builder:
+            return None
+
+        pattern = builder(value)
+        if not pattern:
+            return None
+
+        labels = ["indicator"]  # minimal, non-inferred label required by STIX
+        description = None
+        indicator_types = ["unknown"]
+
+        custom_props: dict[str, str] = {}
+
+        if is_warning:
+            if warning_info:
+                wl_name = warning_info.get("warning_list")
+                wl_desc = warning_info.get("description", "")
+                custom_props["x_warning_list"] = wl_name or ""
+                if wl_desc:
+                    custom_props["x_warning_description"] = wl_desc
+
+        return Indicator(
+            name=f"{ioc_type} indicator",
+            pattern=pattern,
+            pattern_type="stix",
+            pattern_version="2.1",
+            valid_from=self.now,
+            labels=[],
+            description=description,
+            indicator_types=indicator_types,
+            allow_custom=True,
+            **custom_props,
+        )
+
+    def format(self) -> str:
+        """Format the data as a STIX 2.1 bundle."""
+        indicators = []
+        seen_patterns: set[str] = set()
+
+        for ioc_type, value, is_warning, warning_info in self._iter_iocs():
+            indicator = self._build_indicator(ioc_type, value, is_warning, warning_info)
+            if indicator and indicator.pattern not in seen_patterns:
+                indicators.append(indicator)
+                seen_patterns.add(indicator.pattern)
+
+        bundle = Bundle(objects=indicators, allow_custom=True)
+        return bundle.serialize(pretty=True)
+
+    def save(self, output_file: str) -> None:
+        """Save the STIX bundle to a file."""
+        self._ensure_directory(output_file)
+        with Path(output_file).open("w", encoding="utf-8") as f:
+            f.write(self.format())

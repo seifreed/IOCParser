@@ -4,7 +4,7 @@
 IOCParser - A tool for extracting Indicators of Compromise from security reports
 
 Author: Marc Rivero | @seifreed
-Version: 1.0.1
+Version: 5.0.0
 """
 
 import argparse
@@ -36,7 +36,7 @@ from iocparser.modules.exceptions import (
 from iocparser.modules.extractor import IOCExtractor
 from iocparser.modules.file_parser import HTMLParser, PDFParser
 from iocparser.modules.logger import get_logger, setup_logger
-from iocparser.modules.output_formatter import JSONFormatter, TextFormatter
+from iocparser.modules.output_formatter import JSONFormatter, STIXFormatter, TextFormatter
 from iocparser.modules.utils import deduplicate_iocs
 from iocparser.modules.warninglists import MISPWarningLists
 
@@ -52,7 +52,7 @@ COLOR_GREEN: str = str(Fore.GREEN)
 STYLE_RESET: str = str(Style.RESET_ALL)
 
 # Constants
-VERSION = "1.0.1"
+VERSION = "5.0.0"
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
 MAX_URL_SIZE = 50 * 1024 * 1024  # 50MB for URLs
 REQUEST_TIMEOUT = 30  # seconds
@@ -322,13 +322,18 @@ def download_url_to_temp(url: str, timeout: int = REQUEST_TIMEOUT) -> Path:
         return temp_file
 
 
-def get_output_filename(input_source: str, is_json: bool = False) -> str:
+def get_output_filename(
+    input_source: str,
+    is_json: bool = False,
+    output_format: str | None = None,
+) -> str:
     """
     Generate an output filename based on the input name.
 
     Args:
         input_source: The input file or URL
         is_json: If True, use .json extension, else .txt
+        output_format: Explicit output format (text, json, stix)
 
     Returns:
         Output filename
@@ -352,7 +357,13 @@ def get_output_filename(input_source: str, is_json: bool = False) -> str:
     if len(base_name) > MAX_FILENAME_LENGTH:
         base_name = base_name[:MAX_FILENAME_LENGTH]
 
-    extension = ".json" if is_json else ".txt"
+    chosen_format = output_format if output_format else ("json" if is_json else "text")
+    if chosen_format == "stix":
+        extension = ".stix.json"
+    elif chosen_format == "json":
+        extension = ".json"
+    else:
+        extension = ".txt"
     return f"{base_name}_iocs{extension}"
 
 
@@ -524,7 +535,9 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-t", "--type", choices=["pdf", "html", "text"], help="Force specific file type"
     )
-    parser.add_argument("--json", action="store_true", help="Output in JSON format")
+    output_group = parser.add_mutually_exclusive_group()
+    output_group.add_argument("--json", action="store_true", help="Output in JSON format")
+    output_group.add_argument("--stix", action="store_true", help="Output in STIX 2.1 format")
     parser.add_argument("--no-defang", action="store_true", help="Disable automatic defanging")
     parser.add_argument(
         "--no-check-warnings", action="store_true", help="Don't check against MISP warning lists"
@@ -706,10 +719,15 @@ def save_output(
 ) -> None:
     """Format and save output."""
     use_json = get_bool_arg(args, "json")
+    use_stix = get_bool_arg(args, "stix")
     output_path = get_optional_str_arg(args, "output")
 
-    formatter: JSONFormatter | TextFormatter
-    if use_json:
+    formatter: JSONFormatter | TextFormatter | STIXFormatter
+    output_format: str
+    if use_stix:
+        formatter = STIXFormatter(normal_iocs, warning_iocs=warning_iocs, source=input_display)
+        output_format = "STIX 2.1"
+    elif use_json:
         formatter = JSONFormatter(normal_iocs, warning_iocs=warning_iocs)
         output_format = "JSON"
     else:
@@ -729,7 +747,12 @@ def save_output(
     else:
         # Auto-save with generated filename
         print(formatted_output)
-        output_filename = get_output_filename(input_display, is_json=use_json)
+        chosen_format = "stix" if use_stix else ("json" if use_json else "text")
+        output_filename = get_output_filename(
+            input_display,
+            is_json=use_json,
+            output_format=chosen_format,
+        )
         formatter.save(output_filename)
         logger.info(f"Results saved to {output_filename}")
 

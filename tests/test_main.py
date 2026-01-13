@@ -829,6 +829,14 @@ class TestArgumentParser:
 
         assert args.parallel == 8
 
+    def test_parser_persist_flags(self) -> None:
+        """Test parser handles persistence flags."""
+        parser = create_argument_parser()
+        args = parser.parse_args(["--persist", "--db-uri", "sqlite:///test.db"])
+
+        assert args.persist is True
+        assert args.db_uri == "sqlite:///test.db"
+
     def test_parser_force_update_flag(self) -> None:
         """Test parser handles force-update flag."""
         parser = create_argument_parser()
@@ -1114,7 +1122,7 @@ class TestProcessMultipleFilesInput:
                 force_update=False,
             )
 
-            normal_iocs, warning_iocs, input_display = process_multiple_files_input(args)
+            normal_iocs, warning_iocs, input_display, _results = process_multiple_files_input(args)
 
             # Should aggregate IOCs from all files
             assert isinstance(normal_iocs, dict)
@@ -1161,7 +1169,7 @@ class TestProcessMultipleFilesInput:
                 force_update=False,
             )
 
-            normal_iocs, _, _ = process_multiple_files_input(args)
+            normal_iocs, _, _, _results = process_multiple_files_input(args)
 
             # Check deduplication occurred
             if 'domains' in normal_iocs:
@@ -1195,7 +1203,7 @@ class TestProcessMultipleFilesInput:
                 force_update=False,
             )
 
-            normal_iocs, warning_iocs, input_display = process_multiple_files_input(args)
+            normal_iocs, warning_iocs, input_display, _results = process_multiple_files_input(args)
 
             # Should have aggregated results
             assert isinstance(normal_iocs, dict)

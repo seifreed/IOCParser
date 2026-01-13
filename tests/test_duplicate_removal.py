@@ -56,7 +56,7 @@ class TestDuplicateRemoval:
 
         try:
             args = self.create_mock_args([file1, file2])
-            normal_iocs, warning_iocs, display = process_multiple_files_input(args)
+            normal_iocs, warning_iocs, display, _results = process_multiple_files_input(args)
 
             # Check domains are deduplicated (accounting for defanging)
             if 'domains' in normal_iocs:
@@ -95,7 +95,7 @@ class TestDuplicateRemoval:
 
         try:
             args = self.create_mock_args([file1, file2])
-            normal_iocs, warning_iocs, display = process_multiple_files_input(args)
+            normal_iocs, warning_iocs, display, _results = process_multiple_files_input(args)
 
             # Check that we have results
             assert len(normal_iocs) > 0, "Should have extracted some IOCs"
@@ -132,7 +132,7 @@ class TestDuplicateRemoval:
 
         try:
             args = self.create_mock_args([file1, file2])
-            normal_iocs, warning_iocs, display = process_multiple_files_input(args)
+            normal_iocs, warning_iocs, display, _results = process_multiple_files_input(args)
 
             if 'domains' in normal_iocs:
                 domains = normal_iocs['domains']
@@ -161,7 +161,7 @@ class TestDuplicateRemoval:
 
         try:
             args = self.create_mock_args([file1, file2])
-            normal_iocs, warning_iocs, display = process_multiple_files_input(args)
+            normal_iocs, warning_iocs, display, _results = process_multiple_files_input(args)
 
             # Should handle gracefully without errors
             assert isinstance(normal_iocs, dict), "Should return dict even with no IOCs"
@@ -189,7 +189,7 @@ class TestDuplicateRemoval:
 
             import time
             start_time = time.time()
-            normal_iocs, warning_iocs, display = process_multiple_files_input(args)
+            normal_iocs, warning_iocs, display, _results = process_multiple_files_input(args)
             end_time = time.time()
 
             # Should complete in reasonable time (< 5 seconds for this small test)

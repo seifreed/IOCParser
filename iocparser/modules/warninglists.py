@@ -148,10 +148,14 @@ class MISPWarningLists:
     def _reset_cache_files(self) -> None:
         """Remove cache files when they are corrupted."""
         for cache_path in (self.cache_file, self.cache_metadata_file):
-            try:
-                cache_path.unlink(missing_ok=True)
-            except Exception as cleanup_error:
-                logger.debug(f"Could not remove cache file {cache_path}: {cleanup_error}")
+            self._safe_unlink(cache_path)
+
+    def _safe_unlink(self, cache_path: Path) -> None:
+        """Safely unlink a cache file."""
+        try:
+            cache_path.unlink(missing_ok=True)
+        except Exception as cleanup_error:
+            logger.debug(f"Could not remove cache file {cache_path}: {cleanup_error}")
 
     def _load_or_update_lists(self) -> None:
         """Load lists from cache or update them if necessary"""
@@ -351,6 +355,22 @@ class MISPWarningLists:
             clean_value = clean_value.replace(old, new)
 
         return clean_value
+
+    def _extract_email_domain(self, value: str) -> str | None:
+        """Extract domain from an email address."""
+        cleaned = self._clean_defanged_value(value)
+        if "@" not in cleaned:
+            return None
+        domain = cleaned.rsplit("@", 1)[1].strip()
+        return domain or None
+
+    def _email_domain_in_warning_list(self, value: str) -> bool:
+        """Check if an email's domain is in warning lists."""
+        domain = self._extract_email_domain(value)
+        if not domain:
+            return False
+        in_warning_list, _ = self.check_value(domain, "domains")
+        return in_warning_list
 
     def _build_warning_response(
         self,
@@ -734,6 +754,13 @@ class MISPWarningLists:
             for ioc in ioc_list:
                 # Handle dictionary IOCs
                 value: str = ioc["value"] if isinstance(ioc, dict) and "value" in ioc else str(ioc)
+
+                if ioc_type == "emails" and self._email_domain_in_warning_list(value):
+                    logger.info(
+                        "Skipping email IOC due to warning-listed domain: %s",
+                        value,
+                    )
+                    continue
 
                 in_warning_list, warning_info = self.check_value(value, ioc_type)
 

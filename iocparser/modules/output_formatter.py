@@ -8,9 +8,10 @@ Author: Marc Rivero | @seifreed
 
 import json
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Iterable
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, ClassVar, Iterable, Union
+from typing import ClassVar, Union
 
 from stix2 import Bundle, Indicator
 
@@ -316,10 +317,7 @@ class STIXFormatter(OutputFormatter):
         """Yield IOC entries with their type and warning status."""
         for ioc_type, values in self.data.items():
             for value in values:
-                if isinstance(value, dict):
-                    val = value.get("value")
-                else:
-                    val = str(value)
+                val = value.get("value") if isinstance(value, dict) else str(value)
                 if val:
                     yield ioc_type, val, False, None
 
@@ -345,7 +343,6 @@ class STIXFormatter(OutputFormatter):
         if not pattern:
             return None
 
-        labels = ["indicator"]  # minimal, non-inferred label required by STIX
         description = None
         indicator_types = ["unknown"]
 

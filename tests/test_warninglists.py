@@ -185,6 +185,23 @@ class TestMISPWarningLists:
         assert not is_warning
         assert info is None
 
+    def test_email_domain_warning_excluded(self):
+        """Email IOCs are excluded when their domain is in warning lists."""
+        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists.warning_lists = self.mock_warning_lists
+        warning_lists._preprocess_lists()
+
+        iocs = {
+            'emails': ['intelreports@kaspersky.com'],
+            'domains': ['kaspersky.com'],
+        }
+
+        normal_iocs, warning_iocs = warning_lists.separate_iocs_by_warnings(iocs)
+
+        assert 'emails' not in normal_iocs
+        assert 'emails' not in warning_iocs
+        assert 'domains' in warning_iocs
+
     def test_separate_iocs_by_warnings(self):
         """Test IOC separation by warnings."""
         warning_lists = MISPWarningLists(cache_duration=0, force_update=False)

@@ -11,6 +11,7 @@ import argparse
 import concurrent.futures
 import logging
 import re
+from typing import cast
 import sys
 from pathlib import Path
 from urllib.parse import ParseResult, urlparse
@@ -20,6 +21,7 @@ import requests
 from colorama import Fore, Style, init
 from requests.exceptions import RequestException, Timeout
 
+from iocparser.modules.config import AppConfig, load_config
 from iocparser.modules.exceptions import (
     DownloadSizeError,
     FileParsingError,
@@ -37,6 +39,7 @@ from iocparser.modules.extractor import IOCExtractor
 from iocparser.modules.file_parser import HTMLParser, PDFParser
 from iocparser.modules.logger import get_logger, setup_logger
 from iocparser.modules.output_formatter import JSONFormatter, STIXFormatter, TextFormatter
+from iocparser.modules.persistence import PersistenceManager, PersistOptions
 from iocparser.modules.utils import deduplicate_iocs
 from iocparser.modules.warninglists import MISPWarningLists
 
@@ -553,6 +556,14 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--parallel", type=int, default=1, help="Number of parallel workers for multiple files"
     )
+    parser.add_argument(
+        "--persist",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Enable persistence (uses config/env if not set)",
+    )
+    parser.add_argument("--db-uri", help="Database URI for persistence")
+    parser.add_argument("--config", help="Path to config file (INI)")
 
     return parser
 
@@ -592,7 +603,12 @@ def handle_misp_init() -> None:
 
 def process_multiple_files_input(
     args: argparse.Namespace,
-) -> tuple[dict[str, list[str | dict[str, str]]], dict[str, list[dict[str, str]]], str]:
+) -> tuple[
+    dict[str, list[str | dict[str, str]]],
+    dict[str, list[dict[str, str]]],
+    str,
+    dict[str, tuple[dict[str, list[str | dict[str, str]]], dict[str, list[dict[str, str]]]]],
+]:
     """Process multiple files input."""
     multiple_files = get_list_arg(args, "multiple")
     file_paths = [Path(f) for f in multiple_files]
@@ -634,7 +650,7 @@ def process_multiple_files_input(
     # Remove duplicates
     all_normal_iocs = deduplicate_iocs(all_normal_iocs)
 
-    return all_normal_iocs, all_warning_iocs, f"{len(file_paths)} files"
+    return all_normal_iocs, all_warning_iocs, f"{len(file_paths)} files", results
 
 
 def process_single_input(
@@ -691,6 +707,40 @@ def process_single_input(
                 logger.debug("Failed to delete temporary file")
 
     return normal_iocs, warning_iocs, input_display
+
+
+def resolve_persistence(args: argparse.Namespace) -> AppConfig:
+    """Resolve persistence configuration from CLI/env/config."""
+    cli_persist = cast("bool | None", getattr(args, "persist", None))
+    cli_db_uri = get_optional_str_arg(args, "db_uri")
+    cli_config = get_optional_str_arg(args, "config")
+    return load_config(cli_persist, cli_db_uri, cli_config)
+
+
+def persist_results(
+    config: AppConfig,
+    source_kind: str,
+    source_value: str,
+    normal_iocs: dict[str, list[str | dict[str, str]]],
+    warning_iocs: dict[str, list[dict[str, str]]],
+    options: PersistOptions,
+    tool_version: str,
+) -> None:
+    """Persist a single run if enabled."""
+    if not config.persist:
+        return
+    if not config.db_uri:
+        logger.error("Persistence enabled but no database URI provided")
+        return
+    manager = PersistenceManager(config.db_uri)
+    manager.persist_run(
+        source_kind=source_kind,
+        source_value=source_value,
+        normal_iocs=normal_iocs,
+        warning_iocs=warning_iocs,
+        tool_version=tool_version,
+        options=options,
+    )
 
 
 def display_results(
@@ -772,6 +822,7 @@ def main() -> None:
     try:
         parser = create_argument_parser()
         args = parser.parse_args()
+        config = resolve_persistence(args)
 
         setup_application(args)
 
@@ -788,13 +839,54 @@ def main() -> None:
 
         # Process input based on type
         if get_list_arg(args, "multiple"):
-            normal_iocs, warning_iocs, input_display = process_multiple_files_input(args)
+            normal_iocs, warning_iocs, input_display, results = process_multiple_files_input(args)
         else:
             normal_iocs, warning_iocs, input_display = process_single_input(args)
+            results = None
 
         # Display and save results
         display_results(normal_iocs, warning_iocs)
         save_output(args, normal_iocs, warning_iocs, input_display)
+
+        if get_bool_arg(args, "stix"):
+            output_format = "stix"
+        elif get_bool_arg(args, "json"):
+            output_format = "json"
+        else:
+            output_format = "text"
+        options = PersistOptions(
+            defang=not get_bool_arg(args, "no_defang"),
+            check_warnings=not get_bool_arg(args, "no_check_warnings"),
+            force_update=get_bool_arg(args, "force_update"),
+            output_format=output_format,
+        )
+
+        if results:
+            for source_path, (file_iocs, file_warnings) in results.items():
+                persist_results(
+                    config=config,
+                    source_kind="file",
+                    source_value=source_path,
+                    normal_iocs=file_iocs,
+                    warning_iocs=file_warnings,
+                    options=options,
+                    tool_version=VERSION,
+                )
+        else:
+            source_kind = (
+                "url"
+                if get_optional_str_arg(args, "url") or get_optional_str_arg(args, "url_direct")
+                else "file"
+            )
+            persist_results(
+                config=config,
+                source_kind=source_kind,
+                source_value=input_display,
+                normal_iocs=normal_iocs,
+                warning_iocs=warning_iocs,
+                options=options,
+                tool_version=VERSION,
+            )
 
     except KeyboardInterrupt:
         logger.warning("Operation cancelled by user")

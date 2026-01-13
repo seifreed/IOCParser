@@ -89,7 +89,9 @@ def load_config(
     resolved_persist = (
         cli_persist
         if cli_persist is not None
-        else env_persist if env_persist is not None else file_persist or False
+        else env_persist
+        if env_persist is not None
+        else file_persist or False
     )
     resolved_db_uri = cli_db_uri or env_db_uri or file_db_uri
 

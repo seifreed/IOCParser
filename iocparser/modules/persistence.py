@@ -235,7 +235,9 @@ class PersistenceManager:
 
     def persist_multiple_runs(
         self,
-        runs: Iterable[tuple[str, str, dict[str, list[str | dict[str, str]]], dict[str, list[dict[str, str]]]]],
+        runs: Iterable[
+            tuple[str, str, dict[str, list[str | dict[str, str]]], dict[str, list[dict[str, str]]]]
+        ],
         tool_version: str,
         options: PersistOptions,
     ) -> list[int]:

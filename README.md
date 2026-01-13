@@ -37,7 +37,8 @@
 | **MISP Integration** | Filter false positives using MISP warning lists |
 | **Defanging** | Automatic defanging of domains and IPs |
 | **Library Mode** | Use as CLI tool or Python library |
-| **JSON/Text Output** | Flexible output formats |
+| **JSON/Text/STIX Output** | Flexible output formats |
+| **Persistence** | Optional SQLite/MariaDB storage |
 
 ### Supported IOC Types
 
@@ -116,10 +117,14 @@ iocparser -f report -t pdf
 | `-o, --output` | Output file path |
 | `-t, --type` | Force file type (pdf, html, text) |
 | `--json` | Output in JSON format |
+| `--stix` | Output in STIX 2.1 format |
 | `--no-defang` | Disable IOC defanging |
 | `--no-check-warnings` | Skip MISP warning list check |
 | `--force-update` | Force update MISP lists |
 | `--init` | Initialize MISP warning lists |
+| `--persist/--no-persist` | Enable/disable persistence |
+| `--db-uri` | Database URI for persistence |
+| `--config` | Path to config file (INI) |
 
 ---
 
@@ -198,6 +203,41 @@ for report in reports_dir.glob("*.pdf"):
 
 ```bash
 iocparser -f apt_report.pdf --json -o iocs.json
+```
+
+### Export to STIX 2.1
+
+```bash
+iocparser -f apt_report.pdf --stix -o iocs.stix.json
+```
+
+### Persistence (SQLite/MariaDB)
+
+```bash
+# SQLite
+iocparser -u https://example.com/report.html --persist --db-uri "sqlite:///iocparser.db"
+
+# MariaDB
+iocparser -u https://example.com/report.html --persist --db-uri "mysql+pymysql://user:pass@host:3306/iocparser"
+```
+
+### Config + Environment
+
+Supports `.env`, environment variables, and INI config files.
+
+**Environment variables**
+
+```bash
+export IOCPARSER_PERSIST=1
+export IOCPARSER_DB_URI="sqlite:///iocparser.db"
+```
+
+**INI config (`iocparser.ini` or `~/.config/iocparser/config.ini`)**
+
+```ini
+[database]
+persist=true
+uri=sqlite:///iocparser.db
 ```
 
 ### Analyze Threat Intelligence Feed

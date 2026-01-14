@@ -16,7 +16,7 @@ import pytest
 import requests
 from requests.exceptions import RequestException, Timeout
 
-from iocparser.main import (
+from iocparser.core import (
     MAX_FILE_SIZE,
     MAX_URL_SIZE,
     ProcessingOptions,
@@ -34,7 +34,6 @@ from iocparser.main import (
     get_str_arg,
     handle_misp_init,
     has_input_args,
-    main,
     print_warning_lists,
     process_file,
     process_multiple_files,

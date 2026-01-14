@@ -71,7 +71,7 @@ Repository = "https://github.com/seifreed/iocparser"
 "Bug Tracker" = "https://github.com/seifreed/iocparser/issues"
 
 [project.scripts]
-iocparser = "iocparser.main:main"
+iocparser = "iocparser.__main__:main"
 
 [tool.setuptools.packages.find]
 include = ["iocparser*"]

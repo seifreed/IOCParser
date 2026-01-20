@@ -107,4 +107,6 @@ def main() -> None:
         logger.error(f"Unexpected error: {e!s}", exc_info=True)
         sys.exit(1)
 
-if __name__ == "__main__": main()
+
+if __name__ == "__main__":
+    main()

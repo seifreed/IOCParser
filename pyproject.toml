@@ -149,7 +149,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101", "PLR2004", "S311"]
+"tests/*" = ["PLR2004", "S101", "S311", "SLF001"]
 "examples/*" = ["INP001"]
 
 [tool.ruff.lint.isort]
@@ -235,9 +235,29 @@ disable = [
     "C0114",  # missing-module-docstring
     "C0115",  # missing-class-docstring
     "C0116",  # missing-function-docstring
+    "C0207",  # use-maxsplit-arg
+    "C0301",  # line-too-long
+    "C0302",  # too-many-lines
+    "C0325",  # superfluous-parens
+    "C0415",  # import-outside-toplevel
     "R0903",  # too-few-public-methods
+    "R0902",  # too-many-instance-attributes
+    "R0904",  # too-many-public-methods
+    "R0911",  # too-many-return-statements
+    "R0912",  # too-many-branches
     "R0913",  # too-many-arguments
+    "R0914",  # too-many-locals
+    "R0917",  # too-many-positional-arguments
+    "R1702",  # too-many-nested-blocks
+    "R1705",  # no-else-return
+    "R1720",  # no-else-raise
     "W0511",  # fixme
+    "W0401",  # wildcard-import
+    "W0611",  # unused-import
+    "W0613",  # unused-argument
+    "W0614",  # unused-wildcard-import
+    "W0718",  # broad-exception-caught
+    "W1203",  # logging-fstring-interpolation
     "C0103",  # invalid-name
 ]
 good-names = ["i", "j", "k", "f", "e", "v", "ip", "id", "_"]

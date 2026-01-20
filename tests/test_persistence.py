@@ -6,12 +6,10 @@ Tests for SQLite persistence.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from iocparser.modules.persistence import IOC, Run, RunIOC, PersistOptions, PersistenceManager
+from iocparser.modules.persistence import IOC, PersistenceManager, PersistOptions, Run, RunIOC
 
 
 def test_persist_run_sqlite(tmp_path) -> None:

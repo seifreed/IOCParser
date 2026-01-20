@@ -19,6 +19,9 @@ without using mocks.
 Author: Marc Rivero | @seifreed
 """
 
+import tempfile
+from pathlib import Path
+
 import pytest
 
 from iocparser.modules.exceptions import (
@@ -103,9 +106,10 @@ class TestHTMLParsingError:
 
         Validates real exception flow in try/except blocks.
         """
+
         # Arrange: Function that raises HTMLParsingError
         def parse_invalid_html() -> None:
-            raise HTMLParsingError("Malformed HTML tag detected")
+            raise HTMLParsingError("Malformed HTML tag detected")  # noqa: TRY003
 
         # Act & Assert: Should raise and be catchable
         with pytest.raises(HTMLParsingError) as exc_info:
@@ -177,12 +181,10 @@ class TestUnexpectedDownloadError:
 
         Validates real exception flow with the factory function.
         """
+
         # Arrange: Function that raises unexpected download error
         def download_file() -> None:
-            raise UnexpectedDownloadError(
-                "http://evil.com/malware.zip",
-                "Timeout after 30 seconds"
-            )
+            raise UnexpectedDownloadError("http://evil.com/malware.zip", "Timeout after 30 seconds")
 
         # Act & Assert: Should raise DownloadError
         with pytest.raises(DownloadError) as exc_info:
@@ -220,7 +222,7 @@ class TestFileExistenceError:
         Validates the inheritance chain and attribute preservation.
         """
         # Arrange & Act: Create error
-        file_path = "/tmp/missing.pdf"
+        file_path = str(Path(tempfile.gettempdir()) / "missing.pdf")
         error = FileExistenceError(file_path)
 
         # Assert: Verify inheritance and attributes
@@ -255,9 +257,11 @@ class TestFileExistenceError:
 
         Validates exception flow when file doesn't exist.
         """
+
         # Arrange: Function that checks file existence
         def check_file_exists(path: str) -> None:
             from pathlib import Path
+
             if not Path(path).is_file():
                 raise FileExistenceError(path)
 
@@ -313,10 +317,11 @@ class TestHTMLProcessingError:
 
         Validates real exception flow for HTML processing failures.
         """
+
         # Arrange: Function that processes HTML
         def process_html_content(content: str) -> None:
             if "<html>" not in content:
-                raise HTMLProcessingError("Invalid HTML structure")
+                raise HTMLProcessingError("Invalid HTML structure")  # noqa: TRY003
 
         # Act & Assert: Should raise HTMLProcessingError
         with pytest.raises(HTMLProcessingError) as exc_info:
@@ -370,10 +375,11 @@ class TestURLAccessError:
 
         Validates real exception flow for URL access failures.
         """
+
         # Arrange: Function that accesses URLs
         def fetch_url(url: str) -> None:
             if not url.startswith("http"):
-                raise URLAccessError("Invalid URL protocol")
+                raise URLAccessError("Invalid URL protocol")  # noqa: TRY003
 
         # Act & Assert: Should raise URLAccessError
         with pytest.raises(URLAccessError) as exc_info:
@@ -430,6 +436,7 @@ class TestDownloadSizeError:
 
         Validates real exception flow for oversized downloads.
         """
+
         # Arrange: Function that checks download size
         def validate_download_size(size_mb: float, limit_mb: float) -> None:
             if size_mb > limit_mb:
@@ -479,11 +486,7 @@ class TestOtherExceptions:
     def test_file_size_error_with_custom_item_type(self) -> None:
         """Test FileSizeError with custom item type."""
         # Arrange & Act
-        error = FileSizeError(
-            actual_size_mb=150.5,
-            max_size_mb=100.0,
-            item_type="Archive"
-        )
+        error = FileSizeError(actual_size_mb=150.5, max_size_mb=100.0, item_type="Archive")
 
         # Assert
         assert error.actual_size_mb == 150.5
@@ -526,9 +529,7 @@ class TestOtherExceptions:
         """Test DownloadError with network error type."""
         # Arrange & Act
         error = DownloadError(
-            url="http://example.com/file",
-            reason="DNS resolution failed",
-            error_type="network"
+            url="http://example.com/file", reason="DNS resolution failed", error_type="network"
         )
 
         # Assert
@@ -540,10 +541,7 @@ class TestOtherExceptions:
     def test_network_download_error_alias(self) -> None:
         """Test NetworkDownloadError alias for DownloadError."""
         # Arrange & Act
-        error = NetworkDownloadError(
-            url="http://test.com",
-            reason="Connection refused"
-        )
+        error = NetworkDownloadError(url="http://test.com", reason="Connection refused")
 
         # Assert: Should be a DownloadError
         assert isinstance(error, DownloadError)
@@ -553,12 +551,11 @@ class TestOtherExceptions:
         """Test FileProcessingError with file path and reason."""
         # Arrange & Act
         error = FileProcessingError(
-            file_path="/tmp/data.bin",
-            reason="Corrupted file header"
+            file_path=str(Path(tempfile.gettempdir()) / "data.bin"), reason="Corrupted file header"
         )
 
         # Assert
-        assert error.file_path == "/tmp/data.bin"
+        assert error.file_path == str(Path(tempfile.gettempdir()) / "data.bin")
         assert error.reason == "Corrupted file header"
         assert "Failed to process" in str(error)
 

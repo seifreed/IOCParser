@@ -11,11 +11,11 @@ Tests all streaming functionality with real file operations and data.
 Author: Marc Rivero | @seifreed
 """
 
+import contextlib
 import io
 import tempfile
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List
 
 import pytest
 
@@ -29,8 +29,9 @@ from iocparser.modules.streaming import (
 
 
 # Helper function to handle the generator/dict return type from extract_from_file
-def _get_file_extraction_result(extractor: StreamingIOCExtractor, file_path: Path,
-                                yield_chunks: bool = False):
+def _get_file_extraction_result(
+    extractor: StreamingIOCExtractor, file_path: Path, yield_chunks: bool = False
+):
     """
     Helper to properly handle extract_from_file results.
 
@@ -44,19 +45,18 @@ def _get_file_extraction_result(extractor: StreamingIOCExtractor, file_path: Pat
     if yield_chunks:
         # Return the generator as-is for iteration
         return result_gen
-    else:
-        # When yield_chunks=False, the generator doesn't yield anything
-        # but returns a dict. We get this dict from the StopIteration exception.
-        try:
-            # Try to get the next item (should immediately raise StopIteration)
-            while True:
-                next(result_gen)
-        except StopIteration as e:
-            # The return value is in e.value
-            return e.value if hasattr(e, 'value') else {}
+    # When yield_chunks=False, the generator doesn't yield anything
+    # but returns a dict. We get this dict from the StopIteration exception.
+    try:
+        # Try to get the next item (should immediately raise StopIteration)
+        while True:
+            next(result_gen)
+    except StopIteration as e:
+        # The return value is in e.value
+        return e.value if hasattr(e, "value") else {}
 
-        # Fallback (shouldn't reach here)
-        return {}
+    # Fallback (shouldn't reach here)
+    return {}
 
 
 def _consume_generator_result(gen):
@@ -70,7 +70,7 @@ def _consume_generator_result(gen):
         while True:
             next(gen)
     except StopIteration as e:
-        return e.value if hasattr(e, 'value') else {}
+        return e.value if hasattr(e, "value") else {}
     return {}
 
 
@@ -94,10 +94,12 @@ Registry key: HKEY_LOCAL_MACHINE\\Software\\Malware\\Config
 Mutex: Global\\MalwareMutex123
 """
 
-LARGE_SAMPLE_TEXT = "\n".join([
-    f"Line {i}: Found domain test{i}.example.org and IP 10.0.{i % 256}.{(i * 7) % 256}"
-    for i in range(1000)
-])
+LARGE_SAMPLE_TEXT = "\n".join(
+    [
+        f"Line {i}: Found domain test{i}.example.org and IP 10.0.{i % 256}.{(i * 7) % 256}"
+        for i in range(1000)
+    ]
+)
 
 CHUNK_BOUNDARY_TEXT = """
 This text is designed to test chunk boundaries.
@@ -207,16 +209,16 @@ class TestStreamingIOCExtractor:
         """
         extractor = StreamingIOCExtractor()
 
-        target: Dict[str, List[str]] = defaultdict(list)
+        target: dict[str, list[str]] = defaultdict(list)
         source = {
-            'domains': ['evil.com', 'bad.net'],
-            'ips': ['192.168.1.1', '10.0.0.1'],
+            "domains": ["evil.com", "bad.net"],
+            "ips": ["192.168.1.1", "10.0.0.1"],
         }
 
         extractor._accumulate_iocs(target, source)
 
-        assert target['domains'] == ['evil.com', 'bad.net']
-        assert target['ips'] == ['192.168.1.1', '10.0.0.1']
+        assert target["domains"] == ["evil.com", "bad.net"]
+        assert target["ips"] == ["192.168.1.1", "10.0.0.1"]
 
     def test_accumulate_iocs_existing_target(self):
         """
@@ -226,20 +228,20 @@ class TestStreamingIOCExtractor:
         """
         extractor = StreamingIOCExtractor()
 
-        target: Dict[str, List[str]] = defaultdict(list)
-        target['domains'] = ['existing.com']
-        target['md5'] = ['abc123']
+        target: dict[str, list[str]] = defaultdict(list)
+        target["domains"] = ["existing.com"]
+        target["md5"] = ["abc123"]
 
         source = {
-            'domains': ['new1.com', 'new2.org'],
-            'ips': ['192.168.1.1'],
+            "domains": ["new1.com", "new2.org"],
+            "ips": ["192.168.1.1"],
         }
 
         extractor._accumulate_iocs(target, source)
 
-        assert target['domains'] == ['existing.com', 'new1.com', 'new2.org']
-        assert target['md5'] == ['abc123']
-        assert target['ips'] == ['192.168.1.1']
+        assert target["domains"] == ["existing.com", "new1.com", "new2.org"]
+        assert target["md5"] == ["abc123"]
+        assert target["ips"] == ["192.168.1.1"]
 
     def test_deduplicate_iocs_first_call(self):
         """
@@ -251,20 +253,22 @@ class TestStreamingIOCExtractor:
         extractor = StreamingIOCExtractor()
 
         new_iocs = {
-            'domains': ['evil.com', 'bad.net', 'evil.com'],  # Contains duplicate
-            'ips': ['192.168.1.1'],
+            "domains": ["evil.com", "bad.net", "evil.com"],  # Contains duplicate
+            "ips": ["192.168.1.1"],
         }
 
         result = extractor._deduplicate_iocs(new_iocs)
 
         # Should remove duplicates within the same batch
-        assert 'domains' in result
-        assert 'ips' in result
-        assert len(result['domains']) >= 1  # At least one unique domain
+        assert "domains" in result
+        assert "ips" in result
+        assert len(result["domains"]) >= 1  # At least one unique domain
 
         # State should be updated
-        assert 'evil.com' in extractor.seen_iocs['domains'] or \
-               'evil[.]com' in extractor.seen_iocs['domains']
+        assert (
+            "evil.com" in extractor.seen_iocs["domains"]
+            or "evil[.]com" in extractor.seen_iocs["domains"]
+        )
 
     def test_deduplicate_iocs_subsequent_call(self):
         """
@@ -277,23 +281,23 @@ class TestStreamingIOCExtractor:
 
         # First batch
         first_iocs = {
-            'domains': ['evil.com'],
-            'ips': ['192.168.1.1'],
+            "domains": ["evil.com"],
+            "ips": ["192.168.1.1"],
         }
         extractor._deduplicate_iocs(first_iocs)
 
         # Second batch with some duplicates
         second_iocs = {
-            'domains': ['evil.com', 'new.org'],  # evil.com is duplicate
-            'ips': ['192.168.1.1', '10.0.0.1'],  # 192.168.1.1 is duplicate
+            "domains": ["evil.com", "new.org"],  # evil.com is duplicate
+            "ips": ["192.168.1.1", "10.0.0.1"],  # 192.168.1.1 is duplicate
         }
         result = extractor._deduplicate_iocs(second_iocs)
 
         # Should only contain new IOCs
-        if 'domains' in result:
+        if "domains" in result:
             # evil.com should be filtered, only new.org remains
-            assert 'evil.com' not in str(result['domains'])
-            assert any('new' in d for d in result['domains'])
+            assert "evil.com" not in str(result["domains"])
+            assert any("new" in d for d in result["domains"])
 
     def test_read_chunks_small_file(self):
         """
@@ -311,10 +315,10 @@ class TestStreamingIOCExtractor:
 
         assert len(chunks) >= 1
         # All content should be captured
-        full_text = ''.join(chunks)
-        assert 'domain1.com' in full_text
-        assert 'domain2.org' in full_text
-        assert '192.168.1.1' in full_text
+        full_text = "".join(chunks)
+        assert "domain1.com" in full_text
+        assert "domain2.org" in full_text
+        assert "192.168.1.1" in full_text
 
     def test_read_chunks_with_overlap(self):
         """
@@ -333,9 +337,9 @@ class TestStreamingIOCExtractor:
 
         assert len(chunks) >= 2  # Should be multiple chunks
         # Overlap ensures IOCs at boundaries are captured
-        full_text = ''.join(chunks)
-        assert 'evil.com' in full_text
-        assert 'bad.org' in full_text
+        full_text = "".join(chunks)
+        assert "evil.com" in full_text
+        assert "bad.org" in full_text
 
     def test_read_chunks_binary_stream(self):
         """
@@ -351,9 +355,9 @@ class TestStreamingIOCExtractor:
         chunks = list(extractor._read_chunks(stream, is_text=False))
 
         assert len(chunks) >= 1
-        full_text = ''.join(chunks)
-        assert 'evil.com' in full_text
-        assert '192.168.1.1' in full_text
+        full_text = "".join(chunks)
+        assert "evil.com" in full_text
+        assert "192.168.1.1" in full_text
 
     def test_read_chunks_progress_callback(self):
         """
@@ -392,7 +396,7 @@ class TestStreamingIOCExtractor:
         """
         extractor = StreamingIOCExtractor()
 
-        non_existent_path = Path("/tmp/non_existent_file_12345.txt")
+        non_existent_path = Path(tempfile.gettempdir()) / "non_existent_file_12345.txt"
 
         with pytest.raises(IOCFileNotFoundError) as exc_info:
             _get_file_extraction_result(extractor, non_existent_path, yield_chunks=False)
@@ -408,7 +412,7 @@ class TestStreamingIOCExtractor:
         """
         extractor = StreamingIOCExtractor(chunk_size=512, overlap=64)
 
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write(SAMPLE_IOC_TEXT)
             temp_path = Path(f.name)
 
@@ -419,11 +423,11 @@ class TestStreamingIOCExtractor:
             assert isinstance(result, dict)
 
             # Should contain various IOC types
-            assert 'domains' in result or 'ips' in result or 'md5' in result
+            assert "domains" in result or "ips" in result or "md5" in result
 
             # Verify some specific IOCs are found
-            if 'md5' in result:
-                assert len(result['md5']) > 0
+            if "md5" in result:
+                assert len(result["md5"]) > 0
 
         finally:
             temp_path.unlink()
@@ -437,7 +441,7 @@ class TestStreamingIOCExtractor:
         """
         extractor = StreamingIOCExtractor(chunk_size=200, overlap=50)
 
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write(LARGE_SAMPLE_TEXT)
             temp_path = Path(f.name)
 
@@ -468,7 +472,7 @@ class TestStreamingIOCExtractor:
         """
         extractor = StreamingIOCExtractor()
 
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             # Write nothing - empty file
             temp_path = Path(f.name)
 
@@ -495,7 +499,7 @@ class TestStreamingIOCExtractor:
         # Create larger content with repeated IOCs
         large_content = SAMPLE_IOC_TEXT * 100  # Repeat 100 times
 
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write(large_content)
             temp_path = Path(f.name)
 
@@ -510,9 +514,9 @@ class TestStreamingIOCExtractor:
 
             # Deduplication should have worked - shouldn't have 100x the IOCs
             # (since the same IOCs are repeated 100 times)
-            if 'md5' in result:
+            if "md5" in result:
                 # Should have deduplicated the repeated MD5
-                assert len(result['md5']) < 10  # Much less than 100
+                assert len(result["md5"]) < 10  # Much less than 100
 
         finally:
             temp_path.unlink()
@@ -527,12 +531,12 @@ class TestStreamingIOCExtractor:
         extractor = StreamingIOCExtractor()
 
         # First file
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write("Domain: first.com\nIP: 192.168.1.1")
             temp_path1 = Path(f.name)
 
         # Second file with same IOCs
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write("Domain: first.com\nIP: 192.168.1.1")
             temp_path2 = Path(f.name)
 
@@ -566,7 +570,7 @@ class TestStreamingIOCExtractor:
         assert len(chunks) >= 1
 
         # Accumulate all IOCs from chunks
-        all_iocs: Dict[str, List[str]] = defaultdict(list)
+        all_iocs: dict[str, list[str]] = defaultdict(list)
         for chunk in chunks:
             for ioc_type, ioc_list in chunk.items():
                 all_iocs[ioc_type].extend(ioc_list)
@@ -583,15 +587,12 @@ class TestStreamingIOCExtractor:
         """
         extractor = StreamingIOCExtractor(chunk_size=200)
 
-        stream = io.BytesIO(SAMPLE_IOC_TEXT.encode('utf-8'))
+        stream = io.BytesIO(SAMPLE_IOC_TEXT.encode("utf-8"))
 
         chunks = list(extractor.extract_from_stream(stream, is_text=False))
 
         assert len(chunks) >= 1
 
-        # Should have extracted IOCs
-        total_iocs = sum(len(list(chunk.values())[0]) if chunk else 0
-                        for chunk in chunks if chunk)
         # May be 0 if no IOCs, but structure should be correct
         assert all(isinstance(chunk, dict) for chunk in chunks)
 
@@ -621,7 +622,7 @@ class TestStreamingIOCExtractor:
         """
         extractor = StreamingIOCExtractor()
 
-        non_existent_path = Path("/tmp/non_existent_mmap_12345.txt")
+        non_existent_path = Path(tempfile.gettempdir()) / "non_existent_mmap_12345.txt"
 
         with pytest.raises(IOCFileNotFoundError):
             extractor.extract_from_mmap(non_existent_path)
@@ -634,7 +635,7 @@ class TestStreamingIOCExtractor:
         """
         extractor = StreamingIOCExtractor(chunk_size=512, overlap=64)
 
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write(SAMPLE_IOC_TEXT)
             temp_path = Path(f.name)
 
@@ -658,7 +659,7 @@ class TestStreamingIOCExtractor:
         """
         extractor = StreamingIOCExtractor()
 
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             temp_path = Path(f.name)
 
         try:
@@ -684,7 +685,7 @@ class TestStreamingIOCExtractor:
 
         large_content = LARGE_SAMPLE_TEXT
 
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write(large_content)
             temp_path = Path(f.name)
 
@@ -716,7 +717,7 @@ class TestStreamingIOCExtractor:
             progress_callback=progress_callback,
         )
 
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write(LARGE_SAMPLE_TEXT)
             temp_path = Path(f.name)
 
@@ -738,7 +739,7 @@ class TestStreamingIOCExtractor:
         """
         extractor = StreamingIOCExtractor(defang=True)
 
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write("Domain: evil.com IP: 192.168.1.1")
             temp_path = Path(f.name)
 
@@ -746,9 +747,9 @@ class TestStreamingIOCExtractor:
             result = _get_file_extraction_result(extractor, temp_path, yield_chunks=False)
 
             # Check if domains are defanged
-            if 'domains' in result and result['domains']:
+            if result.get("domains"):
                 # Should contain [.] or similar defang marker
-                assert any('[' in d or '(' in d for d in result['domains'])
+                assert any("[" in d or "(" in d for d in result["domains"])
 
         finally:
             temp_path.unlink()
@@ -761,7 +762,7 @@ class TestStreamingIOCExtractor:
         """
         extractor = StreamingIOCExtractor(defang=False)
 
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write("Domain: evil.com IP: 192.168.1.1")
             temp_path = Path(f.name)
 
@@ -769,9 +770,9 @@ class TestStreamingIOCExtractor:
             result = _get_file_extraction_result(extractor, temp_path, yield_chunks=False)
 
             # Domains should not be defanged
-            if 'domains' in result and result['domains']:
+            if result.get("domains"):
                 # Should not contain defang markers
-                assert not any('[.]' in d for d in result['domains'])
+                assert not any("[.]" in d for d in result["domains"])
 
         finally:
             temp_path.unlink()
@@ -816,7 +817,7 @@ class TestParallelStreamingExtractor:
         """
         extractor = ParallelStreamingExtractor(max_workers=2, chunk_size=512)
 
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write(SAMPLE_IOC_TEXT)
             temp_path = Path(f.name)
 
@@ -845,7 +846,7 @@ class TestParallelStreamingExtractor:
 
         # Create multiple files with different content
         for i in range(3):
-            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+            with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
                 f.write(f"File {i}: domain{i}.evil.com IP: 10.0.0.{i}")
                 temp_files.append(Path(f.name))
 
@@ -892,7 +893,7 @@ class TestParallelStreamingExtractor:
 
         temp_files = []
         for i in range(3):
-            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+            with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
                 f.write(f"Content {i}: test{i}.com")
                 temp_files.append(Path(f.name))
 
@@ -919,11 +920,11 @@ class TestParallelStreamingExtractor:
         extractor = ParallelStreamingExtractor(max_workers=2)
 
         # Create one valid file and one non-existent file
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write("Valid content: test.com")
             valid_file = Path(f.name)
 
-        invalid_file = Path("/tmp/non_existent_parallel_test_12345.txt")
+        invalid_file = Path(tempfile.gettempdir()) / "non_existent_parallel_test_12345.txt"
 
         try:
             results = extractor.extract_from_files([valid_file, invalid_file])
@@ -954,12 +955,14 @@ class TestParallelStreamingExtractor:
         # Create multiple files
         temp_files = []
         for i in range(5):
-            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+            with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
                 # Write different content to each
-                content = "\n".join([
-                    f"File {i} line {j}: domain{i}-{j}.test.org IP: 10.{i}.{j}.1"
-                    for j in range(50)
-                ])
+                content = "\n".join(
+                    [
+                        f"File {i} line {j}: domain{i}-{j}.test.org IP: 10.{i}.{j}.1"
+                        for j in range(50)
+                    ]
+                )
                 f.write(content)
                 temp_files.append(Path(f.name))
 
@@ -987,7 +990,7 @@ class TestConvenienceFunctions:
 
         Validates that the convenience wrapper correctly extracts IOCs.
         """
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write(SAMPLE_IOC_TEXT)
             temp_path = Path(f.name)
 
@@ -1009,7 +1012,7 @@ class TestConvenienceFunctions:
 
         Validates parameter passing to underlying extractor.
         """
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write(SAMPLE_IOC_TEXT)
             temp_path = Path(f.name)
 
@@ -1032,7 +1035,7 @@ class TestConvenienceFunctions:
 
         Validates use_mmap parameter functionality.
         """
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write(LARGE_SAMPLE_TEXT)
             temp_path = Path(f.name)
 
@@ -1062,7 +1065,7 @@ class TestConvenienceFunctions:
         def progress_callback(progress: int) -> None:
             progress_values.append(progress)
 
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write(LARGE_SAMPLE_TEXT)
             temp_path = Path(f.name)
 
@@ -1086,7 +1089,7 @@ class TestConvenienceFunctions:
 
         Validates that IOCs are streamed as they're extracted.
         """
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write(LARGE_SAMPLE_TEXT)
             temp_path = Path(f.name)
 
@@ -1109,16 +1112,18 @@ class TestConvenienceFunctions:
 
         Validates parameter customization.
         """
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write(SAMPLE_IOC_TEXT)
             temp_path = Path(f.name)
 
         try:
-            chunks = list(stream_iocs_from_file(
-                temp_path,
-                chunk_size=200,
-                defang=False,
-            ))
+            chunks = list(
+                stream_iocs_from_file(
+                    temp_path,
+                    chunk_size=200,
+                    defang=False,
+                )
+            )
 
             assert isinstance(chunks, list)
             for chunk in chunks:
@@ -1142,7 +1147,7 @@ class TestEdgeCases:
         # Content designed to split IOCs at chunk boundary
         content = "x" * 45 + "evil.malware.com" + "y" * 50
 
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write(content)
             temp_path = Path(f.name)
 
@@ -1150,10 +1155,10 @@ class TestEdgeCases:
             result = _get_file_extraction_result(extractor, temp_path, yield_chunks=False)
 
             # Should still detect the domain despite chunk boundary
-            if 'domains' in result:
-                domain_found = any('malware' in d.lower() for d in result['domains'])
+            if "domains" in result:
+                domain_found = any("malware" in d.lower() for d in result["domains"])
                 # Overlap should help capture this
-                assert domain_found or len(result['domains']) >= 0
+                assert domain_found or len(result["domains"]) >= 0
 
         finally:
             temp_path.unlink()
@@ -1166,7 +1171,7 @@ class TestEdgeCases:
         """
         extractor = StreamingIOCExtractor(chunk_size=10, overlap=5)
 
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write("Domain: test.com IP: 192.168.1.1")
             temp_path = Path(f.name)
 
@@ -1188,14 +1193,15 @@ class TestEdgeCases:
         extractor = StreamingIOCExtractor()
 
         unicode_content = """
-        Анализ малware: domain: зло.example.com
+        Анализ malware: domain: зло.example.com
         中文内容: evil.com
         日本語: 192.168.1.1
         Regular: test.malware.org
         """
 
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt',
-                                        encoding='utf-8') as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", delete=False, suffix=".txt", encoding="utf-8"
+        ) as f:
             f.write(unicode_content)
             temp_path = Path(f.name)
 
@@ -1218,8 +1224,8 @@ class TestEdgeCases:
 
         mixed_content = "Line1: test.com\r\nLine2: evil.org\nLine3: 192.168.1.1\r\n"
 
-        with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.txt') as f:
-            f.write(mixed_content.encode('utf-8'))
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".txt") as f:
+            f.write(mixed_content.encode("utf-8"))
             temp_path = Path(f.name)
 
         try:
@@ -1241,7 +1247,7 @@ class TestEdgeCases:
 
         content_with_nulls = b"Content\x00with\x00nulls\x00test.com\x00192.168.1.1"
 
-        with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".txt") as f:
             f.write(content_with_nulls)
             temp_path = Path(f.name)
 
@@ -1276,13 +1282,13 @@ class TestStreamingExceptionHandling:
                 self.call_count += 1
                 if self.call_count == 1:
                     return "First chunk"
-                raise IOError("Simulated read error")
+                raise OSError("Simulated read error")  # noqa: TRY003
 
             def seek(self, pos, whence=0):
-                raise OSError("Seek not supported")
+                raise OSError("Seek not supported")  # noqa: TRY003
 
             def tell(self):
-                raise OSError("Tell not supported")
+                raise OSError("Tell not supported")  # noqa: TRY003
 
         error_stream = ErrorStream()
 
@@ -1290,8 +1296,8 @@ class TestStreamingExceptionHandling:
         chunks = []
         try:
             for chunk in extractor._read_chunks(error_stream, is_text=True):
-                chunks.append(chunk)
-        except IOError:
+                chunks.append(chunk)  # noqa: PERF402
+        except OSError:
             # Exception should propagate
             pass
 
@@ -1307,27 +1313,25 @@ class TestStreamingExceptionHandling:
         extractor = StreamingIOCExtractor()
 
         # Create a file that exists but will fail during reading
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write("Test content")
             temp_path = Path(f.name)
 
         try:
             # Make the file unreadable by changing permissions (Unix-like systems)
-            import os
             import stat
-            os.chmod(temp_path, 0o000)
+
+            temp_path.chmod(0o000)
 
             # Attempt extraction - should raise exception
-            with pytest.raises(Exception):
+            with pytest.raises(PermissionError):
                 _get_file_extraction_result(extractor, temp_path, yield_chunks=False)
 
         finally:
             # Restore permissions and clean up
-            try:
-                os.chmod(temp_path, stat.S_IRUSR | stat.S_IWUSR)
+            with contextlib.suppress(Exception):
+                temp_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
                 temp_path.unlink()
-            except:
-                pass
 
     def test_parallel_extractor_exception_handling(self):
         """
@@ -1339,19 +1343,18 @@ class TestStreamingExceptionHandling:
         extractor = ParallelStreamingExtractor(max_workers=2)
 
         # Create one valid file
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write("Valid content: test.com")
             valid_file = Path(f.name)
 
         # Create a file we'll make unreadable
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write("Problematic content")
             problem_file = Path(f.name)
 
         try:
             # Make problem file unreadable
-            import os
-            os.chmod(problem_file, 0o000)
+            problem_file.chmod(0o000)
 
             results = extractor.extract_from_files([valid_file, problem_file])
 
@@ -1367,12 +1370,11 @@ class TestStreamingExceptionHandling:
 
         finally:
             valid_file.unlink()
-            try:
+            with contextlib.suppress(Exception):
                 import stat
-                os.chmod(problem_file, stat.S_IRUSR | stat.S_IWUSR)
+
+                problem_file.chmod(stat.S_IRUSR | stat.S_IWUSR)
                 problem_file.unlink()
-            except:
-                pass
 
 
 class TestStreamingUnsupportedOperations:
@@ -1394,15 +1396,15 @@ class TestStreamingUnsupportedOperations:
                 self.pos = 0
 
             def read(self, size):
-                chunk = self.content[self.pos:self.pos + size]
+                chunk = self.content[self.pos : self.pos + size]
                 self.pos += len(chunk)
                 return chunk
 
             def seek(self, pos, whence=0):
-                raise io.UnsupportedOperation("seek not supported")
+                raise io.UnsupportedOperation("seek not supported")  # noqa: TRY003
 
             def tell(self):
-                raise io.UnsupportedOperation("tell not supported")
+                raise io.UnsupportedOperation("tell not supported")  # noqa: TRY003
 
         content = "Test content with domain evil.com and IP 192.168.1.1"
         stream = UnseekableStream(content)
@@ -1411,8 +1413,8 @@ class TestStreamingUnsupportedOperations:
 
         # Should still work without seek/tell
         assert len(chunks) >= 1
-        full_text = ''.join(chunks)
-        assert 'evil.com' in full_text
+        full_text = "".join(chunks)
+        assert "evil.com" in full_text
 
     def test_read_chunks_with_oserror_on_seek(self):
         """
@@ -1428,15 +1430,15 @@ class TestStreamingUnsupportedOperations:
                 self.pos = 0
 
             def read(self, size):
-                chunk = self.content[self.pos:self.pos + size]
+                chunk = self.content[self.pos : self.pos + size]
                 self.pos += len(chunk)
                 return chunk
 
             def seek(self, pos, whence=0):
-                raise OSError("File operation failed")
+                raise OSError("File operation failed")  # noqa: TRY003
 
             def tell(self):
-                raise OSError("File operation failed")
+                raise OSError("File operation failed")  # noqa: TRY003
 
         content = "Content that will cause OSError on seek"
         stream = OSErrorStream(content)
@@ -1445,4 +1447,4 @@ class TestStreamingUnsupportedOperations:
         chunks = list(extractor._read_chunks(stream, is_text=True))
 
         assert len(chunks) >= 1
-        assert 'Content' in ''.join(chunks)
+        assert "Content" in "".join(chunks)

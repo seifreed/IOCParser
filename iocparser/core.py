@@ -136,17 +136,7 @@ def validate_file_size(file_path: Path, max_size: int = MAX_FILE_SIZE) -> None:
 
 def banner() -> None:
     """Display the tool banner."""
-    print(f"""{COLOR_CYAN}
-╔═══════════════════════════════════════════════╗
-║                                               ║
-║              IOC Parser v{VERSION}                ║
-║                                               ║
-║     Indicators of Compromise Extractor        ║
-║                                               ║
-║       Author: Marc Rivero | @seifreed         ║
-║                                               ║
-╚═══════════════════════════════════════════════╝
-{STYLE_RESET}""")
+    return
 
 
 def detect_file_type_by_mime(file_type: str) -> str | None:

@@ -9,7 +9,7 @@ from urllib.parse import ParseResult, urlparse
 
 import magic
 import requests
-from colorama import Fore, Style, init
+from colorama import Fore, Style
 from requests.exceptions import RequestException, Timeout
 
 from iocparser.modules.config import AppConfig, load_config
@@ -34,10 +34,6 @@ from iocparser.modules.persistence import PersistenceManager, PersistOptions
 from iocparser.modules.utils import deduplicate_iocs
 from iocparser.modules.warninglists import MISPWarningLists
 
-# Initialize colorama only when running as a script, not when imported
-if __name__ == "__main__":
-    init(autoreset=True)
-
 # Colorama color constants (typed to avoid Any issues with strict mypy)
 COLOR_CYAN: str = str(Fore.CYAN)
 COLOR_RED: str = str(Fore.RED)
@@ -55,6 +51,8 @@ MAX_FILENAME_LENGTH = 50  # Maximum filename length
 
 # Initialize logger
 logger = get_logger(__name__)
+
+MagicExceptionType: type[Exception] = getattr(magic, "MagicException", Exception)
 
 
 def get_str_arg(args: argparse.Namespace, name: str, default: str = "") -> str:
@@ -207,8 +205,8 @@ def detect_file_type(file_path: Path) -> str:
             ext = file_path.suffix.lower()
             if ext in [".html", ".htm", ".xml"]:
                 return "html"
-    except Exception as e:
-        logger.warning(f"Error detecting file type: {e!s}, falling back to extension")
+    except (OSError, ValueError, MagicExceptionType) as exc:
+        logger.warning("Error detecting file type: %s, falling back to extension", exc)
 
     # Fall back to extension-based detection
     return detect_file_type_by_extension(file_path)
@@ -282,7 +280,7 @@ def download_url_to_temp(url: str, timeout: int = REQUEST_TIMEOUT) -> Path:
     try:
         # Validate URL
         parsed_url = _validate_url(url)
-        logger.info(f"Downloading content from {url}")
+        logger.info("Downloading content from %s", url)
 
         # Stream download to check size
         response = requests.get(url, timeout=timeout, stream=True)
@@ -303,17 +301,15 @@ def download_url_to_temp(url: str, timeout: int = REQUEST_TIMEOUT) -> Path:
         # Download with size check
         downloaded_size = _download_with_size_check(response, temp_file, MAX_URL_SIZE)
 
-    except Timeout as e:
-        raise IOCTimeoutError("Download", url) from e
-    except RequestException as e:
-        raise NetworkDownloadError(url, str(e)) from e
-    except Exception as e:
-        if isinstance(e, (ValidationError, FileSizeError, IOCTimeoutError)):
-            raise
-        raise UnexpectedDownloadError(url, str(e)) from e
-    else:
-        logger.info(f"Downloaded {downloaded_size / 1024:.2f}KB to {temp_file}")
-        return temp_file
+    except Timeout as exc:
+        raise IOCTimeoutError("Download", url) from exc
+    except RequestException as exc:
+        raise NetworkDownloadError(url, str(exc)) from exc
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise UnexpectedDownloadError(url, str(exc)) from exc
+
+    logger.info("Downloaded %.2fKB to %s", downloaded_size / 1024, temp_file)
+    return temp_file
 
 
 def get_output_filename(
@@ -407,52 +403,63 @@ def process_file(
         ExtractionError: If IOC extraction fails
     """
     try:
-        # Validate file size
         validate_file_size(file_path)
 
-        # Detect file type if not specified
         if not file_type:
             file_type = detect_file_type(file_path)
 
-        logger.info(f"Processing {file_path} as {file_type.upper()}")
-
-        # Parse file based on type
-        if file_type == "pdf":
-            pdf_parser = PDFParser(str(file_path))
-            text_content = pdf_parser.extract_text()
-        elif file_type == "html":
-            html_parser = HTMLParser(str(file_path))
-            text_content = html_parser.extract_text()
-        else:
-            # Plain text file
-            with file_path.open(encoding="utf-8", errors="ignore") as f:
-                text_content = f.read()
-            logger.debug(f"Read {len(text_content)} characters from text file")
-
-        # Extract IOCs
-        extractor = IOCExtractor(defang=defang)
-        raw_iocs: dict[str, list[str]] = extractor.extract_all(text_content)
-        # Convert to Union type for compatibility with warning list processing
-        iocs: dict[str, list[str | dict[str, str]]] = {k: list(v) for k, v in raw_iocs.items()}
-
-        # Check against warning lists
-        if check_warnings:
-            logger.info("Checking IOCs against MISP warning lists")
-            warning_lists = MISPWarningLists(force_update=force_update)
-            normal_iocs, warning_iocs = warning_lists.separate_iocs_by_warnings(iocs)
-        else:
-            normal_iocs = iocs
-            warning_iocs = {}
-
-    except Exception as e:
-        logger.exception(f"Error processing file {file_path}")
-        raise FileProcessingError(str(file_path), str(e)) from e
-    else:
+        logger.info("Processing %s as %s", file_path, file_type.upper())
+        text_content = _read_text_content(file_path, file_type)
+        normal_iocs, warning_iocs = _extract_iocs(
+            text_content,
+            defang=defang,
+            check_warnings=check_warnings,
+            force_update=force_update,
+        )
         return normal_iocs, warning_iocs
+    except (FileParsingError, FileSizeError, OSError, ValueError) as exc:
+        logger.exception("Error processing file %s", file_path)
+        raise FileProcessingError(str(file_path), str(exc)) from exc
+
+
+def _read_text_content(file_path: Path, file_type: str) -> str:
+    """Read and extract text content from a file based on its type."""
+    if file_type == "pdf":
+        pdf_parser = PDFParser(str(file_path))
+        return pdf_parser.extract_text()
+    if file_type == "html":
+        html_parser = HTMLParser(str(file_path))
+        return html_parser.extract_text()
+
+    with file_path.open(encoding="utf-8", errors="ignore") as handle:
+        text_content = handle.read()
+    logger.debug("Read %s characters from text file", len(text_content))
+    return text_content
+
+
+def _extract_iocs(
+    text_content: str,
+    *,
+    defang: bool,
+    check_warnings: bool,
+    force_update: bool,
+) -> tuple[dict[str, list[str | dict[str, str]]], dict[str, list[dict[str, str]]]]:
+    """Extract IOCs from text and optionally check MISP warning lists."""
+    extractor = IOCExtractor(defang=defang)
+    raw_iocs: dict[str, list[str]] = extractor.extract_all(text_content)
+    iocs: dict[str, list[str | dict[str, str]]] = {k: list(v) for k, v in raw_iocs.items()}
+
+    if not check_warnings:
+        return iocs, {}
+
+    logger.info("Checking IOCs against MISP warning lists")
+    warning_lists = MISPWarningLists(force_update=force_update)
+    return warning_lists.separate_iocs_by_warnings(iocs)
 
 
 def process_multiple_files(
     file_paths: list[Path],
+    *,
     file_type: str | None = None,
     defang: bool = True,
     check_warnings: bool = True,
@@ -500,9 +507,15 @@ def process_multiple_files(
             try:
                 result = future.result()
                 results[str(file_path)] = result
-                logger.info(f"Successfully processed {file_path}")
-            except Exception:
-                logger.exception(f"Failed to process {file_path}")
+                logger.info("Successfully processed %s", file_path)
+            except (
+                FileParsingError,
+                FileProcessingError,
+                FileSizeError,
+                OSError,
+                ValueError,
+            ):
+                logger.exception("Failed to process %s", file_path)
                 empty_result: tuple[
                     dict[str, list[str | dict[str, str]]],
                     dict[str, list[dict[str, str]]],
@@ -578,12 +591,15 @@ def handle_misp_init() -> None:
     logger.info("Initializing and updating MISP warning lists...")
     warning_lists = MISPWarningLists(cache_duration=0, force_update=True)
     total_lists = len(warning_lists.warning_lists)
-    logger.info(f"Initialization completed. Downloaded {total_lists} warning lists.")
+    logger.info("Initialization completed. Downloaded %s warning lists.", total_lists)
 
     # Show available list categories
     categories: dict[str, list[str]] = {}
     for list_id, wlist in warning_lists.warning_lists.items():
-        category = str(wlist.get("name", "")).split(" ")[0].lower() if "name" in wlist else "other"
+        if "name" in wlist:
+            category = str(wlist.get("name", "")).split(" ", maxsplit=1)[0].lower()
+        else:
+            category = "other"
         if category not in categories:
             categories[category] = []
         categories[category].append(list_id)
@@ -607,11 +623,11 @@ def process_multiple_files_input(
     # Validate all files exist
     for file_path in file_paths:
         if not file_path.exists():
-            logger.error(f"File not found: {file_path}")
+            logger.error("File not found: %s", file_path)
             sys.exit(1)
 
     parallel_workers = get_int_arg(args, "parallel", default=1)
-    logger.info(f"Processing {len(file_paths)} files with {parallel_workers} workers")
+    logger.info("Processing %s files with %s workers", len(file_paths), parallel_workers)
 
     opts = ProcessingOptions.from_args(args)
     results = process_multiple_files(
@@ -658,7 +674,7 @@ def process_single_input(
         is_from_url = False
 
         if not input_source.exists():
-            logger.error(f"File not found: {input_source}")
+            logger.error("File not found: %s", input_source)
             sys.exit(1)
 
     else:
@@ -694,7 +710,7 @@ def process_single_input(
             try:
                 input_source.unlink()
                 logger.debug("Temporary file deleted")
-            except Exception:
+            except (OSError, PermissionError):
                 logger.debug("Failed to delete temporary file")
 
     return normal_iocs, warning_iocs, input_display
@@ -709,6 +725,7 @@ def resolve_persistence(args: argparse.Namespace) -> AppConfig:
 
 
 def persist_results(
+    *,
     config: AppConfig,
     source_kind: str,
     source_value: str,
@@ -740,7 +757,7 @@ def display_results(
 ) -> None:
     """Display extraction results summary."""
     total_iocs = sum(len(iocs) for iocs in normal_iocs.values())
-    logger.info(f"Found {total_iocs} indicators of compromise")
+    logger.info("Found %s indicators of compromise", total_iocs)
 
     for ioc_type, ioc_list in normal_iocs.items():
         if ioc_list:
@@ -749,7 +766,7 @@ def display_results(
     if warning_iocs:
         print_warning_lists(warning_iocs)
         warnings_count = sum(len(warnings) for warnings in warning_iocs.values())
-        logger.warning(f"Found {warnings_count} potential false positives")
+        logger.warning("Found %s potential false positives", warnings_count)
 
 
 def save_output(
@@ -780,11 +797,11 @@ def save_output(
     if output_path:
         if output_path == "-":
             print(formatted_output)
-            logger.info(f"Results displayed in {output_format} format")
+            logger.info("Results displayed in %s format", output_format)
         else:
             output_file = Path(output_path)
             formatter.save(str(output_file))
-            logger.info(f"Results saved to {output_file}")
+            logger.info("Results saved to %s", output_file)
     else:
         # Auto-save with generated filename
         print(formatted_output)
@@ -795,7 +812,7 @@ def save_output(
             output_format=chosen_format,
         )
         formatter.save(output_filename)
-        logger.info(f"Results saved to {output_filename}")
+        logger.info("Results saved to %s", output_filename)
 
 
 def has_input_args(args: argparse.Namespace) -> bool:

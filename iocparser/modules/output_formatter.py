@@ -258,8 +258,8 @@ class TextFormatter(OutputFormatter):
             self._ensure_directory(output_file)
             with Path(output_file).open("w", encoding="utf-8") as f:
                 f.write(self.format())
-        except Exception as e:
-            print(f"Error saving text file: {e!s}")
+        except (OSError, ValueError) as exc:
+            print(f"Error saving text file: {exc!s}")
 
 
 class STIXFormatter(OutputFormatter):

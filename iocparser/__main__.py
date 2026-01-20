@@ -9,6 +9,8 @@ Version: 5.0.0
 
 import sys
 
+from colorama import init
+
 from iocparser.core import (
     VERSION,
     create_argument_parser,
@@ -26,11 +28,13 @@ from iocparser.core import (
     save_output,
     setup_application,
 )
+from iocparser.modules.exceptions import IOCParserError
 from iocparser.modules.persistence import PersistOptions
 
 
 def main() -> None:
     """Main function."""
+    init(autoreset=True)
     try:
         parser = create_argument_parser()
         args = parser.parse_args()
@@ -103,8 +107,8 @@ def main() -> None:
     except KeyboardInterrupt:
         logger.warning("Operation cancelled by user")
         sys.exit(0)
-    except Exception as e:
-        logger.error(f"Unexpected error: {e!s}", exc_info=True)
+    except (IOCParserError, OSError, ValueError, RuntimeError) as exc:
+        logger.error("Unexpected error: %s", exc, exc_info=True)
         sys.exit(1)
 
 

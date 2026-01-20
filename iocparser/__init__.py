@@ -32,8 +32,8 @@ __all__ = [
 
 
 def detect_file_type(file_path: Path) -> str:
-    """Lazy wrapper for detect_file_type to avoid importing main on package import."""
-    from iocparser.main import detect_file_type as _detect_file_type
+    """Lazy wrapper for detect_file_type to avoid importing core on package import."""
+    from iocparser.core import detect_file_type as _detect_file_type
 
     return _detect_file_type(file_path)
 
@@ -43,8 +43,8 @@ def get_output_filename(
     is_json: bool = False,
     output_format: str | None = None,
 ) -> str:
-    """Lazy wrapper for get_output_filename to avoid importing main on package import."""
-    from iocparser.main import get_output_filename as _get_output_filename
+    """Lazy wrapper for get_output_filename to avoid importing core on package import."""
+    from iocparser.core import get_output_filename as _get_output_filename
 
     return _get_output_filename(input_source, is_json=is_json, output_format=output_format)
 

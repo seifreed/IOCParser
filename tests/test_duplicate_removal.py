@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from iocparser.main import process_multiple_files_input
+from iocparser.core import process_multiple_files_input
 
 
 class TestDuplicateRemoval:

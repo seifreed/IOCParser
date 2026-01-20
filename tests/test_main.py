@@ -4,7 +4,7 @@ Copyright (c) 2026 Marc Rivero López
 Licensed under GPLv3. See LICENSE file for details.
 This test suite validates real code behavior without mocks or stubs.
 
-Tests for iocparser.main module - argument parsing, file processing, and CLI operations.
+Tests for iocparser.core module - argument parsing, file processing, and CLI operations.
 """
 
 import argparse
@@ -16,6 +16,7 @@ import pytest
 import requests
 from requests.exceptions import RequestException, Timeout
 
+from iocparser.__main__ import main
 from iocparser.core import (
     MAX_FILE_SIZE,
     MAX_URL_SIZE,
@@ -1481,7 +1482,7 @@ class TestMainFunction:
         def mock_handle_misp_init():
             init_called.append(True)
 
-        monkeypatch.setattr('iocparser.main.handle_misp_init', mock_handle_misp_init)
+        monkeypatch.setattr('iocparser.__main__.handle_misp_init', mock_handle_misp_init)
 
         # Should execute and return without error
         main()
@@ -1499,7 +1500,7 @@ class TestMainFunction:
         def mock_handle_misp_init():
             init_called.append(True)
 
-        monkeypatch.setattr('iocparser.main.handle_misp_init', mock_handle_misp_init)
+        monkeypatch.setattr('iocparser.__main__.handle_misp_init', mock_handle_misp_init)
 
         # Should execute and return without error
         main()
@@ -1570,7 +1571,7 @@ class TestMainFunction:
             def mock_process_file(*args, **kwargs):
                 raise KeyboardInterrupt()
 
-            monkeypatch.setattr('iocparser.main.process_file', mock_process_file)
+            monkeypatch.setattr('iocparser.__main__.process_file', mock_process_file)
 
             with pytest.raises(SystemExit) as exc_info:
                 main()
@@ -1597,7 +1598,7 @@ class TestMainFunction:
             def mock_process_file(*args, **kwargs):
                 raise RuntimeError("Unexpected error for testing")
 
-            monkeypatch.setattr('iocparser.main.process_file', mock_process_file)
+            monkeypatch.setattr('iocparser.__main__.process_file', mock_process_file)
 
             with pytest.raises(SystemExit) as exc_info:
                 main()

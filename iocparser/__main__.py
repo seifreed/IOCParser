@@ -7,9 +7,29 @@ Author: Marc Rivero | @seifreed
 Version: 5.0.0
 """
 
-from iocparser.core import *
+import sys
 
-def main():
+from iocparser.core import (
+    VERSION,
+    create_argument_parser,
+    display_results,
+    get_bool_arg,
+    get_list_arg,
+    get_optional_str_arg,
+    handle_misp_init,
+    has_input_args,
+    logger,
+    persist_results,
+    process_multiple_files_input,
+    process_single_input,
+    resolve_persistence,
+    save_output,
+    setup_application,
+)
+from iocparser.modules.persistence import PersistOptions
+
+
+def main() -> None:
     """Main function."""
     try:
         parser = create_argument_parser()

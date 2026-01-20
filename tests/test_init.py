@@ -72,7 +72,7 @@ startxref
 {400 + len(text_content)}
 %%EOF
 """
-    pdf_path.write_text(pdf_content, encoding='latin-1')
+    pdf_path.write_text(pdf_content, encoding="latin-1")
 
 
 class TestExtractIocsFromFile:
@@ -91,16 +91,14 @@ class TestExtractIocsFromFile:
         create_minimal_pdf(pdf_path, ioc_text)
 
         # Act: Extract IOCs from PDF
-        normal_iocs, warning_iocs = extract_iocs_from_file(
-            pdf_path,
-            check_warnings=False,
-            defang=False
+        normal_iocs, _warning_iocs = extract_iocs_from_file(
+            pdf_path, check_warnings=False, defang=False
         )
 
         # Assert: Verify IOCs were extracted
-        assert 'domains' in normal_iocs or 'ips' in normal_iocs or 'md5' in normal_iocs
+        assert "domains" in normal_iocs or "ips" in normal_iocs or "md5" in normal_iocs
         assert isinstance(normal_iocs, dict)
-        assert isinstance(warning_iocs, dict)
+        assert isinstance(_warning_iocs, dict)
 
     def test_extract_from_html_file(self, tmp_path: Path) -> None:
         """
@@ -122,21 +120,18 @@ class TestExtractIocsFromFile:
     <div>URL: http://phishing-site.com/login</div>
 </body>
 </html>"""
-        html_path.write_text(html_content, encoding='utf-8')
+        html_path.write_text(html_content, encoding="utf-8")
 
         # Act: Extract IOCs from HTML
-        normal_iocs, warning_iocs = extract_iocs_from_file(
-            html_path,
-            check_warnings=False,
-            file_type='html',
-            defang=False
+        normal_iocs, _warning_iocs = extract_iocs_from_file(
+            html_path, check_warnings=False, file_type="html", defang=False
         )
 
         # Assert: Verify IOCs were extracted
         assert isinstance(normal_iocs, dict)
         assert len(normal_iocs) > 0
         # At least one IOC type should be present
-        assert any(key in normal_iocs for key in ['domains', 'ips', 'md5', 'urls'])
+        assert any(key in normal_iocs for key in ["domains", "ips", "md5", "urls"])
 
     def test_extract_from_text_file(self, tmp_path: Path) -> None:
         """
@@ -155,13 +150,11 @@ Indicators of Compromise:
 - SHA256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 - Email: attacker@malicious.net
 """
-        text_path.write_text(text_content, encoding='utf-8')
+        text_path.write_text(text_content, encoding="utf-8")
 
         # Act: Extract IOCs from text file
-        normal_iocs, warning_iocs = extract_iocs_from_file(
-            text_path,
-            check_warnings=False,
-            defang=False
+        normal_iocs, _warning_iocs = extract_iocs_from_file(
+            text_path, check_warnings=False, defang=False
         )
 
         # Assert: Verify extraction
@@ -183,19 +176,17 @@ Dominio malicioso: атака-сервер.com (Cyrillic)
 IP válida: 192.168.1.1
 Hash: 098f6bcd4621d373cade4e832627b4f6
 """
-        text_path.write_text(text_content, encoding='utf-8')
+        text_path.write_text(text_content, encoding="utf-8")
 
         # Act: Extract IOCs
-        normal_iocs, warning_iocs = extract_iocs_from_file(
-            text_path,
-            check_warnings=False,
-            defang=False
+        normal_iocs, _warning_iocs = extract_iocs_from_file(
+            text_path, check_warnings=False, defang=False
         )
 
         # Assert: Should handle Unicode gracefully and extract IPs/hashes
         assert isinstance(normal_iocs, dict)
         # IP and hash should be extractable regardless of surrounding Unicode
-        assert 'ips' in normal_iocs or 'md5' in normal_iocs
+        assert "ips" in normal_iocs or "md5" in normal_iocs
 
     def test_file_not_found_raises_error(self, tmp_path: Path) -> None:
         """
@@ -223,20 +214,16 @@ Hash: 098f6bcd4621d373cade4e832627b4f6
         # Arrange: Create text file with IOCs
         text_path = tmp_path / "iocs_to_defang.txt"
         text_content = "Malicious domain: dangerous.com and IP: 203.0.113.1"
-        text_path.write_text(text_content, encoding='utf-8')
+        text_path.write_text(text_content, encoding="utf-8")
 
         # Act: Extract with defanging
-        normal_iocs, _ = extract_iocs_from_file(
-            text_path,
-            check_warnings=False,
-            defang=True
-        )
+        normal_iocs, _ = extract_iocs_from_file(text_path, check_warnings=False, defang=True)
 
         # Assert: Verify defanging occurred (domains/IPs should contain '[' or be modified)
-        if 'domains' in normal_iocs:
+        if "domains" in normal_iocs:
             # Defanged domains typically have [.] instead of .
-            domain = str(normal_iocs['domains'][0])
-            assert '[' in domain or '.' not in domain
+            domain = str(normal_iocs["domains"][0])
+            assert "[" in domain or "." not in domain
 
     def test_extract_with_defang_disabled(self, tmp_path: Path) -> None:
         """
@@ -248,20 +235,16 @@ Hash: 098f6bcd4621d373cade4e832627b4f6
         # Arrange: Create text file
         text_path = tmp_path / "iocs_no_defang.txt"
         text_content = "Domain: testdomain.org IP: 198.51.100.1"
-        text_path.write_text(text_content, encoding='utf-8')
+        text_path.write_text(text_content, encoding="utf-8")
 
         # Act: Extract without defanging
-        normal_iocs, _ = extract_iocs_from_file(
-            text_path,
-            check_warnings=False,
-            defang=False
-        )
+        normal_iocs, _ = extract_iocs_from_file(text_path, check_warnings=False, defang=False)
 
         # Assert: Verify no defanging (domains should contain '.')
-        if 'domains' in normal_iocs:
-            domain = str(normal_iocs['domains'][0])
-            assert '.' in domain
-            assert '[' not in domain
+        if "domains" in normal_iocs:
+            domain = str(normal_iocs["domains"][0])
+            assert "." in domain
+            assert "[" not in domain
 
     def test_force_file_type_pdf(self, tmp_path: Path) -> None:
         """
@@ -276,10 +259,7 @@ Hash: 098f6bcd4621d373cade4e832627b4f6
 
         # Act: Force PDF parsing
         normal_iocs, _ = extract_iocs_from_file(
-            pdf_path,
-            check_warnings=False,
-            file_type='pdf',
-            defang=False
+            pdf_path, check_warnings=False, file_type="pdf", defang=False
         )
 
         # Assert: Should successfully parse as PDF
@@ -295,14 +275,11 @@ Hash: 098f6bcd4621d373cade4e832627b4f6
         # Arrange: Create HTML file with .txt extension
         html_path = tmp_path / "page.txt"
         html_content = "<html><body>Malware IP: 192.0.2.1</body></html>"
-        html_path.write_text(html_content, encoding='utf-8')
+        html_path.write_text(html_content, encoding="utf-8")
 
         # Act: Force HTML parsing
         normal_iocs, _ = extract_iocs_from_file(
-            html_path,
-            check_warnings=False,
-            file_type='html',
-            defang=False
+            html_path, check_warnings=False, file_type="html", defang=False
         )
 
         # Assert: Should parse as HTML
@@ -318,14 +295,11 @@ Hash: 098f6bcd4621d373cade4e832627b4f6
         # Arrange: Create text file
         text_path = tmp_path / "data.unknown"
         text_content = "Threat actor domain: text-forced.net"
-        text_path.write_text(text_content, encoding='utf-8')
+        text_path.write_text(text_content, encoding="utf-8")
 
         # Act: Force text parsing
         normal_iocs, _ = extract_iocs_from_file(
-            text_path,
-            check_warnings=False,
-            file_type='text',
-            defang=False
+            text_path, check_warnings=False, file_type="text", defang=False
         )
 
         # Assert: Should read as plain text
@@ -349,14 +323,11 @@ Common infrastructure (may be in warning lists):
 - cloudflare.com
 - 8.8.8.8
 """
-        text_path.write_text(text_content, encoding='utf-8')
+        text_path.write_text(text_content, encoding="utf-8")
 
         # Act: Extract with warning list checking
         normal_iocs, warning_iocs = extract_iocs_from_file(
-            text_path,
-            check_warnings=True,
-            force_update=False,
-            defang=False
+            text_path, check_warnings=True, force_update=False, defang=False
         )
 
         # Assert: Both dictionaries should be returned
@@ -375,13 +346,11 @@ Common infrastructure (may be in warning lists):
         # Arrange: Create file with IOCs
         text_path = tmp_path / "all_normal.txt"
         text_content = "Domain: google.com IP: 8.8.8.8"
-        text_path.write_text(text_content, encoding='utf-8')
+        text_path.write_text(text_content, encoding="utf-8")
 
         # Act: Extract without warning checking
         normal_iocs, warning_iocs = extract_iocs_from_file(
-            text_path,
-            check_warnings=False,
-            defang=False
+            text_path, check_warnings=False, defang=False
         )
 
         # Assert: All IOCs should be in normal_iocs, warning_iocs should be empty
@@ -410,17 +379,15 @@ Contact Email: badguy@evil.net
 """
 
         # Act: Extract IOCs
-        normal_iocs, warning_iocs = extract_iocs_from_text(
-            text,
-            check_warnings=False,
-            defang=False
+        normal_iocs, _warning_iocs = extract_iocs_from_text(
+            text, check_warnings=False, defang=False
         )
 
         # Assert: Verify extraction
         assert isinstance(normal_iocs, dict)
         assert len(normal_iocs) > 0
         # Should contain at least domains, IPs, or hashes
-        assert any(key in normal_iocs for key in ['domains', 'ips', 'md5', 'emails'])
+        assert any(key in normal_iocs for key in ["domains", "ips", "md5", "emails"])
 
     def test_extract_from_empty_text(self) -> None:
         """
@@ -433,15 +400,13 @@ Contact Email: badguy@evil.net
         text = ""
 
         # Act: Extract IOCs
-        normal_iocs, warning_iocs = extract_iocs_from_text(
-            text,
-            check_warnings=False,
-            defang=False
+        normal_iocs, _warning_iocs = extract_iocs_from_text(
+            text, check_warnings=False, defang=False
         )
 
         # Assert: Should return empty dictionaries
         assert isinstance(normal_iocs, dict)
-        assert isinstance(warning_iocs, dict)
+        assert isinstance(_warning_iocs, dict)
         assert len(normal_iocs) == 0
 
     def test_extract_with_only_text_no_iocs(self) -> None:
@@ -454,15 +419,13 @@ Contact Email: badguy@evil.net
         text = "This is just normal text without any indicators of compromise."
 
         # Act: Extract IOCs
-        normal_iocs, warning_iocs = extract_iocs_from_text(
-            text,
-            check_warnings=False,
-            defang=False
+        normal_iocs, _warning_iocs = extract_iocs_from_text(
+            text, check_warnings=False, defang=False
         )
 
         # Assert: Should return empty or minimal results
         assert isinstance(normal_iocs, dict)
-        assert isinstance(warning_iocs, dict)
+        assert isinstance(_warning_iocs, dict)
 
     def test_extract_multiple_ioc_types(self) -> None:
         """
@@ -490,17 +453,15 @@ Communication:
 """
 
         # Act: Extract IOCs
-        normal_iocs, warning_iocs = extract_iocs_from_text(
-            text,
-            check_warnings=False,
-            defang=False
+        normal_iocs, _warning_iocs = extract_iocs_from_text(
+            text, check_warnings=False, defang=False
         )
 
         # Assert: Should extract multiple types
         assert isinstance(normal_iocs, dict)
         assert len(normal_iocs) > 0
         # At least 3 different IOC types should be present
-        ioc_type_count = len([k for k in normal_iocs.keys() if normal_iocs[k]])
+        ioc_type_count = len([k for k in normal_iocs if normal_iocs[k]])
         assert ioc_type_count >= 3
 
     def test_extract_with_defang_enabled_from_text(self) -> None:
@@ -514,17 +475,13 @@ Communication:
         text = "Malware contacts command-server.com and 198.51.100.50"
 
         # Act: Extract with defanging
-        normal_iocs, _ = extract_iocs_from_text(
-            text,
-            check_warnings=False,
-            defang=True
-        )
+        normal_iocs, _ = extract_iocs_from_text(text, check_warnings=False, defang=True)
 
         # Assert: Verify defanging
-        if 'domains' in normal_iocs:
-            domain = str(normal_iocs['domains'][0])
+        if "domains" in normal_iocs:
+            domain = str(normal_iocs["domains"][0])
             # Defanged domains should have modified format
-            assert '[' in domain or '.' not in domain
+            assert "[" in domain or "." not in domain
 
     def test_extract_with_defang_disabled_from_text(self) -> None:
         """
@@ -537,17 +494,13 @@ Communication:
         text = "Suspicious domain: preserve-format.org"
 
         # Act: Extract without defanging
-        normal_iocs, _ = extract_iocs_from_text(
-            text,
-            check_warnings=False,
-            defang=False
-        )
+        normal_iocs, _ = extract_iocs_from_text(text, check_warnings=False, defang=False)
 
         # Assert: Verify no defanging
-        if 'domains' in normal_iocs:
-            domain = str(normal_iocs['domains'][0])
-            assert '.' in domain
-            assert '[' not in domain
+        if "domains" in normal_iocs:
+            domain = str(normal_iocs["domains"][0])
+            assert "." in domain
+            assert "[" not in domain
 
     def test_extract_with_warning_check_enabled(self) -> None:
         """
@@ -568,10 +521,7 @@ Suspicious domains:
 
         # Act: Extract with warning checking
         normal_iocs, warning_iocs = extract_iocs_from_text(
-            text,
-            check_warnings=True,
-            force_update=False,
-            defang=False
+            text, check_warnings=True, force_update=False, defang=False
         )
 
         # Assert: Should separate IOCs
@@ -590,17 +540,13 @@ Suspicious domains:
         text = "Domains: google.com, suspicious-site.net"
 
         # Act: Extract without warning checking
-        normal_iocs, warning_iocs = extract_iocs_from_text(
-            text,
-            check_warnings=False,
-            defang=False
-        )
+        normal_iocs, warning_iocs = extract_iocs_from_text(text, check_warnings=False, defang=False)
 
         # Assert: All IOCs in normal, warnings empty
         assert isinstance(normal_iocs, dict)
         assert warning_iocs == {}
-        if 'domains' in normal_iocs:
-            assert len(normal_iocs['domains']) > 0
+        if "domains" in normal_iocs:
+            assert len(normal_iocs["domains"]) > 0
 
     def test_extract_with_force_update_warning_lists(self) -> None:
         """
@@ -615,10 +561,7 @@ Suspicious domains:
         # Act: Extract with forced warning list update
         # This will trigger actual warning list update
         normal_iocs, warning_iocs = extract_iocs_from_text(
-            text,
-            check_warnings=True,
-            force_update=True,
-            defang=False
+            text, check_warnings=True, force_update=True, defang=False
         )
 
         # Assert: Should complete without errors and return results
@@ -636,18 +579,14 @@ Suspicious domains:
         text = "IOCs: malware.net 10.0.0.1 http://phish.com/page"
 
         # Act: Extract IOCs
-        normal_iocs, warning_iocs = extract_iocs_from_text(
-            text,
-            check_warnings=False,
-            defang=False
-        )
+        normal_iocs, warning_iocs = extract_iocs_from_text(text, check_warnings=False, defang=False)
 
         # Assert: Verify structure
         assert isinstance(normal_iocs, dict)
         assert isinstance(warning_iocs, dict)
 
         # All values should be lists
-        for key, value in normal_iocs.items():
+        for value in normal_iocs.values():
             assert isinstance(value, list)
             # Each item should be str or dict
             for item in value:
@@ -670,11 +609,7 @@ IOCs found in traffic logs:
 """
 
         # Act: Extract IOCs
-        normal_iocs, _ = extract_iocs_from_text(
-            text,
-            check_warnings=False,
-            defang=False
-        )
+        normal_iocs, _ = extract_iocs_from_text(text, check_warnings=False, defang=False)
 
         # Assert: Should extract IOCs despite surrounding characters
         assert isinstance(normal_iocs, dict)
@@ -691,11 +626,7 @@ IOCs found in traffic logs:
         text = "Domain:     malware.com\n\n\nIP:\t\t192.168.1.1\r\n\r\nHash:  5f4dcc3b5aa765d61d8327deb882cf99"
 
         # Act: Extract IOCs
-        normal_iocs, _ = extract_iocs_from_text(
-            text,
-            check_warnings=False,
-            defang=False
-        )
+        normal_iocs, _ = extract_iocs_from_text(text, check_warnings=False, defang=False)
 
         # Assert: Should handle whitespace variations
         assert isinstance(normal_iocs, dict)

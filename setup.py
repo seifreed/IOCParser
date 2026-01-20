@@ -55,7 +55,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "iocparser=iocparser.main:main",
+            "iocparser=iocparser.__main__:main",
         ],
     },
     include_package_data=True,

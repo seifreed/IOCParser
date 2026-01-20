@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from iocparser.main import process_multiple_files_input
+from iocparser.core import process_multiple_files_input
 
 
 class TestDuplicateRemoval:
@@ -20,10 +20,9 @@ class TestDuplicateRemoval:
 
     def create_temp_file_with_content(self, content: str) -> Path:
         """Helper method to create temporary file with specific content"""
-        temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
-        temp_file.write(content)
-        temp_file.close()
-        return Path(temp_file.name)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as temp_file:
+            temp_file.write(content)
+            return Path(temp_file.name)
 
     def create_mock_args(self, file_paths: list) -> argparse.Namespace:
         """Helper to create mock args for testing"""
@@ -56,20 +55,30 @@ class TestDuplicateRemoval:
 
         try:
             args = self.create_mock_args([file1, file2])
-            normal_iocs, warning_iocs, display, _results = process_multiple_files_input(args)
+            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(args)
 
             # Check domains are deduplicated (accounting for defanging)
-            if 'domains' in normal_iocs:
-                domains = normal_iocs['domains']
+            if "domains" in normal_iocs:
+                domains = normal_iocs["domains"]
                 # Count occurrences of evil.com (defanged as evil[.]com)
-                evil_com_count = sum(1 for domain in domains if 'evil' in str(domain).lower() and 'com' in str(domain).lower())
-                assert evil_com_count == 1, f"Expected 1 occurrence of evil.com, got {evil_com_count}"
+                evil_com_count = sum(
+                    1
+                    for domain in domains
+                    if "evil" in str(domain).lower() and "com" in str(domain).lower()
+                )
+                assert evil_com_count == 1, (
+                    f"Expected 1 occurrence of evil.com, got {evil_com_count}"
+                )
 
             # Check IPs are deduplicated (accounting for defanging)
-            if 'ips' in normal_iocs:
-                ips = normal_iocs['ips']
+            if "ips" in normal_iocs:
+                ips = normal_iocs["ips"]
                 # Match 192.168.1.1 in both defanged (192[.]168[.]1[.]1) and non-defanged forms
-                ip_count = sum(1 for ip in ips if '192' in str(ip) and '168' in str(ip) and str(ip).count('1') >= 2)
+                ip_count = sum(
+                    1
+                    for ip in ips
+                    if "192" in str(ip) and "168" in str(ip) and str(ip).count("1") >= 2
+                )
                 assert ip_count == 1, f"Expected 1 occurrence of 192.168.1.1, got {ip_count}"
 
         finally:
@@ -95,7 +104,7 @@ class TestDuplicateRemoval:
 
         try:
             args = self.create_mock_args([file1, file2])
-            normal_iocs, warning_iocs, display, _results = process_multiple_files_input(args)
+            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(args)
 
             # Check that we have results
             assert len(normal_iocs) > 0, "Should have extracted some IOCs"
@@ -132,10 +141,10 @@ class TestDuplicateRemoval:
 
         try:
             args = self.create_mock_args([file1, file2])
-            normal_iocs, warning_iocs, display, _results = process_multiple_files_input(args)
+            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(args)
 
-            if 'domains' in normal_iocs:
-                domains = normal_iocs['domains']
+            if "domains" in normal_iocs:
+                domains = normal_iocs["domains"]
                 domain_strings = [str(d) for d in domains]
 
                 # Verify we have unique domains
@@ -161,11 +170,11 @@ class TestDuplicateRemoval:
 
         try:
             args = self.create_mock_args([file1, file2])
-            normal_iocs, warning_iocs, display, _results = process_multiple_files_input(args)
+            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(args)
 
             # Should handle gracefully without errors
             assert isinstance(normal_iocs, dict), "Should return dict even with no IOCs"
-            assert isinstance(warning_iocs, dict), "Should return dict even with no IOCs"
+            assert isinstance(_warning_iocs, dict), "Should return dict even with no IOCs"
 
         finally:
             # Cleanup
@@ -175,11 +184,14 @@ class TestDuplicateRemoval:
     def test_performance_with_many_duplicates(self):
         """Test performance doesn't degrade with many duplicates"""
         # Create content with many repetitive IOCs
-        repeated_content = """
+        repeated_content = (
+            """
         evil.com appears many times
         192.168.1.1 is repeated
         hash: d41d8cd98f00b204e9800998ecf8427e
-        """ * 50  # Repeat 50 times
+        """
+            * 50
+        )  # Repeat 50 times
 
         file1 = self.create_temp_file_with_content(repeated_content)
         file2 = self.create_temp_file_with_content(repeated_content)
@@ -188,8 +200,9 @@ class TestDuplicateRemoval:
             args = self.create_mock_args([file1, file2])
 
             import time
+
             start_time = time.time()
-            normal_iocs, warning_iocs, display, _results = process_multiple_files_input(args)
+            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(args)
             end_time = time.time()
 
             # Should complete in reasonable time (< 5 seconds for this small test)

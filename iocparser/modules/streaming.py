@@ -97,11 +97,13 @@ class StreamingIOCExtractor:
 
         Args:
             file_obj: File object to read from
-            is_text: Whether the file is text or binary
-
+            is_text: Whether the stream contains text
         Yields:
             Text chunks from the file
         """
+        if not is_text and isinstance(file_obj, io.TextIOBase) and hasattr(file_obj, "buffer"):
+            file_obj = file_obj.buffer
+
         previous_chunk_tail = ""
         bytes_read = 0
         total_size = 0
@@ -173,7 +175,7 @@ class StreamingIOCExtractor:
         if not file_path.exists():
             raise IOCFileNotFoundError(str(file_path))
 
-        logger.info(f"Starting streaming extraction from {file_path}")
+        logger.info("Starting streaming extraction from %s", file_path)
 
         # Reset seen IOCs for new file
         self.seen_iocs.clear()
@@ -196,7 +198,7 @@ class StreamingIOCExtractor:
                             self._accumulate_iocs(all_iocs, unique_iocs)
 
         except Exception:
-            logger.exception(f"Error processing file {file_path}")
+            logger.exception("Error processing file %s", file_path)
             raise
 
         if not yield_chunks:
@@ -225,7 +227,11 @@ class StreamingIOCExtractor:
         # Reset seen IOCs for new stream
         self.seen_iocs.clear()
 
-        for chunk in self._read_chunks(stream, is_text=is_text):
+        file_obj: BinaryIO | TextIO = stream
+        if not is_text and isinstance(stream, io.TextIOBase) and hasattr(stream, "buffer"):
+            file_obj = stream.buffer
+
+        for chunk in self._read_chunks(file_obj, is_text=is_text):
             # Extract IOCs from chunk
             chunk_iocs = self.extractor.extract_all(chunk)
 
@@ -256,7 +262,7 @@ class StreamingIOCExtractor:
         if not file_path.exists():
             raise IOCFileNotFoundError(str(file_path))
 
-        logger.info(f"Starting memory-mapped extraction from {file_path}")
+        logger.info("Starting memory-mapped extraction from %s", file_path)
 
         # Reset seen IOCs
         self.seen_iocs.clear()
@@ -377,10 +383,10 @@ class ParallelStreamingExtractor:
                         progress = int((completed_files / total_files) * 100)
                         progress_callback(progress)
 
-                    logger.info(f"Completed extraction from {path_str}")
+                    logger.info("Completed extraction from %s", path_str)
 
-                except Exception:
-                    logger.exception(f"Error processing {file_path}")
+                except (OSError, ValueError, RuntimeError):
+                    logger.exception("Error processing %s", file_path)
                     results[str(file_path)] = {}
 
         return results

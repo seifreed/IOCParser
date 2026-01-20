@@ -13,6 +13,7 @@ from pathlib import Path
 import pdfplumber
 import requests
 from bs4 import BeautifulSoup
+from pdfplumber.utils.exceptions import PdfminerException
 from tqdm import tqdm
 
 from iocparser.modules.exceptions import (
@@ -78,19 +79,30 @@ class PDFParser(FileParser):
                     text_content += page_text
 
                     # Also extract tables as they might contain IOCs
-                    tables = page.extract_tables()
-                    if tables:
-                        for table in tables:
-                            if table:
-                                for row in table:
-                                    if row:
-                                        row_text = " ".join([str(cell) for cell in row if cell])
-                                        text_content += row_text + "\n"
+                    tables = page.extract_tables() or []
+                    for table in tables:
+                        text_content += self._extract_table_text(table)
 
-        except Exception as e:
-            raise PDFProcessingError(str(e)) from e
+        except (OSError, ValueError, PdfminerException) as exc:
+            raise PDFProcessingError(str(exc)) from exc
 
         return text_content
+
+    @staticmethod
+    def _extract_table_text(table: list[list[str | None]] | None) -> str:
+        """Return table text with rows joined and filtered."""
+        if not table:
+            return ""
+        lines: list[str] = []
+        for row in table:
+            if not row:
+                continue
+            row_text = " ".join(str(cell) for cell in row if cell)
+            if row_text:
+                lines.append(row_text)
+        if not lines:
+            return ""
+        return "\n".join(lines) + "\n"
 
 
 class HTMLParser(FileParser):

@@ -145,6 +145,7 @@ class PersistenceManager:
     def _get_or_create_ioc(
         self,
         session: Session,
+        *,
         ioc_type: str,
         value: str,
         is_warning: bool,
@@ -173,10 +174,55 @@ class PersistenceManager:
         session.flush()
         return ioc
 
+    def _collect_normal_ioc_ids(
+        self,
+        session: Session,
+        normal_iocs: dict[str, list[str | dict[str, str]]],
+    ) -> list[int]:
+        ioc_ids: list[int] = []
+        for ioc_type, values in normal_iocs.items():
+            for value in values:
+                val = value.get("value") if isinstance(value, dict) else str(value)
+                if not val:
+                    continue
+                ioc = self._get_or_create_ioc(
+                    session,
+                    ioc_type=ioc_type,
+                    value=val,
+                    is_warning=False,
+                    warning_list="",
+                    warning_description="",
+                )
+                ioc_ids.append(ioc.id)
+        return ioc_ids
+
+    def _collect_warning_ioc_ids(
+        self,
+        session: Session,
+        warning_iocs: dict[str, list[dict[str, str]]],
+    ) -> list[int]:
+        ioc_ids: list[int] = []
+        for ioc_type, warnings in warning_iocs.items():
+            for warning in warnings:
+                val = warning.get("value")
+                if not val:
+                    continue
+                ioc = self._get_or_create_ioc(
+                    session,
+                    ioc_type=ioc_type,
+                    value=val,
+                    is_warning=True,
+                    warning_list=warning.get("warning_list", "") or "",
+                    warning_description=warning.get("description", "") or "",
+                )
+                ioc_ids.append(ioc.id)
+        return ioc_ids
+
     def persist_run(
         self,
         source_kind: str,
         source_value: str,
+        *,
         normal_iocs: dict[str, list[str | dict[str, str]]],
         warning_iocs: dict[str, list[dict[str, str]]],
         tool_version: str,
@@ -196,36 +242,8 @@ class PersistenceManager:
             session.add(run)
             session.flush()
 
-            ioc_ids: list[int] = []
-            for ioc_type, values in normal_iocs.items():
-                for value in values:
-                    val = value.get("value") if isinstance(value, dict) else str(value)
-                    if not val:
-                        continue
-                    ioc = self._get_or_create_ioc(
-                        session,
-                        ioc_type=ioc_type,
-                        value=val,
-                        is_warning=False,
-                        warning_list="",
-                        warning_description="",
-                    )
-                    ioc_ids.append(ioc.id)
-
-            for ioc_type, warnings in warning_iocs.items():
-                for warning in warnings:
-                    val = warning.get("value")
-                    if not val:
-                        continue
-                    ioc = self._get_or_create_ioc(
-                        session,
-                        ioc_type=ioc_type,
-                        value=val,
-                        is_warning=True,
-                        warning_list=warning.get("warning_list", "") or "",
-                        warning_description=warning.get("description", "") or "",
-                    )
-                    ioc_ids.append(ioc.id)
+            ioc_ids = self._collect_normal_ioc_ids(session, normal_iocs)
+            ioc_ids.extend(self._collect_warning_ioc_ids(session, warning_iocs))
 
             for ioc_id in ioc_ids:
                 session.add(RunIOC(run_id=run.id, ioc_id=ioc_id))

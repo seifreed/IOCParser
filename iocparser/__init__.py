@@ -9,6 +9,7 @@ from typing import cast
 
 __version__ = "5.0.0"
 
+from iocparser.core import detect_file_type, get_output_filename
 from iocparser.modules.exceptions import FileExistenceError
 from iocparser.modules.extractor import IOCExtractor
 from iocparser.modules.file_parser import HTMLParser, PDFParser
@@ -29,24 +30,6 @@ __all__ = [
     "extract_iocs_from_text",
     "get_output_filename",
 ]
-
-
-def detect_file_type(file_path: Path) -> str:
-    """Lazy wrapper for detect_file_type to avoid importing main on package import."""
-    from iocparser.main import detect_file_type as _detect_file_type
-
-    return _detect_file_type(file_path)
-
-
-def get_output_filename(
-    input_source: str,
-    is_json: bool = False,
-    output_format: str | None = None,
-) -> str:
-    """Lazy wrapper for get_output_filename to avoid importing main on package import."""
-    from iocparser.main import get_output_filename as _get_output_filename
-
-    return _get_output_filename(input_source, is_json=is_json, output_format=output_format)
 
 
 def extract_iocs_from_file(

@@ -71,7 +71,7 @@ Repository = "https://github.com/seifreed/iocparser"
 "Bug Tracker" = "https://github.com/seifreed/iocparser/issues"
 
 [project.scripts]
-iocparser = "iocparser.main:main"
+iocparser = "iocparser.__main__:main"
 
 [tool.setuptools.packages.find]
 include = ["iocparser*"]
@@ -149,7 +149,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101", "PLR2004", "S311"]
+"tests/*" = ["PLR2004", "S101", "S311", "SLF001"]
 "examples/*" = ["INP001"]
 
 [tool.ruff.lint.isort]

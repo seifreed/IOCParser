@@ -4,7 +4,7 @@ Copyright (c) 2026 Marc Rivero López
 Licensed under GPLv3. See LICENSE file for details.
 This test suite validates real code behavior without mocks or stubs.
 
-Tests for iocparser.main module - argument parsing, file processing, and CLI operations.
+Tests for iocparser.core module - argument parsing, file processing, and CLI operations.
 """
 
 import argparse
@@ -13,12 +13,10 @@ import tempfile
 from pathlib import Path
 
 import pytest
-import requests
-from requests.exceptions import RequestException, Timeout
 
-from iocparser.main import (
+from iocparser.__main__ import main
+from iocparser.core import (
     MAX_FILE_SIZE,
-    MAX_URL_SIZE,
     ProcessingOptions,
     create_argument_parser,
     detect_file_type,
@@ -32,9 +30,7 @@ from iocparser.main import (
     get_optional_str_arg,
     get_output_filename,
     get_str_arg,
-    handle_misp_init,
     has_input_args,
-    main,
     print_warning_lists,
     process_file,
     process_multiple_files,
@@ -45,12 +41,12 @@ from iocparser.main import (
     validate_file_size,
 )
 from iocparser.modules.exceptions import (
-    DownloadSizeError,
-    FileSizeError,
     FileProcessingError,
+    FileSizeError,
     InvalidURLError,
     IOCTimeoutError,
     NetworkDownloadError,
+    NetworkError,
 )
 
 
@@ -59,10 +55,11 @@ class TestArgumentHelpers:
 
     def test_get_str_arg_with_value(self) -> None:
         """Test get_str_arg returns string when attribute exists."""
-        args = argparse.Namespace(file_path="/tmp/test.txt", output="result.json")
+        temp_path = Path(tempfile.gettempdir()) / "test.txt"
+        args = argparse.Namespace(file_path=str(temp_path), output="result.json")
 
         result = get_str_arg(args, "file_path")
-        assert result == "/tmp/test.txt"
+        assert result == str(temp_path)
         assert isinstance(result, str)
 
     def test_get_str_arg_with_none(self) -> None:
@@ -364,7 +361,7 @@ class TestFileTypeDetection:
 
     def test_detect_file_type_text_file(self) -> None:
         """Test automatic file type detection for text files."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Sample text content\n192.168.1.1\nevil.com\n")
             temp_path = Path(f.name)
 
@@ -376,7 +373,7 @@ class TestFileTypeDetection:
 
     def test_detect_file_type_html_extension(self) -> None:
         """Test file type detection falls back to extension for ambiguous files."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False) as f:
             f.write("<html><body>Test</body></html>")
             temp_path = Path(f.name)
 
@@ -392,7 +389,7 @@ class TestFileSizeValidation:
 
     def test_validate_file_size_within_limit(self) -> None:
         """Test file size validation passes for files under limit."""
-        with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
             f.write("Small file content" * 100)  # A few KB
             temp_path = Path(f.name)
 
@@ -404,7 +401,7 @@ class TestFileSizeValidation:
 
     def test_validate_file_size_exceeds_limit(self) -> None:
         """Test file size validation fails for files over limit."""
-        with tempfile.NamedTemporaryFile(mode='wb', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False) as f:
             # Create a file larger than 1KB for testing
             f.write(b"X" * 2000)
             temp_path = Path(f.name)
@@ -418,7 +415,7 @@ class TestFileSizeValidation:
 
     def test_validate_file_size_exact_limit(self) -> None:
         """Test file size validation at exact limit boundary."""
-        with tempfile.NamedTemporaryFile(mode='wb', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False) as f:
             f.write(b"X" * 1000)
             temp_path = Path(f.name)
 
@@ -444,7 +441,7 @@ class TestDownloadURLToTemp:
     def test_download_url_to_temp_timeout(self) -> None:
         """Test download handles timeout errors."""
         # Use a non-routable IP to simulate timeout
-        with pytest.raises(Exception):  # Will raise NetworkError or IOCTimeoutError
+        with pytest.raises((NetworkDownloadError, NetworkError, IOCTimeoutError)):
             download_url_to_temp("http://192.0.2.1/file.txt", timeout=1)
 
     def test_download_url_to_temp_nonexistent_domain(self) -> None:
@@ -487,7 +484,8 @@ class TestGetOutputFilename:
         """Test output filename generation from URL with path."""
         result = get_output_filename("https://blog.example.com/2024/malware-report.pdf")
         # Filename contains domain and path components
-        assert "blog" in result and "example" in result
+        assert "blog" in result
+        assert "example" in result
         assert "malware" in result
 
     def test_get_output_filename_long_name(self) -> None:
@@ -513,14 +511,14 @@ class TestProcessFile:
 
     def test_process_file_text(self) -> None:
         """Test processing a text file extracts IOCs correctly."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Malware contacts evil-domain.com\n")
             f.write("Command and control at 192.168.1.100\n")
             f.write("Hash: 5f4dcc3b5aa765d61d8327deb882cf99\n")
             temp_path = Path(f.name)
 
         try:
-            normal_iocs, warning_iocs = process_file(
+            normal_iocs, _warning_iocs = process_file(
                 temp_path,
                 file_type="text",
                 defang=False,
@@ -532,9 +530,7 @@ class TestProcessFile:
 
             # Should have extracted domains or IPs
             has_network_iocs = (
-                'domains' in normal_iocs or
-                'ips' in normal_iocs or
-                'ipv4s' in normal_iocs
+                "domains" in normal_iocs or "ips" in normal_iocs or "ipv4s" in normal_iocs
             )
             assert has_network_iocs
 
@@ -543,20 +539,20 @@ class TestProcessFile:
 
     def test_process_file_exceeds_size_limit(self) -> None:
         """Test processing fails for files exceeding size limit."""
-        with tempfile.NamedTemporaryFile(mode='wb', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False) as f:
             # Create file larger than MAX_FILE_SIZE
             f.write(b"X" * (MAX_FILE_SIZE + 1000))
             temp_path = Path(f.name)
 
         try:
-            with pytest.raises(Exception):  # Will raise FileSizeError wrapped in FileProcessingError
+            with pytest.raises((FileProcessingError, FileSizeError)):
                 process_file(temp_path, file_type="text")
         finally:
             temp_path.unlink()
 
     def test_process_file_with_defanging(self) -> None:
         """Test processing with defanging enabled."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Contact malicious.example.com for instructions\n")
             temp_path = Path(f.name)
 
@@ -568,17 +564,17 @@ class TestProcessFile:
                 check_warnings=False,
             )
 
-            if 'domains' in normal_iocs and normal_iocs['domains']:
-                domain = str(normal_iocs['domains'][0])
+            if normal_iocs.get("domains"):
+                domain = str(normal_iocs["domains"][0])
                 # Defanged domains should contain brackets
-                assert '[' in domain or '(' in domain
+                assert "[" in domain or "(" in domain
 
         finally:
             temp_path.unlink()
 
     def test_process_file_without_defanging(self) -> None:
         """Test processing with defanging disabled."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Contact malicious-test.example.com for instructions\n")
             temp_path = Path(f.name)
 
@@ -590,10 +586,10 @@ class TestProcessFile:
                 check_warnings=False,
             )
 
-            if 'domains' in normal_iocs and normal_iocs['domains']:
-                domain = str(normal_iocs['domains'][0])
+            if normal_iocs.get("domains"):
+                domain = str(normal_iocs["domains"][0])
                 # Non-defanged domains should not contain brackets
-                assert '[' not in domain
+                assert "[" not in domain
 
         finally:
             temp_path.unlink()
@@ -612,8 +608,8 @@ class TestSaveOutput:
             )
 
             normal_iocs = {
-                'domains': ['evil.com', 'malware.net'],
-                'ips': ['192.168.1.1', '10.0.0.1'],
+                "domains": ["evil.com", "malware.net"],
+                "ips": ["192.168.1.1", "10.0.0.1"],
             }
             warning_iocs = {}
 
@@ -624,7 +620,7 @@ class TestSaveOutput:
 
             # Verify content
             content = Path(output_path).read_text()
-            assert 'evil.com' in content or 'evil[.]com' in content
+            assert "evil.com" in content or "evil[.]com" in content
             assert len(content) > 0
 
     def test_save_output_json_format(self) -> None:
@@ -637,8 +633,8 @@ class TestSaveOutput:
             )
 
             normal_iocs = {
-                'domains': ['evil.com'],
-                'ips': ['192.168.1.1'],
+                "domains": ["evil.com"],
+                "ips": ["192.168.1.1"],
             }
             warning_iocs = {}
 
@@ -649,6 +645,7 @@ class TestSaveOutput:
 
             # Verify it's valid JSON
             import json
+
             content = Path(output_path).read_text()
             data = json.loads(content)
             assert isinstance(data, dict)
@@ -660,7 +657,7 @@ class TestSaveOutput:
             output="-",
         )
 
-        normal_iocs = {'domains': ['test.com']}
+        normal_iocs = {"domains": ["test.com"]}
         warning_iocs = {}
 
         # Should execute without errors (output goes to stdout)
@@ -673,7 +670,7 @@ class TestSaveOutput:
             output=None,
         )
 
-        normal_iocs = {'domains': ['test.com']}
+        normal_iocs = {"domains": ["test.com"]}
         warning_iocs = {}
 
         # Should execute without errors and create file
@@ -885,53 +882,53 @@ class TestDetectFileTypeErrors:
     def test_detect_file_type_magic_error_fallback(self) -> None:
         """Test detect_file_type falls back to extension when magic fails."""
         # Create a file that might cause magic library issues
-        with tempfile.NamedTemporaryFile(mode='wb', suffix='.html', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".html", delete=False) as f:
             # Write binary data that might confuse magic
-            f.write(b'\x00\x01\x02\x03\x04' * 100)
+            f.write(b"\x00\x01\x02\x03\x04" * 100)
             temp_path = Path(f.name)
 
         try:
             # Should fall back to extension-based detection
             file_type = detect_file_type(temp_path)
             # Should detect as html from extension, or text from binary
-            assert file_type in ['html', 'text']
+            assert file_type in ["html", "text"]
         finally:
             temp_path.unlink()
 
     def test_detect_file_type_text_plain_html_extension(self) -> None:
         """Test detect_file_type handles text/plain with .html extension."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False) as f:
             f.write("Plain text but with html extension\n")
             temp_path = Path(f.name)
 
         try:
             file_type = detect_file_type(temp_path)
             # Should be detected as html or text
-            assert file_type in ['html', 'text']
+            assert file_type in ["html", "text"]
         finally:
             temp_path.unlink()
 
     def test_detect_file_type_text_plain_htm_extension(self) -> None:
         """Test detect_file_type handles text/plain with .htm extension."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.htm', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".htm", delete=False) as f:
             f.write("Plain text but with htm extension\n")
             temp_path = Path(f.name)
 
         try:
             file_type = detect_file_type(temp_path)
-            assert file_type in ['html', 'text']
+            assert file_type in ["html", "text"]
         finally:
             temp_path.unlink()
 
     def test_detect_file_type_text_plain_xml_extension(self) -> None:
         """Test detect_file_type handles text/plain with .xml extension."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.xml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".xml", delete=False) as f:
             f.write("<?xml version='1.0'?><root>test</root>\n")
             temp_path = Path(f.name)
 
         try:
             file_type = detect_file_type(temp_path)
-            assert file_type in ['html', 'text']
+            assert file_type in ["html", "text"]
         finally:
             temp_path.unlink()
 
@@ -946,7 +943,7 @@ class TestProcessFileAdvanced:
 
     def test_process_file_html_type(self) -> None:
         """Test processing an HTML file extracts IOCs correctly."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False) as f:
             f.write("""
             <html>
             <body>
@@ -960,7 +957,7 @@ class TestProcessFileAdvanced:
             temp_path = Path(f.name)
 
         try:
-            normal_iocs, warning_iocs = process_file(
+            normal_iocs, _warning_iocs = process_file(
                 temp_path,
                 file_type="html",
                 defang=False,
@@ -975,14 +972,14 @@ class TestProcessFileAdvanced:
 
     def test_process_file_auto_detect_type(self) -> None:
         """Test processing file with automatic type detection."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Malware contacts evil-auto.com\n")
             f.write("IP: 198.51.100.42\n")
             temp_path = Path(f.name)
 
         try:
             # Don't specify file_type - let it auto-detect
-            normal_iocs, warning_iocs = process_file(
+            normal_iocs, _warning_iocs = process_file(
                 temp_path,
                 file_type=None,
                 defang=False,
@@ -996,7 +993,7 @@ class TestProcessFileAdvanced:
 
     def test_process_file_with_warnings_check(self) -> None:
         """Test processing file with MISP warning lists enabled."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             # Use a domain that might be in warning lists
             f.write("Contact google.com or example.com\n")
             f.write("Also check test-malware.example.net\n")
@@ -1028,11 +1025,10 @@ class TestProcessMultipleFiles:
         try:
             # Create three test files
             for i in range(3):
-                f = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
-                f.write(f"File {i} contains evil{i}.com\n")
-                f.write(f"And IP 192.168.1.{i}\n")
-                f.close()
-                files.append(Path(f.name))
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+                    f.write(f"File {i} contains evil{i}.com\n")
+                    f.write(f"And IP 192.168.1.{i}\n")
+                    files.append(Path(f.name))
 
             results = process_multiple_files(
                 files,
@@ -1048,7 +1044,7 @@ class TestProcessMultipleFiles:
             # Each file should have processed successfully
             for file_path in files:
                 assert str(file_path) in results
-                normal_iocs, warning_iocs = results[str(file_path)]
+                normal_iocs, _warning_iocs = results[str(file_path)]
                 assert isinstance(normal_iocs, dict)
 
         finally:
@@ -1061,16 +1057,14 @@ class TestProcessMultipleFiles:
         files = []
         try:
             # Create one valid file
-            f1 = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
-            f1.write("Valid file with evil1.com\n")
-            f1.close()
-            files.append(Path(f1.name))
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f1:
+                f1.write("Valid file with evil1.com\n")
+                files.append(Path(f1.name))
 
             # Create an oversized file
-            f2 = tempfile.NamedTemporaryFile(mode='wb', suffix='.txt', delete=False)
-            f2.write(b"X" * (MAX_FILE_SIZE + 1000))
-            f2.close()
-            files.append(Path(f2.name))
+            with tempfile.NamedTemporaryFile(mode="wb", suffix=".txt", delete=False) as f2:
+                f2.write(b"X" * (MAX_FILE_SIZE + 1000))
+                files.append(Path(f2.name))
 
             results = process_multiple_files(
                 files,
@@ -1108,10 +1102,9 @@ class TestProcessMultipleFilesInput:
         try:
             # Create test files
             for i in range(2):
-                f = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
-                f.write(f"Malware {i}: evil{i}.example.com\n")
-                f.close()
-                files.append(f.name)
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+                    f.write(f"Malware {i}: evil{i}.example.com\n")
+                    files.append(f.name)
 
             args = argparse.Namespace(
                 multiple=files,
@@ -1154,11 +1147,10 @@ class TestProcessMultipleFilesInput:
         try:
             # Create files with overlapping IOCs
             for i in range(2):
-                f = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
-                f.write("Both files have duplicate-domain.com\n")
-                f.write(f"Unique to file {i}: unique{i}.com\n")
-                f.close()
-                files.append(f.name)
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+                    f.write("Both files have duplicate-domain.com\n")
+                    f.write(f"Unique to file {i}: unique{i}.com\n")
+                    files.append(f.name)
 
             args = argparse.Namespace(
                 multiple=files,
@@ -1172,10 +1164,10 @@ class TestProcessMultipleFilesInput:
             normal_iocs, _, _, _results = process_multiple_files_input(args)
 
             # Check deduplication occurred
-            if 'domains' in normal_iocs:
-                domains = normal_iocs['domains']
+            if "domains" in normal_iocs:
+                domains = normal_iocs["domains"]
                 # Should not have duplicates
-                assert len(domains) == len(set(str(d) for d in domains))
+                assert len(domains) == len({str(d) for d in domains})
 
         finally:
             for file_path in files:
@@ -1188,11 +1180,10 @@ class TestProcessMultipleFilesInput:
         try:
             # Create files with IOCs that might trigger warnings
             for i in range(2):
-                f = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
-                f.write("File has google.com and example.com\n")
-                f.write(f"Also malware{i}.example.net\n")
-                f.close()
-                files.append(f.name)
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+                    f.write("File has google.com and example.com\n")
+                    f.write(f"Also malware{i}.example.net\n")
+                    files.append(f.name)
 
             args = argparse.Namespace(
                 multiple=files,
@@ -1221,7 +1212,7 @@ class TestProcessSingleInput:
 
     def test_process_single_input_file(self) -> None:
         """Test process_single_input with a file argument."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Single input test: malware-single.com\n")
             temp_path = Path(f.name)
 
@@ -1236,7 +1227,7 @@ class TestProcessSingleInput:
                 force_update=False,
             )
 
-            normal_iocs, warning_iocs, input_display = process_single_input(args)
+            normal_iocs, _warning_iocs, input_display = process_single_input(args)
 
             assert isinstance(normal_iocs, dict)
             assert str(temp_path) in input_display
@@ -1300,7 +1291,7 @@ class TestProcessSingleInput:
     def test_process_single_input_processing_failure(self) -> None:
         """Test process_single_input exits on file processing failure."""
         # Create an invalid file that will cause processing error
-        with tempfile.NamedTemporaryFile(mode='wb', suffix='.pdf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".pdf", delete=False) as f:
             f.write(b"Not a real PDF file")
             temp_path = Path(f.name)
 
@@ -1318,7 +1309,7 @@ class TestProcessSingleInput:
             # This might raise SystemExit or just process as text
             # depending on error handling
             try:
-                normal_iocs, warning_iocs, input_display = process_single_input(args)
+                normal_iocs, _warning_iocs, _input_display = process_single_input(args)
                 # If it doesn't exit, it should at least return something
                 assert isinstance(normal_iocs, dict)
             except SystemExit:
@@ -1331,10 +1322,10 @@ class TestProcessSingleInput:
     def test_process_single_input_temp_file_cleanup(self) -> None:
         """Test process_single_input cleans up temporary files from URL downloads."""
         # Create a temporary file that simulates a downloaded file
-        temp_dir = Path(__file__).parent.parent / 'iocparser' / 'temp'
+        temp_dir = Path(__file__).parent.parent / "iocparser" / "temp"
         temp_dir.mkdir(exist_ok=True)
 
-        temp_file = temp_dir / 'test_cleanup_file.txt'
+        temp_file = temp_dir / "test_cleanup_file.txt"
         temp_file.write_text("Test content with malware-cleanup.com\n")
 
         try:
@@ -1349,7 +1340,7 @@ class TestProcessSingleInput:
             )
 
             # Process the file - should NOT delete it since it's not from URL
-            normal_iocs, warning_iocs, input_display = process_single_input(args)
+            _normal_iocs, _warning_iocs, _input_display = process_single_input(args)
 
             # File should still exist since it wasn't from URL
             assert temp_file.exists()
@@ -1371,23 +1362,23 @@ class TestPrintWarningLists:
     def test_print_warning_lists_with_warnings(self) -> None:
         """Test print_warning_lists displays warnings correctly."""
         warnings = {
-            'domains': [
+            "domains": [
                 {
-                    'value': 'google.com',
-                    'warning_list': 'Top-1000-Alexa',
-                    'description': 'Top 1000 Alexa domains',
+                    "value": "google.com",
+                    "warning_list": "Top-1000-Alexa",
+                    "description": "Top 1000 Alexa domains",
                 },
                 {
-                    'value': 'example.com',
-                    'warning_list': 'RFC-5737',
-                    'description': 'Reserved domains for documentation',
+                    "value": "example.com",
+                    "warning_list": "RFC-5737",
+                    "description": "Reserved domains for documentation",
                 },
             ],
-            'ips': [
+            "ips": [
                 {
-                    'value': '8.8.8.8',
-                    'warning_list': 'Public-DNS',
-                    'description': 'Public DNS servers',
+                    "value": "8.8.8.8",
+                    "warning_list": "Public-DNS",
+                    "description": "Public DNS servers",
                 },
             ],
         }
@@ -1398,11 +1389,11 @@ class TestPrintWarningLists:
     def test_print_warning_lists_single_type(self) -> None:
         """Test print_warning_lists with single IOC type."""
         warnings = {
-            'domains': [
+            "domains": [
                 {
-                    'value': 'test.com',
-                    'warning_list': 'Test-List',
-                    'description': 'Test warning',
+                    "value": "test.com",
+                    "warning_list": "Test-List",
+                    "description": "Test warning",
                 },
             ],
         }
@@ -1416,9 +1407,9 @@ class TestDisplayResults:
     def test_display_results_with_iocs(self) -> None:
         """Test display_results shows IOC summary."""
         normal_iocs = {
-            'domains': ['evil1.com', 'evil2.com', 'evil3.com'],
-            'ips': ['192.168.1.1', '10.0.0.1'],
-            'md5s': ['d41d8cd98f00b204e9800998ecf8427e'],
+            "domains": ["evil1.com", "evil2.com", "evil3.com"],
+            "ips": ["192.168.1.1", "10.0.0.1"],
+            "md5s": ["d41d8cd98f00b204e9800998ecf8427e"],
         }
         warning_iocs = {}
 
@@ -1428,14 +1419,14 @@ class TestDisplayResults:
     def test_display_results_with_warnings(self) -> None:
         """Test display_results shows warnings."""
         normal_iocs = {
-            'domains': ['evil.com'],
+            "domains": ["evil.com"],
         }
         warning_iocs = {
-            'domains': [
+            "domains": [
                 {
-                    'value': 'google.com',
-                    'warning_list': 'Top-Alexa',
-                    'description': 'Popular domain',
+                    "value": "google.com",
+                    "warning_list": "Top-Alexa",
+                    "description": "Popular domain",
                 },
             ],
         }
@@ -1465,7 +1456,7 @@ class TestMainFunction:
 
     def test_main_no_args_shows_help(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test main() shows help when no arguments provided."""
-        monkeypatch.setattr(sys, 'argv', ['iocparser'])
+        monkeypatch.setattr(sys, "argv", ["iocparser"])
 
         with pytest.raises(SystemExit) as exc_info:
             main()
@@ -1474,7 +1465,7 @@ class TestMainFunction:
 
     def test_main_with_init_flag(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test main() with --init flag returns after initialization."""
-        monkeypatch.setattr(sys, 'argv', ['iocparser', '--init'])
+        monkeypatch.setattr(sys, "argv", ["iocparser", "--init"])
 
         # Mock handle_misp_init to avoid network calls
         init_called = []
@@ -1482,7 +1473,7 @@ class TestMainFunction:
         def mock_handle_misp_init():
             init_called.append(True)
 
-        monkeypatch.setattr('iocparser.main.handle_misp_init', mock_handle_misp_init)
+        monkeypatch.setattr("iocparser.__main__.handle_misp_init", mock_handle_misp_init)
 
         # Should execute and return without error
         main()
@@ -1492,7 +1483,7 @@ class TestMainFunction:
 
     def test_main_with_force_update(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test main() with --force-update flag returns after initialization."""
-        monkeypatch.setattr(sys, 'argv', ['iocparser', '--force-update'])
+        monkeypatch.setattr(sys, "argv", ["iocparser", "--force-update"])
 
         # Mock handle_misp_init to avoid network calls
         init_called = []
@@ -1500,7 +1491,7 @@ class TestMainFunction:
         def mock_handle_misp_init():
             init_called.append(True)
 
-        monkeypatch.setattr('iocparser.main.handle_misp_init', mock_handle_misp_init)
+        monkeypatch.setattr("iocparser.__main__.handle_misp_init", mock_handle_misp_init)
 
         # Should execute and return without error
         main()
@@ -1510,15 +1501,15 @@ class TestMainFunction:
 
     def test_main_with_file(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test main() processes file successfully."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Test malware report with evil-test.com\n")
             temp_path = Path(f.name)
 
         try:
             monkeypatch.setattr(
                 sys,
-                'argv',
-                ['iocparser', '-f', str(temp_path), '--no-check-warnings'],
+                "argv",
+                ["iocparser", "-f", str(temp_path), "--no-check-warnings"],
             )
 
             # Execute main - should complete successfully
@@ -1536,15 +1527,14 @@ class TestMainFunction:
         files = []
         try:
             for i in range(2):
-                f = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
-                f.write(f"File {i} with evil{i}.com\n")
-                f.close()
-                files.append(f.name)
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+                    f.write(f"File {i} with evil{i}.com\n")
+                    files.append(f.name)
 
             monkeypatch.setattr(
                 sys,
-                'argv',
-                ['iocparser', '-m', files[0], files[1], '--no-check-warnings', '--parallel', '2'],
+                "argv",
+                ["iocparser", "-m", files[0], files[1], "--no-check-warnings", "--parallel", "2"],
             )
 
             main()
@@ -1556,22 +1546,22 @@ class TestMainFunction:
 
     def test_main_keyboard_interrupt(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test main() handles keyboard interrupt gracefully."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Test content\n")
             temp_path = Path(f.name)
 
         try:
             monkeypatch.setattr(
                 sys,
-                'argv',
-                ['iocparser', '-f', str(temp_path)],
+                "argv",
+                ["iocparser", "-f", str(temp_path)],
             )
 
             # Mock process_file to raise KeyboardInterrupt
-            def mock_process_file(*args, **kwargs):
-                raise KeyboardInterrupt()
+            def mock_process_file(*_args, **_kwargs):
+                raise KeyboardInterrupt
 
-            monkeypatch.setattr('iocparser.main.process_file', mock_process_file)
+            monkeypatch.setattr("iocparser.core.process_file", mock_process_file)
 
             with pytest.raises(SystemExit) as exc_info:
                 main()
@@ -1583,22 +1573,22 @@ class TestMainFunction:
 
     def test_main_unexpected_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test main() handles unexpected errors."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Test content\n")
             temp_path = Path(f.name)
 
         try:
             monkeypatch.setattr(
                 sys,
-                'argv',
-                ['iocparser', '-f', str(temp_path)],
+                "argv",
+                ["iocparser", "-f", str(temp_path)],
             )
 
             # Mock process_file to raise unexpected error
-            def mock_process_file(*args, **kwargs):
-                raise RuntimeError("Unexpected error for testing")
+            def mock_process_file(*_args, **_kwargs):
+                raise RuntimeError("Unexpected error for testing")  # noqa: TRY003
 
-            monkeypatch.setattr('iocparser.main.process_file', mock_process_file)
+            monkeypatch.setattr("iocparser.core.process_file", mock_process_file)
 
             with pytest.raises(SystemExit) as exc_info:
                 main()
@@ -1610,23 +1600,25 @@ class TestMainFunction:
 
     def test_main_with_output_file(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test main() writes to specified output file."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Test report: malware-test.com\n")
             temp_path = Path(f.name)
 
         output_path = None
         try:
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as out:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as out:
                 output_path = Path(out.name)
 
             monkeypatch.setattr(
                 sys,
-                'argv',
+                "argv",
                 [
-                    'iocparser',
-                    '-f', str(temp_path),
-                    '-o', str(output_path),
-                    '--no-check-warnings',
+                    "iocparser",
+                    "-f",
+                    str(temp_path),
+                    "-o",
+                    str(output_path),
+                    "--no-check-warnings",
                 ],
             )
 
@@ -1644,24 +1636,26 @@ class TestMainFunction:
 
     def test_main_with_json_output(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test main() outputs JSON format."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Test report: malware-json.com\n")
             temp_path = Path(f.name)
 
         output_path = None
         try:
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as out:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as out:
                 output_path = Path(out.name)
 
             monkeypatch.setattr(
                 sys,
-                'argv',
+                "argv",
                 [
-                    'iocparser',
-                    '-f', str(temp_path),
-                    '-o', str(output_path),
-                    '--json',
-                    '--no-check-warnings',
+                    "iocparser",
+                    "-f",
+                    str(temp_path),
+                    "-o",
+                    str(output_path),
+                    "--json",
+                    "--no-check-warnings",
                 ],
             )
 
@@ -1670,6 +1664,7 @@ class TestMainFunction:
             # Verify JSON output
             assert output_path.exists()
             import json
+
             content = output_path.read_text()
             data = json.loads(content)
             assert isinstance(data, dict)

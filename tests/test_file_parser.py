@@ -82,7 +82,7 @@ startxref
 {400 + len(text_content)}
 %%EOF
 """
-    pdf_path.write_text(pdf_content, encoding='latin-1')
+    pdf_path.write_text(pdf_content, encoding="latin-1")
 
 
 class TestPDFParser:
@@ -232,7 +232,7 @@ class TestHTMLParser:
         </body>
         </html>
         """
-        html_path.write_text(html_content, encoding='utf-8')
+        html_path.write_text(html_content, encoding="utf-8")
 
         # Act: Extract text
         parser = HTMLParser(str(html_path))
@@ -262,7 +262,7 @@ class TestHTMLParser:
         </body>
         </html>
         """
-        html_path.write_text(html_content, encoding='utf-8')
+        html_path.write_text(html_content, encoding="utf-8")
 
         # Act: Extract text
         parser = HTMLParser(str(html_path))
@@ -284,7 +284,7 @@ class TestHTMLParser:
         # Arrange: Create file with just a URL
         html_path = tmp_path / "url_only.html"
         url_content = "https://malicious-site.com/payload\n"
-        html_path.write_text(url_content, encoding='utf-8')
+        html_path.write_text(url_content, encoding="utf-8")
 
         # Act: Extract text
         parser = HTMLParser(str(html_path))
@@ -317,7 +317,7 @@ class TestHTMLParser:
         </body>
         </html>
         """
-        html_path.write_text(html_content, encoding='utf-8')
+        html_path.write_text(html_content, encoding="utf-8")
 
         # Act: Extract text
         parser = HTMLParser(str(html_path))
@@ -347,7 +347,7 @@ class TestHTMLParser:
             example.com</p>
         </body></html>
         """
-        html_path.write_text(html_content, encoding='utf-8')
+        html_path.write_text(html_content, encoding="utf-8")
 
         # Act: Extract text
         parser = HTMLParser(str(html_path))
@@ -393,7 +393,7 @@ class TestHTMLParser:
         # Arrange: Create malformed HTML
         html_path = tmp_path / "malformed.html"
         html_content = "<html><body><p>Unclosed paragraph<div>Test</div>"
-        html_path.write_text(html_content, encoding='utf-8')
+        html_path.write_text(html_content, encoding="utf-8")
 
         # Act: Extract text (should not crash)
         parser = HTMLParser(str(html_path))
@@ -430,7 +430,7 @@ class TestGetParser:
         """
         # Arrange: Create HTML file
         html_path = tmp_path / "test.html"
-        html_path.write_text("<html><body>Test</body></html>", encoding='utf-8')
+        html_path.write_text("<html><body>Test</body></html>", encoding="utf-8")
 
         # Act: Get parser
         parser = get_parser(str(html_path))
@@ -446,7 +446,7 @@ class TestGetParser:
         """
         # Arrange: Create .htm file
         htm_path = tmp_path / "test.htm"
-        htm_path.write_text("<html><body>Test</body></html>", encoding='utf-8')
+        htm_path.write_text("<html><body>Test</body></html>", encoding="utf-8")
 
         # Act: Get parser
         parser = get_parser(str(htm_path))
@@ -584,7 +584,7 @@ class TestFileParserIntegration:
         </body>
         </html>
         """
-        html_path.write_text(html_content, encoding='utf-8')
+        html_path.write_text(html_content, encoding="utf-8")
 
         # Act: Use factory function and extract
         parser = get_parser(str(html_path))
@@ -719,7 +719,7 @@ class TestHTMLParserErrorHandling:
         # Write extremely malformed content that might cause parsing issues
         # Note: BeautifulSoup is very permissive, so this tests the exception path
         weird_content = "<" * 10000  # Pathological case
-        html_path.write_text(weird_content, encoding='utf-8')
+        html_path.write_text(weird_content, encoding="utf-8")
 
         parser = HTMLParser(str(html_path))
 

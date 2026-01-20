@@ -5,6 +5,8 @@ Comprehensive unit tests for IOC extractors
 Author: Marc Rivero | @seifreed
 """
 
+import tempfile
+
 import pytest
 
 from iocparser.modules.extractor import IOCExtractor
@@ -370,23 +372,23 @@ class TestExtractAll:
         result = self.extractor.extract_all(text)
 
         # Check that multiple IOC types were extracted
-        assert 'md5' in result
-        assert 'sha256' in result
-        assert 'domains' in result
-        assert 'ips' in result
-        assert 'urls' in result
-        assert 'emails' in result
-        assert 'cves' in result
-        assert 'filenames' in result
-        assert 'filepaths' in result
-        assert 'registry' in result
-        assert 'bitcoin' in result
+        assert "md5" in result
+        assert "sha256" in result
+        assert "domains" in result
+        assert "ips" in result
+        assert "urls" in result
+        assert "emails" in result
+        assert "cves" in result
+        assert "filenames" in result
+        assert "filepaths" in result
+        assert "registry" in result
+        assert "bitcoin" in result
 
         # Check defanging was applied
-        if result.get('domains'):
-            assert any('[.]' in d for d in result['domains'])
-        if result.get('ips'):
-            assert any('[.]' in ip for ip in result['ips'])
+        if result.get("domains"):
+            assert any("[.]" in d for d in result["domains"])
+        if result.get("ips"):
+            assert any("[.]" in ip for ip in result["ips"])
 
 
 class TestCoverageMissing:
@@ -406,12 +408,9 @@ class TestCoverageMissing:
         json_file.write_text("{ invalid json }")
 
         # Create an extractor that will try to load this file
-        import sys
-        from pathlib import Path
-        original_parent = Path(__file__).parent.parent / "iocparser" / "modules"
-
         # Monkey patch to use our temp directory
         import iocparser.modules.extractor as extractor_module
+
         original_file = extractor_module.__file__
         try:
             extractor_module.__file__ = str(tmp_path / "extractor.py")
@@ -431,13 +430,14 @@ class TestCoverageMissing:
         tlds_file.write_text("com\norg\nnet\n")
 
         import iocparser.modules.extractor as extractor_module
+
         original_file = extractor_module.__file__
         try:
             extractor_module.__file__ = str(tmp_path / "extractor.py")
             # Create new extractor - should load from file
             test_extractor = IOCExtractor(defang=False)
-            assert 'com' in test_extractor.valid_tlds
-            assert 'org' in test_extractor.valid_tlds
+            assert "com" in test_extractor.valid_tlds
+            assert "org" in test_extractor.valid_tlds
         finally:
             extractor_module.__file__ = original_file
 
@@ -615,7 +615,7 @@ class TestCoverageMissing:
         assert isinstance(result, list)
         # If it does extract, verify closing brace logic would work
         for rule in result:
-            assert rule.strip().endswith('}')
+            assert rule.strip().endswith("}")
 
     def test_extract_filepaths_windows_env_vars(self):
         """Test extract_filepaths extracts paths with environment variables."""
@@ -631,15 +631,17 @@ class TestCoverageMissing:
 
     def test_extract_filepaths_unix_paths(self):
         """Test extract_filepaths extracts Unix paths."""
+        temp_dir = tempfile.gettempdir()
         text = """
         Unix paths:
         /usr/bin/malware
-        /tmp/payload.sh
+        {temp_dir}/payload.sh
         /var/log/suspicious/activity.log
         """
+        text = text.format(temp_dir=temp_dir)
         result = self.extractor.extract_filepaths(text)
         assert any("/usr/bin/malware" in path for path in result)
-        assert any("/tmp/payload.sh" in path for path in result)
+        assert any(f"{temp_dir}/payload.sh" in path for path in result)
 
     def test_extract_filepaths_filter_phrases(self):
         """Test extract_filepaths filters out descriptive phrases."""
@@ -663,7 +665,7 @@ class TestCoverageMissing:
         result = self.extractor.extract_cert_serials(text)
         assert len(result) >= 1
         # Should be normalized to colon-separated format
-        assert any(':' in serial for serial in result)
+        assert any(":" in serial for serial in result)
 
     def test_extract_cert_serials_mac_address_exclusion(self):
         """Test extract_cert_serials excludes MAC addresses (6 parts)."""
@@ -673,9 +675,9 @@ class TestCoverageMissing:
         """
         result = self.extractor.extract_cert_serials(text)
         # Should not include the MAC address (6 parts)
-        assert not any(serial.count(':') == 5 for serial in result)
+        assert not any(serial.count(":") == 5 for serial in result)
         # Should include the 12-byte serial
-        assert any(serial.count(':') >= 7 for serial in result)
+        assert any(serial.count(":") >= 7 for serial in result)
 
     def test_extract_hosts_netbios_names(self):
         """Test extract_hosts extracts NetBIOS names from UNC paths."""
@@ -697,16 +699,16 @@ class TestCoverageMissing:
         """
         result = self.extractor.extract_hosts(text)
         # Should filter out common names like USERS, WINDOWS, PROGRAM
-        assert not any(host.lower() in ['users', 'windows', 'program'] for host in result)
+        assert not any(host.lower() in ["users", "windows", "program"] for host in result)
 
     def test_extract_single_type_error_handling(self):
         """Test _extract_single_type handles extraction errors gracefully."""
+
         # Create a mock method that raises an exception
-        def failing_method(text):
-            raise ValueError("Intentional error for testing")
+        def failing_method(_text):
+            raise ValueError("Intentional error for testing")  # noqa: TRY003
 
         # Import the function we want to test
-        from iocparser.modules.extractor import IOCExtractor
 
         # Test that extract_all handles errors in individual extractors
         text = "Test text with MD5: 5f4dcc3b5aa765d61d8327deb882cf99"
@@ -717,9 +719,9 @@ class TestCoverageMissing:
             self.extractor.extract_jwt = failing_method
             result = self.extractor.extract_all(text)
             # Should still extract MD5 even though JWT extraction failed
-            assert 'md5' in result
+            assert "md5" in result
             # JWT should not be in results due to error
-            assert 'jwt' not in result or result['jwt'] is None
+            assert "jwt" not in result or result["jwt"] is None
         finally:
             self.extractor.extract_jwt = original_extract_jwt
 
@@ -830,8 +832,8 @@ class TestCoverageMissing:
         """
         result = self.extractor.extract_urls(text)
         # Image/CSS/JS URLs should be filtered
-        assert not any(url.endswith('.png') for url in result)
-        assert not any(url.endswith('.css') for url in result)
+        assert not any(url.endswith(".png") for url in result)
+        assert not any(url.endswith(".css") for url in result)
         # Valid payload should be kept
         assert any("malware-site.com" in url for url in result)
 
@@ -847,7 +849,7 @@ class TestCoverageMissing:
         result = self.extractor.extract_yara_rules(text)
         # If extracted, should have closing brace
         for rule in result:
-            assert rule.strip().endswith('}')
+            assert rule.strip().endswith("}")
 
     def test_is_file_sharing_url_detection(self):
         """Test _is_file_sharing_url detects file sharing services."""
@@ -871,7 +873,9 @@ class TestCoverageMissing:
         # Documentation site without vulnerability keywords - should exclude
         assert self.extractor._should_exclude_url("docs.microsoft.com", "/windows/install")
         # Documentation with vulnerability keywords - should not exclude
-        assert not self.extractor._should_exclude_url("docs.microsoft.com", "/security/cve-2023-1234")
+        assert not self.extractor._should_exclude_url(
+            "docs.microsoft.com", "/security/cve-2023-1234"
+        )
         # Non-documentation site
         assert not self.extractor._should_exclude_url("example.com", "/normal-page")
 
@@ -955,7 +959,7 @@ class TestCoverageMissing:
         text = "Invalid MAC: 00:11:22:33:44"  # Only 5 parts
         result = self.extractor.extract_mac_addresses(text)
         # Should not extract 5-part MAC
-        assert not any(mac.count(':') == 4 for mac in result)
+        assert not any(mac.count(":") == 4 for mac in result)
 
     def test_extract_yara_rules_missing_sections(self):
         """Test extract_yara_rules filters rules without required sections."""
@@ -990,7 +994,7 @@ class TestCoverageMissing:
         text = "Just some random text with no IOCs"
         result = self.extractor.extract_all(text)
         # Empty IOC types should not be in results
-        for ioc_type, iocs in result.items():
+        for iocs in result.values():
             assert len(iocs) > 0
 
     def test_load_tlds_from_file(self, tmp_path):
@@ -1003,13 +1007,14 @@ class TestCoverageMissing:
 
         # Monkey patch to load from our temp file
         import iocparser.modules.extractor as extractor_module
+
         original_file = extractor_module.__file__
         try:
             extractor_module.__file__ = str(tmp_path / "extractor.py")
             test_extractor = IOCExtractor(defang=False)
             # Should have loaded our TLDs
-            assert 'test' in test_extractor.valid_tlds
-            assert 'example' in test_extractor.valid_tlds
+            assert "test" in test_extractor.valid_tlds
+            assert "example" in test_extractor.valid_tlds
         finally:
             extractor_module.__file__ = original_file
 
@@ -1124,7 +1129,7 @@ class TestCoverageMissing:
         result = self.extractor.extract_yara_rules(text)
         # Check if brace adding logic is triggered
         for rule in result:
-            assert rule.strip().endswith('}')
+            assert rule.strip().endswith("}")
 
     def test_extract_hosts_false_positive_filter(self):
         """Test extract_hosts filters false positives with specific keywords."""
@@ -1138,7 +1143,7 @@ class TestCoverageMissing:
         text = "Domain: singlepart"
         result = self.extractor.extract_hosts(text)
         # Single word without dot should not be extracted
-        assert not any("singlepart" == host for host in result)
+        assert not any(host == "singlepart" for host in result)
 
     def test_extract_hosts_unc_short_name_filter(self):
         """Test extract_hosts filters short UNC names."""
@@ -1153,7 +1158,7 @@ class TestCoverageMissing:
         large_text = "malware.com " * 1000  # > 10000 chars
         result = self.extractor.extract_all(large_text)
         # Should still extract IOCs
-        assert 'domains' in result
+        assert "domains" in result
 
     def test_extract_single_type_none_return(self):
         """Test _extract_single_type returns None for empty results."""
@@ -1172,15 +1177,16 @@ class TestCoverageMissing:
         tlds_dir.mkdir()
         tlds_file = tlds_dir / "tlds.txt"
         # Write binary data that will cause decode errors
-        tlds_file.write_bytes(b'\x80\x81\x82\x83')
+        tlds_file.write_bytes(b"\x80\x81\x82\x83")
 
         import iocparser.modules.extractor as extractor_module
+
         original_file = extractor_module.__file__
         try:
             extractor_module.__file__ = str(tmp_path / "extractor.py")
             test_extractor = IOCExtractor(defang=False)
             # Should fallback to common_tlds
-            assert 'com' in test_extractor.valid_tlds
+            assert "com" in test_extractor.valid_tlds
         finally:
             extractor_module.__file__ = original_file
 
@@ -1285,7 +1291,7 @@ class TestCoverageMissing:
         result = self.extractor.extract_yara_rules(text)
         # Should add closing brace
         for rule in result:
-            assert rule.strip().endswith('}')
+            assert rule.strip().endswith("}")
 
     def test_extract_yara_rules_too_long_filter(self):
         """Test extract_yara_rules filters rules that are too long."""
@@ -1308,18 +1314,19 @@ class TestCoverageMissing:
         result = self.extractor.extract_hosts(text)
         # Short name (<=3 chars) should be filtered
         # Only VALIDSERVER should potentially be extracted
-        assert not any("AB" == host for host in result)
+        assert not any(host == "AB" for host in result)
 
     def test_is_valid_hash_import_error_exception(self):
         """Test _is_valid_hash_pattern handles ImportError."""
         # Mock scenario where binascii import would fail
         # Even though binascii is standard, we test the exception path
-        import sys
         import builtins
+        import sys
+
         original_import = builtins.__import__
 
         def mock_import(name, *args, **kwargs):
-            if name == 'binascii' and len(sys._getframe(1).f_code.co_filename) > 0:
+            if name == "binascii" and len(sys._getframe(1).f_code.co_filename) > 0:
                 # Only fail for this specific test context
                 pass
             return original_import(name, *args, **kwargs)
@@ -1361,7 +1368,7 @@ class TestCoverageMissing:
         text = "IP: 192.168.1 (3 parts) and 192.168.1.1.1 (5 parts)"
         result = self.extractor.extract_ips(text)
         # Neither should be extracted
-        assert not any("192.168.1" == ip for ip in result)
+        assert not any(ip == "192.168.1" for ip in result)
 
     def test_extract_ips_range_check_continue(self):
         """Test extract_ips continues when octet out of range."""
@@ -1395,7 +1402,7 @@ class TestCoverageMissing:
     def test_extract_yara_rules_length_check_3000(self):
         """Test extract_yara_rules filters rules over 3000 chars."""
         # Create a rule exactly at the threshold
-        rule_2900 = "rule Test { meta: x = \"" + "a" * 2850 + "\" condition: true }"
+        rule_2900 = 'rule Test { meta: x = "' + "a" * 2850 + '" condition: true }'
         result = self.extractor.extract_yara_rules(rule_2900)
         # Should still extract if under 3000
         assert isinstance(result, list)
@@ -1410,7 +1417,7 @@ class TestCoverageMissing:
         """
         result = self.extractor.extract_yara_rules(text)
         # Should extract complete rule
-        assert any(rule.strip().endswith('}') for rule in result)
+        assert any(rule.strip().endswith("}") for rule in result)
 
     def test_extract_hosts_continue_statement(self):
         """Test extract_hosts continue on filtered domains."""

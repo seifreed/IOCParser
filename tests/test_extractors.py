@@ -86,9 +86,7 @@ class TestNetworkExtractors:
         Invalid: notadomain, test.invalidtld, localhost.localdomain
         """
         result = self.extractor.extract_domains(text)
-        assert "example.com" in result
-        assert "test.co.uk" in result
-        assert "subdomain.example.org" in result
+        assert {"example.com", "test.co.uk", "subdomain.example.org"}.issubset(set(result))
         assert "localhost.localdomain" not in result
 
     def test_extract_domains_defanged(self):

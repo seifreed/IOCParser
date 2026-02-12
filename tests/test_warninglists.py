@@ -219,21 +219,19 @@ class TestMISPWarningLists:
         normal_iocs, warning_iocs = warning_lists.separate_iocs_by_warnings(iocs)
 
         # Check normal IOCs
-        assert "192.168.1.1" in normal_iocs.get("ips", [])
-        assert "evil.com" in normal_iocs.get("domains", [])
-        assert "https://malware.com/payload" in normal_iocs.get("urls", [])
+        assert set(normal_iocs.get("ips", [])) == {"192.168.1.1"}
+        assert set(normal_iocs.get("domains", [])) == {"evil.com"}
+        assert set(normal_iocs.get("urls", [])) == {"https://malware.com/payload"}
 
         # Check warning IOCs
-        warning_ips = [w["value"] for w in warning_iocs.get("ips", [])]
-        assert "8.8.8.8" in warning_ips
-        assert "1.1.1.1" in warning_ips
+        warning_ips = {w["value"] for w in warning_iocs.get("ips", [])}
+        assert warning_ips == {"8.8.8.8", "1.1.1.1"}
 
-        warning_domains = [w["value"] for w in warning_iocs.get("domains", [])]
-        assert "google.com" in warning_domains
-        assert "facebook.com" in warning_domains
+        warning_domains = {w["value"] for w in warning_iocs.get("domains", [])}
+        assert warning_domains == {"google.com", "facebook.com"}
 
-        warning_urls = [w["value"] for w in warning_iocs.get("urls", [])]
-        assert "https://virustotal.com/scan" in warning_urls
+        warning_urls = {w["value"] for w in warning_iocs.get("urls", [])}
+        assert warning_urls == {"https://virustotal.com/scan"}
 
     def test_ipv6_support(self):
         """Test IPv6 address checking."""

@@ -1414,7 +1414,7 @@ class TestStreamingUnsupportedOperations:
         # Should still work without seek/tell
         assert len(chunks) >= 1
         full_text = "".join(chunks)
-        assert "evil.com" in full_text
+        assert full_text == content
 
     def test_read_chunks_with_oserror_on_seek(self):
         """

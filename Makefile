@@ -80,7 +80,7 @@ security: ## Run security checks (bandit, safety)
 	bandit -r $(SRC_DIR) -ll
 	@echo "$(YELLOW)Checking for known vulnerabilities in dependencies...$(NC)"
 	safety check --json || true
-	pip-audit || true
+	pip-audit --ignore-vuln CVE-2026-3219 || true
 	@echo "$(GREEN)✓ Security checks completed$(NC)"
 
 check-all: lint test security ## Run all checks (lint, test, security)

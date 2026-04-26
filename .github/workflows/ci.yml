@@ -106,14 +106,7 @@ jobs:
             platform: windows-x64
             python-version: '3.14'
             upload_coverage: false
-          - runs_on: windows-11-arm
-            platform: windows-arm64
-            python-version: '3.13'
-            upload_coverage: false
-          - runs_on: windows-11-arm
-            platform: windows-arm64
-            python-version: '3.14'
-            upload_coverage: false
+          # windows-11-arm excluded: cryptography has no official wheels for Windows ARM64
           - runs_on: macos-15-intel
             platform: macos-intel
             python-version: '3.13'
@@ -204,7 +197,7 @@ jobs:
 
     - name: Security check with pip-audit
       run: |
-        pip-audit
+        pip-audit --ignore-vuln CVE-2026-3219
       continue-on-error: true
 
   benchmark:

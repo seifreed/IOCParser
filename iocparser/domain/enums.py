@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class RunStatus(str, Enum):
+class RunStatus(StrEnum):
     """Canonical run status values."""
 
     SUCCESS = "success"
@@ -16,7 +16,7 @@ EMPTY_CUSTOM_IOC_TYPE = "Custom IOC type name cannot be empty"
 INVALID_CUSTOM_BASE_TYPE = "Custom IOC types must derive from a built-in base IOC type"
 
 
-class SourceKind(str, Enum):
+class SourceKind(StrEnum):
     """Supported source kinds."""
 
     FILE = "file"
@@ -29,7 +29,7 @@ class SourceKind(str, Enum):
         return cls(value)
 
 
-class IOCType(str, Enum):
+class IOCType(StrEnum):
     """Canonical IOC type names used inside the domain."""
 
     MD5 = "md5"

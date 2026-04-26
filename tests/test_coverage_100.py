@@ -313,7 +313,7 @@ class TestWorkerConcurrentMixed:
         from iocparser.worker_service import DistributedWorkerService
         calls = [0]
 
-        def fake_next(_queue_name: str) -> object | None:
+        def fake_next(queue_name: str) -> object | None:  # noqa: ARG001
             calls[0] += 1
             return SimpleNamespace() if calls[0] <= 2 else None
 

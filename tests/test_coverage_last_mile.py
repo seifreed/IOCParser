@@ -15,6 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from iocparser.domain.models import IOC, ExtractionResult, WarningMatch
+from iocparser.errors import ValidationError
 
 
 def _db(p: Path, n: str = "z.db") -> str:
@@ -63,7 +64,7 @@ def test_stix_build_entry_indicator_unknown_kind():
 # api_persistence_query.py:229 — TypeError on empty string coercion
 def test_api_validated_non_negative_int_empty_string():
     from iocparser.api_persistence_query import validated_non_negative_int
-    with pytest.raises(TypeError):
+    with pytest.raises(ValidationError):
         validated_non_negative_int("", field="test")
 
 def test_api_validated_non_negative_int_string():

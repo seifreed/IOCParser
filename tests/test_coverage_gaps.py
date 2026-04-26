@@ -386,7 +386,7 @@ class TestWorkerServiceConcurrent:
 
         call_count = 0
 
-        def fake_process_next(_queue_name: str) -> object | None:
+        def fake_process_next(queue_name: str) -> object | None:  # noqa: ARG001
             nonlocal call_count
             call_count += 1
             return SimpleNamespace() if call_count <= 2 else None

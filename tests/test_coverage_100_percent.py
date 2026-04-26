@@ -71,7 +71,7 @@ class TestIOCRepoRetryLogic:
         stmt = select(IOCModel).where(
             IOCModel.ioc_type == "md5",
             IOCModel.value == "direct_val",
-            not IOCModel.is_warning,
+            IOCModel.is_warning.is_(False),
             IOCModel.warning_list == "",
             IOCModel.warning_description == "",
         )

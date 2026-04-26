@@ -10,7 +10,6 @@ from iocparser.application.contracts import (
     ExtractURLInput,
     PersistRunInput,
 )
-from iocparser.errors import SourceNotFoundError, SourceProcessingError
 from iocparser.application.use_cases import (
     extract_from_file,
     extract_from_files,
@@ -26,6 +25,7 @@ from iocparser.domain.models import (
     Source,
     WarningMatch,
 )
+from iocparser.errors import SourceNotFoundError, SourceProcessingError
 from iocparser.infrastructure.extraction import DefaultIOCExtractionEngine
 from iocparser.infrastructure.file_batch_executor import ThreadPoolFileBatchExecutor
 from iocparser.infrastructure.temp_files import TemporaryFileCleaner

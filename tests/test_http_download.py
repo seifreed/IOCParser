@@ -129,11 +129,14 @@ def test_generate_temp_filename_appends_pdf_and_html_extensions() -> None:
     parsed_named = urlparse("https://example.test/page.html")
 
     pdf_name = generate_temp_filename(parsed_pdf, "application/pdf")
-    assert pdf_name.startswith("report_") and pdf_name.endswith(".pdf")
+    assert pdf_name.startswith("report_")
+    assert pdf_name.endswith(".pdf")
     html_name = generate_temp_filename(parsed_html, "text/html; charset=utf-8")
-    assert html_name.startswith("index_") and html_name.endswith(".html")
+    assert html_name.startswith("index_")
+    assert html_name.endswith(".html")
     named_name = generate_temp_filename(parsed_named, "text/html")
-    assert named_name.startswith("page_") and named_name.endswith(".html")
+    assert named_name.startswith("page_")
+    assert named_name.endswith(".html")
 
 
 def test_download_with_size_check_writes_content_and_rejects_oversize(tmp_path: Path) -> None:

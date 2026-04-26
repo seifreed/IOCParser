@@ -366,7 +366,7 @@ def test_url_batch_preserves_duplicate_inputs_through_report_and_persistence(tmp
     with StableLocalHTTPServer(body=b"IOC URL: https://duplicate.example/path") as url:
         url_file.write_text(f"{url}\n{url}\n", encoding="utf-8")
         args = _args(url_file=str(url_file), url_workers=2, persist=True)
-        normal_iocs, warning_iocs, _label, results, report = process_url_file_input_with_report(
+        _normal_iocs, warning_iocs, _label, results, report = process_url_file_input_with_report(
             args,
             reader=MagicTextSourceReader(),
             warning_service=None,
@@ -927,7 +927,8 @@ def test_render_result_supports_summary_and_analyst_filters() -> None:
     assert label == "summary"
     assert fmt == "text"
     assert "IOC Summary" in summary_text
-    assert "urls" in summary_text and "1" in summary_text
+    assert "urls" in summary_text
+    assert "1" in summary_text
     assert "Warning Matches" in summary_text
 
     warnings_only, _, _ = render_result(_args(json=True, only_warnings=True), result)

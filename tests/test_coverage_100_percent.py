@@ -6,17 +6,17 @@ write conflicts.
 """
 from __future__ import annotations
 
+import contextlib
 import json
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from iocparser.domain.models import ExtractionResult, IOC, WarningMatch
-from iocparser.infrastructure.persistence_schema import Base
+from iocparser.domain.models import IOC, ExtractionResult, WarningMatch
 
 
 def _db(p: Path, n: str = "final.db") -> str:
@@ -40,7 +40,8 @@ def _persist(uri, sk="file", sv="f.txt", iv="x.com"):
             options=PersistOptions(defang=True, check_warnings=False, force_update=False, output_format="text"),
         ), unit_of_work=u).run_id
     except Exception:
-        u.rollback(); raise
+        u.rollback()
+        raise
 
 
 # ── IOC repo: directly test the retry logic (lines 54-59) ─────────────────
@@ -65,12 +66,12 @@ class TestIOCRepoRetryLogic:
 
         # Now simulate the retry path: after IntegrityError, rollback happened,
         # and we re-execute the SELECT which should find the row
-        repo = SQLAlchemyIOCRepository(session)
+        SQLAlchemyIOCRepository(session)
         from sqlalchemy import select
         stmt = select(IOCModel).where(
             IOCModel.ioc_type == "md5",
             IOCModel.value == "direct_val",
-            IOCModel.is_warning == False,
+            not IOCModel.is_warning,
             IOCModel.warning_list == "",
             IOCModel.warning_description == "",
         )
@@ -84,7 +85,6 @@ class TestIOCRepoRetryLogic:
 class TestSourceRepoRetryLogic:
     def test_retry_path_updates_metadata(self, tmp_path: Path) -> None:
         """Exercise the metadata update that happens in the except block."""
-        from iocparser.infrastructure.persistence_source_repository import SQLAlchemySourceRepository
         from iocparser.infrastructure.persistence_models import SourceModel
         from iocparser.infrastructure.persistence_repository_support import normalize_search
 
@@ -103,12 +103,12 @@ class TestSourceRepoRetryLogic:
         existing = session.get(SourceModel, src_id)
         now = datetime.now(UTC)
         existing.last_seen = now
-        existing.original_url = "https://test.com" or existing.original_url
-        existing.normalized_url = "https://test.com" or existing.normalized_url
-        existing.mime_type = "text/html" or existing.mime_type
+        existing.original_url = "https://test.com"
+        existing.normalized_url = "https://test.com"
+        existing.mime_type = "text/html"
         existing.input_size = 999
-        existing.content_hash = "abc123" or existing.content_hash
-        existing.fingerprint = "abc" or existing.fingerprint
+        existing.content_hash = "abc123"
+        existing.fingerprint = "abc"
         existing.value_search = normalize_search(existing.value)
         session.commit()
 
@@ -123,10 +123,10 @@ class TestSourceRepoRetryLogic:
 class TestHistoryRichImport:
     def _build_rich_export(self, tmp_path: Path) -> tuple[str, dict]:
         """Build a DB with runs, batch, distributed, dead-letter jobs then export."""
+        from iocparser.domain.distributed import QueueEnvelope
+        from iocparser.domain.pipeline import PipelineErrorInfo, PipelineJobRequest
         from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
         from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
-        from iocparser.domain.distributed import QueueEnvelope
-        from iocparser.domain.pipeline import PipelineJobRequest, PipelineErrorInfo
 
         uri = _db(tmp_path, "rich_src.db")
         rid = _persist(uri, sk="url", sv="https://target.com", iv="evil.com")
@@ -229,10 +229,8 @@ def test_cli_dispatch_url_source_kind(tmp_path):
     urls_file = tmp_path / "urls.txt"
     urls_file.write_text("https://example.com\n")
     uri = _db(tmp_path, "dispatch.db")
-    try:
+    with contextlib.suppress(SystemExit, Exception):
         execute(["--url-file", str(urls_file), "--db-uri", uri, "--no-persist"])
-    except (SystemExit, Exception):
-        pass  # we just need the code path to execute
 
 # cli_processing_urls.py:199 — retry from batch with matches but high occurrence
 def test_retry_from_batch_occurrence_fallback(tmp_path):
@@ -267,10 +265,8 @@ def test_batch_retry_attempt_non_list():
 def test_api_search_reraise(tmp_path):
     from iocparser.api_persistence_query import search_persisted_iocs
     uri = _db(tmp_path)
-    try:
+    with contextlib.suppress(Exception):
         search_persisted_iocs(db_uri=uri, value="x", date_from="not-iso")
-    except Exception:
-        pass
 
 # cli_processing_support.py:90 — KeyError on ambiguous source lookup
 def test_batch_collection_ambiguous_source():

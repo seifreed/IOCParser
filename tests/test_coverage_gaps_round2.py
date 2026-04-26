@@ -9,17 +9,13 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
 
 from iocparser.domain.models import (
-    ExtractionResult,
     IOC,
+    ExtractionResult,
     PersistedRunDiff,
-    WarningMatch,
 )
-from iocparser.infrastructure.persistence_schema import Base
 
 
 def _fresh_db(tmp_path: Path, name: str = "test.db") -> str:
@@ -53,7 +49,7 @@ class TestHistoryExportImportRoundTrip:
         db_uri_source = _fresh_db(tmp_path, "source.db")
 
         from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
-        service = SQLAlchemyPersistenceService(db_uri_source)
+        SQLAlchemyPersistenceService(db_uri_source)
         from iocparser.application.contracts import PersistRunInput
         from iocparser.application.use_cases import persist_run
         from iocparser.domain.models import PersistOptions, Source
@@ -114,7 +110,7 @@ class TestHistoryExportImportRoundTrip:
 
         payload = export_history(db_uri)
         db_uri2 = _fresh_db(tmp_path, "target2.db")
-        counts1 = import_history(db_uri2, payload)
+        import_history(db_uri2, payload)
         counts2 = import_history(db_uri2, payload)
         assert counts2.get("sources", 0) == 0
 
@@ -215,7 +211,7 @@ class TestBuildDiffPayload:
             added=ExtractionResult(iocs=(IOC.from_raw("domains", "new.com"),), warnings=()),
             removed=ExtractionResult(iocs=(IOC.from_raw("ips", "1.1.1.1"),), warnings=()),
         )
-        payload, added, removed = _build_diff_payload(diff, "all")
+        payload, _added, _removed = _build_diff_payload(diff, "all")
         assert "added" in payload
         assert "removed" in payload
 
@@ -250,7 +246,10 @@ class TestPruneRunsBranches:
         from iocparser.application.contracts import PersistRunInput
         from iocparser.application.use_cases import persist_run
         from iocparser.domain.models import PersistOptions, Source
-        from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService, SQLAlchemyUnitOfWork
+        from iocparser.infrastructure.persistence import (
+            SQLAlchemyPersistenceService,
+            SQLAlchemyUnitOfWork,
+        )
 
         unit = SQLAlchemyUnitOfWork(db_uri)
         try:
@@ -276,7 +275,10 @@ class TestPruneRunsBranches:
         from iocparser.application.contracts import PersistRunInput
         from iocparser.application.use_cases import persist_run
         from iocparser.domain.models import PersistOptions, Source
-        from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService, SQLAlchemyUnitOfWork
+        from iocparser.infrastructure.persistence import (
+            SQLAlchemyPersistenceService,
+            SQLAlchemyUnitOfWork,
+        )
 
         unit = SQLAlchemyUnitOfWork(db_uri)
         try:
@@ -311,28 +313,28 @@ class TestPruneRunsBranches:
 
 class TestPluginRegistration:
     def test_register_and_get_renderer(self) -> None:
-        from iocparser.plugins import register_renderer, get_renderer
+        from iocparser.plugins import get_renderer, register_renderer
         register_renderer("test_custom_renderer", lambda wc, st: type("R", (), {"render": lambda self, r: "ok"})())
         renderer = get_renderer("test_custom_renderer")
         assert renderer.render(ExtractionResult()) == "ok"
 
     def test_register_and_get_enricher(self) -> None:
-        from iocparser.plugins import register_enricher, enricher_names
+        from iocparser.plugins import enricher_names, register_enricher
         register_enricher("test_enricher_x", lambda: None)
         assert "test_enricher_x" in enricher_names()
 
     def test_register_and_get_extractor(self) -> None:
-        from iocparser.plugins import register_extractor, extractor_names
+        from iocparser.plugins import extractor_names, register_extractor
         register_extractor("test_ext_x", lambda: None)
         assert "test_ext_x" in extractor_names()
 
     def test_register_and_get_postprocessor(self) -> None:
-        from iocparser.plugins import register_postprocessor, postprocessor_names
+        from iocparser.plugins import postprocessor_names, register_postprocessor
         register_postprocessor("test_pp_x", lambda: None)
         assert "test_pp_x" in postprocessor_names()
 
     def test_register_ioc_type_plugin_and_resolve(self) -> None:
-        from iocparser.plugins import register_ioc_type_plugin, get_ioc_type_plugin
+        from iocparser.plugins import get_ioc_type_plugin, register_ioc_type_plugin
         register_ioc_type_plugin("test_ioc_type_x", lambda: {"name": "test_ioc_type_x", "base_type": "urls"})
         definition = get_ioc_type_plugin("test_ioc_type_x")
         assert definition["name"] == "test_ioc_type_x"

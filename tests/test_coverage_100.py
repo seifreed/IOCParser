@@ -2,16 +2,15 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from iocparser.domain.models import ExtractionResult, IOC, WarningMatch
-from iocparser.infrastructure.persistence_schema import Base
+from iocparser.domain.models import IOC, ExtractionResult, WarningMatch
 
 
 def _db(tmp_path: Path, name: str = "c.db") -> str:
@@ -34,7 +33,8 @@ def _persist(db_uri: str, sk: str = "file", sv: str = "f.txt", it: str = "domain
             tool_version="5.0.0", options=PersistOptions(defang=True, check_warnings=False, force_update=False, output_format="text"),
         ), unit_of_work=u).run_id
     except Exception:
-        u.rollback(); raise
+        u.rollback()
+        raise
 
 
 # ── IntegrityError via real UNIQUE constraint ──────────────────────────────
@@ -80,8 +80,8 @@ class TestHistoryImportCollision:
         assert isinstance(counts, dict)
 
     def test_import_with_batch_jobs(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence.history import export_history, import_history
         from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
+        from iocparser.infrastructure.persistence.history import export_history, import_history
         uri = _db(tmp_path, "hbatch.db")
         run_id = _persist(uri)
         svc = SQLAlchemyPersistenceService(uri)
@@ -192,12 +192,13 @@ class TestRendererWarningPaths:
 # ── rendering_support: build_stix_bundle with mutator ─────────────────────
 class TestStixBundleMutator:
     def test_bundle_mutator_called(self) -> None:
-        from iocparser.rendering_support import build_stix_bundle
         from stix2 import Indicator
+
+        from iocparser.rendering_support import build_stix_bundle
         now = datetime.now(UTC)
         ind = Indicator(name="test", pattern="[domain-name:value = 'a.com']", pattern_type="stix", pattern_version="2.1", valid_from=now, indicator_types=["malicious-activity"])
 
-        def build(entry: object) -> Indicator:
+        def build(_entry: object) -> Indicator:
             return ind
 
         result = build_stix_bundle([1], build_indicator=build, bundle_mutator=lambda p: {**p, "mutated": True})
@@ -219,15 +220,16 @@ class TestExtractorNetworkDynamic:
         from iocparser.infrastructure.extraction import IOCExtractor
         e = IOCExtractor(defang=False)
         for name in ("extract_domains", "extract_ips", "extract_ipv6", "extract_urls", "extract_emails"):
-            assert hasattr(e, name) and callable(getattr(e, name))
+            assert hasattr(e, name)
+            assert callable(getattr(e, name))
 
 
 # ── persistence_distributed: mark_running with existing job ───────────────
 class TestDistributedMarkRunning:
     def test_mark_running_existing_job(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
         from iocparser.domain.distributed import QueueEnvelope
         from iocparser.domain.pipeline import PipelineJobRequest
+        from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
         uri = _db(tmp_path, "dj.db")
         svc = SQLAlchemyDistributedJobService(uri)
         req = PipelineJobRequest(input_kind="text", source_value="test")
@@ -249,7 +251,9 @@ class TestDistributedRecords:
         assert _public_job_id(model) == "original-j1"
 
     def test_public_dead_letter_job_id_with_import_marker(self) -> None:
-        from iocparser.infrastructure.persistence_distributed_records import _public_dead_letter_job_id
+        from iocparser.infrastructure.persistence_distributed_records import (
+            _public_dead_letter_job_id,
+        )
         model = SimpleNamespace(
             job_id="dl1#history:abc",
             payload_json='{"request": {"job_id": "orig-dl"}, "__history_import__": {"archive_id": "abc"}}',
@@ -261,7 +265,11 @@ class TestDistributedRecords:
 class TestRev0008:
     def test_applies_to_existing_db(self, tmp_path: Path) -> None:
         from sqlalchemy import inspect
-        from iocparser.infrastructure.persistence_migration_steps import upgrade_to_version, create_latest_schema
+
+        from iocparser.infrastructure.persistence_migration_steps import (
+            create_latest_schema,
+            upgrade_to_version,
+        )
         engine = create_engine(f"sqlite:///{tmp_path / 'r8.db'}", future=True)
         create_latest_schema(engine)
         upgrade_to_version(engine, inspect(engine), 8)
@@ -305,7 +313,7 @@ class TestWorkerConcurrentMixed:
         from iocparser.worker_service import DistributedWorkerService
         calls = [0]
 
-        def fake_next(queue_name: str) -> object | None:
+        def fake_next(_queue_name: str) -> object | None:
             calls[0] += 1
             return SimpleNamespace() if calls[0] <= 2 else None
 

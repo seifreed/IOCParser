@@ -3,19 +3,17 @@ Mocks used ONLY for IntegrityError (requires PostgreSQL concurrent writers).
 """
 from __future__ import annotations
 
-import argparse
 import json
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from iocparser.domain.models import ExtractionResult, IOC, WarningMatch
+from iocparser.domain.models import IOC, ExtractionResult
 
 
 def _db(tmp_path: Path, n: str = "t.db") -> str:
@@ -40,7 +38,8 @@ def _persist(uri: str, sk: str = "file", sv: str = "f.txt", iv: str = "x.com") -
             options=PersistOptions(defang=True, check_warnings=False, force_update=False, output_format="text"),
         ), unit_of_work=u).run_id
     except Exception:
-        u.rollback(); raise
+        u.rollback()
+        raise
 
 
 # ── 1. IntegrityError paths (mock: session.flush) ─────────────────────────
@@ -51,10 +50,12 @@ class TestIOCRepoIntegrity:
         r = SQLAlchemyIOCRepository(s)
         id1 = r._get_or_create(ioc_type="md5", value="v1", is_warning=False, warning_list="", warning_description="")
         s.commit()
-        orig = s.flush; n = [0]
+        orig = s.flush
+        n = [0]
         def f(*a, **k):
             n[0] += 1
-            if n[0] == 2: raise IntegrityError("d", {}, Exception())
+            if n[0] == 2:
+                raise IntegrityError("d", {}, Exception())
             return orig(*a, **k)
         with patch.object(s, "flush", side_effect=f):
             assert r._get_or_create(ioc_type="md5", value="v1", is_warning=False, warning_list="", warning_description="") == id1
@@ -72,15 +73,19 @@ class TestIOCRepoIntegrity:
 
 class TestSourceRepoIntegrity:
     def test_retry_updates_metadata(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence_source_repository import SQLAlchemySourceRepository
+        from iocparser.infrastructure.persistence_source_repository import (
+            SQLAlchemySourceRepository,
+        )
         s = Session(create_engine(_db(tmp_path), future=True))
         r = SQLAlchemySourceRepository(s)
         id1 = r.get_or_create(kind="file", value="a.txt")
         s.commit()
-        orig = s.flush; n = [0]
+        orig = s.flush
+        n = [0]
         def f(*a, **k):
             n[0] += 1
-            if n[0] == 2: raise IntegrityError("d", {}, Exception())
+            if n[0] == 2:
+                raise IntegrityError("d", {}, Exception())
             return orig(*a, **k)
         with patch.object(s, "flush", side_effect=f):
             id2 = r.get_or_create(kind="file", value="a.txt", mime_type="text/html", content_hash="ch", fingerprint="fp", input_size=99, original_url="u", normalized_url="n")
@@ -88,7 +93,9 @@ class TestSourceRepoIntegrity:
         s.close()
 
     def test_reraise_when_not_found(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence_source_repository import SQLAlchemySourceRepository
+        from iocparser.infrastructure.persistence_source_repository import (
+            SQLAlchemySourceRepository,
+        )
         s = Session(create_engine(_db(tmp_path), future=True))
         r = SQLAlchemySourceRepository(s)
         with patch.object(s, "flush", side_effect=IntegrityError("x", {}, Exception())):
@@ -108,9 +115,9 @@ class TestHistoryImportFull:
         svc = SQLAlchemyPersistenceService(uri)
         svc.persist_batch_job(source_kind="url", run_ids=(rid,), report={"total": 1, "successful": 1, "failed": 0, "items": []}, config={})
 
-        from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
         from iocparser.domain.distributed import QueueEnvelope
         from iocparser.domain.pipeline import PipelineJobRequest
+        from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
         dsvc = SQLAlchemyDistributedJobService(uri)
         req = PipelineJobRequest(input_kind="url", source_value="https://example.com/report")
         env = QueueEnvelope(request=req, queue_backend="filesystem", queue_name="default")
@@ -162,7 +169,9 @@ class TestBatchTimestampEdges:
         from iocparser.infrastructure.persistence_batch import create_batch_job
         s = Session(create_engine(_db(tmp_path), future=True))
         bid = create_batch_job(s, source_kind="file", run_ids=(), report={"total": 0, "successful": 0, "failed": 0, "items": []}, config={})
-        s.commit(); assert isinstance(bid, int); s.close()
+        s.commit()
+        assert isinstance(bid, int)
+        s.close()
 
     def test_invalid_timestamp_string(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_batch import create_batch_job
@@ -170,7 +179,9 @@ class TestBatchTimestampEdges:
         report = {"total": 1, "successful": 1, "failed": 0, "items": [],
                   "phase_timestamps": {"started_at": "not-a-date", "finished_at": "also-bad"}, "duration_ms": 10}
         bid = create_batch_job(s, source_kind="url", run_ids=(), report=report, config={})
-        s.commit(); assert isinstance(bid, int); s.close()
+        s.commit()
+        assert isinstance(bid, int)
+        s.close()
 
 
 # ── 4. persistence_distributed: imported job lookup ────────────────────────
@@ -186,7 +197,9 @@ class TestDistributedImportedJob:
 # ── 5. persistence_distributed_records: dead_letter public job id fallback ─
 class TestDeadLetterPublicJobId:
     def test_dead_letter_public_job_id_no_marker(self) -> None:
-        from iocparser.infrastructure.persistence_distributed_records import _public_dead_letter_job_id
+        from iocparser.infrastructure.persistence_distributed_records import (
+            _public_dead_letter_job_id,
+        )
         model = SimpleNamespace(job_id="dl-fallback", payload_json='{"request": {}}')
         assert _public_dead_letter_job_id(model) == "dl-fallback"
 
@@ -234,7 +247,8 @@ class TestApiQueryValidation:
     def test_render_diff_structured(self, tmp_path: Path) -> None:
         from iocparser.api_persistence_query import render_persisted_diff
         uri = _db(tmp_path)
-        r1 = _persist(uri, iv="a.com"); r2 = _persist(uri, iv="b.com")
+        r1 = _persist(uri, iv="a.com")
+        r2 = _persist(uri, iv="b.com")
         out = render_persisted_diff(db_uri=uri, left_run_id=r1, right_run_id=r2, output_format="json")
         assert isinstance(out, str)
 
@@ -259,7 +273,10 @@ class TestCliPersistenceInt:
 # ── 11. cli_processing_files: streaming duplicate path ─────────────────────
 class TestStreamingDuplicatePath:
     def test_process_multiple_streaming_duplicate_files(self, tmp_path: Path) -> None:
-        from iocparser.cli_processing_files import process_multiple_files, MultiFileProcessingRequest
+        from iocparser.cli_processing_files import (
+            MultiFileProcessingRequest,
+            process_multiple_files,
+        )
         from iocparser.infrastructure.file_readers import MagicTextSourceReader
         f = tmp_path / "s.txt"
         f.write_text("IOC: evil.com 1.2.3.4\n")
@@ -341,7 +358,11 @@ class TestIPv6Error:
 class TestRev0008Edge:
     def test_already_has_table(self, tmp_path: Path) -> None:
         from sqlalchemy import inspect
-        from iocparser.infrastructure.persistence_migration_steps import upgrade_to_version, create_latest_schema
+
+        from iocparser.infrastructure.persistence_migration_steps import (
+            create_latest_schema,
+            upgrade_to_version,
+        )
         engine = create_engine(f"sqlite:///{tmp_path / 'r8e.db'}", future=True)
         create_latest_schema(engine)
         upgrade_to_version(engine, inspect(engine), 8)

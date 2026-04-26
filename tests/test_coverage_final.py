@@ -5,7 +5,6 @@ Everything else uses real code paths.
 """
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -17,12 +16,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from iocparser.domain.models import (
-    ExtractionResult,
     IOC,
-    PersistedRunDiff,
+    ExtractionResult,
     WarningMatch,
 )
-from iocparser.infrastructure.persistence_schema import Base
 
 
 def _fresh_db(tmp_path: Path, name: str = "t.db") -> str:
@@ -65,7 +62,8 @@ class TestIOCRepoIntegrity:
         n = [0]
         def fail_once(*a, **k):
             n[0] += 1
-            if n[0] == 2: raise IntegrityError("dup", {}, Exception())
+            if n[0] == 2:
+                raise IntegrityError("dup", {}, Exception())
             return orig(*a, **k)
         with patch.object(session, "flush", side_effect=fail_once):
             id2 = repo._get_or_create(ioc_type="md5", value="a1", is_warning=False, warning_list="", warning_description="")
@@ -86,7 +84,9 @@ class TestIOCRepoIntegrity:
 # === persistence_source_repository IntegrityError (mock: simulates DB unique constraint) ===
 class TestSourceRepoIntegrity:
     def test_retry_updates_metadata(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence_source_repository import SQLAlchemySourceRepository
+        from iocparser.infrastructure.persistence_source_repository import (
+            SQLAlchemySourceRepository,
+        )
         engine = create_engine(_fresh_db(tmp_path), future=True)
         session = Session(engine)
         repo = SQLAlchemySourceRepository(session)
@@ -96,7 +96,8 @@ class TestSourceRepoIntegrity:
         n = [0]
         def fail_once(*a, **k):
             n[0] += 1
-            if n[0] == 2: raise IntegrityError("dup", {}, Exception())
+            if n[0] == 2:
+                raise IntegrityError("dup", {}, Exception())
             return orig(*a, **k)
         with patch.object(session, "flush", side_effect=fail_once):
             id2 = repo.get_or_create(kind="file", value="t.pdf", mime_type="application/pdf", content_hash="ch", fingerprint="fp", input_size=99, original_url="u", normalized_url="n")
@@ -104,7 +105,9 @@ class TestSourceRepoIntegrity:
         session.close()
 
     def test_reraises_when_not_found(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence_source_repository import SQLAlchemySourceRepository
+        from iocparser.infrastructure.persistence_source_repository import (
+            SQLAlchemySourceRepository,
+        )
         engine = create_engine(_fresh_db(tmp_path), future=True)
         session = Session(engine)
         repo = SQLAlchemySourceRepository(session)
@@ -121,9 +124,9 @@ class TestSQSDeadLetter:
         with patch("iocparser.infrastructure.queue_sqs._boto3_module") as mock_boto:
             mock_boto.return_value.client.return_value = SimpleNamespace(send_message=lambda **k: {"MessageId": "x"})
             adapter = SQSQueueAdapter("https://sqs.example/main")
-        from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
+        from iocparser.domain.distributed import QueueReceipt
         receipt = QueueReceipt("sqs", "q", "rh", "mid")
-        envelope = SimpleNamespace(to_record=lambda: {}, request=SimpleNamespace(job_id="j1"), attempts=0, max_attempts=3, queue_name="q", queue_backend="sqs")
+        envelope = SimpleNamespace(to_record=dict, request=SimpleNamespace(job_id="j1"), attempts=0, max_attempts=3, queue_name="q", queue_backend="sqs")
         with pytest.raises(RuntimeError, match="dead-letter queue URL not configured"):
             adapter.dead_letter(receipt, envelope=envelope)
 
@@ -131,7 +134,11 @@ class TestSQSDeadLetter:
 # === plugins.py enricher override warning ===
 class TestPluginsEnricherOverride:
     def test_builtin_enricher_override_warns(self) -> None:
-        from iocparser.plugins import _load_discovered_entry_points, _BUILTIN_ENRICHER_NAMES, _enricher_registry
+        from iocparser.plugins import (
+            _BUILTIN_ENRICHER_NAMES,
+            _enricher_registry,
+            _load_discovered_entry_points,
+        )
         original = _enricher_registry.get("misp")
         ep = SimpleNamespace(name="misp", load=lambda: (lambda: None))
         discovered = SimpleNamespace(select=lambda group: [ep] if group == "iocparser.enrichers" else [])
@@ -186,8 +193,9 @@ class TestTextRendererWarning:
 # === cli_output CSV diff path ===
 class TestCliOutputCsvDiff:
     def test_render_structured_diff_csv(self) -> None:
-        from iocparser.cli_output import _render_structured_diff
         import argparse
+
+        from iocparser.cli_output import _render_structured_diff
         args = argparse.Namespace(json=False, jsonl=False, csv=True)
         payload = {"added": [], "removed": []}
         added = [{"type": "d", "raw_value": "a.com", "is_warning": ""}]
@@ -280,8 +288,8 @@ class TestDistributedJobEdges:
         assert svc.mark_running(job_id="nope", receipt_id="r", attempts=1) is None
 
     def test_mark_dead_lettered_nonexistent(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
         from iocparser.domain.pipeline import PipelineErrorInfo
+        from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
         svc = SQLAlchemyDistributedJobService(_fresh_db(tmp_path))
         assert svc.mark_dead_lettered(job_id="nope", attempts=1, error=PipelineErrorInfo("E", "c", False, "failed", "m")) is None
 
@@ -323,8 +331,9 @@ class TestApiPersistenceValidation:
 # === migration rev_0008 ===
 class TestMigrationRev0008:
     def test_rev0008_applies_on_fresh_db(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence_migration_steps import upgrade_to_version
         from sqlalchemy import inspect
+
+        from iocparser.infrastructure.persistence_migration_steps import upgrade_to_version
         engine = create_engine(f"sqlite:///{tmp_path / 'rev8.db'}", future=True)
         from iocparser.infrastructure.persistence_migration_steps import create_latest_schema
         create_latest_schema(engine)
@@ -344,8 +353,9 @@ class TestHTTPDownloadMetadata:
 # === cli_dispatch_workflow: query/schema paths ===
 class TestCliDispatchPaths:
     def test_has_input_args_with_no_input(self) -> None:
-        from iocparser.cli_args_inputs import has_input_args
         import argparse
+
+        from iocparser.cli_args_inputs import has_input_args
         args = argparse.Namespace(
             file=None, url=None, multiple=None, directory=None,
             url_file=None, stdin=False, retry_failed_from=None,

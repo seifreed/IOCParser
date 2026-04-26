@@ -12,10 +12,8 @@ with no mocks, no monkeypatching, and no test doubles of any kind.
 Author: Marc Rivero | @seifreed
 """
 
-import pytest
 
 from iocparser.infrastructure.extraction import DefaultIOCExtractionEngine
-
 
 # ---------------------------------------------------------------------------
 # Phase 1 — Quick wins

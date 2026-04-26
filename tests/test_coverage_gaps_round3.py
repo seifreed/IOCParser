@@ -11,15 +11,14 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from iocparser.domain.models import ExtractionResult, IOC
-from iocparser.infrastructure.persistence_schema import Base
+from iocparser.domain.models import ExtractionResult
 
 
 def _fresh_db(tmp_path: Path, name: str = "test.db") -> str:
@@ -75,7 +74,7 @@ class TestIOCRepositoryIntegrityRetry:
         session = Session(engine)
         repo = SQLAlchemyIOCRepository(session)
 
-        def always_fail(*args, **kwargs):
+        def always_fail(*_args, **_kwargs):
             raise IntegrityError("mock", {}, Exception())
 
         with patch.object(session, "flush", side_effect=always_fail):
@@ -93,7 +92,9 @@ class TestIOCRepositoryIntegrityRetry:
 
 class TestSourceRepositoryIntegrityRetry:
     def test_integrity_error_triggers_retry_with_metadata_update(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence_source_repository import SQLAlchemySourceRepository
+        from iocparser.infrastructure.persistence_source_repository import (
+            SQLAlchemySourceRepository,
+        )
         db_uri = _fresh_db(tmp_path, "src_retry.db")
         engine = create_engine(db_uri, future=True)
         session = Session(engine)
@@ -132,13 +133,15 @@ class TestSourceRepositoryIntegrityRetry:
         session.close()
 
     def test_integrity_error_reraises_when_source_not_found(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence_source_repository import SQLAlchemySourceRepository
+        from iocparser.infrastructure.persistence_source_repository import (
+            SQLAlchemySourceRepository,
+        )
         db_uri = _fresh_db(tmp_path, "src_reraise.db")
         engine = create_engine(db_uri, future=True)
         session = Session(engine)
         repo = SQLAlchemySourceRepository(session)
 
-        def always_fail(*args, **kwargs):
+        def always_fail(*_args, **_kwargs):
             raise IntegrityError("mock", {}, Exception())
 
         with patch.object(session, "flush", side_effect=always_fail):
@@ -161,12 +164,12 @@ class TestPluginEntryPointLoading:
 
     def test_load_discovered_entry_points_registers_all_types(self) -> None:
         from iocparser.plugins import (
-            _load_discovered_entry_points,
-            _renderer_registry,
             _enricher_registry,
             _extractor_registry,
-            _postprocessor_registry,
             _ioc_type_registry,
+            _load_discovered_entry_points,
+            _postprocessor_registry,
+            _renderer_registry,
         )
 
         def make_ep(name: str, factory: object) -> SimpleNamespace:
@@ -197,19 +200,31 @@ class TestPluginEntryPointLoading:
         })
 
     def test_register_discovered_ioc_types_with_empty_base_type(self) -> None:
-        from iocparser.plugins import _register_discovered_ioc_types, register_ioc_type_plugin, _ioc_type_registry
+        from iocparser.plugins import (
+            _ioc_type_registry,
+            _register_discovered_ioc_types,
+            register_ioc_type_plugin,
+        )
         register_ioc_type_plugin("_bad_plugin", lambda: {"name": "_bad_plugin", "base_type": ""})
         _register_discovered_ioc_types()
         _ioc_type_registry.pop("_bad_plugin", None)
 
     def test_register_discovered_ioc_types_with_invalid_base_type(self) -> None:
-        from iocparser.plugins import _register_discovered_ioc_types, register_ioc_type_plugin, _ioc_type_registry
+        from iocparser.plugins import (
+            _ioc_type_registry,
+            _register_discovered_ioc_types,
+            register_ioc_type_plugin,
+        )
         register_ioc_type_plugin("_invalid_bt", lambda: {"name": "_invalid_bt", "base_type": "nonexistent"})
         _register_discovered_ioc_types()
         _ioc_type_registry.pop("_invalid_bt", None)
 
     def test_builtin_renderer_override_warning(self) -> None:
-        from iocparser.plugins import _load_discovered_entry_points, _BUILTIN_RENDERER_NAMES, _renderer_registry
+        from iocparser.plugins import (
+            _BUILTIN_RENDERER_NAMES,
+            _load_discovered_entry_points,
+            _renderer_registry,
+        )
 
         original_text = _renderer_registry.get("text")
         fake_ep = SimpleNamespace(
@@ -345,8 +360,8 @@ class TestDistributedJobTransitions:
         assert result is None
 
     def test_mark_failed_nonexistent_job(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
         from iocparser.domain.pipeline import PipelineErrorInfo
+        from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
         db_uri = _fresh_db(tmp_path, "dist2.db")
         service = SQLAlchemyDistributedJobService(db_uri)
         result = service.mark_failed(

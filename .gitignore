@@ -247,7 +247,6 @@ tox.ini.lock
 # Development and build files (keep locally, not in repo)
 CONTRIBUTING.md
 QUALITY.md
-Makefile
 build_package.py
 setup_quality.sh
 tox.ini
@@ -337,4 +336,5 @@ _darcs
 .project
 .pydevproject
 .settings/
-.loadpathiocparser/infrastructure/data/misp_warninglists_cache.json
+.loadpath
+iocparser/infrastructure/data/misp_warninglists_cache.json

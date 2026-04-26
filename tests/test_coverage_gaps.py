@@ -14,15 +14,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from iocparser.cli_processing_support import BatchResultsCollection
-from iocparser.domain.models import ExtractionResult
 from iocparser.errors import SourceNotFoundError, SourceProcessingError
 from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
-from iocparser.infrastructure.persistence_schema import Base, IOCModel
+from iocparser.infrastructure.persistence_schema import Base
 from iocparser.infrastructure.persistence_source_repository import SQLAlchemySourceRepository
-from iocparser.infrastructure.persistence_support import SEVERITY_ORDER
 from iocparser.rendering_support import prepare_json_payload, serialize_pretty_json
 from iocparser.shared_utils import _dedup_key, deduplicate_iocs
-
 
 # ---------------------------------------------------------------------------
 # 1. __main__.py — exercise the main() entry point error paths
@@ -34,16 +31,16 @@ class TestMainEntryPoint:
         assert callable(main)
 
     def test_main_help_flag(self, tmp_path: Path) -> None:
-        import subprocess, sys
-        result = subprocess.run(
+        import subprocess
+        import sys
+        result = subprocess.run(  # noqa: S603
             [sys.executable, "-m", "iocparser", "--help"],
-            capture_output=True, text=True, timeout=15,
+            capture_output=True, text=True, timeout=15, check=False,
         )
         assert result.returncode == 0
 
     def test_main_keyboard_interrupt(self) -> None:
         import iocparser.__main__ as main_module
-        from iocparser.errors import IOCParserError, ValidationError
 
         original = main_module.execute
 
@@ -278,7 +275,7 @@ class TestBatchResultsCollectionEdgeCases:
     def test_getitem_by_source_value(self) -> None:
         col = BatchResultsCollection()
         col.add(item_key="batch-item:1", source_value="file.txt", normal_iocs={"d": ["x"]}, warning_iocs={})
-        normal, warnings = col["file.txt"]
+        normal, _warnings = col["file.txt"]
         assert "d" in normal
 
     def test_getitem_raises_on_ambiguous(self) -> None:
@@ -356,6 +353,7 @@ class TestDedupKeyDictBranch:
 class TestWorkerServiceConcurrent:
     def test_concurrency_property_with_limits(self) -> None:
         from types import SimpleNamespace
+
         from iocparser.worker_service import DistributedWorkerService
 
         fake_service = SimpleNamespace(
@@ -371,6 +369,7 @@ class TestWorkerServiceConcurrent:
 
     def test_concurrency_property_without_limits(self) -> None:
         from types import SimpleNamespace
+
         from iocparser.worker_service import DistributedWorkerService
 
         fake_service = SimpleNamespace(process_next=lambda queue_name: None)
@@ -382,11 +381,12 @@ class TestWorkerServiceConcurrent:
 
     def test_run_forever_concurrent_with_stop_event(self) -> None:
         from types import SimpleNamespace
+
         from iocparser.worker_service import DistributedWorkerService
 
         call_count = 0
 
-        def fake_process_next(queue_name: str) -> object | None:
+        def fake_process_next(_queue_name: str) -> object | None:
             nonlocal call_count
             call_count += 1
             return SimpleNamespace() if call_count <= 2 else None
@@ -413,6 +413,7 @@ class TestWorkerServiceConcurrent:
 
     def test_run_forever_concurrent_max_cycles(self) -> None:
         from types import SimpleNamespace
+
         from iocparser.worker_service import DistributedWorkerService
 
         fake_service = SimpleNamespace(

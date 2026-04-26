@@ -2,16 +2,19 @@
 Mocks only for IntegrityError (requires real concurrent DB writers).
 """
 from __future__ import annotations
+
+import contextlib
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from iocparser.domain.models import ExtractionResult, IOC, WarningMatch
+
+from iocparser.domain.models import IOC, ExtractionResult, WarningMatch
 
 
 def _db(p: Path, n: str = "z.db") -> str:
@@ -35,7 +38,8 @@ def _persist(uri, iv="x.com"):
             options=PersistOptions(defang=True, check_warnings=False, force_update=False, output_format="text"),
         ), unit_of_work=u).run_id
     except Exception:
-        u.rollback(); raise
+        u.rollback()
+        raise
 
 
 # renderers_json.py:120 — dict decode from JSON parse
@@ -51,7 +55,7 @@ def test_json_renderer_renders_with_warnings():
 
 # renderers_stix.py:103 — return None for unknown entry kind
 def test_stix_build_entry_indicator_unknown_kind():
-    from iocparser.adapters.renderers_stix import build_entry_indicator, STIXOutputRenderer
+    from iocparser.adapters.renderers_stix import STIXOutputRenderer, build_entry_indicator
     renderer = STIXOutputRenderer()
     assert build_entry_indicator(renderer, ("unknown", SimpleNamespace())) is None
 
@@ -59,7 +63,7 @@ def test_stix_build_entry_indicator_unknown_kind():
 # api_persistence_query.py:229 — TypeError on empty string coercion
 def test_api_validated_non_negative_int_empty_string():
     from iocparser.api_persistence_query import validated_non_negative_int
-    with pytest.raises(Exception):
+    with pytest.raises(TypeError):
         validated_non_negative_int("", field="test")
 
 def test_api_validated_non_negative_int_string():
@@ -69,20 +73,17 @@ def test_api_validated_non_negative_int_string():
 def test_api_search_iocs_reraises_generic_error(tmp_path):
     from iocparser.api_persistence_query import search_persisted_iocs
     uri = _db(tmp_path)
-    try:
+    with contextlib.suppress(Exception):
         search_persisted_iocs(db_uri=uri, value="x", date_from="bad-date")
-    except Exception:
-        pass
 
 
 # cli_dispatch_workflow.py:154 — schema command returns True
-def test_cli_dispatch_schema_version(tmp_path, capsys):
+@pytest.mark.usefixtures("capsys")
+def test_cli_dispatch_schema_version(tmp_path):
     from iocparser.cli import execute
     uri = _db(tmp_path)
-    try:
+    with contextlib.suppress(SystemExit):
         execute(["--schema-version", "--db-uri", uri])
-    except SystemExit:
-        pass
 
 
 # cli_persistence.py:201 — _int_value with bool
@@ -97,7 +98,7 @@ def test_batch_collection_source_conflict_getitem():
     c = BatchResultsCollection()
     c.add(item_key="k1", source_value="conflict", normal_iocs={}, warning_iocs={})
     # lookup by source_value "conflict" works
-    normal, warnings = c["conflict"]
+    normal, _warnings = c["conflict"]
     assert isinstance(normal, dict)
 
 
@@ -142,7 +143,8 @@ def test_history_archive_id_from_origin():
     from iocparser.infrastructure.persistence.history.ops import _archive_id as _resolve_archive_id
     payload = {"sources": [], "runs": [], "iocs": [], "__history_origin_id__": "test-origin"}
     aid = _resolve_archive_id(payload)
-    assert isinstance(aid, str) and len(aid) == 64  # sha256 hex
+    assert isinstance(aid, str)
+    assert len(aid) == 64  # sha256 hex
 
 
 # persistence/history/ops.py:126-128 — legacy collision in dead_letter_jobs
@@ -193,7 +195,8 @@ def test_ioc_repo_integrity_retry(tmp_path):
     orig, n = s.flush, [0]
     def f(*a, **k):
         n[0] += 1
-        if n[0] == 2: raise IntegrityError("d", {}, Exception())
+        if n[0] == 2:
+            raise IntegrityError("d", {}, Exception())
         return orig(*a, **k)
     with patch.object(s, "flush", side_effect=f):
         assert r._get_or_create(ioc_type="md5", value="v1", is_warning=False, warning_list="", warning_description="") == id1
@@ -219,7 +222,8 @@ def test_source_repo_integrity_retry(tmp_path):
     orig, n = s.flush, [0]
     def f(*a, **k):
         n[0] += 1
-        if n[0] == 2: raise IntegrityError("d", {}, Exception())
+        if n[0] == 2:
+            raise IntegrityError("d", {}, Exception())
         return orig(*a, **k)
     with patch.object(s, "flush", side_effect=f):
         assert r.get_or_create(kind="file", value="a.txt", mime_type="t", content_hash="c", fingerprint="f", input_size=1, original_url="o", normalized_url="n") == id1

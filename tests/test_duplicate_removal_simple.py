@@ -6,19 +6,18 @@ Tests the core duplicate removal logic directly without depending on
 complex IOC extraction patterns.
 """
 
-from typing import Union
 
 import pytest
 
 
 def remove_duplicates_test_version(
-    ioc_list: list[Union[str, dict[str, str]]],
-) -> list[Union[str, dict[str, str]]]:
+    ioc_list: list[str | dict[str, str]],
+) -> list[str | dict[str, str]]:
     """
     Test version of our duplicate removal logic
     This mirrors the implementation in main.py
     """
-    unique_items: list[Union[str, dict[str, str]]] = []
+    unique_items: list[str | dict[str, str]] = []
     seen_keys: set[str] = set()
 
     for item in ioc_list:

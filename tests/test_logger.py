@@ -14,12 +14,9 @@ Author: Marc Rivero | @seifreed
 """
 
 import logging
-import sys
 from pathlib import Path
 
-import pytest
-
-from iocparser.modules.logger import (
+from iocparser.infrastructure.logger import (
     ColoredFormatter,
     get_logger,
     setup_logger,
@@ -417,10 +414,7 @@ class TestSetupLogger:
 class TestSetupLoggerTTYDetection:
     """Test TTY detection and conditional colored formatting."""
 
-    def test_setup_logger_uses_colored_formatter_when_tty_available(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
+    def test_setup_logger_uses_colored_formatter_when_tty_available(self) -> None:
         """
         Test setup_logger uses ColoredFormatter when TTY is available.
 
@@ -439,20 +433,16 @@ class TestSetupLoggerTTYDetection:
                 pass
 
         fake_stdout = FakeTTYStdout()
-        monkeypatch.setattr(sys, "stdout", fake_stdout)
 
         # Act: Setup logger (should detect TTY)
-        logger = setup_logger(name="test_tty_colored", console=True)
+        logger = setup_logger(name="test_tty_colored", console=True, stream=fake_stdout)
 
         # Assert: Console handler should use ColoredFormatter
         console_handlers = [h for h in logger.handlers if isinstance(h, logging.StreamHandler)]
         assert len(console_handlers) > 0
         assert isinstance(console_handlers[0].formatter, ColoredFormatter)
 
-    def test_setup_logger_uses_plain_formatter_when_no_tty(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
+    def test_setup_logger_uses_plain_formatter_when_no_tty(self) -> None:
         """
         Test setup_logger uses plain Formatter when TTY is not available.
 
@@ -471,10 +461,9 @@ class TestSetupLoggerTTYDetection:
                 pass
 
         fake_stdout = FakeNonTTYStdout()
-        monkeypatch.setattr(sys, "stdout", fake_stdout)
 
         # Act: Setup logger (should detect no TTY)
-        logger = setup_logger(name="test_no_tty_plain", console=True)
+        logger = setup_logger(name="test_no_tty_plain", console=True, stream=fake_stdout)
 
         # Assert: Console handler should use plain Formatter, not ColoredFormatter
         console_handlers = [h for h in logger.handlers if isinstance(h, logging.StreamHandler)]
@@ -482,10 +471,7 @@ class TestSetupLoggerTTYDetection:
         assert not isinstance(console_handlers[0].formatter, ColoredFormatter)
         assert isinstance(console_handlers[0].formatter, logging.Formatter)
 
-    def test_setup_logger_handles_stdout_without_isatty_method(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
+    def test_setup_logger_handles_stdout_without_isatty_method(self) -> None:
         """
         Test setup_logger handles stdout that lacks isatty() method.
 
@@ -501,10 +487,9 @@ class TestSetupLoggerTTYDetection:
                 pass
 
         minimal_stdout = MinimalStdout()
-        monkeypatch.setattr(sys, "stdout", minimal_stdout)
 
         # Act: Setup logger (should handle missing isatty gracefully)
-        logger = setup_logger(name="test_no_isatty", console=True)
+        logger = setup_logger(name="test_no_isatty", console=True, stream=minimal_stdout)
 
         # Assert: Should use plain formatter (fallback)
         console_handlers = [h for h in logger.handlers if isinstance(h, logging.StreamHandler)]

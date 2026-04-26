@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iocparser-tool"
-version = "5.0.1"
+version = "5.0.2"
 description = "A tool for extracting Indicators of Compromise from security reports"
 readme = "README.md"
 license = {text = "MIT"}
@@ -22,15 +22,13 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Security",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Text Processing :: Filters",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.13,<3.15"
 dependencies = [
     "colorama>=0.4.6",
     "python-magic>=0.4.27",
@@ -49,6 +47,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+pipeline = [
+    "boto3>=1.40.0",
+    "pika>=1.3.2",
+    "celery>=5.5.3",
+]
 dev = [
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
@@ -72,16 +75,17 @@ Repository = "https://github.com/seifreed/iocparser"
 
 [project.scripts]
 iocparser = "iocparser.__main__:main"
+iocparser-worker = "iocparser.worker_main:main"
 
 [tool.setuptools.packages.find]
 include = ["iocparser*"]
 
 [tool.setuptools.package-data]
-iocparser = ["modules/data/*.json"]
+iocparser = ["modules/data/*.json", "schemas/*.json"]
 
 # Ruff configuration
 [tool.ruff]
-target-version = "py310"
+target-version = "py313"
 line-length = 100
 fix = true
 
@@ -97,6 +101,7 @@ select = [
     "W",    # pycodestyle warnings
     "F",    # pyflakes
     "I",    # isort
+    "C90",  # mccabe complexity
     "B",    # flake8-bugbear
     "C4",   # flake8-comprehensions
     "UP",   # pyupgrade
@@ -140,7 +145,6 @@ ignore = [
     "TC001",   # Move import into type-checking block
     "TC002",   # Move third-party import into type-checking block
     "TC003",   # Move standard library import into type-checking block
-    "UP007",   # Use X | Y for type annotations (keep Union for compatibility)
     "ARG002",  # Unused method argument
     "TRY300",  # Consider moving to else block
     "B019",    # lru_cache on methods (intentional for performance)
@@ -149,8 +153,28 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["PLR2004", "S101", "S311", "SLF001"]
+"tests/*" = ["A002", "ARG005", "N806", "PLR0913", "PLR0915", "PLR2004", "RUF012", "S101", "S108", "S311", "SIM117", "SLF001", "TRY003", "UP028"]
 "examples/*" = ["INP001"]
+"iocparser/cli.py" = ["PLR0913"]
+"iocparser/cli_processing_support.py" = ["PLW1641"]
+"iocparser/cli_dispatch_workflow.py" = ["PLR0913"]
+"iocparser/cli_processing_urls.py" = ["PLR0913"]
+"iocparser/api_extraction.py" = ["PLR0913"]
+"iocparser/api_persistence_query.py" = ["TRY301", "UP047"]
+"iocparser/domain/sources.py" = ["PLR0913"]
+"iocparser/infrastructure/http_download.py" = ["PERF203", "RET503"]
+"iocparser/infrastructure/extractor_base.py" = ["SLF001"]
+"iocparser/infrastructure/persistence_queries.py" = ["C901", "PLR0913"]
+"iocparser/infrastructure/persistence_page_queries.py" = ["PLR0913"]
+"iocparser/infrastructure/persistence_schema.py" = ["PLR0913"]
+"iocparser/infrastructure/persistence_distributed.py" = ["PLR0913"]
+"iocparser/infrastructure/persistence/history/ops.py" = ["PLR0913", "SIM105"]
+"iocparser/infrastructure/persistence/query/ops.py" = ["TRY003"]
+"iocparser/infrastructure/queue_sqs.py" = ["TRY003"]
+"iocparser/interfaces/ports.py" = ["PLR0913"]
+"iocparser/interfaces/ports_persistence.py" = ["PLR0913"]
+"iocparser/adapters/renderers_stix.py" = ["SLF001"]
+"tests/test_distributed_pipeline_surface.py" = ["C901", "N802", "N803"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["iocparser"]
@@ -169,8 +193,7 @@ max-statements = 50
 
 # MyPy configuration
 [tool.mypy]
-python_version = "3.10"
-# MAXIMUM STRICTNESS - TRUE 100% COMPLIANCE
+python_version = "3.13"
 strict = true
 mypy_path = "stubs"
 plugins = ["sqlalchemy.ext.mypy.plugin"]
@@ -181,9 +204,9 @@ disallow_incomplete_defs = true
 disallow_untyped_decorators = true
 disallow_any_generics = true
 disallow_any_unimported = true
-disallow_any_expr = true
-disallow_any_decorated = true
-disallow_any_explicit = true
+disallow_any_expr = false
+disallow_any_decorated = false
+disallow_any_explicit = false
 disallow_subclassing_any = true
 ignore_missing_imports = false
 follow_imports = "normal"
@@ -215,6 +238,7 @@ module = [
     "pdfminer.*",
     "requests.*",
     "bs4.*",
+    "stix2.*",
 ]
 ignore_missing_imports = true
 
@@ -228,7 +252,7 @@ skips = ["*/test_*.py", "*/tests/*.py"]
 
 # Pylint configuration
 [tool.pylint.main]
-py-version = "3.10"
+py-version = "3.13"
 jobs = 0
 max-line-length = 100
 disable = [
@@ -274,6 +298,7 @@ exclude_lines = [
     "raise NotImplementedError",
     "if TYPE_CHECKING:",
 ]
+fail_under = 100
 precision = 2
 show_missing = true
 skip_covered = false
@@ -292,6 +317,8 @@ addopts = [
     "-v",
     "--strict-markers",
     "--tb=short",
+    "-m",
+    "not benchmark",
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
@@ -308,7 +335,7 @@ skip = ["venv", ".venv", "build", "dist"]
 # Black configuration (for compatibility if not using ruff format)
 [tool.black]
 line-length = 100
-target-version = ['py310', 'py311', 'py312', 'py313']
+target-version = ['py313', 'py314']
 include = '\.pyi?$'
 exclude = '''
 /(

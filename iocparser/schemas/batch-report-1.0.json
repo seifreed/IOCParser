@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iocparser.local/schemas/batch-report-1.0.json",
+  "title": "IOCParser Batch Report",
+  "type": "object",
+  "required": ["schema_version", "report_type", "job_id", "correlation_id", "status", "total", "successful", "failed", "items"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "report_type": {"const": "url_batch"},
+    "job_id": {"type": "string"},
+    "correlation_id": {"type": "string"},
+    "status": {"type": "string"},
+    "failure_cause": {"type": ["string", "null"]},
+    "total": {"type": "integer"},
+    "successful": {"type": "integer"},
+    "failed": {"type": "integer"},
+    "items": {"type": "array"},
+    "phase_timings_ms": {"type": "object"},
+    "phase_timestamps": {"type": "object"},
+    "metrics": {"type": "object"}
+  }
+}

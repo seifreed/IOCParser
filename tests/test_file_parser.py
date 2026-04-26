@@ -14,18 +14,20 @@ implementations without mocks.
 Author: Marc Rivero | @seifreed
 """
 
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
 
-from iocparser.modules.exceptions import (
+from iocparser.errors import (
     FileExistenceError,
     HTMLProcessingError,
     PDFProcessingError,
     UnsupportedFileTypeError,
     URLAccessError,
 )
-from iocparser.modules.file_parser import (
+from iocparser.infrastructure.file_parser import (
     HTMLParser,
     PDFParser,
     get_parser,
@@ -83,6 +85,56 @@ startxref
 %%EOF
 """
     pdf_path.write_text(pdf_content, encoding="latin-1")
+
+
+def create_table_pdf(pdf_path: Path) -> None:
+    """Create a minimal PDF whose table is detected by pdfplumber."""
+    stream = (
+        "BT\n"
+        "/F1 12 Tf\n"
+        "60 735 Td\n"
+        "(IP) Tj\n"
+        "90 0 Td\n"
+        "(Type) Tj\n"
+        "-90 -40 Td\n"
+        "(203.0.113.7) Tj\n"
+        "90 0 Td\n"
+        "(C2) Tj\n"
+        "ET\n"
+        "50 750 m 250 750 l S\n"
+        "50 710 m 250 710 l S\n"
+        "50 670 m 250 670 l S\n"
+        "50 670 m 50 750 l S\n"
+        "150 670 m 150 750 l S\n"
+        "250 670 m 250 750 l S\n"
+    )
+
+    objects = [
+        "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+        "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+        (
+            "3 0 obj\n"
+            "<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 4 0 R >> >> "
+            "/MediaBox [0 0 300 800] /Contents 5 0 R >>\n"
+            "endobj\n"
+        ),
+        "4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
+        f"5 0 obj\n<< /Length {len(stream.encode('latin-1'))} >>\nstream\n{stream}endstream\nendobj\n",
+    ]
+
+    header = "%PDF-1.4\n"
+    body = ""
+    offsets = [0]
+    for obj in objects:
+        offsets.append(len((header + body).encode("latin-1")))
+        body += obj
+
+    xref_start = len((header + body).encode("latin-1"))
+    xref = "xref\n0 6\n0000000000 65535 f \n"
+    for offset in offsets[1:]:
+        xref += f"{offset:010d} 00000 n \n"
+    trailer = f"trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n{xref_start}\n%%EOF\n"
+    pdf_path.write_bytes((header + body + xref + trailer).encode("latin-1"))
 
 
 class TestPDFParser:
@@ -203,6 +255,12 @@ class TestPDFParser:
         parser = PDFParser(str(invalid_pdf_path))
         with pytest.raises(PDFProcessingError):
             parser.extract_text()
+
+    def test_extract_table_text_handles_empty_rows(self) -> None:
+        assert PDFParser._extract_table_text(None) == ""
+        assert PDFParser._extract_table_text([]) == ""
+        assert PDFParser._extract_table_text([[], [None, None]]) == ""
+        assert PDFParser._extract_table_text([["ioc", None], ["value", "203.0.113.5"]]) == "ioc\nvalue 203.0.113.5\n"
 
 
 class TestHTMLParser:
@@ -609,24 +667,60 @@ class TestPDFParserTableExtraction:
         """
         # Arrange: Create PDF with table-like content
         pdf_path = tmp_path / "table_iocs.pdf"
-
-        # Create a more complex PDF structure that pdfplumber will parse as having tables
-        # Note: This tests the table extraction code path even if the table is simple
-        table_content = "IP Address | Type | Description | 10.0.0.1 | Private | Test"
-
-        create_minimal_pdf(pdf_path, table_content)
+        create_table_pdf(pdf_path)
 
         # Act: Extract text
         parser = PDFParser(str(pdf_path))
         extracted_text = parser.extract_text()
 
         # Assert: Table content should be extracted
-        assert "10.0.0.1" in extracted_text or "IP Address" in extracted_text
+        assert "203.0.113.7" in extracted_text
+        assert "C2" in extracted_text
         assert len(extracted_text) > 0
 
 
 class TestHTMLParserURLFetching:
     """Test HTML parser URL fetching functionality."""
+
+    class _LocalHTTPServer:
+        def __init__(self, *, body: bytes, status: int = 200, content_type: str = "text/html") -> None:
+            self.body = body
+            self.status = status
+            self.content_type = content_type
+            self.server: ThreadingHTTPServer | None = None
+            self.thread: threading.Thread | None = None
+
+        def __enter__(self) -> str:
+            body = self.body
+            status = self.status
+            content_type = self.content_type
+
+            class Handler(BaseHTTPRequestHandler):
+                def do_GET(self) -> None:
+                    self.send_response(status)
+                    self.send_header("Content-Type", content_type)
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+
+                def log_message(self, format: str, *args) -> None:
+                    del format, args
+
+            self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+            self.thread = threading.Thread(
+                target=lambda: self.server.serve_forever(poll_interval=0.01),
+                daemon=True,
+            )
+            self.thread.start()
+            return f"http://127.0.0.1:{self.server.server_address[1]}/page"
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            del exc_type, exc, tb
+            assert self.server is not None
+            assert self.thread is not None
+            self.server.shutdown()
+            self.server.server_close()
+            self.thread.join(timeout=5)
 
     def test_extract_text_from_http_url(self) -> None:
         """
@@ -635,23 +729,12 @@ class TestHTMLParserURLFetching:
         Validates that HTTP URL fetching code path works.
         Note: This test requires network access and uses a real lightweight service.
         """
-        # Use httpbin.org which provides a simple HTML page for testing
-        test_url = "http://httpbin.org/html"
-
-        # Create parser for URL
-        parser = HTMLParser(test_url)
-
-        # Attempt extraction - may fail if network is unavailable
-        try:
+        with self._LocalHTTPServer(body=b"<html><body><h1>Local Page</h1><p>ioc.example</p></body></html>") as test_url:
+            parser = HTMLParser(test_url)
             extracted_text = parser.extract_text()
-
-            # Should have extracted some HTML content
-            assert len(extracted_text) > 0
-            assert isinstance(extracted_text, str)
-
-        except Exception as e:
-            # If network fails, skip test
-            pytest.skip(f"Network request failed: {e}")
+        assert len(extracted_text) > 0
+        assert "Local Page" in extracted_text
+        assert "ioc.example" in extracted_text
 
     def test_extract_text_from_https_url(self) -> None:
         """
@@ -659,19 +742,11 @@ class TestHTMLParserURLFetching:
 
         Validates HTTPS URL fetching with real request.
         """
-        # Use a simple, reliable HTTPS endpoint
-        test_url = "https://httpbin.org/html"
-
-        parser = HTMLParser(test_url)
-
-        try:
+        with self._LocalHTTPServer(body=b"<html><body><h1>HTTPS-like Page</h1></body></html>") as test_url:
+            parser = HTMLParser(test_url)
             extracted_text = parser.extract_text()
-
-            assert len(extracted_text) > 0
-            assert isinstance(extracted_text, str)
-
-        except Exception as e:
-            pytest.skip(f"Network request failed: {e}")
+        assert len(extracted_text) > 0
+        assert "HTTPS-like Page" in extracted_text
 
     def test_extract_text_from_url_with_bad_status(self) -> None:
         """
@@ -679,14 +754,10 @@ class TestHTMLParserURLFetching:
 
         Validates error handling for HTTP error responses.
         """
-        # Use httpbin.org endpoint that returns 404
-        test_url = "https://httpbin.org/status/404"
-
-        parser = HTMLParser(test_url)
-
-        # Should raise URLAccessError or HTTPError
-        with pytest.raises((URLAccessError, Exception)):
-            parser.extract_text()
+        with self._LocalHTTPServer(body=b"missing", status=404) as test_url:
+            parser = HTMLParser(test_url)
+            with pytest.raises(URLAccessError):
+                parser.extract_text()
 
     def test_extract_text_from_unreachable_url(self) -> None:
         """
@@ -694,13 +765,8 @@ class TestHTMLParserURLFetching:
 
         Validates connection error handling.
         """
-        # Use an invalid domain that won't resolve
-        test_url = "http://this-domain-does-not-exist-12345.invalid"
-
-        parser = HTMLParser(test_url)
-
-        # Should raise URLAccessError
-        with pytest.raises((URLAccessError, Exception)):
+        parser = HTMLParser("http://127.0.0.1:9/unreachable")
+        with pytest.raises(URLAccessError):
             parser.extract_text()
 
 
@@ -731,3 +797,40 @@ class TestHTMLParserErrorHandling:
         except HTMLProcessingError:
             # This is also acceptable
             pass
+
+    def test_html_parser_raises_url_access_error_for_local_404(self) -> None:
+        import threading
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                self.send_response(404)
+                self.end_headers()
+
+            def log_message(self, format: str, *args) -> None:
+                del format, args
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(
+            target=lambda: server.serve_forever(poll_interval=0.01),
+            daemon=True,
+        )
+        thread.start()
+        try:
+            parser = HTMLParser(f"http://127.0.0.1:{server.server_address[1]}/missing.html")
+            with pytest.raises(URLAccessError):
+                parser.extract_text()
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=5)
+
+    def test_html_parser_wraps_generic_local_errors(self, tmp_path: Path) -> None:
+        html_path = tmp_path / "generic-error.html"
+        html_path.write_text("<html><body>ok</body></html>", encoding="utf-8")
+
+        parser = HTMLParser(str(html_path))
+        parser.file_path = "\0broken-path"
+
+        with pytest.raises(HTMLProcessingError):
+            parser.extract_text()

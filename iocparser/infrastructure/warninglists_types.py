@@ -1,0 +1,31 @@
+from __future__ import annotations
+
+import ipaddress
+import re
+from dataclasses import dataclass
+from logging import Logger
+
+WarningListEntry = str | dict[str, str] | int | bool | None
+WarningListValue = str | list[WarningListEntry] | int | bool
+WarningListDict = dict[str, WarningListValue]
+IOCValue = str | int | float | bool | None
+JSONValue = str | int | bool | list[str] | list[dict[str, str]] | dict[str, str]
+JSONData = dict[str, JSONValue] | list[JSONValue]
+
+
+def get_mixin_logger(instance: object, fallback: Logger) -> Logger:
+    """Shared logger accessor for warning-list mixins."""
+    try:
+        return instance.logger  # type: ignore[attr-defined, no-any-return]
+    except AttributeError:
+        return fallback
+
+
+@dataclass
+class WarningListLookups:
+    """Lookup containers for optimized warning list checks."""
+
+    string_lookups: dict[str, set[str]]
+    compiled_regex: dict[str, list[re.Pattern[str]]]
+    cidr_networks: dict[str, list[ipaddress.IPv4Network | ipaddress.IPv6Network]]
+    lists_by_ioc_type: dict[str, list[str]]

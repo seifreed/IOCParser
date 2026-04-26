@@ -1,0 +1,95 @@
+import re as _re
+
+DEFANG_REPLACEMENTS: tuple[tuple[str, str], ...] = (
+    ("[.]", "."),
+    ("(.)", "."),
+    ("{.}", "."),
+    ("[:]", ":"),
+    ("(:)", ":"),
+    ("{:}", ":"),
+    ("[@]", "@"),
+    ("[@ ]", "@"),
+    ("(@)", "@"),
+    ("{@}", "@"),
+    ("[//]", "//"),
+    ("{//}", "//"),
+    ("[/]", "/"),
+    ("{/}", "/"),
+    ("hxxp://", "http://"),
+    ("hxxps://", "https://"),
+    ("hXXp://", "http://"),
+    ("hXXps://", "https://"),
+    ("h__p://", "http://"),
+    ("h__ps://", "https://"),
+    ("fxp://", "ftp://"),
+    ("sfxp://", "sftp://"),
+)
+
+
+def _dedup_key(item: str | dict[str, str]) -> str:
+    if isinstance(item, dict):
+        return str(sorted(item.items())).lower()
+    return str(item).lower()
+
+
+def deduplicate_iocs(
+    iocs: dict[str, list[str | dict[str, str]]],
+) -> dict[str, list[str | dict[str, str]]]:
+    """Remove duplicate IOCs while preserving order (case-insensitive)."""
+    deduplicated: dict[str, list[str | dict[str, str]]] = {}
+    for ioc_type, ioc_list in iocs.items():
+        unique_items: list[str | dict[str, str]] = []
+        seen_keys: set[str] = set()
+        for item in ioc_list:
+            key = _dedup_key(item)
+            if key not in seen_keys:
+                seen_keys.add(key)
+                unique_items.append(item)
+        deduplicated[ioc_type] = unique_items
+    return deduplicated
+
+
+def deduplicate_iocs_with_state(
+    new_iocs: dict[str, list[str]],
+    seen_iocs: dict[str, set[str]],
+) -> dict[str, list[str]]:
+    """Remove duplicate IOCs using external state tracking (case-insensitive)."""
+    unique_iocs: dict[str, list[str]] = {}
+    for ioc_type, ioc_list in new_iocs.items():
+        unique = []
+        type_seen = seen_iocs.setdefault(ioc_type, set())
+        for ioc in ioc_list:
+            key = ioc.lower()
+            if key not in type_seen:
+                type_seen.add(key)
+                unique.append(ioc)
+        if unique:
+            unique_iocs[ioc_type] = unique
+    return unique_iocs
+
+
+_NON_SCHEME_REPLACEMENTS: tuple[tuple[str, str], ...] = tuple(
+    (search, replacement) for search, replacement in DEFANG_REPLACEMENTS if "://" not in search
+)
+
+_COMPILED_SCHEME_PATTERNS: tuple[tuple[_re.Pattern[str], str], ...] = tuple(
+    (_re.compile(_re.escape(pattern), _re.IGNORECASE), replacement)
+    for pattern, replacement in (
+        ("hxxps://", "https://"),
+        ("hxxp://", "http://"),
+        ("h__ps://", "https://"),
+        ("h__p://", "http://"),
+        ("sfxp://", "sftp://"),
+        ("fxp://", "ftp://"),
+    )
+)
+
+
+def refang_ioc(value: str) -> str:
+    """Normalize common defanged IOC variants back to canonical form."""
+    cleaned = value
+    for search, replacement in _NON_SCHEME_REPLACEMENTS:
+        cleaned = cleaned.replace(search, replacement)
+    for compiled_pattern, replacement in _COMPILED_SCHEME_PATTERNS:
+        cleaned = compiled_pattern.sub(replacement, cleaned)
+    return cleaned

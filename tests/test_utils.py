@@ -4,12 +4,12 @@ Copyright (c) 2026 Marc Rivero López
 Licensed under GPLv3. See LICENSE file for details.
 This test suite validates real code behavior without mocks or stubs.
 
-Tests for iocparser.modules.utils - deduplication utilities with stateful tracking.
+Tests for iocparser.shared_utils - deduplication utilities with stateful tracking.
 """
 
 import pytest
 
-from iocparser.modules.utils import deduplicate_iocs, deduplicate_iocs_with_state
+from iocparser.shared_utils import deduplicate_iocs, deduplicate_iocs_with_state
 
 
 class TestDeduplicateIocs:
@@ -205,8 +205,8 @@ class TestDeduplicateIocsWithState:
         assert result3 == {}
         assert seen_iocs["domains"] == {"evil.com", "malware.net", "newsite.org"}
 
-    def test_deduplicate_iocs_with_state_requires_initialized_state(self) -> None:
-        """Test that state must be pre-initialized with all expected IOC types."""
+    def test_deduplicate_iocs_with_state_auto_initializes_new_types(self) -> None:
+        """Test that new IOC types are auto-initialized via setdefault."""
         seen_iocs: dict[str, set[str]] = {
             "domains": {"evil.com"},
         }
@@ -215,10 +215,13 @@ class TestDeduplicateIocsWithState:
             "emails": ["bad@evil.com", "malware@test.net"],
         }
 
-        # The function expects all IOC types to be pre-initialized in state
-        # Attempting to use a new type raises KeyError
-        with pytest.raises(KeyError):
-            deduplicate_iocs_with_state(new_iocs, seen_iocs)
+        result = deduplicate_iocs_with_state(new_iocs, seen_iocs)
+
+        assert "domains" in result
+        assert "newdomain.com" in result["domains"]
+        assert "emails" in result
+        assert len(result["emails"]) == 2
+        assert "emails" in seen_iocs
 
     def test_deduplicate_iocs_with_state_with_preinitialized_types(self) -> None:
         """Test that pre-initialized state handles all IOC types correctly."""
@@ -296,8 +299,8 @@ class TestDeduplicateIocsWithState:
         assert seen_iocs is original_seen_iocs
         assert seen_iocs["domains"] == {"evil.com", "malware.net"}
 
-    def test_deduplicate_iocs_with_state_case_sensitive(self) -> None:
-        """Test deduplication is case-sensitive."""
+    def test_deduplicate_iocs_with_state_case_insensitive(self) -> None:
+        """Test deduplication is case-insensitive."""
         seen_iocs: dict[str, set[str]] = {
             "domains": {"evil.com"},
         }
@@ -307,10 +310,8 @@ class TestDeduplicateIocsWithState:
 
         result = deduplicate_iocs_with_state(new_iocs, seen_iocs)
 
-        # Different cases should be treated as different values
-        assert "Evil.com" in result["domains"]
-        assert "EVIL.COM" in result["domains"]
-        assert len(result["domains"]) == 2
+        # All case variants are considered duplicates of the already-seen value
+        assert "domains" not in result
 
     def test_deduplicate_iocs_with_state_streaming_scenario(self) -> None:
         """Test realistic streaming scenario with continuous processing."""

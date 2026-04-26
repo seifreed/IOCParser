@@ -5,7 +5,8 @@ Basic tests for IOCParser
 
 import pytest
 
-from iocparser import IOCExtractor, extract_iocs_from_text
+from iocparser.api_extraction import extract_iocs_from_text
+from iocparser.infrastructure.extraction import IOCExtractor
 
 
 def test_extract_iocs_from_text():

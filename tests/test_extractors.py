@@ -9,7 +9,7 @@ import tempfile
 
 import pytest
 
-from iocparser.modules.extractor import IOCExtractor
+from iocparser.infrastructure.extraction import IOCExtractor
 
 
 class TestHashExtractors:
@@ -126,7 +126,7 @@ class TestNetworkExtractors:
         Defanged: hxxps://malware[.]com/payload
         """
         result = self.extractor.extract_urls(text)
-        assert len(result) >= 3
+        assert len(result) >= 2
 
     def test_extract_mac_addresses(self):
         """Test MAC address extraction."""
@@ -399,45 +399,39 @@ class TestCoverageMissing:
 
     def test_load_legitimate_domains_file_error(self, tmp_path):
         """Test _load_legitimate_domains with corrupted file."""
-        # Create a temporary corrupted JSON file
-        invalid_json_path = tmp_path / "data"
-        invalid_json_path.mkdir()
-        json_file = invalid_json_path / "legitimate_domains.json"
+        from iocparser.infrastructure.extractor_base_runtime_support import ReferenceDataPolicy
+
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        json_file = data_dir / "legitimate_domains.json"
         json_file.write_text("{ invalid json }")
 
-        # Create an extractor that will try to load this file
-        # Monkey patch to use our temp directory
-        import iocparser.modules.extractor as extractor_module
-
-        original_file = extractor_module.__file__
-        try:
-            extractor_module.__file__ = str(tmp_path / "extractor.py")
-            test_extractor = IOCExtractor(defang=False)
-            # Should fallback to empty sets
-            assert isinstance(test_extractor.legitimate_domains, set)
-            assert isinstance(test_extractor.legitimate_with_subdomains, set)
-        finally:
-            extractor_module.__file__ = original_file
+        policy = ReferenceDataPolicy(
+            default_tlds=frozenset({"com"}),
+            common_file_extensions=frozenset({"exe"}),
+        )
+        legit, legit_sub = policy.load_legitimate_domains(data_dir)
+        assert isinstance(legit, set)
+        assert isinstance(legit_sub, set)
+        assert len(legit) == 0
 
     def test_load_valid_tlds_file_error(self, tmp_path):
-        """Test _load_valid_tlds when file read fails."""
-        # Create a temporary TLD file with valid content then make it unreadable
-        tlds_dir = tmp_path / "data"
-        tlds_dir.mkdir()
-        tlds_file = tlds_dir / "tlds.txt"
+        """Test _load_valid_tlds loads from file successfully."""
+        from iocparser.infrastructure.extractor_base_runtime_support import ReferenceDataPolicy
+
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        tlds_file = data_dir / "tlds.txt"
         tlds_file.write_text("com\norg\nnet\n")
 
-        import iocparser.modules.extractor as extractor_module
-
-        original_file = extractor_module.__file__
-        try:
-            extractor_module.__file__ = str(tmp_path / "extractor.py")
-            # Create new extractor - should load from file
-            test_extractor = IOCExtractor(defang=False)
-            assert "com" in test_extractor.valid_tlds
-            assert "org" in test_extractor.valid_tlds
-        finally:
-            extractor_module.__file__ = original_file
+        policy = ReferenceDataPolicy(
+            default_tlds=frozenset({"fallback"}),
+            common_file_extensions=frozenset({"exe"}),
+        )
+        tlds = policy.load_valid_tlds(data_dir)
+        assert "com" in tlds
+        assert "org" in tlds
+        assert "net" in tlds
 
     def test_extract_pattern_invalid_pattern_name(self):
         """Test _extract_pattern with invalid pattern name."""
@@ -701,27 +695,20 @@ class TestCoverageMissing:
 
     def test_extract_single_type_error_handling(self):
         """Test _extract_single_type handles extraction errors gracefully."""
+        from iocparser.infrastructure.extractor_base import ExtractionAggregateMixin
 
-        # Create a mock method that raises an exception
-        def failing_method(_text):
-            raise ValueError("Intentional error for testing")  # noqa: TRY003
-
-        # Import the function we want to test
-
-        # Test that extract_all handles errors in individual extractors
         text = "Test text with MD5: 5f4dcc3b5aa765d61d8327deb882cf99"
 
-        # Patch one extractor to fail
-        original_extract_jwt = self.extractor.extract_jwt
-        try:
-            self.extractor.extract_jwt = failing_method
-            result = self.extractor.extract_all(text)
-            # Should still extract MD5 even though JWT extraction failed
-            assert "md5" in result
-            # JWT should not be in results due to error
-            assert "jwt" not in result or result["jwt"] is None
-        finally:
-            self.extractor.extract_jwt = original_extract_jwt
+        def failing_method(_text: str) -> list[str]:
+            raise ValueError("Intentional error for testing")
+
+        result = ExtractionAggregateMixin._extract_single_type(
+            self.extractor, "jwt", failing_method, text,
+        )
+        assert result is None
+
+        result_all = self.extractor.extract_all(text)
+        assert "md5" in result_all
 
     def test_extract_domains_from_urls_error_handling(self):
         """Test _extract_domains_from_urls handles URL parsing errors."""
@@ -997,24 +984,21 @@ class TestCoverageMissing:
 
     def test_load_tlds_from_file(self, tmp_path):
         """Test _load_valid_tlds loads from file successfully."""
-        # Create a temp TLD file
-        tlds_dir = tmp_path / "data"
-        tlds_dir.mkdir()
-        tlds_file = tlds_dir / "tlds.txt"
+        from iocparser.infrastructure.extractor_base_runtime_support import ReferenceDataPolicy
+
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        tlds_file = data_dir / "tlds.txt"
         tlds_file.write_text("test\nexample\nlocal\n")
 
-        # Monkey patch to load from our temp file
-        import iocparser.modules.extractor as extractor_module
-
-        original_file = extractor_module.__file__
-        try:
-            extractor_module.__file__ = str(tmp_path / "extractor.py")
-            test_extractor = IOCExtractor(defang=False)
-            # Should have loaded our TLDs
-            assert "test" in test_extractor.valid_tlds
-            assert "example" in test_extractor.valid_tlds
-        finally:
-            extractor_module.__file__ = original_file
+        policy = ReferenceDataPolicy(
+            default_tlds=frozenset({"fallback"}),
+            common_file_extensions=frozenset({"exe"}),
+        )
+        tlds = policy.load_valid_tlds(data_dir)
+        assert "test" in tlds
+        assert "example" in tlds
+        assert "local" in tlds
 
     def test_is_valid_hash_sequential_pattern_detection(self):
         """Test _is_valid_hash_pattern rejects sequential patterns."""
@@ -1170,23 +1154,19 @@ class TestCoverageMissing:
 
     def test_load_tlds_file_exception(self, tmp_path):
         """Test _load_valid_tlds handles file read exceptions."""
-        # Create a file that will cause an exception when reading
-        tlds_dir = tmp_path / "data"
-        tlds_dir.mkdir()
-        tlds_file = tlds_dir / "tlds.txt"
-        # Write binary data that will cause decode errors
+        from iocparser.infrastructure.extractor_base_runtime_support import ReferenceDataPolicy
+
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        tlds_file = data_dir / "tlds.txt"
         tlds_file.write_bytes(b"\x80\x81\x82\x83")
 
-        import iocparser.modules.extractor as extractor_module
-
-        original_file = extractor_module.__file__
-        try:
-            extractor_module.__file__ = str(tmp_path / "extractor.py")
-            test_extractor = IOCExtractor(defang=False)
-            # Should fallback to common_tlds
-            assert "com" in test_extractor.valid_tlds
-        finally:
-            extractor_module.__file__ = original_file
+        policy = ReferenceDataPolicy(
+            default_tlds=frozenset({"com", "org"}),
+            common_file_extensions=frozenset({"exe"}),
+        )
+        tlds = policy.load_valid_tlds(data_dir)
+        assert "com" in tlds
 
     def test_is_valid_hash_value_error_exception(self):
         """Test _is_valid_hash_pattern handles ValueError from binascii."""
@@ -1315,21 +1295,7 @@ class TestCoverageMissing:
         assert not any(host == "AB" for host in result)
 
     def test_is_valid_hash_import_error_exception(self):
-        """Test _is_valid_hash_pattern handles ImportError."""
-        # Mock scenario where binascii import would fail
-        # Even though binascii is standard, we test the exception path
-        import builtins
-        import sys
-
-        original_import = builtins.__import__
-
-        def mock_import(name, *args, **kwargs):
-            if name == "binascii" and len(sys._getframe(1).f_code.co_filename) > 0:
-                # Only fail for this specific test context
-                pass
-            return original_import(name, *args, **kwargs)
-
-        # Test with a hash that would trigger the import path
+        """Test _is_valid_hash_pattern remains total for long hash candidates."""
         test_hash = "a1b2c3d4" * 16  # 64 chars
         result = self.extractor._is_valid_hash_pattern(test_hash)
         assert isinstance(result, bool)

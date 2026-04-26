@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iocparser-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: iocparser-worker
+  template:
+    metadata:
+      labels:
+        app: iocparser-worker
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/seifreed/iocparser-worker:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: IOCPARSER_CONFIG
+              value: /etc/iocparser/iocparser.ini
+            - name: IOCPARSER_WORKER_QUEUE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: iocparser-worker-secrets
+                  key: IOCPARSER_WORKER_QUEUE_URL
+            - name: IOCPARSER_WORKER_DB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: iocparser-worker-secrets
+                  key: IOCPARSER_WORKER_DB_URI
+          volumeMounts:
+            - name: config
+              mountPath: /etc/iocparser
+              readOnly: true
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10001
+      volumes:
+        - name: config
+          configMap:
+            name: iocparser-worker-config

@@ -1,0 +1,114 @@
+from __future__ import annotations
+
+from iocparser.domain.models import (
+    IOC,
+    DomainValue,
+    EmailValue,
+    ExtractionResult,
+    IOCType,
+    IpValue,
+    PersistOptions,
+    Source,
+    SourceKind,
+    UrlValue,
+    indicator_value_for,
+)
+
+
+def test_source_kind_and_ioc_type_resolve_aliases() -> None:
+    assert SourceKind.from_name("file") is SourceKind.FILE
+    assert IOCType.from_name("domain") is IOCType.DOMAIN
+    assert IOCType.from_name("host") is IOCType.HOST
+    assert IOCType.from_name("ip") is IOCType.IP
+    assert IOCType.from_name("ipv4") is IOCType.IP
+    assert IOCType.from_name("url") is IOCType.URL
+    assert IOCType.from_name("email") is IOCType.EMAIL
+    assert IOCType.from_name("hashes") is IOCType.SHA256
+
+
+def test_value_objects_canonicalize_expected_values() -> None:
+    assert DomainValue(" Example[.]COM ").canonical() == "example.com"
+    assert UrlValue("hxxps://Example[.]COM/path").canonical() == "https://Example.COM/path"
+    assert UrlValue("not really a url").canonical() == "not really a url"
+    assert IpValue("2001:0db8::1").canonical() == "2001:db8::1"
+    assert IpValue("not-an-ip").canonical() == "not-an-ip"
+    assert EmailValue(" USER@Example[.]COM ").canonical() == "user@example.com"
+
+
+def test_indicator_value_for_selects_specialized_types() -> None:
+    assert type(indicator_value_for(IOCType.DOMAIN, "example.com")).__name__ == "DomainValue"
+    assert type(indicator_value_for(IOCType.URL, "https://example.com")).__name__ == "UrlValue"
+    assert type(indicator_value_for(IOCType.SHA256, "ABCD")).__name__ == "HashValue"
+    assert type(indicator_value_for(IOCType.IP, "198.51.100.7")).__name__ == "IpValue"
+    assert type(indicator_value_for(IOCType.EMAIL, "a@b.test")).__name__ == "EmailValue"
+
+
+def test_ioc_and_source_build_from_raw_inputs() -> None:
+    source = Source.from_raw("text", "sample")
+    ioc = IOC.from_raw("domains", "Example[.]COM")
+
+    assert source == Source(kind=SourceKind.TEXT, value="sample")
+    assert ioc.ioc_type is IOCType.DOMAIN
+    assert ioc.canonical_value() == "example.com"
+
+
+def test_extraction_result_from_grouped_payload_groups_and_deduplicates() -> None:
+    result = ExtractionResult.from_grouped_payload(
+        normal_iocs={
+            "domains": ["Example[.]COM", "Example[.]COM"],
+            "ips": ["198.51.100.7"],
+        },
+        warning_iocs={
+            "domains": [
+                {
+                    "value": "Example[.]COM",
+                    "warning_list": "Known Good",
+                    "description": "Whitelist",
+                },
+                {
+                    "value": "Example[.]COM",
+                    "warning_list": "Known Good",
+                    "description": "Whitelist",
+                },
+                {
+                    "value": "",
+                    "warning_list": "Ignored",
+                    "description": "Missing value",
+                },
+            ],
+        },
+    )
+
+    assert result.grouped_iocs() == {
+        "domains": ["Example[.]COM"],
+        "ips": ["198.51.100.7"],
+    }
+    assert result.grouped_warnings() == {
+        "domains": [
+            {
+                "value": "Example[.]COM",
+                "warning_list": "Known Good",
+                "description": "Whitelist",
+            }
+        ]
+    }
+    assert result.canonical_by_type() == {
+        IOCType.DOMAIN: ("example.com",),
+        IOCType.IP: ("198.51.100.7",),
+    }
+
+
+def test_persist_options_to_dict_is_storage_friendly() -> None:
+    options = PersistOptions(
+        defang=True,
+        check_warnings=False,
+        force_update=True,
+        output_format="stix",
+    )
+
+    assert options.to_dict() == {
+        "defang": True,
+        "check_warnings": False,
+        "force_update": True,
+        "output_format": "stix",
+    }

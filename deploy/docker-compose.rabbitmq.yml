@@ -1,0 +1,21 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile.worker
+    depends_on:
+      - rabbitmq
+    environment:
+      IOCPARSER_CONFIG: /etc/iocparser/iocparser.ini
+    volumes:
+      - worker-data:/data
+      - ./iocparser.scale.example.ini:/etc/iocparser/iocparser.ini:ro
+
+volumes:
+  worker-data:

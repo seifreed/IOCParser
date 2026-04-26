@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iocparser.local/schemas/distributed-job-1.0.json",
+  "title": "IOCParser Distributed Job",
+  "type": "object",
+  "required": ["schema_version", "job_id", "correlation_id", "queue_backend", "queue_name", "input_kind", "source_value", "status", "attempts", "max_attempts"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "job_id": {"type": "string"},
+    "correlation_id": {"type": "string"},
+    "queue_backend": {"type": "string"},
+    "queue_name": {"type": "string"},
+    "input_kind": {"type": "string"},
+    "source_value": {"type": "string"},
+    "status": {"enum": ["queued", "running", "completed", "failed", "dead-lettered"]},
+    "attempts": {"type": "integer"},
+    "max_attempts": {"type": "integer"},
+    "idempotency_key": {"type": ["string", "null"]},
+    "retryable": {"type": ["boolean", "null"]},
+    "run_id": {"type": ["integer", "null"]},
+    "last_error": {"type": ["object", "null"]},
+    "result": {"type": "object"}
+  }
+}

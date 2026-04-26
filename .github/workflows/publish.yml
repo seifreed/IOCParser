@@ -13,7 +13,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.12'
+        python-version: '3.14'
 
     - name: Install dependencies
       run: |
@@ -22,6 +22,17 @@ jobs:
 
     - name: Build package
       run: python -m build
+
+    - name: Upload schema artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: iocparser-schemas
+        path: iocparser/schemas/*.json
+
+    - name: Attach schemas to release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: iocparser/schemas/*.json
 
     - name: Publish to PyPI
       env:

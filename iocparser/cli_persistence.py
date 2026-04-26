@@ -1,0 +1,252 @@
+from __future__ import annotations
+
+import argparse
+from collections.abc import Mapping
+from dataclasses import dataclass
+
+from iocparser import cli_args as _cli_args
+from iocparser import cli_output as _cli_output
+from iocparser.cli_processing_support import BatchResultsCollection, GroupedIocs, GroupedWarnings
+from iocparser.config import AppConfig
+from iocparser.domain.models import PersistOptions
+from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
+
+VERSION = _cli_args.VERSION
+get_bool_arg = _cli_args.get_bool_arg
+BatchResults = BatchResultsCollection
+
+
+@dataclass(frozen=True)
+class PersistResultsRequestData:
+    config: AppConfig
+    source_kind: str
+    source_value: str
+    normal_iocs: GroupedIocs
+    warning_iocs: GroupedWarnings
+    options: PersistOptions
+    source_metadata: dict[str, object] | None = None
+    run_metadata: dict[str, int | str | None] | None = None
+
+
+def build_persist_options(args: argparse.Namespace) -> PersistOptions:
+    if get_bool_arg(args, "stix"):
+        output_format = "stix"
+    elif get_bool_arg(args, "jsonl"):
+        output_format = "jsonl"
+    elif get_bool_arg(args, "csv"):
+        output_format = "csv"
+    elif get_bool_arg(args, "json"):
+        output_format = "json"
+    else:
+        output_format = "text"
+    return PersistOptions(
+        defang=not get_bool_arg(args, "no_defang"),
+        check_warnings=not get_bool_arg(args, "no_check_warnings"),
+        force_update=get_bool_arg(args, "force_update"),
+        output_format=output_format,
+    )
+
+
+def _normalized_run_metadata_map(
+    run_metadata_map: dict[str, dict[str, int | str]] | dict[str, dict[str, int | str | None]] | None,
+) -> dict[str, dict[str, int | str | None]] | None:
+    if run_metadata_map is None:
+        return None
+    return {
+        source_path: {
+            key: value if isinstance(value, (int, str)) or value is None else str(value)
+            for key, value in metadata.items()
+        }
+        for source_path, metadata in run_metadata_map.items()
+    }
+
+
+def _persist_results_request(request: PersistResultsRequestData) -> _cli_output.PersistResultsRequest:
+    return _cli_output.PersistResultsRequest(
+        config=request.config,
+        source_kind=request.source_kind,
+        source_value=request.source_value,
+        normal_iocs=request.normal_iocs,
+        warning_iocs=request.warning_iocs,
+        options=request.options,
+        tool_version=VERSION,
+        source_metadata=request.source_metadata,
+        run_metadata=request.run_metadata,
+    )
+
+
+def persist_many_results(
+    results: BatchResults,
+    *,
+    config: AppConfig,
+    options: PersistOptions,
+    source_kind: str = "file",
+    source_metadata_map: dict[str, dict[str, object]] | None = None,
+    run_metadata_map: dict[str, dict[str, int | str]] | dict[str, dict[str, int | str | None]] | None = None,
+) -> tuple[int, ...]:
+    normalized = _normalized_run_metadata_map(run_metadata_map)
+    run_ids: list[int] = []
+    for item_key, source_path, file_iocs, file_warnings in _batch_result_entries(results):
+        run_id = _cli_output.persist_results(
+            _persist_results_request(
+                PersistResultsRequestData(
+                    config=config,
+                    source_kind=source_kind,
+                    source_value=source_path,
+                    normal_iocs=file_iocs,
+                    warning_iocs=file_warnings,
+                    options=options,
+                    source_metadata=_batch_metadata(source_metadata_map, item_key),
+                    run_metadata=_batch_run_metadata(normalized, item_key, source_path),
+                )
+            ),
+        )
+        if run_id is not None:
+            run_ids.append(run_id)
+    return tuple(run_ids)
+
+
+def persist_failed_batch_items(
+    report: Mapping[str, object],
+    *,
+    config: AppConfig,
+    options: PersistOptions,
+    source_kind: str = "url",
+) -> tuple[int, ...]:
+    items = report.get("items", [])
+    if not isinstance(items, list):
+        return ()
+    run_metadata_map = report.get("run_metadata_map", {})
+    if not isinstance(run_metadata_map, dict):
+        run_metadata_map = {}
+    run_ids: list[int] = []
+    for item in items:
+        if not isinstance(item, dict) or str(item.get("status", "")).lower() != "failed":
+            continue
+        source_value = str(item.get("url", "")).strip()
+        if not source_value:
+            continue
+        run_id = _cli_output.persist_results(
+            _persist_results_request(
+                PersistResultsRequestData(
+                    config=config,
+                    source_kind=source_kind,
+                    source_value=source_value,
+                    normal_iocs={},
+                    warning_iocs={},
+                    options=options,
+                    run_metadata=_failed_item_run_metadata(item, run_metadata_map, source_value),
+                )
+            ),
+        )
+        if run_id is not None:
+            run_ids.append(run_id)
+    return tuple(run_ids)
+
+
+def _batch_result_entries(
+    results: BatchResults,
+) -> list[tuple[str, str, GroupedIocs, GroupedWarnings]]:
+    if isinstance(results, dict):  # type: ignore[unreachable]
+        return [(item_key, item_key, normal_iocs, warning_iocs) for item_key, (normal_iocs, warning_iocs) in results.items()]  # type: ignore[unreachable]
+    return [
+        (entry.item_key, entry.source_value, entry.normal_iocs, entry.warning_iocs)
+        for entry in results.entries
+    ]
+
+
+def _batch_metadata(
+    source_metadata_map: dict[str, dict[str, object]] | None,
+    item_key: str,
+) -> dict[str, object] | None:
+    if source_metadata_map is None:
+        return None
+    return source_metadata_map.get(item_key)
+
+
+def _batch_run_metadata(
+    run_metadata_map: dict[str, dict[str, int | str | None]] | None,
+    item_key: str,
+    source_value: str,
+) -> dict[str, int | str | None] | None:
+    if run_metadata_map is None:
+        return None
+    return run_metadata_map.get(item_key) or run_metadata_map.get(source_value)
+
+
+def _failed_item_run_metadata(
+    item: Mapping[str, object],
+    run_metadata_map: Mapping[str, dict[str, int | str | None]] | None,
+    source_value: str,
+) -> dict[str, int | str | None]:
+    item_key = str(item.get("item_key", "")).strip()
+    fallback = None
+    if run_metadata_map is not None:
+        fallback = run_metadata_map.get(item_key) if item_key else None
+        if fallback is None:
+            fallback = run_metadata_map.get(source_value)
+    return {
+        "duration_ms": _int_value(item.get("duration_ms"), default=fallback_int(fallback, "duration_ms", 0)),
+        "processed_items": 1,
+        "successful_items": 0,
+        "failed_items": 1,
+        "partial_error_count": 1,
+        "status": "failed",
+        "error_message": str(item.get("error", fallback_str(fallback, "error_message", ""))),
+    }
+
+
+def _int_value(value: object, *, default: int) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and value.strip():
+        return int(value.strip())
+    return default
+
+
+def fallback_int(metadata: Mapping[str, int | str | None] | None, key: str, default: int) -> int:
+    if metadata is None:
+        return default
+    value = metadata.get(key)
+    return _int_value(value, default=default)
+
+
+def fallback_str(metadata: Mapping[str, int | str | None] | None, key: str, default: str) -> str:
+    if metadata is None:
+        return default
+    value = metadata.get(key)
+    return default if value is None else str(value)
+
+
+def persist_batch_job(
+    report: Mapping[str, object],
+    *,
+    config: AppConfig,
+    source_kind: str,
+    run_ids: tuple[int, ...],
+    effective_config: Mapping[str, object],
+) -> int | None:
+    db_uri = config.db_uri
+    if not config.persist or not db_uri:
+        return None
+    service = SQLAlchemyPersistenceService(db_uri)
+    return service.persist_batch_job(
+        source_kind=source_kind,
+        run_ids=run_ids,
+        report=dict(report),
+        config=dict(effective_config),
+    )
+
+__all__ = [
+    "VERSION",
+    "BatchResults",
+    "GroupedIocs",
+    "GroupedWarnings",
+    "build_persist_options",
+    "get_bool_arg",
+    "persist_batch_job",
+    "persist_failed_batch_items",
+    "persist_many_results",
+]

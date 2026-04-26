@@ -1,0 +1,178 @@
+from __future__ import annotations
+
+import argparse
+import io
+import threading
+from contextlib import redirect_stdout
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+import pytest
+
+import iocparser.cli as cli_module
+from iocparser.cli import handle_misp_init, process_single_input, save_output
+from iocparser.cli_output import PersistResultsRequest, persist_results
+from iocparser.config import AppConfig
+from iocparser.domain.models import PersistOptions
+
+
+class SimpleTextServer:
+    def __init__(self, body: bytes, content_type: str = "text/plain") -> None:
+        self.body = body
+        self.content_type = content_type
+        self.server: ThreadingHTTPServer | None = None
+        self.thread: threading.Thread | None = None
+
+    def __enter__(self) -> str:
+        body = self.body
+        content_type = self.content_type
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                self.send_response(200)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, format: str, *args) -> None:
+                del format, args
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.thread = threading.Thread(
+            target=lambda: self.server.serve_forever(poll_interval=0.01),
+            daemon=True,
+        )
+        self.thread.start()
+        return f"http://127.0.0.1:{self.server.server_address[1]}/sample.txt"
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        del exc_type, exc, tb
+        assert self.server is not None
+        assert self.thread is not None
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=5)
+
+
+@pytest.mark.slow
+def test_process_single_input_with_real_url_server() -> None:
+    args = argparse.Namespace(
+        file=None,
+        url=None,
+        url_direct=None,
+        type="text",
+        no_defang=True,
+        no_check_warnings=True,
+        force_update=False,
+    )
+
+    with SimpleTextServer(b"IOC URL: https://from-server.example/path\n") as url:
+        args.url = url
+        normal_iocs, warning_iocs, input_display = process_single_input(args)
+
+    assert normal_iocs == {"urls": ["https://from-server.example/path"]}
+    assert warning_iocs == {}
+    assert input_display == args.url
+
+
+def test_save_output_stix_format_to_file(tmp_path: Path) -> None:
+    output_path = tmp_path / "output.stix.json"
+    args = argparse.Namespace(
+        json=False,
+        stix=True,
+        output=str(output_path),
+    )
+
+    save_output(args, {"domains": ["example.com"]}, {}, "input.txt")
+
+    content = output_path.read_text(encoding="utf-8")
+    assert '"type": "bundle"' in content
+    assert "[domain-name:value = 'example.com']" in content
+
+
+def test_persist_results_returns_when_db_uri_missing(tmp_path: Path) -> None:
+    db_path = tmp_path / "should-not-exist.db"
+    config = AppConfig(persist=True, db_uri=None, config_path=None)
+
+    persist_results(
+        PersistResultsRequest(
+            config=config,
+            source_kind="file",
+            source_value="sample.txt",
+            normal_iocs={"domains": ["example.com"]},
+            warning_iocs={},
+            options=PersistOptions(
+                defang=False,
+                check_warnings=False,
+                force_update=False,
+                output_format="text",
+            ),
+            tool_version="1.0.0",
+        )
+    )
+
+    assert not db_path.exists()
+
+
+def test_persist_results_writes_to_sqlite(tmp_path: Path) -> None:
+    db_path = tmp_path / "iocparser.db"
+    config = AppConfig(persist=True, db_uri=f"sqlite:///{db_path}", config_path=None)
+
+    persist_results(
+        PersistResultsRequest(
+            config=config,
+            source_kind="file",
+            source_value="sample.txt",
+            normal_iocs={"domains": ["example.com"]},
+            warning_iocs={},
+            options=PersistOptions(
+                defang=False,
+                check_warnings=False,
+                force_update=False,
+                output_format="json",
+            ),
+            tool_version="1.0.0",
+        )
+    )
+
+    assert db_path.exists()
+
+
+def test_save_output_stix_to_stdout() -> None:
+    args = argparse.Namespace(
+        json=False,
+        stix=True,
+        output="-",
+    )
+    buffer = io.StringIO()
+    with redirect_stdout(buffer):
+        save_output(args, {"urls": ["https://stdout.example/path"]}, {}, "stdout.txt")
+
+    rendered = buffer.getvalue()
+    assert '"type": "bundle"' in rendered
+    assert "stdout.example" in rendered
+
+
+def test_handle_misp_init_with_concrete_replacement() -> None:
+    class LocalWarningLists:
+        def __init__(self, cache_duration: int = 0, force_update: bool = True) -> None:
+            del cache_duration, force_update
+            self.warning_lists = {
+                "dns-google": {"name": "DNS Google"},
+                "dns-cloudflare": {"name": "DNS Cloudflare"},
+                "other-list": {},
+            }
+
+    original_warning_lists = cli_module.MISPWarningLists
+    cli_module.MISPWarningLists = LocalWarningLists
+    try:
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            handle_misp_init()
+    finally:
+        cli_module.MISPWarningLists = original_warning_lists
+
+    output = buffer.getvalue()
+    assert "Dns: 2 lists" in output
+    assert "Other: 1 lists" in output

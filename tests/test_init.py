@@ -18,8 +18,10 @@ from pathlib import Path
 
 import pytest
 
-from iocparser import extract_iocs_from_file, extract_iocs_from_text
-from iocparser.modules.exceptions import FileExistenceError
+import iocparser as iocparser_module
+from iocparser.api_extraction import extract_iocs_from_file, extract_iocs_from_text
+from iocparser.errors import FileExistenceError
+from tests.warning_service_helpers import StaticWarningListService, swap_warning_service
 
 
 def create_minimal_pdf(pdf_path: Path, text_content: str) -> None:
@@ -326,9 +328,10 @@ Common infrastructure (may be in warning lists):
         text_path.write_text(text_content, encoding="utf-8")
 
         # Act: Extract with warning list checking
-        normal_iocs, warning_iocs = extract_iocs_from_file(
-            text_path, check_warnings=True, force_update=False, defang=False
-        )
+        with swap_warning_service(iocparser_module, StaticWarningListService()):
+            normal_iocs, warning_iocs = extract_iocs_from_file(
+                text_path, check_warnings=True, force_update=False, defang=False
+            )
 
         # Assert: Both dictionaries should be returned
         assert isinstance(normal_iocs, dict)
@@ -520,9 +523,10 @@ Suspicious domains:
 """
 
         # Act: Extract with warning checking
-        normal_iocs, warning_iocs = extract_iocs_from_text(
-            text, check_warnings=True, force_update=False, defang=False
-        )
+        with swap_warning_service(iocparser_module, StaticWarningListService()):
+            normal_iocs, warning_iocs = extract_iocs_from_text(
+                text, check_warnings=True, force_update=False, defang=False
+            )
 
         # Assert: Should separate IOCs
         assert isinstance(normal_iocs, dict)
@@ -560,13 +564,16 @@ Suspicious domains:
 
         # Act: Extract with forced warning list update
         # This will trigger actual warning list update
-        normal_iocs, warning_iocs = extract_iocs_from_text(
-            text, check_warnings=True, force_update=True, defang=False
-        )
+        service = StaticWarningListService()
+        with swap_warning_service(iocparser_module, service):
+            normal_iocs, warning_iocs = extract_iocs_from_text(
+                text, check_warnings=True, force_update=True, defang=False
+            )
 
         # Assert: Should complete without errors and return results
         assert isinstance(normal_iocs, dict)
         assert isinstance(warning_iocs, dict)
+        assert service.force_update_calls == [True]
 
     def test_extract_preserves_ioc_structure(self) -> None:
         """

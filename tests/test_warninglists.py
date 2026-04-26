@@ -7,11 +7,26 @@ Author: Marc Rivero | @seifreed
 
 import contextlib
 import json
-from unittest.mock import patch
+import tempfile
+import time
+from pathlib import Path
 
 import pytest
 
-from iocparser.modules.warninglists import MISPWarningLists
+from tests.test_warninglists_offline import (
+    OfflineWarningLists,
+    TrackingWarningLists,
+    WarningListServer,
+)
+
+_warninglist_tempdirs: list[tempfile.TemporaryDirectory[str]] = []
+
+
+def make_warning_lists() -> OfflineWarningLists:
+    """Create an offline warning-lists instance without network refresh."""
+    tempdir = tempfile.TemporaryDirectory()
+    _warninglist_tempdirs.append(tempdir)
+    return OfflineWarningLists(Path(tempdir.name), cache_duration=24, force_update=False)
 
 
 class TestMISPWarningLists:
@@ -19,8 +34,7 @@ class TestMISPWarningLists:
 
     def setup_method(self):
         """Set up test fixtures."""
-        # Create mock warning lists data
-        self.mock_warning_lists = {
+        self.sample_warning_lists = {
             "public-dns-v4": {
                 "name": "Public DNS Resolvers",
                 "description": "List of public DNS resolver IP addresses",
@@ -51,29 +65,25 @@ class TestMISPWarningLists:
             },
         }
 
-    @patch("iocparser.modules.warninglists.requests.get")
-    def test_initialization_with_cache(self, mock_get):
-        """Test initialization with existing cache."""
-        with patch("iocparser.modules.warninglists.Path.exists") as mock_exists:
-            mock_exists.return_value = True
+    def test_initialization_with_cache(self):
+        """Test initialization path uses a fresh local cache without update."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmppath = Path(tmpdir)
+            cache_file = tmppath / "misp_warninglists_cache.json"
+            metadata_file = tmppath / "misp_warninglists_metadata.json"
 
-            with patch("builtins.open", create=True) as mock_open:
-                # Mock cache metadata
-                mock_metadata = {"last_update": 9999999999}  # Far future
-                mock_cache = self.mock_warning_lists
+            cache_file.write_text(json.dumps(self.sample_warning_lists), encoding="utf-8")
+            metadata_file.write_text(json.dumps({"last_update": time.time()}), encoding="utf-8")
 
-                mock_open.return_value.__enter__.return_value.read.side_effect = [
-                    json.dumps(mock_metadata),
-                    json.dumps(mock_cache),
-                ]
+            warning_lists = TrackingWarningLists(tmppath, cache_duration=24, force_update=False)
+            warning_lists._load_or_update_lists()
 
-                # Should not make network request if cache is fresh
-                MISPWarningLists(cache_duration=24)
-                mock_get.assert_not_called()
+            assert warning_lists.updated is False
+            assert warning_lists.warning_lists == self.sample_warning_lists
 
     def test_clean_defanged_value(self):
         """Test defanging cleanup."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Test various defanging patterns
         test_cases = [
@@ -93,7 +103,7 @@ class TestMISPWarningLists:
 
     def test_check_cidr(self):
         """Test CIDR range checking."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Test CIDR checking
         cidr_list = ["192.168.1.0/24", "10.0.0.0/8", "8.8.8.8"]
@@ -114,7 +124,7 @@ class TestMISPWarningLists:
 
     def test_check_value_in_list_string(self):
         """Test string type list checking."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         values = ["google.com", "facebook.com", "youtube.com"]
 
@@ -129,7 +139,7 @@ class TestMISPWarningLists:
 
     def test_check_value_in_list_substring(self):
         """Test substring type list checking."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         values = ["google", "facebook", "virus"]
 
@@ -143,7 +153,7 @@ class TestMISPWarningLists:
 
     def test_check_value_in_list_regex(self):
         """Test regex type list checking."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         values = [r".*\.google\.com$", r"^192\.168\.\d+\.\d+$"]
 
@@ -155,10 +165,51 @@ class TestMISPWarningLists:
         assert not warning_lists._check_value_in_list("google.net", values, "regex")
         assert not warning_lists._check_value_in_list("10.0.0.1", values, "regex")
 
-    def test_check_value_with_mock_lists(self):
-        """Test check_value with mock warning lists."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
-        warning_lists.warning_lists = self.mock_warning_lists
+    def test_check_value_in_list_cidr(self):
+        """Test CIDR type list checking through the generic dispatcher."""
+        warning_lists = make_warning_lists()
+
+        values = ["192.168.1.0/24", "10.0.0.1"]
+
+        assert warning_lists._check_value_in_list("192.168.1.24", values, "cidr")
+        assert warning_lists._check_value_in_list("10.0.0.1", values, "cidr")
+        assert not warning_lists._check_value_in_list("172.16.0.1", values, "cidr")
+
+    def test_check_string_type(self):
+        """Test direct string matching helper."""
+        warning_lists = make_warning_lists()
+
+        values = ["google.com", None, "microsoft.com"]
+
+        assert warning_lists._check_string_type("google.com", values)
+        assert warning_lists._check_string_type("MICROSOFT.COM", values)
+        assert not warning_lists._check_string_type("amazon.com", values)
+
+    def test_get_logger_falls_back_to_module_logger(self):
+        """Test logger fallback when instance logger is missing."""
+        warning_lists = make_warning_lists()
+
+        resolved = warning_lists._get_logger()
+
+        assert resolved.name == "iocparser.infrastructure.warninglists"
+
+    def test_cache_check_value_clears_large_cache(self):
+        """Test warning lookup cache reset when it grows beyond the cap."""
+        warning_lists = make_warning_lists()
+        warning_lists._warning_lookup_cache = {
+            (f"value-{index}", "domains"): (False, None) for index in range(5000)
+        }
+
+        warning_lists._cache_check_value(("fresh", "domains"), (True, {"name": "List", "description": "Desc"}))
+
+        assert warning_lists._warning_lookup_cache == {
+            ("fresh", "domains"): (True, {"name": "List", "description": "Desc"})
+        }
+
+    def test_check_value_with_sample_lists(self):
+        """Test check_value with sample warning lists."""
+        warning_lists = make_warning_lists()
+        warning_lists.warning_lists = self.sample_warning_lists
         warning_lists._preprocess_lists()  # Reprocess after setting mock data
 
         # Test IP in public DNS list
@@ -187,9 +238,9 @@ class TestMISPWarningLists:
         assert info is None
 
     def test_email_domain_warning_excluded(self):
-        """Email IOCs are excluded when their domain is in warning lists."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
-        warning_lists.warning_lists = self.mock_warning_lists
+        """Email IOCs with warning-listed domains appear in warning list, not dropped."""
+        warning_lists = make_warning_lists()
+        warning_lists.warning_lists = self.sample_warning_lists
         warning_lists._preprocess_lists()
 
         iocs = {
@@ -200,13 +251,14 @@ class TestMISPWarningLists:
         normal_iocs, warning_iocs = warning_lists.separate_iocs_by_warnings(iocs)
 
         assert "emails" not in normal_iocs
-        assert "emails" not in warning_iocs
+        assert "emails" in warning_iocs
+        assert warning_iocs["emails"][0]["value"] == "intelreports@kaspersky.com"
         assert "domains" in warning_iocs
 
     def test_separate_iocs_by_warnings(self):
         """Test IOC separation by warnings."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
-        warning_lists.warning_lists = self.mock_warning_lists
+        warning_lists = make_warning_lists()
+        warning_lists.warning_lists = self.sample_warning_lists
         warning_lists._preprocess_lists()  # Reprocess after setting mock data
 
         # Input IOCs
@@ -235,7 +287,7 @@ class TestMISPWarningLists:
 
     def test_ipv6_support(self):
         """Test IPv6 address checking."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Test IPv6 CIDR
         cidr_list = ["2001:db8::/32", "::1"]
@@ -251,7 +303,7 @@ class TestMISPWarningLists:
 
     def test_hash_type_mapping(self):
         """Test hash type IOC mapping."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Create mock hash warning list
         warning_lists.warning_lists = {
@@ -279,7 +331,7 @@ class TestMISPWarningLists:
 
     def test_edge_cases(self):
         """Test edge cases and error handling."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Empty lists
         assert not warning_lists._check_value_in_list("test", [], "string")
@@ -299,56 +351,51 @@ class TestWarningListsDownloadAndUpdate:
     """Test warning list download and update functionality."""
 
     def test_update_warning_lists_with_network(self):
-        """Test updating warning lists from GitHub (network-dependent)."""
-        import tempfile
-        from pathlib import Path
-
-        # Create a temporary directory for testing
+        """Test updating warning lists from a local HTTP source."""
         with tempfile.TemporaryDirectory() as tmpdir:
             tmppath = Path(tmpdir)
+            warning_lists = OfflineWarningLists(tmppath, cache_duration=24, force_update=False)
+            payloads = {
+                "good-domains": (
+                    200,
+                    {
+                        "name": "Good Domains",
+                        "type": "string",
+                        "matching_attributes": ["domain"],
+                        "list": ["good.example"],
+                    },
+                ),
+                "bad-domains": (500, {}),
+            }
 
-            # Create a test instance that will download lists
-            warning_lists = MISPWarningLists(cache_duration=0, force_update=True)
+            with WarningListServer(["good-domains", "bad-domains"], payloads) as base_url:
+                original_api = OfflineWarningLists.GITHUB_API_BASE
+                original_raw = OfflineWarningLists.GITHUB_RAW_BASE
+                OfflineWarningLists.GITHUB_API_BASE = f"{base_url}/contents/lists"
+                OfflineWarningLists.GITHUB_RAW_BASE = f"{base_url}/lists"
+                try:
+                    warning_lists._update_warning_lists()
+                finally:
+                    OfflineWarningLists.GITHUB_API_BASE = original_api
+                    OfflineWarningLists.GITHUB_RAW_BASE = original_raw
 
-            # Override the data directory to use temp directory
-            warning_lists.data_dir = tmppath
-            warning_lists.cache_file = tmppath / "misp_warninglists_cache.json"
-            warning_lists.cache_metadata_file = tmppath / "misp_warninglists_metadata.json"
-
-            # Trigger update
-            warning_lists._update_warning_lists()
-
-            # If rate limited or network error, the update may fail gracefully
-            # but we can still verify the structure is correct
-            if warning_lists.cache_file.exists():
-                # Successfully downloaded - verify structure
-                assert len(warning_lists.warning_lists) > 0, "Should have downloaded warning lists"
-                assert warning_lists.cache_metadata_file.exists(), "Metadata file should exist"
-
-                # Verify cache metadata structure
-                with warning_lists.cache_metadata_file.open() as f:
-                    metadata = json.load(f)
-                    assert "last_update" in metadata
-                    assert isinstance(metadata["last_update"], (int, float))
-            else:
-                # Rate limited or network error - verify graceful handling
-                # The warning_lists dict should be empty but not cause a crash
-                assert isinstance(warning_lists.warning_lists, dict)
+            assert "good-domains" in warning_lists.warning_lists
+            assert warning_lists.cache_metadata_file.exists()
+            with warning_lists.cache_metadata_file.open() as f:
+                metadata = json.load(f)
+            assert "last_update" in metadata
+            assert isinstance(metadata["last_update"], (int, float))
 
     def test_load_from_cache_when_fresh(self):
         """Test loading warning lists from fresh cache."""
-        import tempfile
-        import time
-        from pathlib import Path
-
         with tempfile.TemporaryDirectory() as tmpdir:
             tmppath = Path(tmpdir)
 
-            # Create mock cache files
+            # Create sample cache files
             cache_file = tmppath / "misp_warninglists_cache.json"
             metadata_file = tmppath / "misp_warninglists_metadata.json"
 
-            mock_lists = {
+            sample_lists = {
                 "test-list": {
                     "name": "Test List",
                     "description": "Test description",
@@ -358,16 +405,12 @@ class TestWarningListsDownloadAndUpdate:
             }
 
             with cache_file.open("w") as f:
-                json.dump(mock_lists, f)
+                json.dump(sample_lists, f)
 
             with metadata_file.open("w") as f:
                 json.dump({"last_update": time.time()}, f)
 
-            # Create instance pointing to temp directory
-            warning_lists = MISPWarningLists(cache_duration=24, force_update=False)
-            warning_lists.data_dir = tmppath
-            warning_lists.cache_file = cache_file
-            warning_lists.cache_metadata_file = metadata_file
+            warning_lists = OfflineWarningLists(tmppath, cache_duration=24, force_update=False)
 
             # Load from cache
             warning_lists._load_or_update_lists()
@@ -378,9 +421,6 @@ class TestWarningListsDownloadAndUpdate:
 
     def test_cache_expiration_triggers_update(self):
         """Test that expired cache triggers update."""
-        import tempfile
-        from pathlib import Path
-
         with tempfile.TemporaryDirectory() as tmpdir:
             tmppath = Path(tmpdir)
 
@@ -396,29 +436,12 @@ class TestWarningListsDownloadAndUpdate:
             with metadata_file.open("w") as f:
                 json.dump({"last_update": old_time}, f)
 
-            # Create instance with 24 hour cache duration
-            warning_lists = MISPWarningLists(cache_duration=24, force_update=False)
-            warning_lists.data_dir = tmppath
-            warning_lists.cache_file = cache_file
-            warning_lists.cache_metadata_file = metadata_file
-
-            # This should trigger update because cache is expired
+            warning_lists = TrackingWarningLists(tmppath, cache_duration=24, force_update=False)
             warning_lists._load_or_update_lists()
-
-            # Verify update was attempted
-            # If successful, metadata should be updated
-            # If rate limited, old cache is used and metadata stays the same
-            with metadata_file.open() as f:
-                metadata = json.load(f)
-                # Either update succeeded (new timestamp) or failed gracefully (old timestamp)
-                assert "last_update" in metadata
-                assert isinstance(metadata["last_update"], (int, float))
+            assert warning_lists.updated is True
 
     def test_corrupted_cache_fallback(self):
         """Test fallback when cache is corrupted."""
-        import tempfile
-        from pathlib import Path
-
         with tempfile.TemporaryDirectory() as tmpdir:
             tmppath = Path(tmpdir)
 
@@ -432,17 +455,9 @@ class TestWarningListsDownloadAndUpdate:
             with metadata_file.open("w") as f:
                 f.write('{ "last_update": "not a number" }')
 
-            # Create instance
-            warning_lists = MISPWarningLists(cache_duration=24, force_update=False)
-            warning_lists.data_dir = tmppath
-            warning_lists.cache_file = cache_file
-            warning_lists.cache_metadata_file = metadata_file
-
-            # Should handle corrupted cache gracefully
+            warning_lists = TrackingWarningLists(tmppath, cache_duration=24, force_update=False)
             warning_lists._load_or_update_lists()
-
-            # Should have downloaded new lists
-            assert len(warning_lists.warning_lists) >= 0
+            assert warning_lists.updated is True
 
 
 class TestWarningListsPreprocessing:
@@ -450,7 +465,7 @@ class TestWarningListsPreprocessing:
 
     def test_preprocess_lists_with_invalid_regex(self):
         """Test preprocessing handles invalid regex patterns."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Create lists with invalid regex
         warning_lists.warning_lists = {
@@ -472,7 +487,7 @@ class TestWarningListsPreprocessing:
 
     def test_preprocess_lists_with_invalid_cidr(self):
         """Test preprocessing handles invalid CIDR ranges."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Create lists with invalid CIDR
         warning_lists.warning_lists = {
@@ -494,7 +509,7 @@ class TestWarningListsPreprocessing:
 
     def test_preprocess_lists_with_non_list_values(self):
         """Test preprocessing handles non-list values gracefully."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Create list with non-list value
         warning_lists.warning_lists = {
@@ -515,7 +530,7 @@ class TestWarningListsPreprocessing:
 
     def test_clear_preprocessed_data(self):
         """Test clearing preprocessed data structures."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Populate preprocessed structures
         warning_lists.string_lookups["test"] = {"list1"}
@@ -538,7 +553,7 @@ class TestWarningListsGetWarnings:
 
     def test_get_warnings_for_iocs_with_string_iocs(self):
         """Test getting warnings for string IOCs."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Setup mock lists
         warning_lists.warning_lists = {
@@ -571,7 +586,7 @@ class TestWarningListsGetWarnings:
 
     def test_get_warnings_for_iocs_with_dict_iocs(self):
         """Test getting warnings for dictionary IOCs."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Setup mock lists
         warning_lists.warning_lists = {
@@ -603,7 +618,7 @@ class TestWarningListsGetWarnings:
 
     def test_get_warnings_for_iocs_empty_input(self):
         """Test getting warnings with empty input."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Test with empty dict
         warnings = warning_lists.get_warnings_for_iocs({})
@@ -619,7 +634,7 @@ class TestWarningListsSeparateIOCs:
 
     def test_separate_iocs_preserves_dict_fields(self):
         """Test that separation preserves additional fields in dict IOCs."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Setup mock lists
         warning_lists.warning_lists = {
@@ -674,7 +689,7 @@ class TestWarningListsHelperFunctions:
 
     def test_get_misp_types_for_cryptocurrency(self):
         """Test MISP type mapping for cryptocurrency IOCs."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Test bitcoin
         types = warning_lists._get_misp_types_for_ioc("bitcoin")
@@ -694,7 +709,7 @@ class TestWarningListsHelperFunctions:
 
     def test_get_misp_types_for_hashes(self):
         """Test MISP type mapping for hash IOCs."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         for hash_type in ["md5", "sha1", "sha256", "sha512"]:
             types = warning_lists._get_misp_types_for_ioc(hash_type)
@@ -704,7 +719,7 @@ class TestWarningListsHelperFunctions:
 
     def test_extract_domain_from_url_with_port(self):
         """Test domain extraction from URL with port."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Test URL with port
         domain = warning_lists._extract_domain_from_url("https://example.com:8080/path")
@@ -720,7 +735,7 @@ class TestWarningListsHelperFunctions:
 
     def test_is_list_applicable_with_dict_attributes(self):
         """Test list applicability check with dictionary attributes."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Test with dictionary attributes
         warning_list = {
@@ -745,7 +760,7 @@ class TestWarningListsHelperFunctions:
 
     def test_is_list_applicable_without_attributes(self):
         """Test list applicability when matching_attributes is missing or invalid."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Test without matching_attributes
         warning_list = {
@@ -765,7 +780,7 @@ class TestWarningListsHelperFunctions:
 
     def test_is_list_applicable_cidr_special_case(self):
         """Test CIDR list applicability for IPs."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # CIDR lists should apply to IPs even without matching attributes
         warning_list = {
@@ -780,7 +795,7 @@ class TestWarningListsHelperFunctions:
 
     def test_check_against_warning_list_with_url_domain_extraction(self):
         """Test checking against warning list with URL domain extraction."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         warning_list = {
             "name": "Alexa Top Sites",
@@ -802,7 +817,7 @@ class TestWarningListsHelperFunctions:
 
     def test_check_value_with_no_relevant_lists(self):
         """Test check_value when no relevant lists exist for IOC type."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         warning_lists.warning_lists = {
             "unrelated-list": {
@@ -822,7 +837,7 @@ class TestWarningListsHelperFunctions:
 
     def test_check_substring_type(self):
         """Test substring type checking."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         values = ["malware", "virus", "trojan"]
 
@@ -839,7 +854,7 @@ class TestWarningListsHelperFunctions:
 
     def test_check_regex_type_with_none_values(self):
         """Test regex checking with None values in list."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         values = [r".*\.google\.com$", None, r"^test.*"]
 
@@ -850,7 +865,7 @@ class TestWarningListsHelperFunctions:
 
     def test_check_value_in_list_unknown_type(self):
         """Test check_value_in_list with unknown type."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Unknown type should return False
         result = warning_lists._check_value_in_list("test", ["test"], "unknown-type")
@@ -858,7 +873,7 @@ class TestWarningListsHelperFunctions:
 
     def test_check_value_with_extracted_domain_in_string_lookups(self):
         """Test check_value when extracted domain is in string lookups."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         warning_lists.warning_lists = {
             "alexa-top": {
@@ -878,7 +893,7 @@ class TestWarningListsHelperFunctions:
 
     def test_check_value_with_extracted_domain_in_regex(self):
         """Test check_value when extracted domain matches regex."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         warning_lists.warning_lists = {
             "google-domains": {
@@ -898,7 +913,7 @@ class TestWarningListsHelperFunctions:
 
     def test_check_value_ipv6_in_cidr(self):
         """Test IPv6 address checking in CIDR ranges."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         warning_lists.warning_lists = {
             "reserved-ipv6": {
@@ -922,7 +937,7 @@ class TestWarningListsHelperFunctions:
 
     def test_check_value_invalid_ip_for_cidr(self):
         """Test CIDR checking with invalid IP address."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         warning_lists.warning_lists = {
             "private-ips": {
@@ -946,7 +961,7 @@ class TestWarningListsAdditionalEdgeCases:
 
     def test_get_misp_types_for_ipv6(self):
         """Test MISP type mapping specifically for IPv6."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         types = warning_lists._get_misp_types_for_ioc("ipv6")
         assert "ip-src" in types
@@ -955,7 +970,7 @@ class TestWarningListsAdditionalEdgeCases:
 
     def test_get_misp_types_for_ssdeep(self):
         """Test MISP type mapping for ssdeep hash type."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         types = warning_lists._get_misp_types_for_ioc("ssdeep")
         assert "ssdeep" in types
@@ -964,7 +979,7 @@ class TestWarningListsAdditionalEdgeCases:
 
     def test_get_misp_types_for_imphash(self):
         """Test MISP type mapping for imphash type."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         types = warning_lists._get_misp_types_for_ioc("imphash")
         assert "imphash" in types
@@ -972,7 +987,7 @@ class TestWarningListsAdditionalEdgeCases:
 
     def test_check_against_warning_list_with_non_list_values(self):
         """Test checking against warning list when values field is not a list."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Create warning list with non-list values field
         warning_list = {
@@ -994,7 +1009,7 @@ class TestWarningListsAdditionalEdgeCases:
 
     def test_check_cidr_with_ipv6_exact_match(self):
         """Test CIDR checking with exact IPv6 match."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         cidr_list = ["2001:db8::1", "::1"]
 
@@ -1007,7 +1022,7 @@ class TestWarningListsAdditionalEdgeCases:
 
     def test_check_substring_type_with_none_values(self):
         """Test substring checking with None values in list."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         values = ["malware", None, "virus"]
 
@@ -1017,7 +1032,7 @@ class TestWarningListsAdditionalEdgeCases:
 
     def test_extract_domain_from_url_exception_handling(self):
         """Test domain extraction with various edge cases."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Test with empty string
         domain = warning_lists._extract_domain_from_url("")
@@ -1032,7 +1047,7 @@ class TestWarningListsAdditionalEdgeCases:
         import io
         import logging
 
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Setup mock list with non-matching values and proper matching attributes
         warning_lists.warning_lists = {
@@ -1049,7 +1064,7 @@ class TestWarningListsAdditionalEdgeCases:
         # Capture log output
         log_capture = io.StringIO()
         handler = logging.StreamHandler(log_capture)
-        logger = logging.getLogger("iocparser.modules.warninglists")
+        logger = logging.getLogger("iocparser.infrastructure.warninglists")
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
 
@@ -1074,7 +1089,7 @@ class TestWarningListsDiagnostic:
         import io
         import logging
 
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Setup mock lists
         warning_lists.warning_lists = {
@@ -1091,7 +1106,7 @@ class TestWarningListsDiagnostic:
         # Capture log output
         log_capture = io.StringIO()
         handler = logging.StreamHandler(log_capture)
-        logger = logging.getLogger("iocparser.modules.warninglists")
+        logger = logging.getLogger("iocparser.infrastructure.warninglists")
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
 
@@ -1114,7 +1129,7 @@ class TestWarningListsDiagnostic:
         import io
         import logging
 
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Setup mock lists
         warning_lists.warning_lists = {
@@ -1131,7 +1146,7 @@ class TestWarningListsDiagnostic:
         # Capture log output
         log_capture = io.StringIO()
         handler = logging.StreamHandler(log_capture)
-        logger = logging.getLogger("iocparser.modules.warninglists")
+        logger = logging.getLogger("iocparser.infrastructure.warninglists")
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
 
@@ -1153,7 +1168,7 @@ class TestWarningListsDiagnostic:
         import io
         import logging
 
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Setup multiple mock lists
         warning_lists.warning_lists = {
@@ -1177,7 +1192,7 @@ class TestWarningListsDiagnostic:
         # Capture log output
         log_capture = io.StringIO()
         handler = logging.StreamHandler(log_capture)
-        logger = logging.getLogger("iocparser.modules.warninglists")
+        logger = logging.getLogger("iocparser.infrastructure.warninglists")
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
 
@@ -1198,7 +1213,7 @@ class TestWarningListsDiagnostic:
         import io
         import logging
 
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Setup mock lists
         warning_lists.warning_lists = {
@@ -1215,7 +1230,7 @@ class TestWarningListsDiagnostic:
         # Capture log output
         log_capture = io.StringIO()
         handler = logging.StreamHandler(log_capture)
-        logger = logging.getLogger("iocparser.modules.warninglists")
+        logger = logging.getLogger("iocparser.infrastructure.warninglists")
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
 
@@ -1234,7 +1249,7 @@ class TestWarningListsDiagnostic:
 
     def test_is_list_relevant_for_expected(self):
         """Test expected list relevance checking."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Test matching name
         assert warning_lists._is_list_relevant_for_expected(
@@ -1273,7 +1288,7 @@ class TestWarningListsDiagnostic:
 
     def test_is_list_relevant_for_type(self):
         """Test IOC type relevance checking."""
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Test IP relevance
         assert warning_lists._is_list_relevant_for_type(
@@ -1314,31 +1329,40 @@ class TestWarningListsDiagnostic:
 class TestWarningListsUpdateAndDownload:
     """Test warning list update and download functionality for 100% coverage."""
 
-    @pytest.mark.skip(reason="Requires network access; use for manual testing only")
     def test_update_warning_lists_network_request(self):
         """
-        Test actual network download of warning lists.
-
-        This test requires network access and makes real requests to GitHub.
-        Skipped by default to avoid test flakiness.
+        Test warning list download flow via a local HTTP server.
         """
         import tempfile
         from pathlib import Path
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmppath = Path(tmpdir)
+            warning_lists = OfflineWarningLists(tmppath, cache_duration=0, force_update=True)
+            payloads = {
+                "test-domains": (
+                    200,
+                    {
+                        "name": "Test Domains",
+                        "type": "string",
+                        "matching_attributes": ["domain"],
+                        "list": ["example.com"],
+                    },
+                ),
+            }
 
-            # Create instance with force update
-            warning_lists = MISPWarningLists(cache_duration=0, force_update=True)
-            warning_lists.data_dir = tmppath
-            warning_lists.cache_file = tmppath / "misp_warninglists_cache.json"
-            warning_lists.cache_metadata_file = tmppath / "misp_warninglists_metadata.json"
+            with WarningListServer(["test-domains"], payloads) as base_url:
+                original_api = OfflineWarningLists.GITHUB_API_BASE
+                original_raw = OfflineWarningLists.GITHUB_RAW_BASE
+                OfflineWarningLists.GITHUB_API_BASE = f"{base_url}/contents/lists"
+                OfflineWarningLists.GITHUB_RAW_BASE = f"{base_url}/lists"
+                try:
+                    warning_lists._update_warning_lists()
+                finally:
+                    OfflineWarningLists.GITHUB_API_BASE = original_api
+                    OfflineWarningLists.GITHUB_RAW_BASE = original_raw
 
-            # Trigger update
-            warning_lists._update_warning_lists()
-
-            # Verify download succeeded
-            assert len(warning_lists.warning_lists) > 0
+            assert len(warning_lists.warning_lists) == 1
             assert warning_lists.cache_file.exists()
             assert warning_lists.cache_metadata_file.exists()
 
@@ -1354,21 +1378,17 @@ class TestWarningListsUpdateAndDownload:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmppath = Path(tmpdir)
 
-            warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+            warning_lists = make_warning_lists()
             warning_lists.data_dir = tmppath
             warning_lists.cache_file = tmppath / "misp_warninglists_cache.json"
             warning_lists.cache_metadata_file = tmppath / "misp_warninglists_metadata.json"
 
-            # Mock requests to raise exception
-            with patch("iocparser.modules.warninglists.requests.get") as mock_get:
-                mock_get.side_effect = Exception("Network error")
+            warning_lists.GITHUB_API_BASE = "http://127.0.0.1:9/unreachable"
 
-                # Should handle exception gracefully
-                with contextlib.suppress(Exception):
-                    warning_lists._update_warning_lists()
+            with contextlib.suppress(Exception):
+                warning_lists._update_warning_lists()
 
-                # Should have empty warning lists but not crash
-                assert isinstance(warning_lists.warning_lists, dict)
+            assert isinstance(warning_lists.warning_lists, dict)
 
 
 class TestWarningListsCheckValueEdgeCases:
@@ -1380,7 +1400,7 @@ class TestWarningListsCheckValueEdgeCases:
 
         Validates regex matching code path in check_value.
         """
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         warning_lists.warning_lists = {
             "google-regex": {
@@ -1410,7 +1430,7 @@ class TestWarningListsCheckValueEdgeCases:
 
         Validates CIDR matching code path.
         """
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         warning_lists.warning_lists = {
             "private-ips": {
@@ -1438,7 +1458,7 @@ class TestWarningListsCheckValueEdgeCases:
 
         Validates substring matching in fallback logic.
         """
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         warning_lists.warning_lists = {
             "security-providers": {
@@ -1462,7 +1482,7 @@ class TestWarningListsCheckValueEdgeCases:
 
         Validates URL domain extraction and regex matching.
         """
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         warning_lists.warning_lists = {
             "cdn-domains": {
@@ -1488,7 +1508,7 @@ class TestWarningListsCheckValueEdgeCases:
 
         Validates exception handling in IP address parsing.
         """
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         warning_lists.warning_lists = {
             "test-cidrs": {
@@ -1520,7 +1540,7 @@ class TestWarningListsExtractDomainEdgeCases:
 
         Validates port stripping in domain extraction.
         """
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Test URL with port
         domain = warning_lists._extract_domain_from_url("https://example.com:8080/path")
@@ -1536,7 +1556,7 @@ class TestWarningListsExtractDomainEdgeCases:
 
         Validates graceful failure for malformed URLs.
         """
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # Test with invalid URL
         domain = warning_lists._extract_domain_from_url("not a url")
@@ -1560,7 +1580,7 @@ class TestWarningListsIsListApplicableEdgeCases:
 
         Validates handling of edge case where matching_attributes yields no valid attrs.
         """
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         # List with only invalid attribute formats
         warning_list = {
@@ -1586,7 +1606,7 @@ class TestWarningListsDiagnoseValueDetection:
         import io
         import logging
 
-        warning_lists = MISPWarningLists(cache_duration=0, force_update=False)
+        warning_lists = make_warning_lists()
 
         warning_lists.warning_lists = {
             "test-list": {
@@ -1602,7 +1622,7 @@ class TestWarningListsDiagnoseValueDetection:
         # Capture log output
         log_capture = io.StringIO()
         handler = logging.StreamHandler(log_capture)
-        logger = logging.getLogger("iocparser.modules.warninglists")
+        logger = logging.getLogger("iocparser.infrastructure.warninglists")
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
 

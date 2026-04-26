@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iocparser.local/schemas/pipeline-job-result-1.0.json",
+  "title": "IOCParser Pipeline Job Result",
+  "type": "object",
+  "required": ["schema_version", "job_id", "correlation_id", "input_kind", "source_value", "status", "result"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "job_id": {"type": "string"},
+    "correlation_id": {"type": "string"},
+    "input_kind": {"type": "string"},
+    "source_value": {"type": "string"},
+    "status": {"type": "string"},
+    "skipped": {"type": "boolean"},
+    "run_id": {"type": ["integer", "null"]},
+    "fingerprint": {"type": ["string", "null"]},
+    "content_hash": {"type": ["string", "null"]},
+    "duration_ms": {"type": "integer"},
+    "phase_timings_ms": {"type": "object"},
+    "metadata": {"type": "object"},
+    "error": {"type": ["object", "null"]},
+    "started_at": {"type": "string"},
+    "finished_at": {"type": "string"},
+    "result": {"type": "object"}
+  }
+}

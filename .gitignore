@@ -337,4 +337,4 @@ _darcs
 .project
 .pydevproject
 .settings/
-.loadpath
+.loadpathiocparser/infrastructure/data/misp_warninglists_cache.json

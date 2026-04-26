@@ -5,11 +5,10 @@
 # This test suite validates real code behavior without mocks or stubs.
 
 """
-Comprehensive unit tests for iocparser.modules.exceptions module
+Comprehensive unit tests for iocparser.errors module
 
 Tests cover all custom exception classes with focus on uncovered lines:
 - HTMLParsingError
-- UnexpectedDownloadError factory function
 - InvalidCacheError (if it exists)
 - FileExistenceError message override
 
@@ -24,7 +23,7 @@ from pathlib import Path
 
 import pytest
 
-from iocparser.modules.exceptions import (
+from iocparser.errors import (
     DownloadError,
     DownloadSizeError,
     FileExistenceError,
@@ -36,11 +35,9 @@ from iocparser.modules.exceptions import (
     IOCFileNotFoundError,
     IOCParserError,
     IOCTimeoutError,
-    NetworkDownloadError,
     NetworkError,
     PDFParsingError,
     PDFProcessingError,
-    UnexpectedDownloadError,
     UnsupportedFileTypeError,
     URLAccessError,
     ValidationError,
@@ -109,7 +106,7 @@ class TestHTMLParsingError:
 
         # Arrange: Function that raises HTMLParsingError
         def parse_invalid_html() -> None:
-            raise HTMLParsingError("Malformed HTML tag detected")  # noqa: TRY003
+            raise HTMLParsingError("Malformed HTML tag detected")
 
         # Act & Assert: Should raise and be catchable
         with pytest.raises(HTMLParsingError) as exc_info:
@@ -133,21 +130,18 @@ class TestHTMLParsingError:
 
 
 class TestUnexpectedDownloadError:
-    """Test suite for UnexpectedDownloadError factory function (uncovered line 113)."""
+    """Test suite for unexpected DownloadError instances."""
 
     def test_unexpected_download_error_factory(self) -> None:
         """
-        Test the UnexpectedDownloadError factory function.
-
-        This covers line 113 in exceptions.py where the factory function
-        creates a DownloadError with error_type='unexpected'.
+        Test a DownloadError created with unexpected error type.
         """
         # Arrange: Download error parameters
         url = "http://malware-sample.com/payload.exe"
         reason = "Connection reset by peer"
 
         # Act: Create error using factory function
-        error = UnexpectedDownloadError(url, reason)
+        error = DownloadError(url, reason, error_type="unexpected")
 
         # Assert: Verify it's a DownloadError with unexpected type
         assert isinstance(error, DownloadError)
@@ -157,7 +151,7 @@ class TestUnexpectedDownloadError:
 
     def test_unexpected_download_error_message_format(self) -> None:
         """
-        Test that UnexpectedDownloadError has correct message format.
+        Test that unexpected DownloadError has correct message format.
 
         Validates that the error message starts with "Unexpected error"
         instead of "Failed to" (line 103 in exceptions.py).
@@ -167,7 +161,7 @@ class TestUnexpectedDownloadError:
         reason = "SSL certificate verification failed"
 
         # Act: Create error
-        error = UnexpectedDownloadError(url, reason)
+        error = DownloadError(url, reason, error_type="unexpected")
 
         # Assert: Message should start with "Unexpected error"
         error_message = str(error)
@@ -177,14 +171,12 @@ class TestUnexpectedDownloadError:
 
     def test_unexpected_download_error_can_be_raised(self) -> None:
         """
-        Test that UnexpectedDownloadError can be raised and caught.
-
-        Validates real exception flow with the factory function.
+        Test that unexpected DownloadError can be raised and caught.
         """
 
         # Arrange: Function that raises unexpected download error
         def download_file() -> None:
-            raise UnexpectedDownloadError("http://evil.com/malware.zip", "Timeout after 30 seconds")
+            raise DownloadError("http://evil.com/malware.zip", "Timeout after 30 seconds", error_type="unexpected")
 
         # Act & Assert: Should raise DownloadError
         with pytest.raises(DownloadError) as exc_info:
@@ -321,7 +313,7 @@ class TestHTMLProcessingError:
         # Arrange: Function that processes HTML
         def process_html_content(content: str) -> None:
             if "<html>" not in content:
-                raise HTMLProcessingError("Invalid HTML structure")  # noqa: TRY003
+                raise HTMLProcessingError("Invalid HTML structure")
 
         # Act & Assert: Should raise HTMLProcessingError
         with pytest.raises(HTMLProcessingError) as exc_info:
@@ -379,7 +371,7 @@ class TestURLAccessError:
         # Arrange: Function that accesses URLs
         def fetch_url(url: str) -> None:
             if not url.startswith("http"):
-                raise URLAccessError("Invalid URL protocol")  # noqa: TRY003
+                raise URLAccessError("Invalid URL protocol")
 
         # Act & Assert: Should raise URLAccessError
         with pytest.raises(URLAccessError) as exc_info:
@@ -538,10 +530,10 @@ class TestOtherExceptions:
         assert error.error_type == "network"
         assert "Failed to download" in str(error)
 
-    def test_network_download_error_alias(self) -> None:
-        """Test NetworkDownloadError alias for DownloadError."""
+    def test_download_error_network_variant(self) -> None:
+        """Test DownloadError in its default network-failure form."""
         # Arrange & Act
-        error = NetworkDownloadError(url="http://test.com", reason="Connection refused")
+        error = DownloadError(url="http://test.com", reason="Connection refused")
 
         # Assert: Should be a DownloadError
         assert isinstance(error, DownloadError)

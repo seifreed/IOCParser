@@ -12,7 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from iocparser.core import process_multiple_files_input
+from iocparser.cli_processing import process_multiple_files_input
+from iocparser.cli_runtime import reader as cli_reader
 
 
 class TestDuplicateRemoval:
@@ -24,8 +25,8 @@ class TestDuplicateRemoval:
             temp_file.write(content)
             return Path(temp_file.name)
 
-    def create_mock_args(self, file_paths: list) -> argparse.Namespace:
-        """Helper to create mock args for testing"""
+    def create_test_args(self, file_paths: list) -> argparse.Namespace:
+        """Helper to create test args."""
         args = argparse.Namespace()
         args.multiple = [str(path) for path in file_paths]
         args.type = None
@@ -54,8 +55,8 @@ class TestDuplicateRemoval:
         file2 = self.create_temp_file_with_content(file2_content)
 
         try:
-            args = self.create_mock_args([file1, file2])
-            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(args)
+            args = self.create_test_args([file1, file2])
+            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(args, reader=cli_reader, warning_service=None)
 
             # Check domains are deduplicated (accounting for defanging)
             if "domains" in normal_iocs:
@@ -103,8 +104,8 @@ class TestDuplicateRemoval:
         file2 = self.create_temp_file_with_content(file2_content)
 
         try:
-            args = self.create_mock_args([file1, file2])
-            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(args)
+            args = self.create_test_args([file1, file2])
+            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(args, reader=cli_reader, warning_service=None)
 
             # Check that we have results
             assert len(normal_iocs) > 0, "Should have extracted some IOCs"
@@ -140,8 +141,8 @@ class TestDuplicateRemoval:
         file2 = self.create_temp_file_with_content(file2_content)
 
         try:
-            args = self.create_mock_args([file1, file2])
-            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(args)
+            args = self.create_test_args([file1, file2])
+            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(args, reader=cli_reader, warning_service=None)
 
             if "domains" in normal_iocs:
                 domains = normal_iocs["domains"]
@@ -169,8 +170,8 @@ class TestDuplicateRemoval:
         file2 = self.create_temp_file_with_content(file2_content)
 
         try:
-            args = self.create_mock_args([file1, file2])
-            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(args)
+            args = self.create_test_args([file1, file2])
+            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(args, reader=cli_reader, warning_service=None)
 
             # Should handle gracefully without errors
             assert isinstance(normal_iocs, dict), "Should return dict even with no IOCs"
@@ -197,12 +198,12 @@ class TestDuplicateRemoval:
         file2 = self.create_temp_file_with_content(repeated_content)
 
         try:
-            args = self.create_mock_args([file1, file2])
+            args = self.create_test_args([file1, file2])
 
             import time
 
             start_time = time.time()
-            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(args)
+            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(args, reader=cli_reader, warning_service=None)
             end_time = time.time()
 
             # Should complete in reasonable time (< 5 seconds for this small test)

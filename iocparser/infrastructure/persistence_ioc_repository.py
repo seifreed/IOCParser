@@ -1,0 +1,84 @@
+from __future__ import annotations
+
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from iocparser.domain.models import ExtractionResult
+from iocparser.infrastructure.persistence_models import IOCModel
+from iocparser.infrastructure.persistence_repository_support import (
+    IOC_MODEL,
+    ExtractionResultLike,
+    normalized_ioc_type_name,
+)
+from iocparser.interfaces.ports import IOCRepository
+
+
+class SQLAlchemyIOCRepository(IOCRepository):
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def _get_or_create(
+        self,
+        *,
+        ioc_type: str,
+        value: str,
+        is_warning: bool,
+        warning_list: str,
+        warning_description: str,
+    ) -> int:
+        stmt = select(IOC_MODEL).where(
+            IOCModel.ioc_type == ioc_type,
+            IOCModel.value == value,
+            IOCModel.is_warning == is_warning,
+            IOCModel.warning_list == warning_list,
+            IOCModel.warning_description == warning_description,
+        )
+        ioc_rows: list[IOCModel] = self.session.execute(stmt).scalars().all()
+        ioc = ioc_rows[0] if ioc_rows else None
+        if ioc is not None:
+            return ioc.id
+        ioc = IOC_MODEL(
+            ioc_type=ioc_type,
+            value=value,
+            value_search=value.strip().lower(),
+            is_warning=is_warning,
+            warning_list=warning_list,
+            warning_description=warning_description,
+        )
+        self.session.add(ioc)
+        savepoint = self.session.begin_nested()
+        try:
+            self.session.flush()
+            savepoint.commit()
+        except IntegrityError:
+            savepoint.rollback()
+            ioc_rows = self.session.execute(stmt).scalars().all()
+            if not ioc_rows:
+                raise
+            return ioc_rows[0].id
+        return ioc.id
+
+    def get_or_create_normal(self, result: ExtractionResultLike | ExtractionResult) -> list[int]:
+        return [
+            self._get_or_create(
+                ioc_type=normalized_ioc_type_name(ioc.ioc_type),
+                value=ioc.value.raw,
+                is_warning=False,
+                warning_list="",
+                warning_description="",
+            )
+            for ioc in result.iocs
+        ]
+
+    def get_or_create_warnings(self, result: ExtractionResultLike | ExtractionResult) -> list[int]:
+        return [
+            self._get_or_create(
+                ioc_type=normalized_ioc_type_name(warning.ioc.ioc_type),
+                value=warning.ioc.value.raw,
+                is_warning=True,
+                warning_list=warning.warning_list,
+                warning_description=warning.description,
+            )
+            for warning in result.warnings
+        ]

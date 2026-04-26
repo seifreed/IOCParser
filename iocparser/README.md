@@ -12,32 +12,47 @@ pip install iocparser-tool
 
 ## Using as a Library
 
+### Recommended Public Entry Points
+
+For new integrations, prefer the public extraction API and the normalized rendering API:
+
+```python
+from iocparser import extraction
+from iocparser import renderers
+
+result = extraction.extract_result_from_text(
+    "IOC URL: https://evil.example/path and domain alpha.example",
+    check_warnings=False,
+)
+
+print(renderers.JSONOutputRenderer().render(result))
+```
+
 ### Basic Usage
 
 ```python
-from iocparser import IOCExtractor, PDFParser, HTMLParser, JSONFormatter, TextFormatter
+from iocparser import extraction, renderers
 
-# Extract IOCs from plain text
-text = "This malware contacts evil.com with hash 5f4dcc3b5aa765d61d8327deb882cf99"
-extractor = IOCExtractor(defang=True)
-iocs = extractor.extract_all(text)
-print(iocs)
+normal_iocs, warning_iocs = extraction.extract_iocs_from_text(
+    "This malware contacts evil.com with hash 5f4dcc3b5aa765d61d8327deb882cf99",
+    check_warnings=False,
+)
+result = extraction.extract_result_from_text(
+    "This malware contacts evil.com with hash 5f4dcc3b5aa765d61d8327deb882cf99",
+    check_warnings=False,
+)
 
-# Format the results as JSON
-formatter = JSONFormatter(iocs)
-json_output = formatter.format()
-print(json_output)
-
-# Format the results as plain text
-formatter = TextFormatter(iocs)
-text_output = formatter.format()
-print(text_output)
+print(normal_iocs)
+print(warning_iocs)
+print(renderers.JSONOutputRenderer().render(result))
+print(renderers.TextOutputRenderer().render(result))
 ```
 
 ### Processing Files
 
 ```python
-from iocparser import PDFParser, HTMLParser, IOCExtractor
+from iocparser.infrastructure.file_parser import PDFParser, HTMLParser
+from iocparser.infrastructure.extraction import IOCExtractor
 
 # Process a PDF file
 pdf_parser = PDFParser("report.pdf")
@@ -55,7 +70,8 @@ html_iocs = extractor.extract_all(html_text)
 ### Checking Against MISP Warning Lists
 
 ```python
-from iocparser import MISPWarningLists, IOCExtractor
+from iocparser.infrastructure.warninglists import MISPWarningLists
+from iocparser.infrastructure.extraction import IOCExtractor
 
 # Extract IOCs
 extractor = IOCExtractor()
@@ -70,19 +86,13 @@ print(warnings)
 ### Saving Results to Files
 
 ```python
-from iocparser import IOCExtractor, JSONFormatter, TextFormatter
+from pathlib import Path
 
-# Extract IOCs
-extractor = IOCExtractor()
-iocs = extractor.extract_all("Domain: evil.com, IP: 192.168.1.1")
+from iocparser import extraction, renderers
 
-# Save as JSON
-json_formatter = JSONFormatter(iocs)
-json_formatter.save("results.json")
-
-# Save as plain text
-text_formatter = TextFormatter(iocs)
-text_formatter.save("results.txt")
+result = extraction.extract_result_from_text("Domain: evil.com, IP: 192.168.1.1", check_warnings=False)
+Path("results.json").write_text(renderers.JSONOutputRenderer().render(result), encoding="utf-8")
+Path("results.txt").write_text(renderers.TextOutputRenderer().render(result), encoding="utf-8")
 ```
 
 ### Specific Extraction Methods
@@ -113,36 +123,25 @@ filepaths = extractor.extract_filepaths(text)
 ## Full Example
 
 ```python
-from iocparser import IOCExtractor, PDFParser, MISPWarningLists, JSONFormatter
+from pathlib import Path
 
-# 1. Parse a PDF report
-parser = PDFParser("path/to/threat_report.pdf")
-text_content = parser.extract_text()
+from iocparser import extraction, renderers
 
-# 2. Extract IOCs
-extractor = IOCExtractor(defang=True)
-iocs = extractor.extract_all(text_content)
+normal_iocs, warning_iocs = extraction.extract_iocs_from_file("path/to/threat_report.pdf")
+result = extraction.extract_result_from_file("path/to/threat_report.pdf")
 
-# 3. Check for false positives
-warning_lists = MISPWarningLists()
-warnings = warning_lists.get_warnings_for_iocs(iocs)
-
-# 4. Print summary
-total_iocs = sum(len(iocs[k]) for k in iocs)
+total_iocs = sum(len(values) for values in normal_iocs.values())
 print(f"Found {total_iocs} indicators of compromise:")
-for ioc_type, ioc_list in iocs.items():
-    if ioc_list:
-        print(f"  - {ioc_type}: {len(ioc_list)}")
+for ioc_type, values in normal_iocs.items():
+    if values:
+        print(f"  - {ioc_type}: {len(values)}")
 
-# 5. Print warnings
-for ioc_type, type_warnings in warnings.items():
+for ioc_type, values in warning_iocs.items():
     print(f"\nWarnings for {ioc_type}:")
-    for warning in type_warnings:
+    for warning in values:
         print(f"  - {warning['value']} - List: {warning['warning_list']}")
         print(f"    Description: {warning['description']}")
 
-# 6. Save results
-formatter = JSONFormatter(iocs)
-formatter.save("iocs_results.json")
+Path("iocs_results.json").write_text(renderers.JSONOutputRenderer().render(result), encoding="utf-8")
 print("Results saved to iocs_results.json")
 ``` 

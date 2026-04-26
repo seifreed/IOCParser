@@ -4,26 +4,33 @@ Copyright (c) 2026 Marc Rivero López
 Licensed under GPLv3. See LICENSE file for details.
 This test suite validates real code behavior without mocks or stubs.
 
-Tests for iocparser.core module - argument parsing, file processing, and CLI operations.
+Tests for current CLI and infrastructure modules - argument parsing, file processing, and CLI operations.
 """
 
 import argparse
-import sys
+import io
 import tempfile
+import threading
+from contextlib import redirect_stdout
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
 
-from iocparser.__main__ import main
-from iocparser.core import (
-    MAX_FILE_SIZE,
+import iocparser.cli as cli_module
+import iocparser.cli_processing as cli_processing_module
+import iocparser.cli_runtime as cli_runtime_module
+from iocparser.cli import (
+    execute,
+    process_file,
+    process_multiple_files,
+    process_multiple_files_input,
+    process_single_input,
+    save_output,
+)
+from iocparser.cli_args import (
     ProcessingOptions,
     create_argument_parser,
-    detect_file_type,
-    detect_file_type_by_extension,
-    detect_file_type_by_mime,
-    display_results,
-    download_url_to_temp,
     get_bool_arg,
     get_int_arg,
     get_list_arg,
@@ -31,23 +38,74 @@ from iocparser.core import (
     get_output_filename,
     get_str_arg,
     has_input_args,
-    print_warning_lists,
-    process_file,
-    process_multiple_files,
-    process_multiple_files_input,
-    process_single_input,
-    save_output,
-    setup_application,
-    validate_file_size,
 )
-from iocparser.modules.exceptions import (
+from iocparser.cli_output import (
+    display_results,
+    print_warning_lists,
+)
+from iocparser.cli_runtime import setup_application
+from iocparser.errors import (
+    DownloadError,
+    FileExistenceError,
+    FileParsingError,
     FileProcessingError,
     FileSizeError,
     InvalidURLError,
     IOCTimeoutError,
-    NetworkDownloadError,
     NetworkError,
+    ValidationError,
 )
+from iocparser.infrastructure.file_readers import (
+    MAX_FILE_SIZE,
+    detect_file_type,
+    detect_file_type_by_extension,
+    detect_file_type_by_mime,
+    validate_file_size,
+)
+from iocparser.infrastructure.http_download import download_url_to_temp
+from tests.test_file_parser import create_minimal_pdf
+from tests.warning_service_helpers import StaticWarningListService, swap_warning_service
+
+
+class LocalDownloadServer:
+    def __init__(self, *, body: bytes, content_type: str = "text/plain", content_length: str | None = None) -> None:
+        self.body = body
+        self.content_type = content_type
+        self.content_length = content_length
+        self.server: ThreadingHTTPServer | None = None
+        self.thread: threading.Thread | None = None
+
+    def __enter__(self) -> str:
+        body = self.body
+        content_type = self.content_type
+        content_length = self.content_length
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                self.send_response(200)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Content-Length", content_length or str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, format: str, *args) -> None:
+                del format, args
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.thread = threading.Thread(
+            target=lambda: self.server.serve_forever(poll_interval=0.01),
+            daemon=True,
+        )
+        self.thread.start()
+        return f"http://127.0.0.1:{self.server.server_address[1]}/sample"
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        del exc_type, exc, tb
+        assert self.server is not None
+        assert self.thread is not None
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=5)
 
 
 class TestArgumentHelpers:
@@ -434,19 +492,19 @@ class TestDownloadURLToTemp:
         with pytest.raises(InvalidURLError):
             download_url_to_temp("not-a-url")
 
-        # FTP URLs raise NetworkDownloadError (different exception than validation)
-        with pytest.raises(NetworkDownloadError):
+        # FTP URLs raise DownloadError (different exception than validation)
+        with pytest.raises(DownloadError):
             download_url_to_temp("ftp://example.com/file.txt")
 
     def test_download_url_to_temp_timeout(self) -> None:
         """Test download handles timeout errors."""
-        # Use a non-routable IP to simulate timeout
-        with pytest.raises((NetworkDownloadError, NetworkError, IOCTimeoutError)):
-            download_url_to_temp("http://192.0.2.1/file.txt", timeout=1)
+        # Use a closed local port to trigger a fast network failure in the same path.
+        with pytest.raises((DownloadError, NetworkError, IOCTimeoutError)):
+            download_url_to_temp("http://127.0.0.1:9/file.txt", timeout=0.1)
 
     def test_download_url_to_temp_nonexistent_domain(self) -> None:
         """Test download handles DNS resolution failures."""
-        with pytest.raises(NetworkDownloadError):
+        with pytest.raises(DownloadError):
             download_url_to_temp("http://this-domain-does-not-exist-12345.com/file.txt")
 
 
@@ -854,26 +912,58 @@ class TestDownloadURLAdvanced:
 
     def test_download_url_content_length_check(self) -> None:
         """Test download fails when content-length header exceeds limit."""
-        # This test requires a real server - skip in CI/local environment
-        pytest.skip("Requires controlled HTTP server with specific content-length header")
+        from iocparser.infrastructure.http_download import MAX_URL_SIZE
+
+        with LocalDownloadServer(body=b"", content_length=str(MAX_URL_SIZE + 1)) as url:
+            with pytest.raises(FileSizeError):
+                download_url_to_temp(url)
 
     def test_download_url_chunk_size_exceeded(self) -> None:
         """Test download fails when actual downloaded size exceeds limit during streaming."""
-        # This test requires a real server - skip in CI/local environment
-        pytest.skip("Requires controlled HTTP server streaming large content")
+        from iocparser.infrastructure.http_download import MAX_URL_SIZE
+
+        with LocalDownloadServer(body=b"x" * (MAX_URL_SIZE + 1)) as url:
+            with pytest.raises(FileSizeError):
+                download_url_to_temp(url)
 
     def test_download_url_creates_temp_directory(self) -> None:
         """Test download creates temp directory if it doesn't exist."""
-        # This test would require network access
-        pytest.skip("Requires real network request")
+        temp_dir = Path(__file__).parent.parent / "iocparser" / "temp"
+        removed = False
+        if temp_dir.exists():
+            for child in temp_dir.iterdir():
+                if child.is_file():
+                    child.unlink()
+            temp_dir.rmdir()
+            removed = True
+
+        with LocalDownloadServer(body=b"IOC domain: create-temp.example\n") as url:
+            downloaded = Path(download_url_to_temp(url))
+            try:
+                assert temp_dir.exists()
+                assert downloaded.exists()
+            finally:
+                downloaded.unlink(missing_ok=True)
+                if removed and temp_dir.exists() and not any(temp_dir.iterdir()):
+                    temp_dir.rmdir()
 
     def test_download_url_pdf_extension_added(self) -> None:
         """Test download adds .pdf extension for PDF content-type."""
-        pytest.skip("Requires real network request with PDF content-type")
+        with LocalDownloadServer(body=b"%PDF-1.4", content_type="application/pdf") as url:
+            downloaded = Path(download_url_to_temp(url))
+            try:
+                assert downloaded.suffix == ".pdf"
+            finally:
+                downloaded.unlink(missing_ok=True)
 
     def test_download_url_html_extension_added(self) -> None:
         """Test download adds .html extension for HTML content-type."""
-        pytest.skip("Requires real network request with HTML content-type")
+        with LocalDownloadServer(body=b"<html>ok</html>", content_type="text/html") as url:
+            downloaded = Path(download_url_to_temp(url))
+            try:
+                assert downloaded.suffix == ".html"
+            finally:
+                downloaded.unlink(missing_ok=True)
 
 
 class TestDetectFileTypeErrors:
@@ -938,8 +1028,19 @@ class TestProcessFileAdvanced:
 
     def test_process_file_pdf_type(self) -> None:
         """Test processing a PDF file extracts IOCs correctly."""
-        # Would require creating a real PDF file with IOCs
-        pytest.skip("Requires PDF file creation - integration test")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pdf_path = Path(tmpdir) / "ioc.pdf"
+            create_minimal_pdf(pdf_path, "IOC IP 203.0.113.7 and domain pdf-example.com")
+
+            normal_iocs, warning_iocs = process_file(
+                pdf_path,
+                file_type="pdf",
+                defang=False,
+                check_warnings=False,
+            )
+
+            assert "203.0.113.7" in normal_iocs.get("ips", [])
+            assert warning_iocs == {}
 
     def test_process_file_html_type(self) -> None:
         """Test processing an HTML file extracts IOCs correctly."""
@@ -1000,13 +1101,15 @@ class TestProcessFileAdvanced:
             temp_path = Path(f.name)
 
         try:
-            normal_iocs, warning_iocs = process_file(
-                temp_path,
-                file_type="text",
-                defang=False,
-                check_warnings=True,
-                force_update=False,
-            )
+            with swap_warning_service(cli_runtime_module, StaticWarningListService()) as warning_service:
+                normal_iocs, warning_iocs = process_file(
+                    temp_path,
+                    file_type="text",
+                    defang=False,
+                    check_warnings=True,
+                    force_update=False,
+                    warning_service=warning_service,
+                )
 
             # Either normal or warning IOCs should have entries
             total_iocs = len(normal_iocs) + len(warning_iocs)
@@ -1128,7 +1231,7 @@ class TestProcessMultipleFilesInput:
                     Path(file_path).unlink()
 
     def test_process_multiple_files_input_file_not_found(self) -> None:
-        """Test process_multiple_files_input exits when file doesn't exist."""
+        """Test process_multiple_files_input raises when a file doesn't exist."""
         args = argparse.Namespace(
             multiple=["/nonexistent/file1.txt", "/nonexistent/file2.txt"],
             parallel=1,
@@ -1138,7 +1241,7 @@ class TestProcessMultipleFilesInput:
             force_update=False,
         )
 
-        with pytest.raises(SystemExit):
+        with pytest.raises(FileExistenceError):
             process_multiple_files_input(args)
 
     def test_process_multiple_files_input_deduplication(self) -> None:
@@ -1194,7 +1297,12 @@ class TestProcessMultipleFilesInput:
                 force_update=False,
             )
 
-            normal_iocs, warning_iocs, input_display, _results = process_multiple_files_input(args)
+            with swap_warning_service(cli_runtime_module, StaticWarningListService()) as warning_service:
+                normal_iocs, warning_iocs, input_display, _results = cli_processing_module.process_multiple_files_input(
+                    args,
+                    reader=cli_runtime_module.reader,
+                    warning_service=warning_service,
+                )
 
             # Should have aggregated results
             assert isinstance(normal_iocs, dict)
@@ -1236,7 +1344,7 @@ class TestProcessSingleInput:
             temp_path.unlink()
 
     def test_process_single_input_file_not_found(self) -> None:
-        """Test process_single_input exits when file doesn't exist."""
+        """Test process_single_input raises when file doesn't exist."""
         args = argparse.Namespace(
             file="/nonexistent/file.txt",
             url=None,
@@ -1247,11 +1355,11 @@ class TestProcessSingleInput:
             force_update=False,
         )
 
-        with pytest.raises(SystemExit):
+        with pytest.raises(FileExistenceError):
             process_single_input(args)
 
     def test_process_single_input_no_url(self) -> None:
-        """Test process_single_input exits when no URL provided."""
+        """Test process_single_input raises when no URL is provided."""
         args = argparse.Namespace(
             file=None,
             url=None,
@@ -1262,19 +1370,49 @@ class TestProcessSingleInput:
             force_update=False,
         )
 
-        with pytest.raises(SystemExit):
+        with pytest.raises(ValidationError):
             process_single_input(args)
 
     def test_process_single_input_url_arg(self) -> None:
-        """Test process_single_input with URL argument (network test - skip)."""
-        pytest.skip("Requires real network request")
+        """Test process_single_input with URL argument."""
+        args = argparse.Namespace(
+            file=None,
+            url=None,
+            url_direct=None,
+            type="text",
+            no_defang=True,
+            no_check_warnings=True,
+            force_update=False,
+        )
+        with LocalDownloadServer(body=b"IOC URL: https://url-arg.example/path\n") as url:
+            args.url = url
+            normal_iocs, warning_iocs, input_display = process_single_input(args)
+
+        assert normal_iocs == {"urls": ["https://url-arg.example/path"]}
+        assert warning_iocs == {}
+        assert input_display == args.url
 
     def test_process_single_input_url_direct_arg(self) -> None:
-        """Test process_single_input with direct URL argument (network test - skip)."""
-        pytest.skip("Requires real network request")
+        """Test process_single_input with direct URL argument."""
+        args = argparse.Namespace(
+            file=None,
+            url=None,
+            url_direct=None,
+            type="text",
+            no_defang=True,
+            no_check_warnings=True,
+            force_update=False,
+        )
+        with LocalDownloadServer(body=b"IOC URL: https://url-direct.example/path\n") as url:
+            args.url_direct = url
+            normal_iocs, warning_iocs, input_display = process_single_input(args)
+
+        assert normal_iocs == {"urls": ["https://url-direct.example/path"]}
+        assert warning_iocs == {}
+        assert input_display == args.url_direct
 
     def test_process_single_input_url_download_failure(self) -> None:
-        """Test process_single_input exits on download failure."""
+        """Test process_single_input raises on download failure."""
         args = argparse.Namespace(
             file=None,
             url="http://this-domain-absolutely-does-not-exist-12345.com/file.txt",
@@ -1285,11 +1423,11 @@ class TestProcessSingleInput:
             force_update=False,
         )
 
-        with pytest.raises(SystemExit):
+        with pytest.raises((NetworkError, InvalidURLError, IOCTimeoutError, FileSizeError)):
             process_single_input(args)
 
     def test_process_single_input_processing_failure(self) -> None:
-        """Test process_single_input exits on file processing failure."""
+        """Test process_single_input raises on file processing failure."""
         # Create an invalid file that will cause processing error
         with tempfile.NamedTemporaryFile(mode="wb", suffix=".pdf", delete=False) as f:
             f.write(b"Not a real PDF file")
@@ -1306,15 +1444,8 @@ class TestProcessSingleInput:
                 force_update=False,
             )
 
-            # This might raise SystemExit or just process as text
-            # depending on error handling
-            try:
-                normal_iocs, _warning_iocs, _input_display = process_single_input(args)
-                # If it doesn't exit, it should at least return something
-                assert isinstance(normal_iocs, dict)
-            except SystemExit:
-                # Expected behavior - processing failed
-                pass
+            with pytest.raises((FileProcessingError, FileParsingError, OSError, ValueError)):
+                process_single_input(args)
 
         finally:
             temp_path.unlink()
@@ -1446,74 +1577,44 @@ class TestHandleMISPInit:
 
     def test_handle_misp_init(self) -> None:
         """Test handle_misp_init downloads and displays warning lists."""
-        # This test actually downloads MISP warning lists
-        # Skip if network unavailable or in CI
-        pytest.skip("Network-dependent test - downloads real MISP warning lists")
+        class LocalWarningLists:
+            def __init__(self, cache_duration: int = 0, force_update: bool = True) -> None:
+                del cache_duration, force_update
+                self.warning_lists = {
+                    "dns-google": {"name": "DNS Google"},
+                    "dns-cloudflare": {"name": "DNS Cloudflare"},
+                    "other-list": {},
+                }
+
+        original = cli_module.MISPWarningLists
+        cli_module.MISPWarningLists = LocalWarningLists
+        try:
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                cli_module.handle_misp_init()
+        finally:
+            cli_module.MISPWarningLists = original
+
+        output = buffer.getvalue()
+        assert "Dns: 2 lists" in output
+        assert "Other: 1 lists" in output
 
 
 class TestMainFunction:
-    """Test main() function integration."""
+    """Test CLI execute() integration without patching runtime internals."""
 
-    def test_main_no_args_shows_help(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test main() shows help when no arguments provided."""
-        monkeypatch.setattr(sys, "argv", ["iocparser"])
+    def test_execute_no_args_raises_validation_error(self) -> None:
+        with pytest.raises(ValidationError):
+            execute([])
 
-        with pytest.raises(SystemExit) as exc_info:
-            main()
-
-        assert exc_info.value.code == 1
-
-    def test_main_with_init_flag(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test main() with --init flag returns after initialization."""
-        monkeypatch.setattr(sys, "argv", ["iocparser", "--init"])
-
-        # Mock handle_misp_init to avoid network calls
-        init_called = []
-
-        def mock_handle_misp_init():
-            init_called.append(True)
-
-        monkeypatch.setattr("iocparser.__main__.handle_misp_init", mock_handle_misp_init)
-
-        # Should execute and return without error
-        main()
-
-        # Verify init was called
-        assert len(init_called) == 1
-
-    def test_main_with_force_update(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test main() with --force-update flag returns after initialization."""
-        monkeypatch.setattr(sys, "argv", ["iocparser", "--force-update"])
-
-        # Mock handle_misp_init to avoid network calls
-        init_called = []
-
-        def mock_handle_misp_init():
-            init_called.append(True)
-
-        monkeypatch.setattr("iocparser.__main__.handle_misp_init", mock_handle_misp_init)
-
-        # Should execute and return without error
-        main()
-
-        # Verify init was called
-        assert len(init_called) == 1
-
-    def test_main_with_file(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test main() processes file successfully."""
+    def test_execute_with_file(self) -> None:
+        """Test execute() processes file successfully."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Test malware report with evil-test.com\n")
             temp_path = Path(f.name)
 
         try:
-            monkeypatch.setattr(
-                sys,
-                "argv",
-                ["iocparser", "-f", str(temp_path), "--no-check-warnings"],
-            )
-
-            # Execute main - should complete successfully
-            main()
+            execute(["-f", str(temp_path), "--no-check-warnings"])
 
         finally:
             temp_path.unlink()
@@ -1522,8 +1623,8 @@ class TestMainFunction:
             if output_file.exists():
                 output_file.unlink()
 
-    def test_main_with_multiple_files(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test main() processes multiple files."""
+    def test_execute_with_multiple_files(self) -> None:
+        """Test execute() processes multiple files."""
         files = []
         try:
             for i in range(2):
@@ -1531,75 +1632,15 @@ class TestMainFunction:
                     f.write(f"File {i} with evil{i}.com\n")
                     files.append(f.name)
 
-            monkeypatch.setattr(
-                sys,
-                "argv",
-                ["iocparser", "-m", files[0], files[1], "--no-check-warnings", "--parallel", "2"],
-            )
-
-            main()
+            execute(["-m", files[0], files[1], "--no-check-warnings", "--parallel", "2"])
 
         finally:
             for file_path in files:
                 if Path(file_path).exists():
                     Path(file_path).unlink()
 
-    def test_main_keyboard_interrupt(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test main() handles keyboard interrupt gracefully."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-            f.write("Test content\n")
-            temp_path = Path(f.name)
-
-        try:
-            monkeypatch.setattr(
-                sys,
-                "argv",
-                ["iocparser", "-f", str(temp_path)],
-            )
-
-            # Mock process_file to raise KeyboardInterrupt
-            def mock_process_file(*_args, **_kwargs):
-                raise KeyboardInterrupt
-
-            monkeypatch.setattr("iocparser.core.process_file", mock_process_file)
-
-            with pytest.raises(SystemExit) as exc_info:
-                main()
-
-            assert exc_info.value.code == 0
-
-        finally:
-            temp_path.unlink()
-
-    def test_main_unexpected_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test main() handles unexpected errors."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-            f.write("Test content\n")
-            temp_path = Path(f.name)
-
-        try:
-            monkeypatch.setattr(
-                sys,
-                "argv",
-                ["iocparser", "-f", str(temp_path)],
-            )
-
-            # Mock process_file to raise unexpected error
-            def mock_process_file(*_args, **_kwargs):
-                raise RuntimeError("Unexpected error for testing")  # noqa: TRY003
-
-            monkeypatch.setattr("iocparser.core.process_file", mock_process_file)
-
-            with pytest.raises(SystemExit) as exc_info:
-                main()
-
-            assert exc_info.value.code == 1
-
-        finally:
-            temp_path.unlink()
-
-    def test_main_with_output_file(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test main() writes to specified output file."""
+    def test_execute_with_output_file(self) -> None:
+        """Test execute() writes to specified output file."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Test report: malware-test.com\n")
             temp_path = Path(f.name)
@@ -1609,20 +1650,15 @@ class TestMainFunction:
             with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as out:
                 output_path = Path(out.name)
 
-            monkeypatch.setattr(
-                sys,
-                "argv",
+            execute(
                 [
-                    "iocparser",
                     "-f",
                     str(temp_path),
                     "-o",
                     str(output_path),
                     "--no-check-warnings",
-                ],
+                ]
             )
-
-            main()
 
             # Verify output file was created
             assert output_path.exists()
@@ -1634,8 +1670,8 @@ class TestMainFunction:
             if output_path and output_path.exists():
                 output_path.unlink()
 
-    def test_main_with_json_output(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test main() outputs JSON format."""
+    def test_execute_with_json_output(self) -> None:
+        """Test execute() outputs JSON format."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Test report: malware-json.com\n")
             temp_path = Path(f.name)
@@ -1645,21 +1681,16 @@ class TestMainFunction:
             with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as out:
                 output_path = Path(out.name)
 
-            monkeypatch.setattr(
-                sys,
-                "argv",
+            execute(
                 [
-                    "iocparser",
                     "-f",
                     str(temp_path),
                     "-o",
                     str(output_path),
                     "--json",
                     "--no-check-warnings",
-                ],
+                ]
             )
-
-            main()
 
             # Verify JSON output
             assert output_path.exists()

@@ -823,15 +823,16 @@ class TestCoverageMissing:
     def test_extract_urls_image_extension_filter(self):
         """Test extract_urls filters URLs ending with image/resource extensions."""
         text = """
-        Image: https://example.com/logo.png
-        CSS: https://example.com/style.css
-        JS: https://example.com/script.js
+        Image: https://malware-site.com/logo.png
+        CSS: https://evil-cdn.net/style.css
+        JS: https://cdn.badhost.org/script.js
         Valid: https://malware-site.com/payload.exe
         """
         result = self.extractor.extract_urls(text)
         # Image/CSS/JS URLs should be filtered
         assert not any(url.endswith(".png") for url in result)
         assert not any(url.endswith(".css") for url in result)
+        assert not any(url.endswith(".js") for url in result)
         # Valid payload should be kept
         assert any("malware-site.com" in url for url in result)
 

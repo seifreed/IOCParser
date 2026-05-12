@@ -95,7 +95,7 @@ class NetworkHeuristicPolicy:
             or self.should_exclude_documentation_url(domain, path)
         ):
             return False
-        return bool(domain) and not domain.endswith(self.filtered_url_suffixes)
+        return bool(domain) and not path.endswith(self.filtered_url_suffixes)
 
     def is_valid_host_candidate(self, domain: str) -> bool:
         if "." not in domain:

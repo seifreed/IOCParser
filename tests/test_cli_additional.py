@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 import iocparser.cli as cli_module
+import iocparser.cli_output_rendering as cli_output_rendering_module
 from iocparser.cli import handle_misp_init, process_single_input, save_output
 from iocparser.cli_output import PersistResultsRequest, persist_results
 from iocparser.config import AppConfig
@@ -136,6 +137,40 @@ def test_persist_results_writes_to_sqlite(tmp_path: Path) -> None:
         )
     )
 
+    assert db_path.exists()
+
+
+def test_persist_results_continues_when_file_metadata_detection_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    db_path = tmp_path / "iocparser.db"
+    sample = tmp_path / "sample.txt"
+    sample.write_text("IOC domain: example.com", encoding="utf-8")
+    config = AppConfig(persist=True, db_uri=f"sqlite:///{db_path}", config_path=None)
+
+    def raise_value_error(_path: Path) -> str:
+        raise ValueError("unreadable magic metadata")
+
+    monkeypatch.setattr(cli_output_rendering_module, "detect_file_type", raise_value_error)
+
+    run_id = persist_results(
+        PersistResultsRequest(
+            config=config,
+            source_kind="file",
+            source_value=str(sample),
+            normal_iocs={"domains": ["example.com"]},
+            warning_iocs={},
+            options=PersistOptions(
+                defang=False,
+                check_warnings=False,
+                force_update=False,
+                output_format="json",
+            ),
+            tool_version="1.0.0",
+        )
+    )
+
+    assert isinstance(run_id, int)
     assert db_path.exists()
 
 

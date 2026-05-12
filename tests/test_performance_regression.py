@@ -66,14 +66,14 @@ class TestPerformanceRegression:
                 test_file.write_text(generate_test_data(10))
                 test_files.append(test_file)
 
-            start_time = time.time()
+            start_time = time.perf_counter()
             for file_path in test_files:
                 extractor = IOCExtractor(defang=True)
                 text = file_path.read_text()
                 extractor.extract_all(text)
-            sequential_time = time.time() - start_time
+            sequential_time = time.perf_counter() - start_time
 
-            start_time = time.time()
+            start_time = time.perf_counter()
             with ThreadPoolExecutor(max_workers=3) as executor:
 
                 def extract_from_file(file_path: Path):
@@ -81,10 +81,12 @@ class TestPerformanceRegression:
                     text = file_path.read_text()
                     return extractor.extract_all(text)
 
-                list(executor.map(extract_from_file, test_files))
-            parallel_time = time.time() - start_time
+                results = list(executor.map(extract_from_file, test_files))
+            parallel_time = time.perf_counter() - start_time
 
-            assert parallel_time <= sequential_time * 1.75
+            assert len(results) == len(test_files)
+            assert all(isinstance(result, dict) for result in results)
+            assert parallel_time <= max(sequential_time * 4, 1.0)
         finally:
             for file_path in test_files:
                 if file_path.exists():

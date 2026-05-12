@@ -19,6 +19,7 @@ from iocparser.errors import (
 )
 from iocparser.infrastructure.http_download import (
     MAX_URL_SIZE,
+    REQUEST_TIMEOUT,
     RequestsURLDownloader,
     check_content_size,
     download_url_to_temp,
@@ -113,6 +114,17 @@ def test_validate_url_rejects_invalid_url() -> None:
         validate_url("http://[::1")
     with pytest.raises(InvalidURLError):
         validate_url("https://example.test:99999/path")
+
+
+def test_requests_url_downloader_sanitizes_non_positive_timeouts() -> None:
+    scalar_timeout = RequestsURLDownloader(timeout=-1)
+    tuple_timeout = RequestsURLDownloader(timeout=(-1.0, 0.0))
+
+    assert scalar_timeout.timeout == float(REQUEST_TIMEOUT)
+    assert tuple_timeout.timeout == (
+        RequestsURLDownloader.default_connect_timeout(),
+        RequestsURLDownloader.default_read_timeout(),
+    )
 
 
 def test_check_content_size_accepts_empty_and_small_values() -> None:

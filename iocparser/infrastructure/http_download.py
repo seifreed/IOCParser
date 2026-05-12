@@ -27,6 +27,7 @@ MAX_URL_SIZE = 50 * 1024 * 1024
 REQUEST_TIMEOUT = 30
 DEFAULT_CONNECT_TIMEOUT = 10.0
 DEFAULT_READ_TIMEOUT = float(REQUEST_TIMEOUT)
+TimeoutValue = int | float | tuple[float, float]
 logger = get_logger(__name__)
 
 
@@ -46,7 +47,7 @@ def _default_downloader() -> RequestsURLDownloader:
 class HTTPTransportConfig:
     """Reusable HTTP transport settings for the download adapter."""
 
-    timeout: int | tuple[float, float] = REQUEST_TIMEOUT
+    timeout: TimeoutValue = REQUEST_TIMEOUT
     retries: int = 0
     backoff: float = 0.0
     rate_limit_delay: float = 0.0
@@ -59,6 +60,20 @@ class HTTPTransportConfig:
     cert: str | None = None
 
 
+def _positive_timeout(value: int | float, default: float) -> float:
+    return float(value) if value > 0 else default
+
+
+def _sanitize_timeout(timeout: TimeoutValue) -> TimeoutValue:
+    if isinstance(timeout, tuple):
+        connect_timeout, read_timeout = timeout
+        return (
+            _positive_timeout(connect_timeout, DEFAULT_CONNECT_TIMEOUT),
+            _positive_timeout(read_timeout, DEFAULT_READ_TIMEOUT),
+        )
+    return _positive_timeout(timeout, float(REQUEST_TIMEOUT))
+
+
 class RequestsURLDownloader(URLDownloader):
     """HTTP download adapter backed by requests."""
 
@@ -68,7 +83,7 @@ class RequestsURLDownloader(URLDownloader):
         self,
         *,
         config: HTTPTransportConfig | None = None,
-        timeout: int | tuple[float, float] | None = None,
+        timeout: TimeoutValue | None = None,
         retries: int | None = None,
         backoff: float | None = None,
         rate_limit_delay: float | None = None,
@@ -82,7 +97,9 @@ class RequestsURLDownloader(URLDownloader):
         **kwargs: object,
     ) -> None:
         cfg = config or HTTPTransportConfig()
-        self.timeout: int | tuple[float, float] = timeout if timeout is not None else cfg.timeout
+        self.timeout: TimeoutValue = _sanitize_timeout(
+            timeout if timeout is not None else cfg.timeout
+        )
         self.retries = max(0, retries if retries is not None else cfg.retries)
         self.backoff = max(0.0, backoff if backoff is not None else cfg.backoff)
         self.rate_limit_delay = max(

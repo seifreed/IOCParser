@@ -698,6 +698,7 @@ def test_distributed_persistence_rolls_back_and_single_import_lookup(
 def test_history_private_edges_with_real_models(tmp_path) -> None:
     from iocparser.infrastructure.persistence.history import ops
     from iocparser.infrastructure.persistence_batch import BatchJobModel, FailedBatchItemModel
+    from iocparser.infrastructure.persistence_models import IOCModel
     from iocparser.infrastructure.persistence_schema import (
         DeadLetterJobModel,
         DistributedJobModel,
@@ -807,6 +808,29 @@ def test_history_private_edges_with_real_models(tmp_path) -> None:
             )
             session.add(run)
             session.flush()
+            ioc = IOCModel(
+                ioc_type="domains",
+                value="history.example",
+                value_search="history.example",
+                is_warning=False,
+                warning_list="",
+                warning_description="",
+            )
+            session.add(ioc)
+            session.flush()
+            assert (
+                ops._existing_ioc(
+                    session,
+                    {
+                        "ioc_type": "domains",
+                        "value": "history.example",
+                        "is_warning": "false",
+                        "warning_list": "",
+                        "warning_description": "",
+                    },
+                )
+                == ioc
+            )
             assert (
                 ops._existing_run(
                     session,
@@ -892,7 +916,7 @@ def test_history_private_edges_with_real_models(tmp_path) -> None:
                         "error_code": "ERR",
                         "error_category": "test",
                         "error_message": "boom",
-                        "retryable": False,
+                        "retryable": "false",
                         "payload_json": '{"payload": "incoming"}',
                     },
                     archive_id="archive",

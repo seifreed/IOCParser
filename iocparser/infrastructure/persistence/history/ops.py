@@ -198,6 +198,18 @@ def _typed_row(row: dict[str, object]) -> dict[str, object]:
     return row_dict
 
 
+def _bool_from_row(value: object, *, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"0", "false", "no", "off", ""}:
+            return False
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+    return bool(value)
+
+
 def _source_identity(row: dict[str, object]) -> tuple[object, ...]:
     kind = str(row.get("kind", ""))
     value = str(row.get("value", ""))
@@ -246,7 +258,7 @@ def _existing_ioc(session: Session, row: dict[str, object]) -> IOCModel | None:
         select(IOCModel).where(
             IOCModel.ioc_type == str(row.get("ioc_type", "")),
             IOCModel.value == str(row.get("value", "")),
-            IOCModel.is_warning == bool(row.get("is_warning", False)),
+            IOCModel.is_warning == _bool_from_row(row.get("is_warning")),
             IOCModel.warning_list == str(row.get("warning_list", "")),
             IOCModel.warning_description == str(row.get("warning_description", "")),
         )
@@ -532,7 +544,7 @@ def _existing_dead_letter_job(
                 DeadLetterJobModel.error_code == str(row.get("error_code", "")),
                 DeadLetterJobModel.error_category == str(row.get("error_category", "")),
                 DeadLetterJobModel.error_message == str(row.get("error_message", "")),
-                DeadLetterJobModel.retryable == bool(row.get("retryable", False)),
+                DeadLetterJobModel.retryable == _bool_from_row(row.get("retryable")),
             )
         )
         .scalars()

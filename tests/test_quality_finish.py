@@ -233,7 +233,8 @@ def test_cli_processing_url_helper_parsing_and_plugin_builder() -> None:
 
     options = argparse.Namespace(include_types=(IOCType.DOMAIN,), exclude_types=("ips",))
     assert url_joined_type_filters(options) == ("domains", "ips")
-    assert url_int_value(True) == 1
+    assert url_int_value(True) == 0
+    assert url_int_value("bad", default=9) == 9
     assert url_int_value("", default=9) == 9
     assert _report_items({}) == []
 

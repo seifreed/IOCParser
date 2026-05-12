@@ -62,13 +62,16 @@ class BatchReportContext(TypedDict):
 
 def int_value(value: object, *, default: int = 0) -> int:
     if isinstance(value, bool):
-        return int(value)
+        return default
     if isinstance(value, int):
         return value
     if isinstance(value, str):
         stripped = value.strip()
         if stripped:
-            return int(stripped)
+            try:
+                return int(stripped)
+            except ValueError:
+                return default
     return default
 
 

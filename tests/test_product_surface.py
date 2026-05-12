@@ -163,11 +163,16 @@ def test_batch_report_item_parses_retryable_bool_strings() -> None:
     enabled = _report_item({"url": "https://b.example", "retryable": "yes"})
     unknown = _report_item({"url": "https://c.example", "retryable": "maybe"})
     invalid = _report_item({"url": "https://d.example", "retryable": ["yes"]})
+    invalid_ints = _report_item(
+        {"url": "https://e.example", "duration_ms": True, "retry_attempt": "bad"}
+    )
 
     assert disabled["retryable"] is False
     assert enabled["retryable"] is True
     assert unknown["retryable"] is False
     assert invalid["retryable"] is False
+    assert invalid_ints["duration_ms"] == 0
+    assert invalid_ints["retry_attempt"] == 0
 
 
 class _Writer:

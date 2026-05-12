@@ -356,6 +356,8 @@ def test_client_persistence_and_distributed_payload_helpers() -> None:
     assert _int_from_payload({"attempts": "3"}, "attempts", 0) == 3
     with pytest.raises(TypeError):
         _int_from_payload({"attempts": []}, "attempts", 0)
+    with pytest.raises(TypeError, match="attempts"):
+        _int_from_payload({"attempts": "bad"}, "attempts", 0)
 
 
 def test_http_and_queue_helpers_cover_error_paths() -> None:

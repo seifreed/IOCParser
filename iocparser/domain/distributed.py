@@ -36,7 +36,10 @@ def _int_from_payload(payload: dict[str, object], key: str, default: int) -> int
     if isinstance(raw_value, int):
         return raw_value
     if isinstance(raw_value, str):
-        return int(raw_value)
+        try:
+            return int(raw_value)
+        except ValueError as exc:
+            raise _invalid_int_payload_value(key=key, raw_value=raw_value) from exc
     raise _invalid_int_payload_value(key=key, raw_value=raw_value)
 
 

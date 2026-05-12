@@ -36,6 +36,11 @@ from iocparser.api_persistence import (
     render_persisted_run,
     search_persisted_iocs,
 )
+from iocparser.api_persistence_query import (
+    coerce_diff_filters,
+    coerce_export_filters,
+    coerce_render_options,
+)
 from iocparser.cli_args import parse_string_filters
 from iocparser.cli_output import (
     PersistResultsRequest,
@@ -133,6 +138,21 @@ def _args(**overrides: object) -> argparse.Namespace:
     }
     base.update(overrides)
     return argparse.Namespace(**base)
+
+
+def test_persisted_option_overrides_parse_bool_strings() -> None:
+    render_options = coerce_render_options(None, {"with_context": "false"})
+    export_filters = coerce_export_filters(None, {"only_warnings": "false", "only_normal": "0"})
+    diff_filters = coerce_diff_filters(
+        None,
+        {"only_warnings": "false", "only_normal": "0", "diff_only": "all"},
+    )
+
+    assert render_options.with_context is False
+    assert export_filters.only_warnings is False
+    assert export_filters.only_normal is False
+    assert diff_filters.only_warnings is False
+    assert diff_filters.only_normal is False
 
 
 class _Writer:

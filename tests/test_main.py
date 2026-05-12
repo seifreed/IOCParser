@@ -147,11 +147,13 @@ class TestArgumentHelpers:
 
     def test_get_bool_arg_false(self) -> None:
         """Test get_bool_arg returns False for falsy values."""
-        args = argparse.Namespace(verbose=False, debug=0, enabled=None)
+        args = argparse.Namespace(verbose=False, debug=0, enabled=None, disabled="false", off="0")
 
         assert get_bool_arg(args, "verbose") is False
         assert get_bool_arg(args, "debug") is False
         assert get_bool_arg(args, "enabled") is False
+        assert get_bool_arg(args, "disabled") is False
+        assert get_bool_arg(args, "off") is False
 
     def test_get_bool_arg_missing(self) -> None:
         """Test get_bool_arg returns False when attribute missing."""

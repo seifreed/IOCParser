@@ -16,6 +16,12 @@ def get_str_arg(args: argparse.Namespace, name: str, default: str = "") -> str:
 def get_bool_arg(args: argparse.Namespace, name: str) -> bool:
     """Get boolean argument from argparse namespace."""
     value: object = getattr(args, name, False)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"0", "false", "no", "off", ""}:
+            return False
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
     return bool(value)
 
 

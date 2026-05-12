@@ -121,6 +121,18 @@ def optional_str(value: object | None) -> str | None:
     return None if value is None else str(value)
 
 
+def bool_option(value: object | None, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"0", "false", "no", "off", ""}:
+            return False
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+    return bool(value)
+
+
 def parse_string_filters(value: str | None) -> tuple[str, ...]:
     if value is None:
         return ()
@@ -277,7 +289,7 @@ def persisted_diff_input(
         right_run_id=right_run_id,
         only_added=diff_only == "added",
         only_removed=diff_only == "removed",
-        only_warnings=options.get("only_warnings", False),
+        only_warnings=bool_option(options.get("only_warnings")),
         ioc_types=parse_string_filters(options.get("ioc_type")),
         severity=parse_string_filters(options.get("severity")),
         tags=parse_string_filters(options.get("tag")),
@@ -294,7 +306,7 @@ def latest_source_diff_input(
         run_id=run_id,
         only_added=diff_only == "added",
         only_removed=diff_only == "removed",
-        only_warnings=options.get("only_warnings", False),
+        only_warnings=bool_option(options.get("only_warnings")),
         ioc_types=parse_string_filters(options.get("ioc_type")),
         severity=parse_string_filters(options.get("severity")),
         tags=parse_string_filters(options.get("tag")),
@@ -318,7 +330,7 @@ def coerce_render_options(
         return options
     return PersistedRenderOptions(
         output_format=str(option_overrides.pop("output_format", "json")),
-        with_context=bool(option_overrides.pop("with_context", False)),
+        with_context=bool_option(option_overrides.pop("with_context", False)),
         stix_types=optional_str(option_overrides.pop("stix_types", None)),
     )
 
@@ -332,8 +344,8 @@ def coerce_export_filters(
     return PersistedExportFilters(
         severity=optional_str(option_overrides.pop("severity", None)),
         tag=optional_str(option_overrides.pop("tag", None)),
-        only_warnings=bool(option_overrides.pop("only_warnings", False)),
-        only_normal=bool(option_overrides.pop("only_normal", False)),
+        only_warnings=bool_option(option_overrides.pop("only_warnings", False)),
+        only_normal=bool_option(option_overrides.pop("only_normal", False)),
     )
 
 
@@ -346,8 +358,8 @@ def coerce_diff_filters(
     return PersistedDiffFilters(
         severity=optional_str(option_overrides.pop("severity", None)),
         tag=optional_str(option_overrides.pop("tag", None)),
-        only_warnings=bool(option_overrides.pop("only_warnings", False)),
-        only_normal=bool(option_overrides.pop("only_normal", False)),
+        only_warnings=bool_option(option_overrides.pop("only_warnings", False)),
+        only_normal=bool_option(option_overrides.pop("only_normal", False)),
         diff_only=validated_diff_only(optional_str(option_overrides.pop("diff_only", None))),
         ioc_type=optional_str(option_overrides.pop("ioc_type", None)),
     )

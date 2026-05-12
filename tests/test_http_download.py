@@ -227,3 +227,26 @@ def test_requests_url_downloader_reports_unexpected_errors() -> None:
         with pytest.raises(DownloadError) as exc_info:
             downloader.download(broken_url)
     assert exc_info.value.error_type == "unexpected"
+
+
+def test_requests_url_downloader_rate_limit_sleep_path_is_deterministic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    downloader = RequestsURLDownloader(rate_limit_delay=0.5)
+    downloader._last_request_started = 9.75
+    monotonic_values = iter([10.0, 10.5])
+    sleeps: list[float] = []
+
+    monkeypatch.setattr(
+        "iocparser.infrastructure.http_download.time.monotonic",
+        lambda: next(monotonic_values),
+    )
+    monkeypatch.setattr(
+        "iocparser.infrastructure.http_download.time.sleep",
+        sleeps.append,
+    )
+
+    downloader._respect_rate_limit()
+
+    assert sleeps == [pytest.approx(0.25)]
+    assert downloader._last_request_started == 10.5

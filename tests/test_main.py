@@ -161,6 +161,12 @@ class TestArgumentHelpers:
 
         assert get_bool_arg(args, "nonexistent") is False
 
+    def test_get_bool_arg_unknown_string_is_false(self) -> None:
+        """Test get_bool_arg does not treat unknown strings as enabled flags."""
+        args = argparse.Namespace(enabled="maybe")
+
+        assert get_bool_arg(args, "enabled") is False
+
     def test_get_int_arg_with_value(self) -> None:
         """Test get_int_arg returns integer when attribute exists."""
         args = argparse.Namespace(timeout=30, workers=4)

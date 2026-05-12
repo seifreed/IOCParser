@@ -337,9 +337,17 @@ def test_runtime_and_worker_config_support_helpers_cover_error_branches(tmp_path
     with pytest.raises(TypeError):
         int_or_none([])
     with pytest.raises(TypeError):
+        int_or(True, 0)
+    with pytest.raises(TypeError):
+        int_or_none(True)
+    with pytest.raises(TypeError):
         float_or([], 0.0)
     with pytest.raises(TypeError):
         float_or_none([])
+    with pytest.raises(TypeError):
+        float_or(True, 0.0)
+    with pytest.raises(TypeError):
+        float_or_none(True)
 
 
 def test_client_persistence_and_distributed_payload_helpers() -> None:
@@ -531,6 +539,10 @@ def test_pipeline_worker_private_helpers_cover_remaining_branches() -> None:
 
     assert _metadata_int({}, "input_size") is None
     assert _metadata_int({"input_size": "5"}, "input_size") == 5
+    with pytest.raises(TypeError):
+        _metadata_int({"input_size": True}, "input_size")
+    with pytest.raises(TypeError):
+        _metadata_int({"input_size": "bad"}, "input_size")
     with pytest.raises(TypeError):
         _metadata_int({"input_size": []}, "input_size")
     with pytest.raises(ValueError, match="missing temp_file"):

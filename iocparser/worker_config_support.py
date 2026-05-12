@@ -124,6 +124,8 @@ def str_or_none(value: object) -> str | None:
 def int_or(value: object, default: int) -> int:
     if value is None:
         return default
+    if isinstance(value, bool):
+        raise _int_type_error(value)
     if isinstance(value, int):
         return value
     if isinstance(value, str):
@@ -134,6 +136,8 @@ def int_or(value: object, default: int) -> int:
 def int_or_none(value: object) -> int | None:
     if value is None:
         return None
+    if isinstance(value, bool):
+        raise _int_type_error(value)
     if isinstance(value, int):
         return value
     if isinstance(value, str):
@@ -144,6 +148,8 @@ def int_or_none(value: object) -> int | None:
 def float_or(value: object, default: float) -> float:
     if value is None:
         return default
+    if isinstance(value, bool):
+        raise _float_type_error(value)
     if isinstance(value, (int, float)):
         return float(value)
     if isinstance(value, str):
@@ -154,6 +160,8 @@ def float_or(value: object, default: float) -> float:
 def float_or_none(value: object) -> float | None:
     if value is None:
         return None
+    if isinstance(value, bool):
+        raise _float_type_error(value)
     if isinstance(value, (int, float)):
         return float(value)
     if isinstance(value, str):

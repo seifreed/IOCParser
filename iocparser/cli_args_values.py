@@ -22,6 +22,7 @@ def get_bool_arg(args: argparse.Namespace, name: str) -> bool:
             return False
         if normalized in {"1", "true", "yes", "on"}:
             return True
+        return False
     return bool(value)
 
 

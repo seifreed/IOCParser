@@ -164,10 +164,15 @@ def metadata_int(metadata: dict[str, object], key: str) -> int | None:
     raw_value = metadata.get(key)
     if raw_value is None:
         return None
+    if isinstance(raw_value, bool):
+        raise invalid_int_error(key=key, raw_value=raw_value)
     if isinstance(raw_value, int):
         return raw_value
     if isinstance(raw_value, str):
-        return int(raw_value)
+        try:
+            return int(raw_value)
+        except ValueError as exc:
+            raise invalid_int_error(key=key, raw_value=raw_value) from exc
     raise invalid_int_error(key=key, raw_value=raw_value)
 
 

@@ -7,6 +7,7 @@ Author: Marc Rivero | @seifreed
 """
 
 import re
+import urllib.parse
 from abc import ABC, abstractmethod
 from pathlib import Path
 
@@ -166,6 +167,12 @@ EXTENSION_PARSERS: dict[str, type[FileParser]] = {
 }
 
 
+def _parser_suffix(file_path: str) -> str:
+    if file_path.startswith(("http://", "https://")):
+        return Path(urllib.parse.urlparse(file_path).path).suffix.lower()
+    return Path(file_path).suffix.lower()
+
+
 def get_parser(file_path: str) -> FileParser:
     """
     Determine the file type and return the appropriate parser.
@@ -177,9 +184,9 @@ def get_parser(file_path: str) -> FileParser:
         The appropriate parser for the file type
     """
     # Check extension against known parsers
-    for ext, parser_class in EXTENSION_PARSERS.items():
-        if file_path.endswith(ext):
-            return parser_class(file_path)
+    parser_class = EXTENSION_PARSERS.get(_parser_suffix(file_path))
+    if parser_class is not None:
+        return parser_class(file_path)
 
     # For URLs without recognized extension, default to HTML
     if file_path.startswith(("http://", "https://")):

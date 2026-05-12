@@ -485,6 +485,14 @@ class TestGetParser:
         assert isinstance(parser, PDFParser)
         assert parser.file_path == str(pdf_path)
 
+    def test_get_parser_handles_uppercase_pdf_extension(self, tmp_path: Path) -> None:
+        pdf_path = tmp_path / "TEST.PDF"
+        create_minimal_pdf(pdf_path, "Test")
+
+        parser = get_parser(str(pdf_path))
+
+        assert isinstance(parser, PDFParser)
+
     def test_get_parser_returns_html_parser_for_html_extension(self, tmp_path: Path) -> None:
         """
         Test get_parser returns HTMLParser for .html files.
@@ -588,6 +596,11 @@ class TestGetParser:
         parser = get_parser(pdf_url)
 
         # Assert: Should return PDFParser based on extension
+        assert isinstance(parser, PDFParser)
+
+    def test_get_parser_handles_pdf_url_with_query_string(self) -> None:
+        parser = get_parser("https://example.com/document.PDF?download=1")
+
         assert isinstance(parser, PDFParser)
 
     def test_get_parser_handles_url_with_html_extension(self) -> None:

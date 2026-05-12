@@ -656,3 +656,39 @@ def test_queue_factory_and_optional_queue_adapters() -> None:
         create_queue_adapter("rabbitmq")
     with pytest.raises(ValueError, match="Unsupported queue backend"):
         create_queue_adapter("unsupported")
+
+
+def test_celery_queue_falls_back_to_task_id_and_dead_letters_receipt_queue() -> None:
+    class FakeAsyncResult:
+        id = None
+
+    class FakeCeleryApp:
+        def __init__(self) -> None:
+            self.sent: list[dict[str, object]] = []
+
+        def send_task(
+            self, task_name: str, *, args: list[object], queue: str, task_id: str
+        ) -> FakeAsyncResult:
+            self.sent.append(
+                {"task_name": task_name, "args": args, "queue": queue, "task_id": task_id}
+            )
+            return FakeAsyncResult()
+
+    class FakeCeleryModule:
+        class Celery(FakeCeleryApp):
+            def __init__(self, name: str, broker: str) -> None:
+                del name, broker
+                super().__init__()
+
+    envelope = _envelope("celery-job")
+    with installed_module("celery", FakeCeleryModule()):
+        celery = CeleryQueueAdapter("redis://localhost/0")
+        receipt = celery.enqueue(queue_name="jobs", envelope=envelope)
+        assert receipt.receipt_id == "celery-job"
+
+        dead_receipt = celery.dead_letter(
+            QueueReceipt("celery", "priority", "old-task", "old-task"), envelope=envelope
+        )
+
+        assert dead_receipt.queue_name == "priority.dead"
+        assert celery.app.sent[-1]["queue"] == "priority.dead"

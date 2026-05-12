@@ -44,13 +44,15 @@ class CeleryQueueAdapter:
         self.task_name = task_name
 
     def enqueue(self, *, queue_name: str, envelope: QueueEnvelope) -> QueueReceipt:
+        task_id = str(envelope.request.job_id or uuid4())
         result = self.app.send_task(
             self.task_name,
             args=[envelope.to_record()],
             queue=queue_name,
-            task_id=str(envelope.request.job_id or uuid4()),
+            task_id=task_id,
         )
-        return QueueReceipt("celery", queue_name, str(result.id), str(result.id))
+        message_id = str(result.id or task_id)
+        return QueueReceipt("celery", queue_name, message_id, message_id)
 
     def dequeue(self, *, queue_name: str) -> tuple[QueueReceipt, QueueEnvelope] | None:
         del queue_name
@@ -64,8 +66,8 @@ class CeleryQueueAdapter:
         return self.enqueue(queue_name=target_queue, envelope=envelope)
 
     def dead_letter(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
-        del receipt
-        dead_queue = f"{envelope.queue_name}.dead"
+        source_queue = receipt.queue_name or envelope.queue_name
+        dead_queue = f"{source_queue}.dead"
         return self.enqueue(
             queue_name=dead_queue,
             envelope=QueueEnvelope(

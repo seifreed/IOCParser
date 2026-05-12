@@ -6,6 +6,7 @@ import threading
 from contextlib import redirect_stdout
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -172,6 +173,98 @@ def test_persist_results_continues_when_file_metadata_detection_fails(
 
     assert isinstance(run_id, int)
     assert db_path.exists()
+
+
+def test_persist_results_closes_owned_unit_of_work(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    created_units = []
+
+    class FakeUnitOfWork:
+        def __init__(self, db_uri: str) -> None:
+            self.db_uri = db_uri
+            self.closed = False
+            created_units.append(self)
+
+        def close(self) -> None:
+            self.closed = True
+
+    def fake_persist_run(_request, *, unit_of_work):
+        assert unit_of_work is created_units[0]
+        return SimpleNamespace(run_id=42)
+
+    monkeypatch.setattr(cli_output_rendering_module, "SQLAlchemyUnitOfWork", FakeUnitOfWork)
+    monkeypatch.setattr(cli_output_rendering_module, "persist_run_use_case", fake_persist_run)
+
+    run_id = persist_results(
+        PersistResultsRequest(
+            config=AppConfig(
+                persist=True,
+                db_uri=f"sqlite:///{tmp_path / 'owned.db'}",
+                config_path=None,
+            ),
+            source_kind="file",
+            source_value="sample.txt",
+            normal_iocs={"domains": ["example.com"]},
+            warning_iocs={},
+            options=PersistOptions(
+                defang=False,
+                check_warnings=False,
+                force_update=False,
+                output_format="json",
+            ),
+            tool_version="1.0.0",
+        )
+    )
+
+    assert run_id == 42
+    assert created_units[0].closed is True
+
+
+def test_persist_results_closes_owned_unit_of_work_on_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    created_units = []
+
+    class FakeUnitOfWork:
+        def __init__(self, db_uri: str) -> None:
+            self.db_uri = db_uri
+            self.closed = False
+            created_units.append(self)
+
+        def close(self) -> None:
+            self.closed = True
+
+    def raise_persist_error(_request, *, unit_of_work) -> None:
+        assert unit_of_work is created_units[0]
+        raise RuntimeError("persist failed")
+
+    monkeypatch.setattr(cli_output_rendering_module, "SQLAlchemyUnitOfWork", FakeUnitOfWork)
+    monkeypatch.setattr(cli_output_rendering_module, "persist_run_use_case", raise_persist_error)
+
+    with pytest.raises(RuntimeError, match="persist failed"):
+        persist_results(
+            PersistResultsRequest(
+                config=AppConfig(
+                    persist=True,
+                    db_uri=f"sqlite:///{tmp_path / 'owned-error.db'}",
+                    config_path=None,
+                ),
+                source_kind="file",
+                source_value="sample.txt",
+                normal_iocs={"domains": ["example.com"]},
+                warning_iocs={},
+                options=PersistOptions(
+                    defang=False,
+                    check_warnings=False,
+                    force_update=False,
+                    output_format="json",
+                ),
+                tool_version="1.0.0",
+            )
+        )
+
+    assert created_units[0].closed is True
 
 
 def test_save_output_stix_to_stdout() -> None:

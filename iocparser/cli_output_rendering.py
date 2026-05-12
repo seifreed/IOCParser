@@ -127,36 +127,50 @@ def persist_results_request(request: PersistResultsRequest) -> int | None:
         metadata.setdefault("original_url", request.source_value)
     original_url, normalized_url, mime_type, input_size = source_metadata_values(metadata)
     effective_run_metadata = dict(request.run_metadata or {})
-    persisted = persist_run_use_case(
-        PersistRunInput(
-            source=Source.from_raw(
-                request.source_kind,
-                request.source_value,
-                original_url=original_url,
-                normalized_url=normalized_url,
-                mime_type=mime_type,
-                input_size=input_size,
-                content_hash=str(metadata["content_hash"])
-                if metadata.get("content_hash")
-                else None,
-                fingerprint=str(metadata["fingerprint"]) if metadata.get("fingerprint") else None,
+    unit_of_work = SQLAlchemyUnitOfWork(request.config.db_uri)
+    try:
+        persisted = persist_run_use_case(
+            PersistRunInput(
+                source=Source.from_raw(
+                    request.source_kind,
+                    request.source_value,
+                    original_url=original_url,
+                    normalized_url=normalized_url,
+                    mime_type=mime_type,
+                    input_size=input_size,
+                    content_hash=str(metadata["content_hash"])
+                    if metadata.get("content_hash")
+                    else None,
+                    fingerprint=str(metadata["fingerprint"])
+                    if metadata.get("fingerprint")
+                    else None,
+                ),
+                result=ExtractionResult.from_grouped_payload(
+                    request.normal_iocs, request.warning_iocs
+                ),
+                tool_version=request.tool_version,
+                options=request.options,
+                duration_ms=optional_int_run_metadata_value(effective_run_metadata, "duration_ms"),
+                processed_items=int_run_metadata_value(
+                    effective_run_metadata, "processed_items", 1
+                ),
+                successful_items=int_run_metadata_value(
+                    effective_run_metadata, "successful_items", 1
+                ),
+                failed_items=int_run_metadata_value(effective_run_metadata, "failed_items", 0),
+                partial_error_count=int_run_metadata_value(
+                    effective_run_metadata, "partial_error_count", 0
+                ),
+                status=optional_str_run_metadata_value(effective_run_metadata, "status"),
+                error_message=optional_str_run_metadata_value(
+                    effective_run_metadata, "error_message"
+                )
+                or "",
             ),
-            result=ExtractionResult.from_grouped_payload(request.normal_iocs, request.warning_iocs),
-            tool_version=request.tool_version,
-            options=request.options,
-            duration_ms=optional_int_run_metadata_value(effective_run_metadata, "duration_ms"),
-            processed_items=int_run_metadata_value(effective_run_metadata, "processed_items", 1),
-            successful_items=int_run_metadata_value(effective_run_metadata, "successful_items", 1),
-            failed_items=int_run_metadata_value(effective_run_metadata, "failed_items", 0),
-            partial_error_count=int_run_metadata_value(
-                effective_run_metadata, "partial_error_count", 0
-            ),
-            status=optional_str_run_metadata_value(effective_run_metadata, "status"),
-            error_message=optional_str_run_metadata_value(effective_run_metadata, "error_message")
-            or "",
-        ),
-        unit_of_work=SQLAlchemyUnitOfWork(request.config.db_uri),
-    )
+            unit_of_work=unit_of_work,
+        )
+    finally:
+        unit_of_work.close()
     return persisted.run_id
 
 

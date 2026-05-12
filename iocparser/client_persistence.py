@@ -5,6 +5,7 @@ from typing import TypedDict, Unpack
 
 from iocparser.api_persistence_query import (
     optional_str,
+    validated_ioc_type_filter,
     validated_iso_datetime,
     validated_min_severity,
     validated_non_negative_int,
@@ -115,7 +116,7 @@ class PersistenceClient:
             date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
             source_kind=options.get("source_kind"),
             source_value=options.get("source_value"),
-            ioc_type=options.get("ioc_type"),
+            ioc_type=validated_ioc_type_filter(optional_str(options.get("ioc_type"))),
             severity=validated_severity_values(tuple(options.get("severity", ()))),
             tags=tuple(options.get("tags", ())),
             exclude_tags=tuple(options.get("exclude_tags", ())),

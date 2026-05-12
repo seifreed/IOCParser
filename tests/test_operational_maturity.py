@@ -324,6 +324,17 @@ def test_public_query_api_validates_dates_and_min_severity(tmp_path: Path) -> No
             severity="critical",
         )
 
+    with pytest.raises(ValidationError, match="Invalid ioc_type"):
+        query_persisted_iocs(db_uri=db_uri, value="alpha", ioc_type="bogus")
+
+    with pytest.raises(ValidationError, match="Invalid ioc_type"):
+        diff_persisted_runs(
+            db_uri=db_uri,
+            left_run_id=first_run_id,
+            right_run_id=second_run_id,
+            ioc_type="bogus",
+        )
+
     with pytest.raises(ValidationError, match="Invalid limit"):
         query_persisted_iocs(db_uri=db_uri, value="alpha", limit=-1)
 
@@ -369,6 +380,17 @@ def test_public_query_api_validates_dates_and_min_severity(tmp_path: Path) -> No
 
     normalized_page = query_persisted_iocs(db_uri=db_uri, value="alpha", severity="HIGH")
     assert normalized_page.total == 1
+    alias_page = query_persisted_iocs(db_uri=db_uri, value="alpha", ioc_type="domain")
+    assert alias_page.total == 1
+    alias_diff = diff_persisted_runs(
+        db_uri=db_uri,
+        left_run_id=first_run_id,
+        right_run_id=second_run_id,
+        ioc_type="domain",
+    )
+    assert alias_diff.added.total_count() == 1
+    assert alias_diff.removed.total_count() == 1
+    assert client.search_iocs(value="alpha", ioc_type="domain").items[0].value == "alpha.example"
 
 
 def test_direct_persistence_services_do_not_treat_negative_limits_as_unbounded(

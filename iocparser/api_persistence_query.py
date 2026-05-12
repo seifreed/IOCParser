@@ -24,12 +24,14 @@ from iocparser.domain.models import (
     DeadLetterRecord,
     DistributedJobRecord,
     ExtractionResult,
+    IOCType,
     PersistedIOCSearchPage,
     PersistedRunDiff,
     PersistedRunExport,
     PersistedRunQueryHit,
     PersistedRunsPage,
     PersistedRunSummary,
+    ioc_type_name,
 )
 from iocparser.errors import ValidationError
 from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
@@ -95,6 +97,7 @@ class PersistedDiffFilters(PersistedExportFilters):
 
 MISSING_DIFF_TARGET_ERROR = "Missing diff target"
 INVALID_DATE_ERROR = "Invalid ISO date: {value}"
+INVALID_IOC_TYPE_ERROR = "Invalid ioc_type: {value}"
 INVALID_SEVERITY_ERROR = "Invalid severity: {value}"
 INVALID_MIN_SEVERITY_ERROR = "Invalid min_severity: {value}"
 INVALID_TAG_MODE_ERROR = "Invalid tag_mode: {value}"
@@ -164,7 +167,7 @@ def search_input(value: str, options: SearchPersistedIOCOptions) -> SearchPersis
         date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
         source_kind=options.get("source_kind"),
         source_value=options.get("source_value"),
-        ioc_type=options.get("ioc_type"),
+        ioc_type=validated_ioc_type_filter(optional_str(options.get("ioc_type"))),
         severity=validated_severity_filters(options.get("severity")),
         tags=parse_string_filters(options.get("tag")),
         exclude_tags=parse_string_filters(options.get("exclude_tag")),
@@ -206,6 +209,27 @@ def validated_severity_filters(value: str | None) -> tuple[str, ...]:
         if candidate not in VALID_MIN_SEVERITIES:
             raise ValidationError(INVALID_SEVERITY_ERROR.format(value=severity))
         normalized.append(candidate)
+    return tuple(normalized)
+
+
+def validated_ioc_type_filter(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    if not normalized:
+        return None
+    try:
+        return ioc_type_name(IOCType.from_name(normalized))
+    except ValueError as exc:
+        raise ValidationError(INVALID_IOC_TYPE_ERROR.format(value=value)) from exc
+
+
+def validated_ioc_type_filters(value: str | None) -> tuple[str, ...]:
+    normalized: list[str] = []
+    for item in parse_string_filters(value):
+        ioc_type = validated_ioc_type_filter(item)
+        if ioc_type is not None:
+            normalized.append(ioc_type)
     return tuple(normalized)
 
 
@@ -293,7 +317,7 @@ def persisted_diff_input(
         only_added=diff_only == "added",
         only_removed=diff_only == "removed",
         only_warnings=bool_option(options.get("only_warnings")),
-        ioc_types=parse_string_filters(options.get("ioc_type")),
+        ioc_types=validated_ioc_type_filters(options.get("ioc_type")),
         severity=validated_severity_filters(options.get("severity")),
         tags=parse_string_filters(options.get("tag")),
     )
@@ -310,7 +334,7 @@ def latest_source_diff_input(
         only_added=diff_only == "added",
         only_removed=diff_only == "removed",
         only_warnings=bool_option(options.get("only_warnings")),
-        ioc_types=parse_string_filters(options.get("ioc_type")),
+        ioc_types=validated_ioc_type_filters(options.get("ioc_type")),
         severity=validated_severity_filters(options.get("severity")),
         tags=parse_string_filters(options.get("tag")),
     )

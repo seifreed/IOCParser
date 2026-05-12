@@ -80,6 +80,7 @@ jobs:
   test:
     runs-on: ${{ matrix.runs_on }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - runs_on: ubuntu-24.04
@@ -134,6 +135,7 @@ jobs:
         cache: pip
 
     - name: Install system dependencies
+      if: runner.os == 'Linux'
       run: |
         sudo apt-get update
         sudo apt-get install -y libmagic1

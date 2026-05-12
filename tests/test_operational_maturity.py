@@ -1334,6 +1334,28 @@ def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_pa
     assert invalid_fk_counts["runs"] == 0
     assert invalid_fk_counts["run_iocs"] == 0
     assert invalid_fk_counts["failed_batch_items"] == 0
+    invalid_int_counts = import_history_raw(
+        db_uri,
+        {
+            "batch_jobs": [
+                {
+                    "id": 99,
+                    "source_kind": "url",
+                    "started_at": "2026-01-01T00:00:00",
+                    "finished_at": "2026-01-01T00:00:00",
+                    "total_inputs": "bad",
+                    "successful_inputs": True,
+                    "failed_inputs": "bad",
+                    "retry_attempt": "bad",
+                    "status": "success",
+                    "config_json": "{}",
+                    "error_summary_json": "{}",
+                    "metrics_json": "{}",
+                }
+            ],
+        },
+    )
+    assert invalid_int_counts["batch_jobs"] == 1
 
     batch_job_id = persist_batch_job(
         {

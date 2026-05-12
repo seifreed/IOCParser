@@ -15,7 +15,11 @@ from sqlalchemy.orm import Session
 from iocparser.domain.jobs import BatchJobDetail, BatchJobSummary, FailedBatchItem
 from iocparser.domain.models import PersistedRunSummary
 from iocparser.domain.sources import normalize_url_value
-from iocparser.infrastructure.persistence.history.row_values import bool_from_row, int_from_row
+from iocparser.infrastructure.persistence.history.row_values import (
+    bool_from_row,
+    int_from_row,
+    typed_row,
+)
 from iocparser.infrastructure.persistence_batch import (
     BatchJobModel,
     FailedBatchItemModel,
@@ -191,14 +195,7 @@ def _payload_rows(payload: dict[str, object], key: str) -> list[dict[str, object
 
 
 def _typed_row(row: dict[str, object]) -> dict[str, object]:
-    row_dict = dict(row)
-    for key, value in list(row_dict.items()):
-        if isinstance(value, str) and key.endswith(("_at", "_seen")) and value:
-            try:
-                row_dict[key] = datetime.fromisoformat(value)
-            except (ValueError, TypeError):
-                pass
-    return row_dict
+    return typed_row(row)
 
 
 def _source_identity(row: dict[str, object]) -> tuple[object, ...]:

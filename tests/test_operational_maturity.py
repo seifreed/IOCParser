@@ -1564,6 +1564,38 @@ def test_import_history_keeps_distinct_runs_with_same_metadata_but_different_ioc
     assert exported_values == {("alpha.example",), ("beta.example",)}
 
 
+def test_import_history_same_origin_accepts_string_run_ioc_foreign_keys(
+    tmp_path: Path,
+) -> None:
+    db_uri = f"sqlite:///{tmp_path / 'history-string-run-ioc-fks.sqlite'}"
+    persist_results(
+        PersistResultsRequest(
+            config=load_config(True, db_uri, None),
+            source_kind="file",
+            source_value="same-origin.txt",
+            normal_iocs={"domains": ["alpha.example"]},
+            warning_iocs={},
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
+            tool_version="5.0.0",
+            run_metadata={"duration_ms": 10},
+        )
+    )
+    payload = export_persisted_history(db_uri=db_uri)
+    run_ioc_rows = payload["run_iocs"]
+    assert isinstance(run_ioc_rows, list)
+    for row in run_ioc_rows:
+        assert isinstance(row, dict)
+        row["run_id"] = str(row["run_id"])
+        row["ioc_id"] = str(row["ioc_id"])
+
+    counts = import_history_raw(db_uri, payload)
+
+    assert counts["runs"] == 0
+    assert counts["run_iocs"] == 0
+
+
 def test_import_history_keeps_distinct_runs_with_same_iocs_but_different_run_ioc_metadata(
     tmp_path: Path,
 ) -> None:

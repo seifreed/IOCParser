@@ -679,8 +679,9 @@ def _import_runs(
     run_map: dict[int, int] = {}
     imported_signatures: dict[int, list[tuple[int, str, str, str]]] = {}
     for run_ioc_row in run_ioc_rows:
-        original_run_id = run_ioc_row.get("run_id")
-        original_ioc_id = run_ioc_row.get("ioc_id")
+        typed_run_ioc = _typed_row(run_ioc_row)
+        original_run_id = typed_run_ioc.get("run_id")
+        original_ioc_id = typed_run_ioc.get("ioc_id")
         if not isinstance(original_run_id, int) or not isinstance(original_ioc_id, int):
             continue
         mapped_ioc_id = ioc_map.get(original_ioc_id)
@@ -690,9 +691,9 @@ def _import_runs(
         imported_signatures[original_run_id].append(
             (
                 mapped_ioc_id,
-                str(run_ioc_row.get("severity", "")),
-                str(run_ioc_row.get("tags_json", "[]")),
-                str(run_ioc_row.get("evidence_json", "[]")),
+                str(typed_run_ioc.get("severity", "")),
+                str(typed_run_ioc.get("tags_json", "[]")),
+                str(typed_run_ioc.get("evidence_json", "[]")),
             )
         )
     for row in rows:

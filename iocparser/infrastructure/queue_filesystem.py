@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 from pathlib import Path
 from typing import cast
 from uuid import uuid4
 
 from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
+
+INVALID_QUEUE_NAME_ERROR = "Invalid queue name"
 
 
 def _load_queue_record(payload: str) -> dict[str, object]:
@@ -20,6 +23,18 @@ def _queue_payload_type_error() -> TypeError:
     return TypeError("Queue payload must be a JSON object")
 
 
+def _safe_filename_component(value: object) -> str:
+    normalized = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(value)).strip("._")
+    return normalized or str(uuid4())
+
+
+def _validate_queue_name(queue_name: str) -> None:
+    if not queue_name or Path(queue_name).is_absolute() or "/" in queue_name or "\\" in queue_name:
+        raise ValueError(INVALID_QUEUE_NAME_ERROR)
+    if any(part in {"", ".", ".."} for part in Path(queue_name).parts):
+        raise ValueError(INVALID_QUEUE_NAME_ERROR)
+
+
 class FilesystemQueueAdapter:
     """Simple filesystem-backed queue for local staging and test environments."""
 
@@ -31,7 +46,7 @@ class FilesystemQueueAdapter:
     def enqueue(self, *, queue_name: str, envelope: QueueEnvelope) -> QueueReceipt:
         message_id = envelope.request.job_id or str(uuid4())
         queue_dir = self._queue_dir(queue_name, "pending")
-        receipt_path = queue_dir / f"{message_id}-{uuid4().hex}.json"
+        receipt_path = queue_dir / f"{_safe_filename_component(message_id)}-{uuid4().hex}.json"
         receipt_path.write_text(json.dumps(envelope.to_record(), sort_keys=True), encoding="utf-8")
         return QueueReceipt(
             queue_backend="filesystem",
@@ -69,7 +84,8 @@ class FilesystemQueueAdapter:
     def requeue(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
         queue_dir = self._queue_dir(receipt.queue_name, "pending")
         temp_path = queue_dir / f"tmp-{uuid4().hex}.json"
-        new_path = queue_dir / f"{envelope.request.job_id or uuid4()}-{uuid4().hex}.json"
+        message_name = _safe_filename_component(envelope.request.job_id or uuid4())
+        new_path = queue_dir / f"{message_name}-{uuid4().hex}.json"
         temp_path.write_text(json.dumps(envelope.to_record(), sort_keys=True), encoding="utf-8")
         temp_path.rename(new_path)
         processing_path = Path(receipt.receipt_id)
@@ -103,6 +119,7 @@ class FilesystemQueueAdapter:
         return len(list(self._queue_dir(queue_name, "dead").glob("*.json")))
 
     def _queue_dir(self, queue_name: str, state: str) -> Path:
+        _validate_queue_name(queue_name)
         path = self.root_dir / queue_name / state
         path.mkdir(parents=True, exist_ok=True)
         return path

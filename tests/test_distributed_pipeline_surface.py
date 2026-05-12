@@ -175,6 +175,21 @@ def test_filesystem_queue_empty_and_race_branch(tmp_path: Path) -> None:
         Path.rename = original_rename  # type: ignore[assignment]
 
 
+def test_filesystem_queue_rejects_path_traversal_components(tmp_path: Path) -> None:
+    adapter = FilesystemQueueAdapter(tmp_path / "queue")
+    envelope = _envelope("../escape-job")
+
+    with pytest.raises(ValueError, match="queue name"):
+        adapter.enqueue(queue_name="../escape", envelope=envelope)
+
+    receipt = adapter.enqueue(queue_name="safe", envelope=envelope)
+    receipt_path = Path(receipt.receipt_id).resolve()
+    pending_dir = (tmp_path / "queue" / "safe" / "pending").resolve()
+    assert receipt_path.parent == pending_dir
+    assert ".." not in receipt_path.name
+    assert adapter.pending_count(queue_name="safe") == 1
+
+
 def test_distributed_pipeline_without_database_covers_empty_and_retry_paths(tmp_path: Path) -> None:
     queue = FilesystemQueueAdapter(tmp_path / "queue")
     service = DistributedPipelineService(queue_adapter=queue)

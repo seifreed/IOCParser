@@ -585,7 +585,10 @@ def test_queue_factory_and_optional_queue_adapters() -> None:
         assert item is not None
         sqs.ack(item[0])
         sqs.requeue(receipt, envelope=envelope)
-        sqs.dead_letter(receipt, envelope=envelope)
+        dead_receipt = sqs.dead_letter(receipt, envelope=envelope)
+        assert dead_receipt.queue_name == "ignored.dead"
+        assert sqs._resolve_queue_url(dead_receipt.queue_name) == "https://sqs.example/jobs-dead"
+        assert len(sqs.client.queues["https://sqs.example/jobs-dead"]) == 1
 
     with installed_module("celery", FakeCeleryModule()):
         celery = create_queue_adapter("celery", queue_url="redis://localhost/0")

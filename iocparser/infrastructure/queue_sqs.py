@@ -145,6 +145,8 @@ class SQSQueueAdapter:
                     "queue which would cause an infinite processing loop. Set dead_letter_queue_url."
                 )
             target_queue = self.dead_letter_queue_url
+            dead_queue_name = f"{receipt.queue_name}.dead"
+            self._queue_urls[dead_queue_name] = target_queue
             response = self.client.send_message(
                 QueueUrl=target_queue,
                 MessageBody=json.dumps(envelope.to_record(), sort_keys=True),
@@ -152,4 +154,4 @@ class SQSQueueAdapter:
             message_id = str(response["MessageId"])
             resolved_url = self._resolve_queue_url(receipt.queue_name)
             self.client.delete_message(QueueUrl=resolved_url, ReceiptHandle=receipt.receipt_id)
-            return QueueReceipt("sqs", target_queue, message_id, message_id)
+            return QueueReceipt("sqs", dead_queue_name, message_id, message_id)

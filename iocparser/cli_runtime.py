@@ -86,7 +86,7 @@ def _optional_float_arg(args: argparse.Namespace, name: str) -> float | None:
     if value is None:
         return None
     if isinstance(value, bool):
-        return float(value)
+        raise _unsupported_float_argument_type(name, value)
     if isinstance(value, (int, float)):
         return float(value)
     if isinstance(value, str):

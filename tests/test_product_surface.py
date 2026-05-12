@@ -154,6 +154,9 @@ def test_persisted_option_overrides_parse_bool_strings() -> None:
     assert diff_filters.only_warnings is False
     assert diff_filters.only_normal is False
 
+    with pytest.raises(ValidationError, match="Invalid boolean option"):
+        coerce_render_options(None, {"with_context": "maybe"})
+
 
 def test_batch_report_item_parses_retryable_bool_strings() -> None:
     disabled = _report_item({"url": "https://a.example", "retryable": "false"})

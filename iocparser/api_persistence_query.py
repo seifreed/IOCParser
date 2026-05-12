@@ -102,6 +102,7 @@ INVALID_SEARCH_BACKEND_ERROR = "Invalid search_backend: {value}"
 INVALID_DIFF_ONLY_ERROR = "Invalid diff_only: {value}"
 INVALID_LIMIT_ERROR = "Invalid limit: {value}"
 INVALID_OFFSET_ERROR = "Invalid offset: {value}"
+INVALID_BOOLEAN_ERROR = "Invalid boolean option: {value}"
 VALID_MIN_SEVERITIES = {"informational", "low", "medium", "high"}
 VALID_TAG_MODES = {"all", "any"}
 VALID_RUN_SORT_VALUES = {"newest", "oldest", "source"}
@@ -130,6 +131,7 @@ def bool_option(value: object | None, default: bool = False) -> bool:
             return False
         if normalized in {"1", "true", "yes", "on"}:
             return True
+        raise ValidationError(INVALID_BOOLEAN_ERROR.format(value=value))
     return bool(value)
 
 

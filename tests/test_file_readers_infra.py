@@ -68,3 +68,43 @@ def test_detect_file_type_falls_back_when_magic_module_unavailable(
     monkeypatch.setattr(file_readers_module, "_MAGIC_MODULE", None)
 
     assert MagicTextSourceReader().detect_file_type(sample) == "html"
+
+
+def test_detect_file_type_uses_magic_instance_and_mime(monkeypatch, tmp_path: Path) -> None:
+    class FakeMagic:
+        def __init__(self, *, mime: bool) -> None:
+            self.mime = mime
+
+        def from_file(self, path: str) -> str:
+            assert path == str(sample)
+            return "application/pdf"
+
+    sample = tmp_path / "sample.bin"
+    sample.write_text("not a pdf, just exercising magic", encoding="utf-8")
+    monkeypatch.setattr(file_readers_module, "_MAGIC_MODULE", SimpleNamespace(Magic=FakeMagic))
+    reader = MagicTextSourceReader()
+    reader._magic_local = SimpleNamespace()
+
+    assert reader.detect_file_type(sample) == "pdf"
+    assert reader._magic_local.instance.mime is True
+    assert reader._magic() is reader._magic_local.instance
+
+
+def test_detect_file_type_prefers_html_extension_for_text_plain_magic(
+    monkeypatch, tmp_path: Path
+) -> None:
+    class FakeMagic:
+        def __init__(self, *, mime: bool) -> None:
+            assert mime is True
+
+        def from_file(self, path: str) -> str:
+            assert path == str(sample)
+            return "text/plain"
+
+    sample = tmp_path / "sample.html"
+    sample.write_text("plain text saved as html", encoding="utf-8")
+    monkeypatch.setattr(file_readers_module, "_MAGIC_MODULE", SimpleNamespace(Magic=FakeMagic))
+    reader = MagicTextSourceReader()
+    reader._magic_local = SimpleNamespace()
+
+    assert reader.detect_file_type(sample) == "html"

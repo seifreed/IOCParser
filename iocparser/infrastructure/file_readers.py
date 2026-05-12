@@ -106,16 +106,16 @@ class MagicTextSourceReader(TextSourceReader):
         try:
             mime = self._magic()
             file_type = str(mime.from_file(str(file_path)))
-            detected = self.detect_file_type_by_mime(file_type)
-            if detected:
-                return detected
-
             if "text/plain" in file_type.lower() and file_path.suffix.lower() in {
                 ".html",
                 ".htm",
                 ".xml",
             }:
                 return "html"
+
+            detected = self.detect_file_type_by_mime(file_type)
+            if detected:
+                return detected
         except (OSError, ValueError, MagicExceptionType) as exc:
             logger.warning("Error detecting file type: %s, falling back to extension", exc)
         return self.detect_file_type_by_extension(file_path)

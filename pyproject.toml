@@ -79,6 +79,7 @@ iocparser-worker = "iocparser.worker_main:main"
 
 [tool.setuptools.packages.find]
 include = ["iocparser*"]
+exclude = ["iocparser.modules", "iocparser.modules.*"]
 
 [tool.setuptools.package-data]
 iocparser = [

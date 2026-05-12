@@ -22,18 +22,34 @@ def int_metadata_value(metadata: dict[str, int | str | None], key: str, default:
     raw_value = metadata.get(key)
     if raw_value is None:
         return default
+    if isinstance(raw_value, bool):
+        return default
     if isinstance(raw_value, int):
         return raw_value
-    return int(raw_value)
+    stripped = raw_value.strip()
+    if not stripped:
+        return default
+    try:
+        return int(stripped)
+    except ValueError:
+        return default
 
 
 def optional_int_metadata_value(metadata: dict[str, int | str | None], key: str) -> int | None:
     raw_value = metadata.get(key)
     if raw_value is None:
         return None
+    if isinstance(raw_value, bool):
+        return None
     if isinstance(raw_value, int):
         return raw_value
-    return int(raw_value)
+    stripped = raw_value.strip()
+    if not stripped:
+        return None
+    try:
+        return int(stripped)
+    except ValueError:
+        return None
 
 
 def string_metadata_value(metadata: dict[str, int | str | None], key: str, default: str) -> str:

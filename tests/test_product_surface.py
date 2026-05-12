@@ -430,6 +430,38 @@ def test_diff_previous_source_skips_partial_prior_runs(tmp_path: Path) -> None:
     assert exported.result.grouped_iocs() == {"domains": ["alpha.example"]}
 
 
+def test_persist_results_defaults_invalid_numeric_run_metadata(tmp_path: Path) -> None:
+    db_uri = f"sqlite:///{tmp_path / 'invalid-run-metadata.sqlite'}"
+    config = load_config(cli_persist=True, cli_db_uri=db_uri, cli_config_path=None)
+    run_id = persist_results(
+        PersistResultsRequest(
+            config=config,
+            source_kind="file",
+            source_value="invalid-metadata.txt",
+            normal_iocs={"domains": ["bad-metadata.example"]},
+            warning_iocs={},
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
+            tool_version="5.0.0",
+            source_metadata={"input_size": True},
+            run_metadata={
+                "failed_items": True,
+                "partial_error_count": "bad",
+                "successful_items": "bad",
+            },
+        )
+    )
+
+    assert run_id is not None
+    runs = query_persisted_runs(db_uri=db_uri, limit=10)
+    assert runs.items[0].failed_items == 0
+    assert runs.items[0].partial_error_count == 0
+    assert runs.items[0].successful_items == 1
+    exported = export_persisted_run(db_uri=db_uri, run_id=run_id)
+    assert exported.summary.input_size is None
+
+
 def test_url_batch_preserves_duplicate_inputs_through_report_and_persistence(
     tmp_path: Path,
 ) -> None:

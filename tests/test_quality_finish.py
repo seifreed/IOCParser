@@ -376,6 +376,10 @@ def test_persistence_helper_functions_cover_conversion_edges() -> None:
     assert _int_report_value({"count": "4"}, "count") == 4
     assert _int_report_value({"count": True}, "count", default=7) == 7
     assert _int_report_value({"count": "bad"}, "count", default=7) == 7
+    assert _int_metadata_value({"count": True}, "count", 7) == 7
+    assert _int_metadata_value({"count": "bad"}, "count", 7) == 7
+    assert _optional_int_metadata_value({"count": True}, "count") is None
+    assert _optional_int_metadata_value({"count": "bad"}, "count") is None
     assert _failed_items("bad") == []
     with pytest.raises(TypeError):
         _int_report_value({"count": []}, "count")

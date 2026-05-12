@@ -71,7 +71,7 @@ def source_metadata_values(
         str(original_url) if isinstance(original_url, str) and original_url else None,
         str(normalized_url) if isinstance(normalized_url, str) and normalized_url else None,
         str(mime_type) if isinstance(mime_type, str) and mime_type else None,
-        input_size if isinstance(input_size, int) else None,
+        input_size if isinstance(input_size, int) and not isinstance(input_size, bool) else None,
     )
 
 
@@ -81,9 +81,17 @@ def int_run_metadata_value(
     raw_value = run_metadata.get(key)
     if raw_value is None:
         return default
+    if isinstance(raw_value, bool):
+        return default
     if isinstance(raw_value, int):
         return raw_value
-    return int(raw_value)
+    stripped = raw_value.strip()
+    if not stripped:
+        return default
+    try:
+        return int(stripped)
+    except ValueError:
+        return default
 
 
 def optional_int_run_metadata_value(
@@ -92,9 +100,17 @@ def optional_int_run_metadata_value(
     raw_value = run_metadata.get(key)
     if raw_value is None:
         return None
+    if isinstance(raw_value, bool):
+        return None
     if isinstance(raw_value, int):
         return raw_value
-    return int(raw_value)
+    stripped = raw_value.strip()
+    if not stripped:
+        return None
+    try:
+        return int(stripped)
+    except ValueError:
+        return None
 
 
 def optional_str_run_metadata_value(

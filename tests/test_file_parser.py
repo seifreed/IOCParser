@@ -22,6 +22,7 @@ import pytest
 
 from iocparser.errors import (
     FileExistenceError,
+    FileSizeError,
     HTMLProcessingError,
     PDFProcessingError,
     UnsupportedFileTypeError,
@@ -32,6 +33,7 @@ from iocparser.infrastructure.file_parser import (
     PDFParser,
     get_parser,
 )
+from iocparser.infrastructure.http_download import MAX_URL_SIZE
 
 
 def create_minimal_pdf(pdf_path: Path, text_content: str) -> None:
@@ -700,11 +702,17 @@ class TestHTMLParserURLFetching:
 
     class _LocalHTTPServer:
         def __init__(
-            self, *, body: bytes, status: int = 200, content_type: str = "text/html"
+            self,
+            *,
+            body: bytes,
+            status: int = 200,
+            content_type: str = "text/html",
+            content_length: str | None = None,
         ) -> None:
             self.body = body
             self.status = status
             self.content_type = content_type
+            self.content_length = content_length
             self.server: ThreadingHTTPServer | None = None
             self.thread: threading.Thread | None = None
 
@@ -712,12 +720,14 @@ class TestHTMLParserURLFetching:
             body = self.body
             status = self.status
             content_type = self.content_type
+            content_length = self.content_length
 
             class Handler(BaseHTTPRequestHandler):
                 def do_GET(self) -> None:
                     self.send_response(status)
                     self.send_header("Content-Type", content_type)
-                    self.send_header("Content-Length", str(len(body)))
+                    header_value = content_length if content_length is not None else str(len(body))
+                    self.send_header("Content-Length", header_value)
                     self.end_headers()
                     self.wfile.write(body)
 
@@ -790,6 +800,21 @@ class TestHTMLParserURLFetching:
         parser = HTMLParser("http://127.0.0.1:9/unreachable")
         with pytest.raises(URLAccessError):
             parser.extract_text()
+
+    def test_remote_file_parsers_reject_oversized_content_length(self) -> None:
+        oversized_length = str(MAX_URL_SIZE + 1)
+
+        with self._LocalHTTPServer(body=b"", content_length=oversized_length) as test_url:
+            with pytest.raises(FileSizeError):
+                HTMLParser(test_url).extract_text()
+
+        with self._LocalHTTPServer(
+            body=b"",
+            content_type="application/pdf",
+            content_length=oversized_length,
+        ) as test_url:
+            with pytest.raises(FileSizeError):
+                get_parser(f"{test_url}.pdf").extract_text()
 
     def test_pdf_parser_extracts_remote_pdf_url(self, tmp_path: Path) -> None:
         pdf_path = tmp_path / "remote.pdf"

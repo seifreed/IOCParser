@@ -9,19 +9,23 @@ Author: Marc Rivero | @seifreed
 import re
 import urllib.parse
 from abc import ABC, abstractmethod
-from io import BytesIO
+from collections.abc import Iterator
+from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any
 
 import pdfplumber
-import requests
 from bs4 import BeautifulSoup
 from pdfplumber.utils.exceptions import PdfminerException
 from tqdm import tqdm
 
 from iocparser.errors import (
+    DownloadError,
     FileExistenceError,
     HTMLProcessingError,
+    InvalidURLError,
+    IOCParserError,
+    IOCTimeoutError,
     PDFProcessingError,
     UnsupportedFileTypeError,
     URLAccessError,
@@ -32,6 +36,33 @@ from iocparser.infrastructure.logger import get_logger
 MAX_URL_CONTENT_LINES = 5
 
 logger = get_logger(__name__)
+
+
+def _is_remote_source(file_path: str) -> bool:
+    return file_path.startswith(("http://", "https://"))
+
+
+def _download_remote_source(file_path: str) -> Path:
+    from iocparser.infrastructure.http_download import RequestsURLDownloader
+
+    try:
+        return Path(RequestsURLDownloader().download(file_path))
+    except (DownloadError, InvalidURLError, IOCTimeoutError) as exc:
+        raise URLAccessError(str(exc)) from exc
+
+
+@contextmanager
+def _local_parse_path(file_path: str) -> Iterator[str]:
+    if not _is_remote_source(file_path):
+        yield file_path
+        return
+
+    temp_path = _download_remote_source(file_path)
+    try:
+        yield str(temp_path)
+    finally:
+        with suppress(OSError):
+            temp_path.unlink(missing_ok=True)
 
 
 class FileParser(ABC):
@@ -47,7 +78,7 @@ class FileParser(ABC):
         self.file_path = file_path
 
         # Verify the file exists if it's not a URL
-        if not file_path.startswith(("http://", "https://")) and not Path(self.file_path).is_file():
+        if not _is_remote_source(file_path) and not Path(self.file_path).is_file():
             raise FileExistenceError(self.file_path)
 
     @abstractmethod
@@ -91,17 +122,11 @@ class PDFParser(FileParser):
         text_content = ""
 
         try:
-            if self.file_path.startswith(("http://", "https://")):
-                with requests.get(self.file_path, timeout=30, stream=True) as response:
-                    response.raise_for_status()
-                    with pdfplumber.open(BytesIO(response.content)) as pdf:
-                        text_content = self._extract_pdf_text(pdf)
-            else:
-                with pdfplumber.open(self.file_path) as pdf:
-                    text_content = self._extract_pdf_text(pdf)
-
-        except requests.exceptions.RequestException as exc:
-            raise URLAccessError(str(exc)) from exc
+            with (
+                _local_parse_path(self.file_path) as parse_path,
+                pdfplumber.open(parse_path) as pdf,
+            ):
+                text_content = self._extract_pdf_text(pdf)
         except (OSError, ValueError, PdfminerException) as exc:
             raise PDFProcessingError(str(exc)) from exc
 
@@ -137,14 +162,11 @@ class HTMLParser(FileParser):
         logger.info("Extracting text from HTML: %s", self.file_path)
 
         try:
-            # Check if it's a URL or a local file
-            if self.file_path.startswith(("http://", "https://")):
-                with requests.get(self.file_path, timeout=30, stream=True) as response:
-                    response.raise_for_status()  # Ensure request was successful
-                    content = response.text
-            else:
-                with Path(self.file_path).open(encoding="utf-8", errors="ignore") as f:
-                    content = f.read()
+            with (
+                _local_parse_path(self.file_path) as parse_path,
+                Path(parse_path).open(encoding="utf-8", errors="ignore") as f,
+            ):
+                content = f.read()
 
             # Check if the content looks like a URL instead of HTML
             content_starts_with_url = content.strip().startswith(
@@ -168,8 +190,8 @@ class HTMLParser(FileParser):
             # Clean multiple whitespaces and return
             return re.sub(r"\s+", " ", text)
 
-        except requests.exceptions.RequestException as exc:
-            raise URLAccessError(str(exc)) from exc
+        except IOCParserError:
+            raise
         except Exception as exc:
             raise HTMLProcessingError(str(exc)) from exc
 
@@ -183,7 +205,7 @@ EXTENSION_PARSERS: dict[str, type[FileParser]] = {
 
 
 def _parser_suffix(file_path: str) -> str:
-    if file_path.startswith(("http://", "https://")):
+    if _is_remote_source(file_path):
         return Path(urllib.parse.urlparse(file_path).path).suffix.lower()
     return Path(file_path).suffix.lower()
 
@@ -204,7 +226,7 @@ def get_parser(file_path: str) -> FileParser:
         return parser_class(file_path)
 
     # For URLs without recognized extension, default to HTML
-    if file_path.startswith(("http://", "https://")):
+    if _is_remote_source(file_path):
         return HTMLParser(file_path)
 
     raise UnsupportedFileTypeError(file_path)

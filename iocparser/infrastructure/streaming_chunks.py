@@ -48,4 +48,4 @@ def read_chunks_with_prefix(
             progress_callback(min(100, int((bytes_read / total_size) * 100)))
 
         yield chunk, prefix_length
-        previous_chunk_tail = chunk[-overlap:] if len(chunk) > overlap else chunk
+        previous_chunk_tail = chunk[-overlap:] if overlap > 0 else ""

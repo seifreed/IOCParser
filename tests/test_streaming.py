@@ -313,6 +313,13 @@ class TestStreamingIOCExtractor:
         assert "evil.com" in full_text
         assert "bad.org" in full_text
 
+    def test_read_chunks_with_zero_overlap(self):
+        extractor = StreamingIOCExtractor(chunk_size=3, overlap=0)
+
+        chunks = list(extractor._read_chunks_with_prefix(io.StringIO("abcdef"), is_text=True))
+
+        assert chunks == [("abc", 0), ("def", 0)]
+
     def test_read_chunks_binary_stream(self):
         """
         Test chunk reading from binary stream.

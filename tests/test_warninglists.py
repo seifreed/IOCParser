@@ -777,6 +777,14 @@ class TestWarningListsHelperFunctions:
         domain = warning_lists._extract_domain_from_url("https://example.com/path")
         assert domain == "example.com"
 
+        # Test URL with user info
+        domain = warning_lists._extract_domain_from_url("https://user:pass@example.com/path")
+        assert domain == "example.com"
+
+        # Test bracketed IPv6 host
+        domain = warning_lists._extract_domain_from_url("https://[2001:db8::1]:443/path")
+        assert domain == "2001:db8::1"
+
         # Test invalid URL
         domain = warning_lists._extract_domain_from_url("not-a-url")
         assert domain is None

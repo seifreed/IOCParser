@@ -265,9 +265,7 @@ class WarningListMatchingMixin:
         except ValueError:
             self._get_logger().debug("Failed to parse URL for domain extraction: %s", url)
             return None
-        if parsed.netloc:
-            return parsed.netloc.split(":", 1)[0]
-        return None
+        return parsed.hostname
 
     def _is_list_applicable(
         self,

@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from iocparser.domain.jobs import BatchJobDetail, BatchJobSummary, FailedBatchItem
 from iocparser.domain.models import PersistedRunSummary
 from iocparser.domain.sources import normalize_url_value
-from iocparser.infrastructure.persistence.history.row_values import bool_from_row
+from iocparser.infrastructure.persistence.history.row_values import bool_from_row, int_from_row
 from iocparser.infrastructure.persistence_batch import (
     BatchJobModel,
     FailedBatchItemModel,
@@ -700,7 +700,7 @@ def _import_runs(
         )
     for row in rows:
         typed = _typed_row(row)
-        source_id = source_map.get(int(typed.get("source_id", 0)))  # type: ignore[call-overload]
+        source_id = source_map.get(int_from_row(typed.get("source_id"), default=0) or 0)
         if source_id is None:
             continue
         original_batch_id = typed.get("batch_job_id")
@@ -762,8 +762,8 @@ def _import_run_iocs(
     inserted = 0
     for row in rows:
         typed = _typed_row(row)
-        run_id = run_map.get(int(typed.get("run_id", 0)))  # type: ignore[call-overload]
-        ioc_id = ioc_map.get(int(typed.get("ioc_id", 0)))  # type: ignore[call-overload]
+        run_id = run_map.get(int_from_row(typed.get("run_id"), default=0) or 0)
+        ioc_id = ioc_map.get(int_from_row(typed.get("ioc_id"), default=0) or 0)
         if run_id is None or ioc_id is None:
             continue
         if _existing_run_ioc(session, run_id=run_id, ioc_id=ioc_id) is not None:
@@ -793,7 +793,7 @@ def _import_failed_batch_items(
     seen_signatures: dict[tuple[int, str, str, str, int, object], int] = {}
     for row in rows:
         typed = _typed_row(row)
-        batch_job_id = batch_map.get(int(typed.get("batch_job_id", 0)))  # type: ignore[call-overload]
+        batch_job_id = batch_map.get(int_from_row(typed.get("batch_job_id"), default=0) or 0)
         if batch_job_id is None:
             continue
         signature = (
@@ -801,7 +801,7 @@ def _import_failed_batch_items(
             str(typed.get("source_value", "")),
             str(typed.get("error_type", "")),
             str(typed.get("error_message", "")),
-            int(typed.get("retry_attempt", 0)),  # type: ignore[call-overload]
+            int_from_row(typed.get("retry_attempt"), default=0) or 0,
             typed.get("created_at"),
         )
         existing_matches = (

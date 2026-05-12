@@ -1323,6 +1323,17 @@ def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_pa
     db_uri = f"sqlite:///{tmp_path / 'entry.sqlite'}"
     assert import_history_raw(db_uri, {"sources": "bad"})["sources"] == 0
     assert import_history_raw(db_uri, {"sources": [1]})["sources"] == 0
+    invalid_fk_counts = import_history_raw(
+        db_uri,
+        {
+            "runs": [{"id": 1, "source_id": "bad"}],
+            "run_iocs": [{"run_id": "bad", "ioc_id": "bad"}],
+            "failed_batch_items": [{"batch_job_id": "bad"}],
+        },
+    )
+    assert invalid_fk_counts["runs"] == 0
+    assert invalid_fk_counts["run_iocs"] == 0
+    assert invalid_fk_counts["failed_batch_items"] == 0
 
     batch_job_id = persist_batch_job(
         {

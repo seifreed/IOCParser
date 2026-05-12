@@ -48,6 +48,12 @@ class WorkerServiceConfig:
         """Load worker runtime settings from INI config plus environment overrides."""
         resolved_path = resolve_config_path(config_path)
         file_values = load_worker_file_values(resolved_path)
+        poll_interval_default = float_or(file_values["poll_interval_seconds"], 1.0)
+        poll_interval_seconds = float_env(
+            "IOCPARSER_WORKER_POLL_INTERVAL_SECONDS", poll_interval_default
+        )
+        if poll_interval_seconds is None:
+            poll_interval_seconds = poll_interval_default
         return cls(
             queue_backend=os.environ.get(
                 "IOCPARSER_WORKER_QUEUE_BACKEND", str(file_values["queue_backend"])
@@ -63,11 +69,7 @@ class WorkerServiceConfig:
             dead_letter_queue_url=os.environ.get("IOCPARSER_WORKER_DEAD_LETTER_QUEUE_URL")
             or str_or_none(file_values["dead_letter_queue_url"]),
             db_uri=os.environ.get("IOCPARSER_WORKER_DB_URI") or str_or_none(file_values["db_uri"]),
-            poll_interval_seconds=float_env(
-                "IOCPARSER_WORKER_POLL_INTERVAL_SECONDS",
-                float_or(file_values["poll_interval_seconds"], 1.0),
-            )
-            or 1.0,
+            poll_interval_seconds=poll_interval_seconds,
             max_messages_per_cycle=int_env(
                 "IOCPARSER_WORKER_MAX_MESSAGES_PER_CYCLE",
                 int_or(file_values["max_messages_per_cycle"], 1),

@@ -106,6 +106,17 @@ max_input_seconds = 2.5
     assert config.skip_processed is True
 
 
+def test_worker_config_preserves_zero_poll_interval(tmp_path: Path) -> None:
+    with _Env(IOCPARSER_WORKER_POLL_INTERVAL_SECONDS="0"):
+        env_config = WorkerServiceConfig.from_sources()
+    assert env_config.poll_interval_seconds == 0.0
+
+    config_path = tmp_path / "iocparser.ini"
+    config_path.write_text("[worker]\npoll_interval_seconds = 0\n", encoding="utf-8")
+    file_config = WorkerServiceConfig.from_sources(str(config_path))
+    assert file_config.poll_interval_seconds == 0.0
+
+
 def test_worker_config_uses_default_ini_path(tmp_path: Path) -> None:
     config_path = tmp_path / "iocparser.ini"
     config_path.write_text(

@@ -791,6 +791,19 @@ class TestHTMLParserURLFetching:
         with pytest.raises(URLAccessError):
             parser.extract_text()
 
+    def test_pdf_parser_extracts_remote_pdf_url(self, tmp_path: Path) -> None:
+        pdf_path = tmp_path / "remote.pdf"
+        create_minimal_pdf(pdf_path, "Remote PDF IOC 198.51.100.42")
+
+        with self._LocalHTTPServer(
+            body=pdf_path.read_bytes(), content_type="application/pdf"
+        ) as test_url:
+            parser = get_parser(f"{test_url}.PDF?download=1")
+            extracted_text = parser.extract_text()
+
+        assert isinstance(parser, PDFParser)
+        assert "198.51.100.42" in extracted_text
+
 
 class TestHTMLParserErrorHandling:
     """Test HTML parser error handling for complete coverage."""

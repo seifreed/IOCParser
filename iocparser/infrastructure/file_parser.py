@@ -9,7 +9,9 @@ Author: Marc Rivero | @seifreed
 import re
 import urllib.parse
 from abc import ABC, abstractmethod
+from io import BytesIO
 from pathlib import Path
+from typing import Any
 
 import pdfplumber
 import requests
@@ -61,6 +63,22 @@ class FileParser(ABC):
 class PDFParser(FileParser):
     """Class for extracting text from PDF files."""
 
+    @staticmethod
+    def _extract_pdf_text(pdf: Any) -> str:
+        text_content = ""
+        total_pages: int = len(pdf.pages)
+
+        for page_num in tqdm(range(total_pages), desc="Processing pages"):
+            page = pdf.pages[page_num]
+            page_text: str = str(page.extract_text() or "")
+            text_content += page_text
+
+            tables = page.extract_tables() or []
+            for table in tables:
+                text_content += PDFParser._extract_table_text(table)
+
+        return text_content
+
     def extract_text(self) -> str:
         """
         Extract text from a PDF file.
@@ -73,20 +91,17 @@ class PDFParser(FileParser):
         text_content = ""
 
         try:
-            with pdfplumber.open(self.file_path) as pdf:
-                total_pages: int = len(pdf.pages)
+            if self.file_path.startswith(("http://", "https://")):
+                with requests.get(self.file_path, timeout=30, stream=True) as response:
+                    response.raise_for_status()
+                    with pdfplumber.open(BytesIO(response.content)) as pdf:
+                        text_content = self._extract_pdf_text(pdf)
+            else:
+                with pdfplumber.open(self.file_path) as pdf:
+                    text_content = self._extract_pdf_text(pdf)
 
-                # Use tqdm to show progress
-                for page_num in tqdm(range(total_pages), desc="Processing pages"):
-                    page = pdf.pages[page_num]
-                    page_text: str = str(page.extract_text() or "")
-                    text_content += page_text
-
-                    # Also extract tables as they might contain IOCs
-                    tables = page.extract_tables() or []
-                    for table in tables:
-                        text_content += self._extract_table_text(table)
-
+        except requests.exceptions.RequestException as exc:
+            raise URLAccessError(str(exc)) from exc
         except (OSError, ValueError, PdfminerException) as exc:
             raise PDFProcessingError(str(exc)) from exc
 

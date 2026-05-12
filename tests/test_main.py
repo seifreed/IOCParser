@@ -63,6 +63,7 @@ from iocparser.infrastructure.file_readers import (
     validate_file_size,
 )
 from iocparser.infrastructure.http_download import download_url_to_temp
+from iocparser.infrastructure.logger import setup_logger
 from tests.test_file_parser import create_minimal_pdf
 from tests.warning_service_helpers import StaticWarningListService, swap_warning_service
 
@@ -365,10 +366,13 @@ class TestSetupApplication:
                 log_file=log_path,
             )
 
-            setup_application(args)
+            try:
+                setup_application(args)
 
-            # Verify log file was created
-            assert Path(log_path).exists()
+                # Verify log file was created
+                assert Path(log_path).exists()
+            finally:
+                setup_logger(console=False)
 
 
 class TestFileTypeDetection:

@@ -215,6 +215,7 @@ class RequestsURLDownloader(URLDownloader):
         """Download URL content into a temp file and return the path."""
         import tempfile
 
+        self.last_download_metadata = None
         parsed_url = self.validate_url(url)
         temp_dir = Path(tempfile.gettempdir()) / "iocparser"
         temp_dir.mkdir(exist_ok=True)

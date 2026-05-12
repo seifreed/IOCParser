@@ -232,6 +232,23 @@ def test_requests_url_downloader_reports_unexpected_errors() -> None:
     assert exc_info.value.error_type == "unexpected"
 
 
+def test_requests_url_downloader_clears_metadata_before_failed_download() -> None:
+    downloader = RequestsURLDownloader()
+
+    with LocalHTTPServer(body=b"ok") as success_url:
+        downloaded = Path(downloader.download(success_url))
+        try:
+            assert downloader.download_metadata()["input_size"] == 2
+        finally:
+            downloaded.unlink(missing_ok=True)
+
+    with LocalHTTPServer(body=b"abc", content_length="not-an-int") as broken_url:
+        with pytest.raises(DownloadError):
+            downloader.download(broken_url)
+
+    assert downloader.download_metadata() == {}
+
+
 def test_requests_url_downloader_rate_limit_sleep_path_is_deterministic(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

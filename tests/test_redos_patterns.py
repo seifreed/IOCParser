@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import multiprocessing
+import queue
 import signal
 import time
 
@@ -14,6 +16,37 @@ MAX_SECONDS = 1.0
 
 def _alarm_handler(_signum: int, _frame: object) -> None:
     raise TimeoutError("Pattern took too long - probable ReDoS")
+
+
+def _findall_in_child(pattern_name: str, payload: str, results: multiprocessing.Queue) -> None:
+    try:
+        pattern = PATTERNS[pattern_name]
+        start = time.perf_counter()
+        pattern.findall(payload)
+        results.put(("ok", time.perf_counter() - start))
+    except BaseException as exc:
+        results.put(("error", repr(exc)))
+
+
+def _findall_with_subprocess_timeout(pattern_name: str, payload: str) -> float:
+    ctx = multiprocessing.get_context("spawn")
+    results = ctx.Queue()
+    process = ctx.Process(target=_findall_in_child, args=(pattern_name, payload, results))
+    process.start()
+    process.join(MAX_SECONDS + 1.0)
+    if process.is_alive():
+        process.terminate()
+        process.join(timeout=5)
+        raise TimeoutError("Pattern took too long - probable ReDoS")
+    try:
+        status, value = results.get(timeout=1)
+    except queue.Empty as exc:
+        raise RuntimeError(
+            f"Pattern subprocess exited without a result: {process.exitcode}"
+        ) from exc
+    if status == "error":
+        raise RuntimeError(str(value))
+    return float(value)
 
 
 @pytest.mark.parametrize(
@@ -79,9 +112,11 @@ def test_pattern_does_not_redos(pattern_name: str, payload: str) -> None:
             signal.alarm(0)
             signal.signal(signal.SIGALRM, old_handler)
     else:
-        # Fallback: measure and hope the test runner kills it if hung
-        start = time.perf_counter()
-        pattern.findall(payload)
-        elapsed = time.perf_counter() - start
+        elapsed = _findall_with_subprocess_timeout(pattern_name, payload)
 
     assert elapsed < MAX_SECONDS, f"{pattern_name} took {elapsed:.2f}s - probable ReDoS"
+
+
+def test_subprocess_timeout_fallback_runs_fast_pattern() -> None:
+    elapsed = _findall_with_subprocess_timeout("domains", "example.com")
+    assert elapsed < MAX_SECONDS

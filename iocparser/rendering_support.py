@@ -52,30 +52,128 @@ def render_text_output(
     context_lookup: Callable[[str, str], Iterable[str]] | None = None,
 ) -> str:
     output: list[str] = ["# Indicators of Compromise (IOCs) Extracted\n"]
-    for section_key, section_title in SECTION_ORDER:
-        section_data = grouped.get(section_key)
-        if not section_data:
-            continue
-        output.append(f"\n## {section_title}\n")
-        lines = format_section(section_key, section_data)
-        output.extend(lines)
-        if context_map is not None and context_lookup is not None:
-            for line in lines:
-                for excerpt in context_lookup(section_key, line):
-                    output.append(f"  Context: {excerpt}")
+    append_text_sections(
+        output,
+        grouped=grouped,
+        format_section=format_section,
+        context_map=context_map,
+        context_lookup=context_lookup,
+    )
     if warning_grouped:
         output.append("\n# Warning List Matches\n")
         output.append(
             "The following indicators were found in warning lists and might be false positives:\n"
         )
-        for section_key, section_title in SECTION_ORDER:
-            warnings = warning_grouped.get(section_key)
-            if not warnings:
-                continue
-            output.append(f"\n## {section_title} in Warning Lists\n")
-            for warning in warnings:
-                output.extend(format_warning(warning))
+        append_warning_sections(
+            output,
+            warning_grouped=warning_grouped,
+            format_warning=format_warning,
+        )
     return "\n".join(output)
+
+
+def append_text_sections(
+    output: list[str],
+    *,
+    grouped: Mapping[str, Sequence[SectionValue]],
+    format_section: Callable[[str, Sequence[SectionValue]], list[str]],
+    context_map: ContextMap | None,
+    context_lookup: Callable[[str, str], Iterable[str]] | None,
+) -> None:
+    rendered_sections: set[str] = set()
+    for section_key, section_title in SECTION_ORDER:
+        if append_text_section(
+            output,
+            section_key,
+            section_title,
+            grouped=grouped,
+            format_section=format_section,
+            context_map=context_map,
+            context_lookup=context_lookup,
+        ):
+            rendered_sections.add(section_key)
+    for section_key in sorted(grouped):
+        if section_key not in rendered_sections and append_text_section(
+            output,
+            section_key,
+            fallback_section_title(section_key),
+            grouped=grouped,
+            format_section=format_section,
+            context_map=context_map,
+            context_lookup=context_lookup,
+        ):
+            rendered_sections.add(section_key)
+
+
+def append_text_section(
+    output: list[str],
+    section_key: str,
+    section_title: str,
+    *,
+    grouped: Mapping[str, Sequence[SectionValue]],
+    format_section: Callable[[str, Sequence[SectionValue]], list[str]],
+    context_map: ContextMap | None,
+    context_lookup: Callable[[str, str], Iterable[str]] | None,
+) -> bool:
+    section_data = grouped.get(section_key)
+    if not section_data:
+        return False
+    output.append(f"\n## {section_title}\n")
+    lines = format_section(section_key, section_data)
+    output.extend(lines)
+    if context_map is not None and context_lookup is not None:
+        for line in lines:
+            for excerpt in context_lookup(section_key, line):
+                output.append(f"  Context: {excerpt}")
+    return True
+
+
+def append_warning_sections(
+    output: list[str],
+    *,
+    warning_grouped: Mapping[str, Sequence[WarningValue]],
+    format_warning: Callable[[WarningValue], list[str]],
+) -> None:
+    rendered_warning_sections: set[str] = set()
+    for section_key, section_title in SECTION_ORDER:
+        if append_warning_section(
+            output,
+            section_key,
+            section_title,
+            warning_grouped=warning_grouped,
+            format_warning=format_warning,
+        ):
+            rendered_warning_sections.add(section_key)
+    for section_key in sorted(warning_grouped):
+        if section_key not in rendered_warning_sections and append_warning_section(
+            output,
+            section_key,
+            fallback_section_title(section_key),
+            warning_grouped=warning_grouped,
+            format_warning=format_warning,
+        ):
+            rendered_warning_sections.add(section_key)
+
+
+def append_warning_section(
+    output: list[str],
+    section_key: str,
+    section_title: str,
+    *,
+    warning_grouped: Mapping[str, Sequence[WarningValue]],
+    format_warning: Callable[[WarningValue], list[str]],
+) -> bool:
+    warnings = warning_grouped.get(section_key)
+    if not warnings:
+        return False
+    output.append(f"\n## {section_title} in Warning Lists\n")
+    for warning in warnings:
+        output.extend(format_warning(warning))
+    return True
+
+
+def fallback_section_title(section_key: str) -> str:
+    return section_key.replace("_", " ").title()
 
 
 def prepare_json_payload(

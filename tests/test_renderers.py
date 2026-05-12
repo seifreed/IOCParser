@@ -96,6 +96,26 @@ def test_text_output_renderer_renders_golden_output() -> None:
     assert rendered == expected
 
 
+def test_text_output_renderer_includes_unlisted_ioc_types() -> None:
+    renderer = TextOutputRenderer()
+    result = ExtractionResult(
+        iocs=(IOC.from_raw("ja3", "d4fdb5a4b9b3b1a5b2e2f7c9f8c6a111"),),
+        warnings=(
+            WarningMatch(
+                ioc=IOC.from_raw("aws_access_keys", "AKIAIOSFODNN7EXAMPLE"),
+                warning_list="Test Warning",
+            ),
+        ),
+    )
+
+    rendered = renderer.render(result)
+
+    assert "## Ja3" in rendered
+    assert "d4fdb5a4b9b3b1a5b2e2f7c9f8c6a111" in rendered
+    assert "## Aws Access Keys in Warning Lists" in rendered
+    assert "AKIAIOSFODNN7EXAMPLE - *Test Warning*" in rendered
+
+
 def test_json_output_renderer_renders_sorted_and_exact_payload() -> None:
     renderer = JSONOutputRenderer()
 

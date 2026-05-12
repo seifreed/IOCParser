@@ -118,16 +118,8 @@ def parse_http_mapping(value: object, *, separator: str) -> dict[str, str]:
         stripped = value.strip()
         if not stripped:
             return {}
-        if stripped.startswith("{"):
-            try:
-                parsed: object = json.loads(stripped)
-            except json.JSONDecodeError as exc:
-                raise ValidationError(INVALID_HTTP_MAPPING_ERROR.format(value=stripped)) from exc
-            return (
-                {str(key): str(item) for key, item in parsed.items()}
-                if isinstance(parsed, dict)
-                else {}
-            )
+        if stripped.startswith(("{", "[")):
+            return _parse_json_http_mapping(stripped)
         items = [stripped]
     elif isinstance(value, (list, tuple)):
         items = [str(item) for item in value if str(item).strip()]
@@ -143,3 +135,13 @@ def parse_http_mapping(value: object, *, separator: str) -> dict[str, str]:
             continue
         mapping[normalized_name] = raw_value.strip()
     return mapping
+
+
+def _parse_json_http_mapping(value: str) -> dict[str, str]:
+    try:
+        parsed: object = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise ValidationError(INVALID_HTTP_MAPPING_ERROR.format(value=value)) from exc
+    if not isinstance(parsed, dict):
+        raise ValidationError(INVALID_HTTP_MAPPING_ERROR.format(value=value))
+    return {str(key): str(item) for key, item in parsed.items()}

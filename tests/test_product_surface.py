@@ -1939,7 +1939,11 @@ def test_schema_migration_status_and_retry_failed_batch(tmp_path: Path) -> None:
     current_db = tmp_path / "current.sqlite"
     current_uow = SQLAlchemyUnitOfWork(f"sqlite:///{current_db}")
     current_uow.close()
-    migrations.migrate_engine(SQLAlchemyUnitOfWork(f"sqlite:///{current_db}").engine)
+    current_migration_uow = SQLAlchemyUnitOfWork(f"sqlite:///{current_db}")
+    try:
+        migrations.migrate_engine(current_migration_uow.engine)
+    finally:
+        current_migration_uow.close()
 
     partial_db = tmp_path / "partial.sqlite"
     partial = sqlite3.connect(partial_db)
@@ -1948,10 +1952,17 @@ def test_schema_migration_status_and_retry_failed_batch(tmp_path: Path) -> None:
         partial.commit()
     finally:
         partial.close()
-    migrations.migrate_engine(SQLAlchemyUnitOfWork(f"sqlite:///{partial_db}").engine)
+    partial_migration_uow = SQLAlchemyUnitOfWork(f"sqlite:///{partial_db}")
+    try:
+        migrations.migrate_engine(partial_migration_uow.engine)
+    finally:
+        partial_migration_uow.close()
 
-    current_engine = SQLAlchemyUnitOfWork(f"sqlite:///{current_db}").engine
-    migrations._upgrade_to_v2(current_engine, migrations.inspect(current_engine))
+    upgrade_uow = SQLAlchemyUnitOfWork(f"sqlite:///{current_db}")
+    try:
+        migrations._upgrade_to_v2(upgrade_uow.engine, migrations.inspect(upgrade_uow.engine))
+    finally:
+        upgrade_uow.close()
 
     with FlakyLocalHTTPServer() as url:
         report_path = tmp_path / "batch-report.json"

@@ -14,7 +14,10 @@ def fresh_db(tmp_path: Path, name: str = "test.db") -> str:
     engine = create_engine(db_uri, future=True)
     from iocparser.infrastructure.persistence_migration_runtime import migrate_engine
 
-    migrate_engine(engine)
+    try:
+        migrate_engine(engine)
+    finally:
+        engine.dispose()
     return db_uri
 
 
@@ -55,3 +58,5 @@ def persist_run_into(
     except Exception:
         unit.rollback()
         raise
+    finally:
+        unit.close()

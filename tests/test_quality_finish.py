@@ -595,14 +595,17 @@ def test_schema_version_accepts_string_rows(tmp_path: Path) -> None:
         )
         connection.execute(text("DELETE FROM schema_migrations"))
         connection.execute(text("INSERT INTO schema_migrations(version) VALUES ('7')"))
-    assert schema_version(engine) == 7
-    assert _coerce_version_row("8") == 8
+    try:
+        assert schema_version(engine) == 7
+        assert _coerce_version_row("8") == 8
 
-    class _VersionLike:
-        def __str__(self) -> str:
-            return "9"
+        class _VersionLike:
+            def __str__(self) -> str:
+                return "9"
 
-    assert _coerce_version_row(_VersionLike()) == 9
+        assert _coerce_version_row(_VersionLike()) == 9
+    finally:
+        engine.dispose()
 
 
 def test_repository_helpers_cover_remaining_metadata_branches() -> None:

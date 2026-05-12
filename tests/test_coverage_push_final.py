@@ -23,7 +23,8 @@ class TestIOCRepoIntegrity:
     def test_retry_on_integrity_error(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
 
-        s = Session(create_engine(fresh_db(tmp_path), future=True))
+        engine = create_engine(fresh_db(tmp_path), future=True)
+        s = Session(engine)
         r = SQLAlchemyIOCRepository(s)
         id1 = r._get_or_create(
             ioc_type="md5", value="v1", is_warning=False, warning_list="", warning_description=""
@@ -50,11 +51,13 @@ class TestIOCRepoIntegrity:
                 == id1
             )
         s.close()
+        engine.dispose()
 
     def test_reraise_when_not_found(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
 
-        s = Session(create_engine(fresh_db(tmp_path), future=True))
+        engine = create_engine(fresh_db(tmp_path), future=True)
+        s = Session(engine)
         r = SQLAlchemyIOCRepository(s)
         with patch.object(s, "flush", side_effect=IntegrityError("x", {}, Exception())):
             with pytest.raises(IntegrityError):
@@ -66,6 +69,7 @@ class TestIOCRepoIntegrity:
                     warning_description="",
                 )
         s.close()
+        engine.dispose()
 
 
 class TestSourceRepoIntegrity:
@@ -74,7 +78,8 @@ class TestSourceRepoIntegrity:
             SQLAlchemySourceRepository,
         )
 
-        s = Session(create_engine(fresh_db(tmp_path), future=True))
+        engine = create_engine(fresh_db(tmp_path), future=True)
+        s = Session(engine)
         r = SQLAlchemySourceRepository(s)
         id1 = r.get_or_create(kind="file", value="a.txt")
         s.commit()
@@ -100,18 +105,21 @@ class TestSourceRepoIntegrity:
             )
         assert id1 == id2
         s.close()
+        engine.dispose()
 
     def test_reraise_when_not_found(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_source_repository import (
             SQLAlchemySourceRepository,
         )
 
-        s = Session(create_engine(fresh_db(tmp_path), future=True))
+        engine = create_engine(fresh_db(tmp_path), future=True)
+        s = Session(engine)
         r = SQLAlchemySourceRepository(s)
         with patch.object(s, "flush", side_effect=IntegrityError("x", {}, Exception())):
             with pytest.raises(IntegrityError):
                 r.get_or_create(kind="file", value="ghost.pdf")
         s.close()
+        engine.dispose()
 
 
 # ── 2. History import with URL sources, distributed jobs, dead letters ─────
@@ -196,7 +204,8 @@ class TestBatchTimestampEdges:
     def test_no_phase_timestamps_at_all(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_batch import create_batch_job
 
-        s = Session(create_engine(fresh_db(tmp_path), future=True))
+        engine = create_engine(fresh_db(tmp_path), future=True)
+        s = Session(engine)
         bid = create_batch_job(
             s,
             source_kind="file",
@@ -207,11 +216,13 @@ class TestBatchTimestampEdges:
         s.commit()
         assert isinstance(bid, int)
         s.close()
+        engine.dispose()
 
     def test_invalid_timestamp_string(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_batch import create_batch_job
 
-        s = Session(create_engine(fresh_db(tmp_path), future=True))
+        engine = create_engine(fresh_db(tmp_path), future=True)
+        s = Session(engine)
         report = {
             "total": 1,
             "successful": 1,
@@ -224,6 +235,7 @@ class TestBatchTimestampEdges:
         s.commit()
         assert isinstance(bid, int)
         s.close()
+        engine.dispose()
 
 
 # ── 4. persistence_distributed: imported job lookup ────────────────────────
@@ -454,7 +466,10 @@ class TestRev0008Edge:
         )
 
         engine = create_engine(f"sqlite:///{tmp_path / 'r8e.db'}", future=True)
-        create_latest_schema(engine)
-        upgrade_to_version(engine, inspect(engine), 8)
-        upgrade_to_version(engine, inspect(engine), 8)
-        assert "history_metadata" in set(inspect(engine).get_table_names())
+        try:
+            create_latest_schema(engine)
+            upgrade_to_version(engine, inspect(engine), 8)
+            upgrade_to_version(engine, inspect(engine), 8)
+            assert "history_metadata" in set(inspect(engine).get_table_names())
+        finally:
+            engine.dispose()

@@ -63,6 +63,7 @@ class TestIOCRepoRetryLogic:
         assert len(ioc_rows) > 0
         assert ioc_rows[0].id == existing_id
         session.close()
+        engine.dispose()
 
 
 # ── Source repo: directly test the retry logic (lines 70-86) ──────────────
@@ -106,6 +107,7 @@ class TestSourceRepoRetryLogic:
         assert refreshed.content_hash == "abc123"
         assert refreshed.input_size == 999
         session.close()
+        engine.dispose()
 
 
 # ── History: rich import with distributed + dead_letter jobs ──────────────

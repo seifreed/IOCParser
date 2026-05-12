@@ -99,6 +99,7 @@ class TestBatchTimestamps:
         session.commit()
         assert isinstance(bid, int)
         session.close()
+        engine.dispose()
 
     def test_non_dict_phase_timestamps(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_batch import create_batch_job
@@ -117,6 +118,7 @@ class TestBatchTimestamps:
         session.commit()
         assert isinstance(bid, int)
         session.close()
+        engine.dispose()
 
 
 # ── cli_processing_files: merge_results ────────────────────────────────────
@@ -319,9 +321,12 @@ class TestRev0008:
         )
 
         engine = create_engine(f"sqlite:///{tmp_path / 'r8.db'}", future=True)
-        create_latest_schema(engine)
-        upgrade_to_version(engine, inspect(engine), 8)
-        assert "history_metadata" in set(inspect(engine).get_table_names())
+        try:
+            create_latest_schema(engine)
+            upgrade_to_version(engine, inspect(engine), 8)
+            assert "history_metadata" in set(inspect(engine).get_table_names())
+        finally:
+            engine.dispose()
 
 
 # ── api_persistence_query: validation paths ───────────────────────────────

@@ -10,8 +10,9 @@ FTS_TABLE = "ioc_search_fts"
 
 def has_fts_table(engine: Engine) -> bool:
     """Return whether the configured database contains the IOC FTS table."""
-    inspector: Inspector = inspect(engine)
-    return FTS_TABLE in set(inspector.get_table_names())
+    with engine.connect() as connection:
+        inspector: Inspector = inspect(connection)
+        return FTS_TABLE in set(inspector.get_table_names())
 
 
 def build_fts_query(value: str) -> str | None:

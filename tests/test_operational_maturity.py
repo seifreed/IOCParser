@@ -163,24 +163,31 @@ def _persist_result(
     tags: tuple[str, ...] = (),
     status: str = "success",
 ) -> int:
-    persisted = persist_run(
-        PersistRunInput(
-            source=Source.from_raw("file", source_value),
-            result=ExtractionResult(
-                iocs=(IOC.from_raw("domains", ioc_value, severity=severity, tags=tags),)
+    unit_of_work = SQLAlchemyUnitOfWork(db_uri)
+    try:
+        persisted = persist_run(
+            PersistRunInput(
+                source=Source.from_raw("file", source_value),
+                result=ExtractionResult(
+                    iocs=(IOC.from_raw("domains", ioc_value, severity=severity, tags=tags),)
+                ),
+                tool_version="5.0.0",
+                options=PersistOptions(
+                    defang=False, check_warnings=False, force_update=False, output_format="json"
+                ),
+                status=status,
+                failed_items=1 if status == "failed" else 0,
+                successful_items=0 if status == "failed" else 1,
+                partial_error_count=1 if status == "partial" else 0,
             ),
-            tool_version="5.0.0",
-            options=PersistOptions(
-                defang=False, check_warnings=False, force_update=False, output_format="json"
-            ),
-            status=status,
-            failed_items=1 if status == "failed" else 0,
-            successful_items=0 if status == "failed" else 1,
-            partial_error_count=1 if status == "partial" else 0,
-        ),
-        unit_of_work=SQLAlchemyUnitOfWork(db_uri),
-    )
-    return persisted.run_id
+            unit_of_work=unit_of_work,
+        )
+        return persisted.run_id
+    except Exception:
+        unit_of_work.rollback()
+        raise
+    finally:
+        unit_of_work.close()
 
 
 def test_search_page_uses_sql_side_filters_and_indexes(tmp_path: Path) -> None:
@@ -378,18 +385,22 @@ def test_migration_revision_history_and_validation(tmp_path: Path) -> None:
     assert version == CURRENT_SCHEMA_VERSION
     assert revision_history()[-1].version == CURRENT_SCHEMA_VERSION
 
-    engine = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}").engine
-    assert schema_version(engine) == CURRENT_SCHEMA_VERSION
-    assert validate_schema(engine) == []
+    migrated_unit = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
+    try:
+        assert schema_version(migrated_unit.engine) == CURRENT_SCHEMA_VERSION
+        assert validate_schema(migrated_unit.engine) == []
+    finally:
+        migrated_unit.close()
     blank_db = tmp_path / "blank.sqlite"
     blank_db.touch()
     from sqlalchemy import create_engine
 
-    assert schema_version(create_engine(f"sqlite:///{blank_db}", future=True)) == 0
-    assert any(
-        "schema version drift" in problem
-        for problem in validate_schema(create_engine(f"sqlite:///{blank_db}", future=True))
-    )
+    blank_engine = create_engine(f"sqlite:///{blank_db}", future=True)
+    try:
+        assert schema_version(blank_engine) == 0
+        assert any("schema version drift" in problem for problem in validate_schema(blank_engine))
+    finally:
+        blank_engine.dispose()
     partial_db = tmp_path / "partial-schema.sqlite"
     partial = sqlite3.connect(partial_db)
     partial.execute(
@@ -427,11 +438,14 @@ def test_migration_revision_history_and_validation(tmp_path: Path) -> None:
     broken_engine = create_engine(f"sqlite:///{broken_db}", future=True)
     from sqlalchemy import inspect
 
-    assert any(
-        "run_iocs missing column: tags_search" in problem
-        for problem in validate_schema(broken_engine)
-    )
-    assert _has_column(inspect(broken_engine), "missing", "nope") is False
+    try:
+        assert any(
+            "run_iocs missing column: tags_search" in problem
+            for problem in validate_schema(broken_engine)
+        )
+        assert _has_column(inspect(broken_engine), "missing", "nope") is False
+    finally:
+        broken_engine.dispose()
 
 
 def test_history_export_import_compact_and_retain(tmp_path: Path) -> None:

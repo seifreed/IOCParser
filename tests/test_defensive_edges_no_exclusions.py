@@ -429,9 +429,15 @@ def test_source_repository_integrity_retry_and_reraise_paths() -> None:
 
 def test_unit_of_work_race_branches_and_context_manager(tmp_path) -> None:
     from sqlalchemy import create_engine as sqlalchemy_create_engine
+    from sqlalchemy.pool import NullPool
 
     from iocparser.infrastructure import persistence_uow
     from iocparser.infrastructure.persistence_uow import SQLAlchemyUnitOfWork
+
+    assert persistence_uow._engine_kwargs(f"sqlite:///{tmp_path / 'pool.db'}") == {
+        "poolclass": NullPool
+    }
+    assert persistence_uow._engine_kwargs("sqlite:///:memory:") == {}
 
     engine_uri = "sqlite:///:memory:?engine-race"
     sentinel_engine = sqlalchemy_create_engine("sqlite:///:memory:", future=True)

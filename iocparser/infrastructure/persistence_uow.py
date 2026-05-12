@@ -7,6 +7,7 @@ from typing import ClassVar, Literal
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
+from sqlalchemy.pool import NullPool
 
 from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
 from iocparser.infrastructure.persistence_run_repository import SQLAlchemyRunRepository
@@ -18,6 +19,12 @@ _ENGINE_CACHE: dict[str, Engine] = {}
 _ENGINE_LOCK = threading.Lock()
 
 
+def _engine_kwargs(db_uri: str) -> dict[str, object]:
+    if db_uri.startswith("sqlite:///") and ":memory:" not in db_uri:
+        return {"poolclass": NullPool}
+    return {}
+
+
 def _get_or_create_engine(db_uri: str) -> Engine:
     """Return a cached Engine for *db_uri*, creating it if necessary."""
     engine = _ENGINE_CACHE.get(db_uri)
@@ -27,7 +34,7 @@ def _get_or_create_engine(db_uri: str) -> Engine:
         engine = _ENGINE_CACHE.get(db_uri)
         if engine is not None:
             return engine
-        new_engine = create_engine(db_uri, future=True)
+        new_engine = create_engine(db_uri, future=True, **_engine_kwargs(db_uri))
         _ENGINE_CACHE[db_uri] = new_engine
         return new_engine
 

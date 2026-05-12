@@ -65,6 +65,7 @@ class TestIOCRepositoryIntegrityRetry:
 
         assert id1 == id2
         session.close()
+        engine.dispose()
 
     def test_integrity_error_reraises_when_row_not_found(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
@@ -87,6 +88,7 @@ class TestIOCRepositoryIntegrityRetry:
                     warning_description="",
                 )
         session.close()
+        engine.dispose()
 
 
 # ---------------------------------------------------------------------------
@@ -138,6 +140,7 @@ class TestSourceRepositoryIntegrityRetry:
         assert source.content_hash == "deadbeef"
         assert source.input_size == 12345
         session.close()
+        engine.dispose()
 
     def test_integrity_error_reraises_when_source_not_found(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_source_repository import (
@@ -156,6 +159,7 @@ class TestSourceRepositoryIntegrityRetry:
             with pytest.raises(IntegrityError):
                 repo.get_or_create(kind="file", value="ghost.pdf")
         session.close()
+        engine.dispose()
 
 
 # ---------------------------------------------------------------------------
@@ -368,6 +372,7 @@ class TestBatchJobReportParsing:
         session.commit()
         assert isinstance(batch_id, int)
         session.close()
+        engine.dispose()
 
 
 # ---------------------------------------------------------------------------

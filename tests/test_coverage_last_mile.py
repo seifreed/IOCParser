@@ -157,8 +157,11 @@ def test_history_legacy_collision_empty_db(tmp_path):
     from iocparser.infrastructure.persistence.history.ops import _has_legacy_archive_collision
 
     engine = create_engine(fresh_db(tmp_path), future=True)
-    with Session(engine) as session:
-        assert _has_legacy_archive_collision(session, archive_id="nonexistent") is False
+    try:
+        with Session(engine) as session:
+            assert _has_legacy_archive_collision(session, archive_id="nonexistent") is False
+    finally:
+        engine.dispose()
 
 
 # persistence_batch.py:165 — _report_datetime ValueError
@@ -203,7 +206,8 @@ def test_worker_concurrent_empty_sleeps():
 def test_ioc_repo_integrity_retry(tmp_path):
     from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
 
-    s = Session(create_engine(fresh_db(tmp_path), future=True))
+    engine = create_engine(fresh_db(tmp_path), future=True)
+    s = Session(engine)
     r = SQLAlchemyIOCRepository(s)
     id1 = r._get_or_create(
         ioc_type="md5", value="v1", is_warning=False, warning_list="", warning_description=""
@@ -229,12 +233,14 @@ def test_ioc_repo_integrity_retry(tmp_path):
             == id1
         )
     s.close()
+    engine.dispose()
 
 
 def test_ioc_repo_integrity_reraise(tmp_path):
     from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
 
-    s = Session(create_engine(fresh_db(tmp_path), future=True))
+    engine = create_engine(fresh_db(tmp_path), future=True)
+    s = Session(engine)
     r = SQLAlchemyIOCRepository(s)
     with patch.object(s, "flush", side_effect=IntegrityError("x", {}, Exception())):
         with pytest.raises(IntegrityError):
@@ -246,12 +252,14 @@ def test_ioc_repo_integrity_reraise(tmp_path):
                 warning_description="",
             )
     s.close()
+    engine.dispose()
 
 
 def test_source_repo_integrity_retry(tmp_path):
     from iocparser.infrastructure.persistence_source_repository import SQLAlchemySourceRepository
 
-    s = Session(create_engine(fresh_db(tmp_path), future=True))
+    engine = create_engine(fresh_db(tmp_path), future=True)
+    s = Session(engine)
     r = SQLAlchemySourceRepository(s)
     id1 = r.get_or_create(kind="file", value="a.txt")
     s.commit()
@@ -278,17 +286,20 @@ def test_source_repo_integrity_retry(tmp_path):
             == id1
         )
     s.close()
+    engine.dispose()
 
 
 def test_source_repo_integrity_reraise(tmp_path):
     from iocparser.infrastructure.persistence_source_repository import SQLAlchemySourceRepository
 
-    s = Session(create_engine(fresh_db(tmp_path), future=True))
+    engine = create_engine(fresh_db(tmp_path), future=True)
+    s = Session(engine)
     r = SQLAlchemySourceRepository(s)
     with patch.object(s, "flush", side_effect=IntegrityError("x", {}, Exception())):
         with pytest.raises(IntegrityError):
             r.get_or_create(kind="file", value="ghost.pdf")
     s.close()
+    engine.dispose()
 
 
 # cli_processing_urls.py:199 — _retry_attempt_from_batch with matches but occurrence out of range

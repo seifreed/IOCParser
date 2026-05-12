@@ -580,13 +580,19 @@ def test_cli_plugin_paths_and_batch_queries(
     assert 'metrics\t{"duration_ms": 10}' in output
 
     blank_engine = create_engine(f"sqlite:///{tmp_path / 'blank-no-fts.sqlite'}", future=True)
-    with Session(blank_engine) as blank_session:
-        sync_fts_index(blank_session)
+    try:
+        with Session(blank_engine) as blank_session:
+            sync_fts_index(blank_session)
+    finally:
+        blank_engine.dispose()
 
 
 def test_search_index_revision_is_noop_without_known_tables(tmp_path: Path) -> None:
     engine = create_engine(f"sqlite:///{tmp_path / 'empty.sqlite'}", future=True)
-    rev_0006_search_indexes.apply(engine, inspect(engine))
+    try:
+        rev_0006_search_indexes.apply(engine, inspect(engine))
+    finally:
+        engine.dispose()
 
 
 def test_plugin_entry_points_and_query_filter_edges() -> None:

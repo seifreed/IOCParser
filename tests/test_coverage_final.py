@@ -55,6 +55,7 @@ class TestIOCRepoIntegrity:
             )
         assert id1 == id2
         session.close()
+        engine.dispose()
 
     def test_reraises_when_not_found(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
@@ -72,6 +73,7 @@ class TestIOCRepoIntegrity:
                     warning_description="",
                 )
         session.close()
+        engine.dispose()
 
 
 # === persistence_source_repository IntegrityError (mock: simulates DB unique constraint) ===
@@ -108,6 +110,7 @@ class TestSourceRepoIntegrity:
             )
         assert id1 == id2
         session.close()
+        engine.dispose()
 
     def test_reraises_when_not_found(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_source_repository import (
@@ -121,6 +124,7 @@ class TestSourceRepoIntegrity:
             with pytest.raises(IntegrityError):
                 repo.get_or_create(kind="file", value="ghost.pdf")
         session.close()
+        engine.dispose()
 
 
 # === SQS dead_letter (mock: simulates AWS SQS) ===
@@ -310,6 +314,7 @@ class TestBatchTimestampFallbacks:
         session.commit()
         assert isinstance(bid, int)
         session.close()
+        engine.dispose()
 
     def test_batch_job_inverted_timestamps(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_batch import create_batch_job
@@ -332,6 +337,7 @@ class TestBatchTimestampFallbacks:
         session.commit()
         assert isinstance(bid, int)
         session.close()
+        engine.dispose()
 
 
 # === persistence_distributed: nonexistent job transitions ===
@@ -406,10 +412,13 @@ class TestMigrationRev0008:
         engine = create_engine(f"sqlite:///{tmp_path / 'rev8.db'}", future=True)
         from iocparser.infrastructure.persistence_migration_steps import create_latest_schema
 
-        create_latest_schema(engine)
-        inspector = inspect(engine)
-        upgrade_to_version(engine, inspector, 8)
-        assert "history_metadata" in set(inspect(engine).get_table_names())
+        try:
+            create_latest_schema(engine)
+            inspector = inspect(engine)
+            upgrade_to_version(engine, inspector, 8)
+            assert "history_metadata" in set(inspect(engine).get_table_names())
+        finally:
+            engine.dispose()
 
 
 # === http_download: metadata on download_metadata call ===

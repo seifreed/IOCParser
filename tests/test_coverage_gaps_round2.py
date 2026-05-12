@@ -65,6 +65,8 @@ class TestHistoryExportImportRoundTrip:
         except Exception:
             unit.rollback()
             raise
+        finally:
+            unit.close()
 
         payload = export_history(db_uri_source)
         assert len(payload["sources"]) >= 1
@@ -101,6 +103,8 @@ class TestHistoryExportImportRoundTrip:
         except Exception:
             unit.rollback()
             raise
+        finally:
+            unit.close()
 
         payload = export_history(db_uri)
         db_uri2 = fresh_db(tmp_path, "target2.db")
@@ -287,6 +291,8 @@ class TestPruneRunsBranches:
         except Exception:
             unit.rollback()
             raise
+        finally:
+            unit.close()
 
         service = SQLAlchemyPersistenceService(db_uri)
         deleted = service.prune_runs(source_kind="file")
@@ -318,6 +324,8 @@ class TestPruneRunsBranches:
         except Exception:
             unit.rollback()
             raise
+        finally:
+            unit.close()
 
         service = SQLAlchemyPersistenceService(db_uri)
         deleted = service.prune_runs(source_kind="file", source_value="specific.txt")

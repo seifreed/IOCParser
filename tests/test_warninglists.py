@@ -29,6 +29,12 @@ def make_warning_lists() -> OfflineWarningLists:
     return OfflineWarningLists(Path(tempdir.name), cache_duration=24, force_update=False)
 
 
+def teardown_module() -> None:
+    """Clean warning-list cache directories kept alive for module-scoped tests."""
+    while _warninglist_tempdirs:
+        _warninglist_tempdirs.pop().cleanup()
+
+
 class TestMISPWarningLists:
     """Test MISP warning lists functionality."""
 

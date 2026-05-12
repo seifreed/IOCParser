@@ -31,42 +31,47 @@ def test_persist_run_sqlite(tmp_path) -> None:
     db_path = tmp_path / "iocparser.db"
     unit_of_work = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
 
-    normal_iocs = {
-        "domains": ["example.com"],
-        "md5": ["5f4dcc3b5aa765d61d8327deb882cf99"],
-    }
-    warning_iocs = {
-        "domains": [
-            {"value": "google.com", "warning_list": "top", "description": "popular"},
-        ],
-    }
+    try:
+        normal_iocs = {
+            "domains": ["example.com"],
+            "md5": ["5f4dcc3b5aa765d61d8327deb882cf99"],
+        }
+        warning_iocs = {
+            "domains": [
+                {"value": "google.com", "warning_list": "top", "description": "popular"},
+            ],
+        }
 
-    options = PersistOptions(
-        defang=True,
-        check_warnings=True,
-        force_update=False,
-        output_format="stix",
-    )
+        options = PersistOptions(
+            defang=True,
+            check_warnings=True,
+            force_update=False,
+            output_format="stix",
+        )
 
-    result = ExtractionResult.from_grouped_payload(normal_iocs, warning_iocs)
-    source_id = unit_of_work.source_repository.get_or_create(
-        kind="url",
-        value="https://example.com/report",
-    )
-    run_id = unit_of_work.run_repository.create_run(
-        source_id=source_id,
-        tool_version="5.0.0",
-        options=options,
-    )
-    ioc_ids = unit_of_work.ioc_repository.get_or_create_normal(result)
-    ioc_ids.extend(unit_of_work.ioc_repository.get_or_create_warnings(result))
-    unit_of_work.run_repository.attach_iocs(run_id=run_id, ioc_ids=ioc_ids)
-    unit_of_work.commit()
+        result = ExtractionResult.from_grouped_payload(normal_iocs, warning_iocs)
+        source_id = unit_of_work.source_repository.get_or_create(
+            kind="url",
+            value="https://example.com/report",
+        )
+        run_id = unit_of_work.run_repository.create_run(
+            source_id=source_id,
+            tool_version="5.0.0",
+            options=options,
+        )
+        ioc_ids = unit_of_work.ioc_repository.get_or_create_normal(result)
+        ioc_ids.extend(unit_of_work.ioc_repository.get_or_create_warnings(result))
+        unit_of_work.run_repository.attach_iocs(run_id=run_id, ioc_ids=ioc_ids)
+        unit_of_work.commit()
 
-    with Session(unit_of_work.engine) as session:
-        run = session.execute(select(Run).where(Run.id == run_id)).scalar_one()
-        ioc_count = session.execute(select(IOCModel)).scalars().all()
-        run_iocs = session.execute(select(RunIOC).where(RunIOC.run_id == run.id)).scalars().all()
+        with Session(unit_of_work.engine) as session:
+            run = session.execute(select(Run).where(Run.id == run_id)).scalar_one()
+            ioc_count = session.execute(select(IOCModel)).scalars().all()
+            run_iocs = (
+                session.execute(select(RunIOC).where(RunIOC.run_id == run.id)).scalars().all()
+            )
+    finally:
+        unit_of_work.close()
 
     assert run.source_id is not None
     assert len(ioc_count) == 3

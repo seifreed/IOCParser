@@ -149,7 +149,8 @@ class TestApplicationErrorsShim:
 
 class TestIOCRepositorySavepointRetry:
     def test_get_or_create_returns_existing_on_duplicate(self, tmp_path: Path) -> None:
-        session = Session(create_engine(fresh_db(tmp_path), future=True))
+        engine = create_engine(fresh_db(tmp_path), future=True)
+        session = Session(engine)
         repo = SQLAlchemyIOCRepository(session)
         id1 = repo._get_or_create(
             ioc_type="domains",
@@ -168,9 +169,11 @@ class TestIOCRepositorySavepointRetry:
         )
         assert id1 == id2
         session.close()
+        engine.dispose()
 
     def test_multiple_get_or_create_same_session(self, tmp_path: Path) -> None:
-        session = Session(create_engine(fresh_db(tmp_path), future=True))
+        engine = create_engine(fresh_db(tmp_path), future=True)
+        session = Session(engine)
         repo = SQLAlchemyIOCRepository(session)
         ids = [
             repo._get_or_create(
@@ -185,11 +188,13 @@ class TestIOCRepositorySavepointRetry:
         session.commit()
         assert len(set(ids)) == 5
         session.close()
+        engine.dispose()
 
 
 class TestSourceRepositorySavepointRetry:
     def test_get_or_create_returns_existing_on_duplicate(self, tmp_path: Path) -> None:
-        session = Session(create_engine(fresh_db(tmp_path), future=True))
+        engine = create_engine(fresh_db(tmp_path), future=True)
+        session = Session(engine)
         repo = SQLAlchemySourceRepository(session)
         id1 = repo.get_or_create(kind="file", value="test.pdf")
         session.commit()
@@ -201,9 +206,11 @@ class TestSourceRepositorySavepointRetry:
         )
         assert id1 == id2
         session.close()
+        engine.dispose()
 
     def test_get_or_create_updates_metadata_on_existing(self, tmp_path: Path) -> None:
-        session = Session(create_engine(fresh_db(tmp_path), future=True))
+        engine = create_engine(fresh_db(tmp_path), future=True)
+        session = Session(engine)
         repo = SQLAlchemySourceRepository(session)
         repo.get_or_create(kind="url", value="https://example.com")
         session.commit()
@@ -221,9 +228,11 @@ class TestSourceRepositorySavepointRetry:
         assert source.mime_type == "text/html"
         assert source.content_hash == "newchash"
         session.close()
+        engine.dispose()
 
     def test_get_or_create_url_with_normalized_url(self, tmp_path: Path) -> None:
-        session = Session(create_engine(fresh_db(tmp_path), future=True))
+        engine = create_engine(fresh_db(tmp_path), future=True)
+        session = Session(engine)
         repo = SQLAlchemySourceRepository(session)
         id1 = repo.get_or_create(
             kind="url",
@@ -239,6 +248,7 @@ class TestSourceRepositorySavepointRetry:
         )
         assert id1 == id2
         session.close()
+        engine.dispose()
 
 
 # ---------------------------------------------------------------------------

@@ -21,6 +21,7 @@ from iocparser.api_persistence import (
     query_persisted_iocs,
     query_persisted_runs,
     render_persisted_diff,
+    render_persisted_run,
     retain_persisted_history,
 )
 from iocparser.application.contracts import PersistRunInput
@@ -309,8 +310,19 @@ def test_public_query_api_validates_dates_and_min_severity(tmp_path: Path) -> No
     with pytest.raises(ValidationError, match="Invalid search value"):
         query_persisted_iocs(db_uri=db_uri, value="   ", search_backend="like")
 
-    with pytest.raises(ValidationError, match="Invalid min_severity"):
+    with pytest.raises(ValidationError, match="Invalid severity"):
         query_persisted_iocs(db_uri=db_uri, value="alpha", severity="HIGH,critical")
+
+    with pytest.raises(ValidationError, match="Invalid severity"):
+        render_persisted_run(db_uri=db_uri, run_id=first_run_id, severity="critical")
+
+    with pytest.raises(ValidationError, match="Invalid severity"):
+        diff_persisted_runs(
+            db_uri=db_uri,
+            left_run_id=first_run_id,
+            right_run_id=second_run_id,
+            severity="critical",
+        )
 
     with pytest.raises(ValidationError, match="Invalid limit"):
         query_persisted_iocs(db_uri=db_uri, value="alpha", limit=-1)

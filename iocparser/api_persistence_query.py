@@ -95,6 +95,7 @@ class PersistedDiffFilters(PersistedExportFilters):
 
 MISSING_DIFF_TARGET_ERROR = "Missing diff target"
 INVALID_DATE_ERROR = "Invalid ISO date: {value}"
+INVALID_SEVERITY_ERROR = "Invalid severity: {value}"
 INVALID_MIN_SEVERITY_ERROR = "Invalid min_severity: {value}"
 INVALID_TAG_MODE_ERROR = "Invalid tag_mode: {value}"
 INVALID_SORT_BY_ERROR = "Invalid sort_by: {value}"
@@ -203,7 +204,7 @@ def validated_severity_filters(value: str | None) -> tuple[str, ...]:
     for severity in severities:
         candidate = severity.strip().lower()
         if candidate not in VALID_MIN_SEVERITIES:
-            raise ValidationError(INVALID_MIN_SEVERITY_ERROR.format(value=severity))
+            raise ValidationError(INVALID_SEVERITY_ERROR.format(value=severity))
         normalized.append(candidate)
     return tuple(normalized)
 
@@ -293,7 +294,7 @@ def persisted_diff_input(
         only_removed=diff_only == "removed",
         only_warnings=bool_option(options.get("only_warnings")),
         ioc_types=parse_string_filters(options.get("ioc_type")),
-        severity=parse_string_filters(options.get("severity")),
+        severity=validated_severity_filters(options.get("severity")),
         tags=parse_string_filters(options.get("tag")),
     )
 
@@ -310,7 +311,7 @@ def latest_source_diff_input(
         only_removed=diff_only == "removed",
         only_warnings=bool_option(options.get("only_warnings")),
         ioc_types=parse_string_filters(options.get("ioc_type")),
-        severity=parse_string_filters(options.get("severity")),
+        severity=validated_severity_filters(options.get("severity")),
         tags=parse_string_filters(options.get("tag")),
     )
 
@@ -558,7 +559,7 @@ def render_persisted_run(
         or export_filters.only_normal
     ):
         filtered = export.result.filter_analyst_view(
-            severities=parse_string_filters(export_filters.severity),
+            severities=validated_severity_filters(export_filters.severity),
             tags=parse_string_filters(export_filters.tag),
             include_normal=not export_filters.only_warnings,
             include_warnings=not export_filters.only_normal,

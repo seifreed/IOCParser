@@ -104,6 +104,66 @@ def test_repositories_reuse_existing_source_and_iocs(tmp_path) -> None:
     unit_of_work.close()
 
 
+def test_persisted_diff_compares_canonical_ioc_values(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-diff-canonical.db"
+    service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
+    options = PersistOptions(
+        defang=False,
+        check_warnings=True,
+        force_update=False,
+        output_format="json",
+    )
+    run_ids = service.persist_multiple_runs(
+        [
+            (
+                "file",
+                "same.txt",
+                ExtractionResult.from_grouped_payload(
+                    {
+                        "domains": ["Example[.]COM"],
+                        "urls": ["hxxps://Example[.]COM/a"],
+                    },
+                    {
+                        "domains": [
+                            {
+                                "value": "Warn[.]Example",
+                                "warning_list": "Known",
+                                "description": "",
+                            }
+                        ]
+                    },
+                ),
+            ),
+            (
+                "file",
+                "same.txt",
+                ExtractionResult.from_grouped_payload(
+                    {
+                        "domains": ["example.com"],
+                        "urls": ["https://Example.COM/a"],
+                    },
+                    {
+                        "domains": [
+                            {
+                                "value": "warn.example",
+                                "warning_list": "Known",
+                                "description": "",
+                            }
+                        ]
+                    },
+                ),
+            ),
+        ],
+        tool_version="5.0.0",
+        options=options,
+    )
+
+    diff = service.diff_runs(left_run_id=run_ids[0], right_run_id=run_ids[1])
+
+    assert diff.added.total_count() == 0
+    assert diff.removed.total_count() == 0
+
+
 def test_unit_of_work_rollback_discards_uncommitted_changes(tmp_path) -> None:
     db_path = tmp_path / "iocparser-rollback.db"
     unit_of_work = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")

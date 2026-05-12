@@ -15,14 +15,16 @@ def diff_run_exports(
     left_run_id: int,
     right_run_id: int,
 ) -> PersistedRunDiff:
-    left_ioc_keys = {(ioc_type_name(ioc.ioc_type), ioc.value.raw): ioc for ioc in left.result.iocs}
+    left_ioc_keys = {
+        (ioc_type_name(ioc.ioc_type), ioc.canonical_value()): ioc for ioc in left.result.iocs
+    }
     right_ioc_keys = {
-        (ioc_type_name(ioc.ioc_type), ioc.value.raw): ioc for ioc in right.result.iocs
+        (ioc_type_name(ioc.ioc_type), ioc.canonical_value()): ioc for ioc in right.result.iocs
     }
     left_warning_keys = {
         (
             ioc_type_name(warning.ioc.ioc_type),
-            warning.ioc.value.raw,
+            warning.ioc.canonical_value(),
             warning.warning_list,
             warning.description,
         ): warning
@@ -31,7 +33,7 @@ def diff_run_exports(
     right_warning_keys = {
         (
             ioc_type_name(warning.ioc.ioc_type),
-            warning.ioc.value.raw,
+            warning.ioc.canonical_value(),
             warning.warning_list,
             warning.description,
         ): warning

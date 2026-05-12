@@ -18,6 +18,8 @@ def check_substring_type(value: str, values: list[IOCValue]) -> bool:
         if list_value is None:
             continue
         list_value_str = str(list_value).lower()
+        if not list_value_str.strip():
+            continue
         if list_value_str in value_lower:
             return True
     return False
@@ -27,8 +29,11 @@ def check_regex_type(get_logger: Callable[[], Logger], value: str, values: list[
     for regex_pattern in values:
         if regex_pattern is None:
             continue
+        pattern_text = str(regex_pattern)
+        if not pattern_text.strip():
+            continue
         try:
-            if re.search(str(regex_pattern), value, re.IGNORECASE):
+            if re.search(pattern_text, value, re.IGNORECASE):
                 return True
         except (re.error, TypeError):
             get_logger().debug("Invalid regex pattern: %s", regex_pattern)

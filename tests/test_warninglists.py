@@ -895,7 +895,7 @@ class TestWarningListsHelperFunctions:
         """Test substring type checking."""
         warning_lists = make_warning_lists()
 
-        values = ["malware", "virus", "trojan"]
+        values = ["malware", "virus", "trojan", ""]
 
         # Should match substring
         assert warning_lists._check_substring_type("malwarebytes.com", values)
@@ -912,7 +912,7 @@ class TestWarningListsHelperFunctions:
         """Test regex checking with None values in list."""
         warning_lists = make_warning_lists()
 
-        values = [r".*\.google\.com$", None, r"^test.*"]
+        values = [r".*\.google\.com$", None, r"^test.*", ""]
 
         # Should skip None values
         assert warning_lists._check_regex_type("mail.google.com", values)

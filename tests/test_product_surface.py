@@ -161,9 +161,13 @@ def test_persisted_option_overrides_parse_bool_strings() -> None:
 def test_batch_report_item_parses_retryable_bool_strings() -> None:
     disabled = _report_item({"url": "https://a.example", "retryable": "false"})
     enabled = _report_item({"url": "https://b.example", "retryable": "yes"})
+    unknown = _report_item({"url": "https://c.example", "retryable": "maybe"})
+    invalid = _report_item({"url": "https://d.example", "retryable": ["yes"]})
 
     assert disabled["retryable"] is False
     assert enabled["retryable"] is True
+    assert unknown["retryable"] is False
+    assert invalid["retryable"] is False
 
 
 class _Writer:

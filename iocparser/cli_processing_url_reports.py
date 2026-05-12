@@ -75,13 +75,17 @@ def int_value(value: object, *, default: int = 0) -> int:
 def bool_value(value: object, *, default: bool = False) -> bool:
     if value is None:
         return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in {0, 1}:
+        return bool(value)
     if isinstance(value, str):
         normalized = value.strip().lower()
         if normalized in {"0", "false", "no", "off", ""}:
             return False
         if normalized in {"1", "true", "yes", "on"}:
             return True
-    return bool(value)
+    return default
 
 
 def _json_dict(path: Path) -> dict[str, object]:

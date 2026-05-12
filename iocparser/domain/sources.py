@@ -9,7 +9,10 @@ from iocparser.domain.enums import SourceKind
 def normalize_url_value(value: str | None) -> str | None:
     if not value:
         return None
-    parts = urlsplit(value.strip())
+    try:
+        parts = urlsplit(value.strip())
+    except ValueError:
+        return None
     if not parts.scheme or not parts.netloc:
         return None
     return urlunsplit(

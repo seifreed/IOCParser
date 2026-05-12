@@ -157,7 +157,11 @@ class RequestsURLDownloader(URLDownloader):
 
     def validate_url(self, url: str) -> ParseResult:
         """Validate URL format and return parsed URL."""
-        parsed_url = urlparse(url)
+        try:
+            parsed_url = urlparse(url)
+            _ = parsed_url.port
+        except ValueError as exc:
+            raise InvalidURLError(url) from exc
         if not parsed_url.scheme or not parsed_url.netloc:
             raise InvalidURLError(url)
         if parsed_url.scheme.lower() not in {"http", "https"}:

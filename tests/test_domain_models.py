@@ -13,6 +13,7 @@ from iocparser.domain.models import (
     UrlValue,
     indicator_value_for,
 )
+from iocparser.domain.sources import normalize_url_value
 
 
 def test_source_kind_and_ioc_type_resolve_aliases() -> None:
@@ -50,6 +51,13 @@ def test_ioc_and_source_build_from_raw_inputs() -> None:
     assert source == Source(kind=SourceKind.TEXT, value="sample")
     assert ioc.ioc_type is IOCType.DOMAIN
     assert ioc.canonical_value() == "example.com"
+
+
+def test_malformed_urls_do_not_break_source_normalization() -> None:
+    source = Source.from_raw("url", "http://[::1")
+
+    assert normalize_url_value("http://[::1") is None
+    assert source.normalized_url is None
 
 
 def test_extraction_result_from_grouped_payload_groups_and_deduplicates() -> None:

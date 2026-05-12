@@ -18,7 +18,7 @@ class ThreadPoolFileBatchExecutor(FileBatchExecutor):
     """Infrastructure batch executor using a thread pool."""
 
     def __init__(self, *, max_workers: int = 4) -> None:
-        self.max_workers = max_workers
+        self.max_workers = max(1, max_workers)
 
     def execute(
         self,

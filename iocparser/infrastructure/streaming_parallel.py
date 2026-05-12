@@ -18,7 +18,7 @@ class ParallelStreamingExtractor:
         overlap: int = 1024,
         defang: bool = True,
     ):
-        self.max_workers = max_workers
+        self.max_workers = max(1, max_workers)
         self.chunk_size = chunk_size
         self.overlap = overlap
         self.defang = defang

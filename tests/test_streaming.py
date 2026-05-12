@@ -786,6 +786,24 @@ class TestParallelStreamingExtractor:
         assert extractor.chunk_size == 512 * 1024
         assert extractor.defang is False
 
+    def test_zero_workers_falls_back_to_single_worker(self):
+        """
+        Test invalid zero parallelism is normalized before creating the pool.
+        """
+        extractor = ParallelStreamingExtractor(max_workers=0, chunk_size=512, defang=False)
+
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
+            f.write("IOC: zero-workers.evil.com")
+            temp_path = Path(f.name)
+
+        try:
+            results = extractor.extract_from_files([temp_path])
+
+            assert extractor.max_workers == 1
+            assert "zero-workers.evil.com" in results[str(temp_path)]["domains"]
+        finally:
+            temp_path.unlink()
+
     def test_extract_from_files_single_file(self):
         """
         Test parallel extraction from single file.

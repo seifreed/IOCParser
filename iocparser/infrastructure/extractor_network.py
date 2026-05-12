@@ -80,8 +80,18 @@ class NetworkHeuristicPolicy:
             return False
         return any(keyword in path for keyword in self.suspicious_path_keywords)
 
+    def matches_documentation_url(self, domain: str, path: str, doc_domain: str) -> bool:
+        if "/" in doc_domain:
+            domain_path = f"{domain}{path}"
+            return domain_path == doc_domain or domain_path.startswith(f"{doc_domain}/")
+        return domain == doc_domain or domain.endswith(f".{doc_domain}")
+
     def should_exclude_documentation_url(self, domain: str, path: str) -> bool:
-        if not any(doc_domain in domain for doc_domain in self.documentation_domains):
+        matches_documentation = any(
+            self.matches_documentation_url(domain, path, doc_domain)
+            for doc_domain in self.documentation_domains
+        )
+        if not matches_documentation:
             return False
         return not any(term in path for term in self.suspicious_doc_terms)
 

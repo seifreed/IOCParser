@@ -574,12 +574,15 @@ class TestCoverageMissing:
         Docs: https://docs.microsoft.com/normal-page
         Vuln: https://docs.microsoft.com/vulnerability-cve-2023-1234
         Normal: https://developer.mozilla.org/docs
+        Cloud docs: https://cloud.google.com/docs/normal-page
+        Cloud vuln: https://cloud.google.com/docs/security/cve-2024-0001
         """
         result = self.extractor.extract_urls(text)
         # Documentation without exploits should be filtered
         assert not any("normal-page" in url for url in result)
         # Documentation with vulnerability keywords should be kept
         assert any("vulnerability" in url for url in result)
+        assert any("cve-2024-0001" in url for url in result)
 
     def test_extract_urls_error_handling(self):
         """Test extract_urls handles malformed URLs gracefully."""

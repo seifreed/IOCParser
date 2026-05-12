@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import importlib
+import sys
 import threading as _threading
+from collections.abc import Callable
 from pathlib import Path
-
-import magic
+from typing import Any
 
 from iocparser.domain.models import ExtractionOptions
 from iocparser.errors import FileSizeError, SourceNotFoundError
@@ -13,7 +15,31 @@ from iocparser.interfaces.ports import TextSourceReader
 
 MAX_FILE_SIZE = 100 * 1024 * 1024
 logger = get_logger(__name__)
-MagicExceptionType: type[Exception] = getattr(magic, "MagicException", Exception)
+
+
+def _load_magic_module(
+    platform: str = sys.platform,
+    import_module: Callable[[str], Any] = importlib.import_module,
+) -> Any | None:
+    if platform == "win32":
+        return None
+    try:
+        return import_module("magic")
+    except Exception:
+        return None
+
+
+def _magic_exception_type(magic_module: Any | None) -> type[Exception]:
+    if magic_module is None:
+        return Exception
+    exception_type = getattr(magic_module, "MagicException", Exception)
+    if isinstance(exception_type, type) and issubclass(exception_type, Exception):
+        return exception_type
+    return Exception
+
+
+_MAGIC_MODULE = _load_magic_module()
+MagicExceptionType = _magic_exception_type(_MAGIC_MODULE)
 
 _DEFAULT_READER_HOLDER: list[MagicTextSourceReader] = []
 _DEFAULT_READER_LOCK = _threading.Lock()
@@ -65,10 +91,13 @@ class MagicTextSourceReader(TextSourceReader):
     # Thread-local storage for magic instances - libmagic is not thread-safe.
     _magic_local = _threading.local()
 
-    def _magic(self) -> magic.Magic:
+    def _magic(self) -> Any:
+        magic_module = _MAGIC_MODULE
+        if magic_module is None:
+            raise OSError
         instance = getattr(self._magic_local, "instance", None)
         if instance is None:
-            instance = magic.Magic(mime=True)
+            instance = magic_module.Magic(mime=True)
             self._magic_local.instance = instance
         return instance
 

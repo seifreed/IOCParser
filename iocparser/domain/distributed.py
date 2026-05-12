@@ -31,6 +31,8 @@ def _int_from_payload(payload: dict[str, object], key: str, default: int) -> int
     raw_value = payload.get(key)
     if raw_value is None:
         return default
+    if isinstance(raw_value, bool):
+        raise _invalid_int_payload_value(key=key, raw_value=raw_value)
     if isinstance(raw_value, int):
         return raw_value
     if isinstance(raw_value, str):

@@ -147,6 +147,14 @@ def test_queue_envelope_from_record_parses_bool_compatible_values() -> None:
     assert restored.request.emit_only is True
 
 
+def test_queue_envelope_from_record_rejects_bool_integer_fields() -> None:
+    payload = _envelope("job-int").to_record()
+    payload["attempts"] = True
+
+    with pytest.raises(TypeError, match="attempts"):
+        QueueEnvelope.from_record(payload)
+
+
 def test_filesystem_queue_empty_and_race_branch(tmp_path: Path) -> None:
     adapter = FilesystemQueueAdapter(tmp_path / "queue")
     assert adapter.dequeue(queue_name="empty") is None

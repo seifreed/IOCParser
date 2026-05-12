@@ -19,6 +19,18 @@ from iocparser.worker_config_support import (
 )
 
 
+def _positive_int_or_default(value: int | None, default: int) -> int:
+    if value is None or value <= 0:
+        return default
+    return value
+
+
+def _non_negative_float_or_default(value: float | None, default: float) -> float:
+    if value is None or value < 0:
+        return default
+    return value
+
+
 @dataclass(frozen=True)
 class WorkerServiceConfig:
     """Environment-driven configuration for the standalone worker service."""
@@ -48,12 +60,13 @@ class WorkerServiceConfig:
         """Load worker runtime settings from INI config plus environment overrides."""
         resolved_path = resolve_config_path(config_path)
         file_values = load_worker_file_values(resolved_path)
-        poll_interval_default = float_or(file_values["poll_interval_seconds"], 1.0)
-        poll_interval_seconds = float_env(
-            "IOCPARSER_WORKER_POLL_INTERVAL_SECONDS", poll_interval_default
+        poll_interval_default = _non_negative_float_or_default(
+            float_or(file_values["poll_interval_seconds"], 1.0), 1.0
         )
-        if poll_interval_seconds is None:
-            poll_interval_seconds = poll_interval_default
+        poll_interval_seconds = _non_negative_float_or_default(
+            float_env("IOCPARSER_WORKER_POLL_INTERVAL_SECONDS", poll_interval_default),
+            poll_interval_default,
+        )
         return cls(
             queue_backend=os.environ.get(
                 "IOCPARSER_WORKER_QUEUE_BACKEND", str(file_values["queue_backend"])
@@ -70,18 +83,22 @@ class WorkerServiceConfig:
             or str_or_none(file_values["dead_letter_queue_url"]),
             db_uri=os.environ.get("IOCPARSER_WORKER_DB_URI") or str_or_none(file_values["db_uri"]),
             poll_interval_seconds=poll_interval_seconds,
-            max_messages_per_cycle=int_env(
-                "IOCPARSER_WORKER_MAX_MESSAGES_PER_CYCLE",
-                int_or(file_values["max_messages_per_cycle"], 1),
-            )
-            or 1,
+            max_messages_per_cycle=_positive_int_or_default(
+                int_env(
+                    "IOCPARSER_WORKER_MAX_MESSAGES_PER_CYCLE",
+                    int_or(file_values["max_messages_per_cycle"], 1),
+                ),
+                1,
+            ),
             max_cycles=int_env(
                 "IOCPARSER_WORKER_MAX_CYCLES", int_or_none(file_values["max_cycles"])
             ),
-            concurrency=int_env(
-                "IOCPARSER_WORKER_CONCURRENCY", int_or(file_values["concurrency"], 1)
-            )
-            or 1,
+            concurrency=_positive_int_or_default(
+                int_env(
+                    "IOCPARSER_WORKER_CONCURRENCY", int_or(file_values["concurrency"], 1)
+                ),
+                1,
+            ),
             telemetry_mode=os.environ.get(
                 "IOCPARSER_WORKER_TELEMETRY_MODE", str(file_values["telemetry_mode"])
             ),
@@ -104,10 +121,13 @@ class WorkerServiceConfig:
                 "IOCPARSER_WORKER_HARD_TIMEOUT_SECONDS",
                 int_or_none(file_values["hard_timeout_seconds"]),
             ),
-            max_queue_size=int_env(
-                "IOCPARSER_WORKER_MAX_QUEUE_SIZE", int_or(file_values["max_queue_size"], 64)
-            )
-            or 64,
+            max_queue_size=_positive_int_or_default(
+                int_env(
+                    "IOCPARSER_WORKER_MAX_QUEUE_SIZE",
+                    int_or(file_values["max_queue_size"], 64),
+                ),
+                64,
+            ),
             skip_processed=bool_env(
                 "IOCPARSER_WORKER_SKIP_PROCESSED", bool(file_values["skip_processed"])
             ),

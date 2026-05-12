@@ -117,6 +117,21 @@ def test_worker_config_preserves_zero_poll_interval(tmp_path: Path) -> None:
     assert file_config.poll_interval_seconds == 0.0
 
 
+def test_worker_config_sanitizes_negative_operational_limits() -> None:
+    with _Env(
+        IOCPARSER_WORKER_POLL_INTERVAL_SECONDS="-0.25",
+        IOCPARSER_WORKER_MAX_MESSAGES_PER_CYCLE="-3",
+        IOCPARSER_WORKER_CONCURRENCY="-4",
+        IOCPARSER_WORKER_MAX_QUEUE_SIZE="-9",
+    ):
+        config = WorkerServiceConfig.from_sources()
+
+    assert config.poll_interval_seconds == 1.0
+    assert config.max_messages_per_cycle == 1
+    assert config.concurrency == 1
+    assert config.max_queue_size == 64
+
+
 def test_worker_config_rejects_invalid_boolean_env() -> None:
     with _Env(IOCPARSER_WORKER_SKIP_PROCESSED="maybe"):
         with pytest.raises(ValueError, match="IOCPARSER_WORKER_SKIP_PROCESSED"):

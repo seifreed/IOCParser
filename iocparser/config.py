@@ -220,8 +220,9 @@ def load_config(
 
     if cli_config_path:
         config_path = Path(cli_config_path)
-        if config_path.exists():
-            file_values = _load_ini_config(config_path)
+        if not config_path.is_file():
+            raise FileNotFoundError(config_path)
+        file_values = _load_ini_config(config_path)
     else:
         for path in _find_default_config_paths():
             if path.exists():

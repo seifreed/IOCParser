@@ -77,3 +77,10 @@ def test_config_rejects_invalid_boolean_values(tmp_path) -> None:
     with _env(IOCPARSER_PERSIST="definitely"):
         with pytest.raises(ValueError, match="IOCPARSER_PERSIST"):
             load_config(None, None, None)
+
+
+def test_explicit_missing_config_path_is_rejected(tmp_path) -> None:
+    missing_config = tmp_path / "missing.ini"
+
+    with pytest.raises(FileNotFoundError, match=r"missing\.ini"):
+        load_config(None, None, str(missing_config))

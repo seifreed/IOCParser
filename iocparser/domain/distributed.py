@@ -82,23 +82,37 @@ class QueueEnvelope:
             request=PipelineJobRequest(
                 input_kind=str(request_payload.get("input_kind", "")),
                 source_value=str(request_payload.get("source_value", "")),
-                file_type=str(request_payload["file_type"]) if request_payload.get("file_type") is not None else None,
+                file_type=str(request_payload["file_type"])
+                if request_payload.get("file_type") is not None
+                else None,
                 persist=bool(request_payload.get("persist", False)),
-                db_uri=str(request_payload["db_uri"]) if request_payload.get("db_uri") is not None else None,
+                db_uri=str(request_payload["db_uri"])
+                if request_payload.get("db_uri") is not None
+                else None,
                 check_warnings=bool(request_payload.get("check_warnings", True)),
                 force_update=bool(request_payload.get("force_update", False)),
                 defang=bool(request_payload.get("defang", True)),
-                only=str(request_payload["only"]) if request_payload.get("only") is not None else None,
-                exclude=str(request_payload["exclude"]) if request_payload.get("exclude") is not None else None,
-                correlation_id=str(request_payload["correlation_id"]) if request_payload.get("correlation_id") is not None else None,
-                job_id=str(request_payload["job_id"]) if request_payload.get("job_id") is not None else None,
+                only=str(request_payload["only"])
+                if request_payload.get("only") is not None
+                else None,
+                exclude=str(request_payload["exclude"])
+                if request_payload.get("exclude") is not None
+                else None,
+                correlation_id=str(request_payload["correlation_id"])
+                if request_payload.get("correlation_id") is not None
+                else None,
+                job_id=str(request_payload["job_id"])
+                if request_payload.get("job_id") is not None
+                else None,
                 emit_only=bool(request_payload.get("emit_only", False)),
             ),
             queue_backend=str(payload.get("queue_backend", "filesystem")),
             queue_name=str(payload.get("queue_name", "default")),
             attempts=_int_from_payload(payload, "attempts", 0),
             max_attempts=_int_from_payload(payload, "max_attempts", 3),
-            idempotency_key=str(payload["idempotency_key"]) if payload.get("idempotency_key") is not None else None,
+            idempotency_key=str(payload["idempotency_key"])
+            if payload.get("idempotency_key") is not None
+            else None,
             schema_version=str(payload.get("schema_version", PIPELINE_JOB_SCHEMA_VERSION)),
             submitted_at=str(payload.get("submitted_at", datetime.now(UTC).isoformat())),
         )

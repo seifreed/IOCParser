@@ -18,7 +18,9 @@ def run_cli(
     args: argparse.Namespace,
     *,
     handle_misp_init: Callable[[], None],
-    process_multiple_files_input: Callable[[argparse.Namespace], tuple[GroupedIocs, GroupedWarnings, str, BatchResults]],
+    process_multiple_files_input: Callable[
+        [argparse.Namespace], tuple[GroupedIocs, GroupedWarnings, str, BatchResults]
+    ],
     process_single_input: Callable[[argparse.Namespace], tuple[GroupedIocs, GroupedWarnings, str]],
     save_output: Callable[[argparse.Namespace, GroupedIocs, GroupedWarnings, str], None],
 ) -> None:
@@ -27,7 +29,9 @@ def run_cli(
     _cli_runtime.setup_application(args)
     workflow_started = time.perf_counter()
 
-    if _workflow.handle_preprocessing_commands(args, config=config, handle_misp_init=handle_misp_init):
+    if _workflow.handle_preprocessing_commands(
+        args, config=config, handle_misp_init=handle_misp_init
+    ):
         return
 
     payload = _workflow.resolve_input_payload(

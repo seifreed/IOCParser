@@ -49,24 +49,66 @@ class WorkerServiceConfig:
         resolved_path = resolve_config_path(config_path)
         file_values = load_worker_file_values(resolved_path)
         return cls(
-            queue_backend=os.environ.get("IOCPARSER_WORKER_QUEUE_BACKEND", str(file_values["queue_backend"])),
-            queue_name=os.environ.get("IOCPARSER_WORKER_QUEUE_NAME", str(file_values["queue_name"])),
-            queue_url=os.environ.get("IOCPARSER_WORKER_QUEUE_URL") or str_or_none(file_values["queue_url"]),
-            queue_path=os.environ.get("IOCPARSER_WORKER_QUEUE_PATH", str(file_values["queue_path"])),
-            dead_letter_queue_url=os.environ.get("IOCPARSER_WORKER_DEAD_LETTER_QUEUE_URL") or str_or_none(file_values["dead_letter_queue_url"]),
+            queue_backend=os.environ.get(
+                "IOCPARSER_WORKER_QUEUE_BACKEND", str(file_values["queue_backend"])
+            ),
+            queue_name=os.environ.get(
+                "IOCPARSER_WORKER_QUEUE_NAME", str(file_values["queue_name"])
+            ),
+            queue_url=os.environ.get("IOCPARSER_WORKER_QUEUE_URL")
+            or str_or_none(file_values["queue_url"]),
+            queue_path=os.environ.get(
+                "IOCPARSER_WORKER_QUEUE_PATH", str(file_values["queue_path"])
+            ),
+            dead_letter_queue_url=os.environ.get("IOCPARSER_WORKER_DEAD_LETTER_QUEUE_URL")
+            or str_or_none(file_values["dead_letter_queue_url"]),
             db_uri=os.environ.get("IOCPARSER_WORKER_DB_URI") or str_or_none(file_values["db_uri"]),
-            poll_interval_seconds=float_env("IOCPARSER_WORKER_POLL_INTERVAL_SECONDS", float_or(file_values["poll_interval_seconds"], 1.0)) or 1.0,
-            max_messages_per_cycle=int_env("IOCPARSER_WORKER_MAX_MESSAGES_PER_CYCLE", int_or(file_values["max_messages_per_cycle"], 1)) or 1,
-            max_cycles=int_env("IOCPARSER_WORKER_MAX_CYCLES", int_or_none(file_values["max_cycles"])),
-            concurrency=int_env("IOCPARSER_WORKER_CONCURRENCY", int_or(file_values["concurrency"], 1)) or 1,
-            telemetry_mode=os.environ.get("IOCPARSER_WORKER_TELEMETRY_MODE", str(file_values["telemetry_mode"])),
-            max_input_size_bytes=int_env("IOCPARSER_WORKER_MAX_INPUT_SIZE_BYTES", int_or_none(file_values["max_input_size_bytes"])),
-            max_input_seconds=float_env("IOCPARSER_WORKER_MAX_INPUT_SECONDS", float_or_none(file_values["max_input_seconds"])),
-            memory_limit_bytes=int_env("IOCPARSER_WORKER_MEMORY_LIMIT_BYTES", int_or_none(file_values["memory_limit_bytes"])),
-            cpu_seconds=int_env("IOCPARSER_WORKER_CPU_SECONDS", int_or_none(file_values["cpu_seconds"])),
-            hard_timeout_seconds=int_env("IOCPARSER_WORKER_HARD_TIMEOUT_SECONDS", int_or_none(file_values["hard_timeout_seconds"])),
-            max_queue_size=int_env("IOCPARSER_WORKER_MAX_QUEUE_SIZE", int_or(file_values["max_queue_size"], 64)) or 64,
-            skip_processed=bool_env("IOCPARSER_WORKER_SKIP_PROCESSED", bool(file_values["skip_processed"])),
+            poll_interval_seconds=float_env(
+                "IOCPARSER_WORKER_POLL_INTERVAL_SECONDS",
+                float_or(file_values["poll_interval_seconds"], 1.0),
+            )
+            or 1.0,
+            max_messages_per_cycle=int_env(
+                "IOCPARSER_WORKER_MAX_MESSAGES_PER_CYCLE",
+                int_or(file_values["max_messages_per_cycle"], 1),
+            )
+            or 1,
+            max_cycles=int_env(
+                "IOCPARSER_WORKER_MAX_CYCLES", int_or_none(file_values["max_cycles"])
+            ),
+            concurrency=int_env(
+                "IOCPARSER_WORKER_CONCURRENCY", int_or(file_values["concurrency"], 1)
+            )
+            or 1,
+            telemetry_mode=os.environ.get(
+                "IOCPARSER_WORKER_TELEMETRY_MODE", str(file_values["telemetry_mode"])
+            ),
+            max_input_size_bytes=int_env(
+                "IOCPARSER_WORKER_MAX_INPUT_SIZE_BYTES",
+                int_or_none(file_values["max_input_size_bytes"]),
+            ),
+            max_input_seconds=float_env(
+                "IOCPARSER_WORKER_MAX_INPUT_SECONDS",
+                float_or_none(file_values["max_input_seconds"]),
+            ),
+            memory_limit_bytes=int_env(
+                "IOCPARSER_WORKER_MEMORY_LIMIT_BYTES",
+                int_or_none(file_values["memory_limit_bytes"]),
+            ),
+            cpu_seconds=int_env(
+                "IOCPARSER_WORKER_CPU_SECONDS", int_or_none(file_values["cpu_seconds"])
+            ),
+            hard_timeout_seconds=int_env(
+                "IOCPARSER_WORKER_HARD_TIMEOUT_SECONDS",
+                int_or_none(file_values["hard_timeout_seconds"]),
+            ),
+            max_queue_size=int_env(
+                "IOCPARSER_WORKER_MAX_QUEUE_SIZE", int_or(file_values["max_queue_size"], 64)
+            )
+            or 64,
+            skip_processed=bool_env(
+                "IOCPARSER_WORKER_SKIP_PROCESSED", bool(file_values["skip_processed"])
+            ),
             config_path=resolved_path,
         )
 

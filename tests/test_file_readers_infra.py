@@ -16,4 +16,7 @@ def test_read_text_content_reads_plain_text(tmp_path: Path) -> None:
     sample = tmp_path / "sample.txt"
     sample.write_text("IOC domain: example.com", encoding="utf-8")
 
-    assert read_text_content(str(sample), ExtractionOptions(file_type="text")) == "IOC domain: example.com"
+    assert (
+        read_text_content(str(sample), ExtractionOptions(file_type="text"))
+        == "IOC domain: example.com"
+    )

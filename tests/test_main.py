@@ -68,7 +68,9 @@ from tests.warning_service_helpers import StaticWarningListService, swap_warning
 
 
 class LocalDownloadServer:
-    def __init__(self, *, body: bytes, content_type: str = "text/plain", content_length: str | None = None) -> None:
+    def __init__(
+        self, *, body: bytes, content_type: str = "text/plain", content_length: str | None = None
+    ) -> None:
         self.body = body
         self.content_type = content_type
         self.content_length = content_length
@@ -1103,7 +1105,9 @@ class TestProcessFileAdvanced:
             temp_path = Path(f.name)
 
         try:
-            with swap_warning_service(cli_runtime_module, StaticWarningListService()) as warning_service:
+            with swap_warning_service(
+                cli_runtime_module, StaticWarningListService()
+            ) as warning_service:
                 normal_iocs, warning_iocs = process_file(
                     temp_path,
                     file_type="text",
@@ -1299,11 +1303,15 @@ class TestProcessMultipleFilesInput:
                 force_update=False,
             )
 
-            with swap_warning_service(cli_runtime_module, StaticWarningListService()) as warning_service:
-                normal_iocs, warning_iocs, input_display, _results = cli_processing_module.process_multiple_files_input(
-                    args,
-                    reader=cli_runtime_module.reader,
-                    warning_service=warning_service,
+            with swap_warning_service(
+                cli_runtime_module, StaticWarningListService()
+            ) as warning_service:
+                normal_iocs, warning_iocs, input_display, _results = (
+                    cli_processing_module.process_multiple_files_input(
+                        args,
+                        reader=cli_runtime_module.reader,
+                        warning_service=warning_service,
+                    )
                 )
 
             # Should have aggregated results
@@ -1579,6 +1587,7 @@ class TestHandleMISPInit:
 
     def test_handle_misp_init(self) -> None:
         """Test handle_misp_init downloads and displays warning lists."""
+
         class LocalWarningLists:
             def __init__(self, cache_duration: int = 0, force_update: bool = True) -> None:
                 del cache_duration, force_update

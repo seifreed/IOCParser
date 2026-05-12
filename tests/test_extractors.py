@@ -705,7 +705,10 @@ class TestCoverageMissing:
             raise ValueError("Intentional error for testing")
 
         result = ExtractionAggregateMixin._extract_single_type(
-            self.extractor, "jwt", failing_method, text,
+            self.extractor,
+            "jwt",
+            failing_method,
+            text,
         )
         assert result is None
 

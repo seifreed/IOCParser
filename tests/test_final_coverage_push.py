@@ -35,7 +35,11 @@ class ServiceBackedWarningListsWithFallback:
             {
                 "domains": [
                     {"value": ""},
-                    {"value": "normal.example", "warning_list": "Matched", "description": "existing"},
+                    {
+                        "value": "normal.example",
+                        "warning_list": "Matched",
+                        "description": "existing",
+                    },
                     {"value": "warning.example", "warning_list": "Known", "description": ""},
                 ]
             },
@@ -50,10 +54,14 @@ def test_use_case_helpers_cover_empty_duplicates_and_truncation() -> None:
         "https://evil.example/path",
     )
     assert len(evidence) == 3
-    assert _build_evidence("https://evil.example/path\n \nhttps://evil.example/path\n", "https://evil.example/path")
+    assert _build_evidence(
+        "https://evil.example/path\n \nhttps://evil.example/path\n", "https://evil.example/path"
+    )
     assert _build_evidence("xxxhttps://evil.example/pathyyy", "https://evil.example/path")
 
-    result = _build_result_from_raw_iocs({"urls": ["https://evil.example/path", ""]}, "https://evil.example/path")
+    result = _build_result_from_raw_iocs(
+        {"urls": ["https://evil.example/path", ""]}, "https://evil.example/path"
+    )
     assert result.grouped_iocs() == {"urls": ["https://evil.example/path"]}
 
 
@@ -124,7 +132,11 @@ def test_warninglist_service_fallback_and_empty_warning_value() -> None:
 def test_streaming_private_helpers_cover_remaining_branches(tmp_path: Path) -> None:
     extractor = StreamingIOCExtractor(chunk_size=16, overlap=8, defang=False)
 
-    chunks = list(extractor._read_chunks_with_prefix(NoSeekBytesIO(b"https://evil.example/path"), is_text=False))
+    chunks = list(
+        extractor._read_chunks_with_prefix(
+            NoSeekBytesIO(b"https://evil.example/path"), is_text=False
+        )
+    )
     assert chunks
     wrapped = WrappedTextIO(io.BytesIO(b"placeholder"), encoding="utf-8")
     assert list(extractor._read_chunks_with_prefix(wrapped, is_text=False))

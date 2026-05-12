@@ -21,7 +21,9 @@ def test_load_config_uses_default_config_path_from_cwd(tmp_path: Path) -> None:
     original_persist = os.environ.pop("IOCPARSER_PERSIST", None)
     original_db_uri = os.environ.pop("IOCPARSER_DB_URI", None)
     config_path = tmp_path / "iocparser.ini"
-    config_path.write_text("[database]\npersist=true\nuri=sqlite:///from_default.db\n", encoding="utf-8")
+    config_path.write_text(
+        "[database]\npersist=true\nuri=sqlite:///from_default.db\n", encoding="utf-8"
+    )
 
     try:
         os.chdir(tmp_path)

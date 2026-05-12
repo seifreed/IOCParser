@@ -25,17 +25,23 @@ from tests.coverage_helpers import fresh_db
 # 1. __main__.py — exercise the main() entry point error paths
 # ---------------------------------------------------------------------------
 
+
 class TestMainEntryPoint:
     def test_main_function_exists_and_callable(self) -> None:
         from iocparser.__main__ import main
+
         assert callable(main)
 
     def test_main_help_flag(self, tmp_path: Path) -> None:
         import subprocess
         import sys
+
         result = subprocess.run(
             [sys.executable, "-m", "iocparser", "--help"],
-            capture_output=True, text=True, timeout=15, check=False,
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
         )
         assert result.returncode == 0
 
@@ -91,9 +97,11 @@ class TestMainEntryPoint:
 # 2. api_public.py — verify the facade re-exports
 # ---------------------------------------------------------------------------
 
+
 class TestApiPublicFacade:
     def test_api_public_imports_extraction(self) -> None:
         from iocparser import api_public
+
         assert hasattr(api_public, "extraction")
         assert hasattr(api_public, "persistence")
         assert hasattr(api_public, "pipeline")
@@ -102,10 +110,12 @@ class TestApiPublicFacade:
 
     def test_extraction_module_has_extract_functions(self) -> None:
         from iocparser.api_public import extraction
+
         assert callable(getattr(extraction, "extract_result_from_text", None))
 
     def test_integrations_has_get_renderer(self) -> None:
         from iocparser.api_public import integrations
+
         assert callable(getattr(integrations, "get_renderer", None))
 
 
@@ -113,17 +123,21 @@ class TestApiPublicFacade:
 # 3. application/errors.py — re-export shim coverage
 # ---------------------------------------------------------------------------
 
+
 class TestApplicationErrorsShim:
     def test_source_not_found_error_importable(self) -> None:
         from iocparser.application.errors import SourceNotFoundError as Imported
+
         assert Imported is SourceNotFoundError
 
     def test_source_processing_error_importable(self) -> None:
         from iocparser.application.errors import SourceProcessingError as Imported
+
         assert Imported is SourceProcessingError
 
     def test_all_exports(self) -> None:
         from iocparser.application import errors
+
         assert "SourceNotFoundError" in errors.__all__
         assert "SourceProcessingError" in errors.__all__
 
@@ -132,18 +146,25 @@ class TestApplicationErrorsShim:
 # 4+5. persistence repositories — savepoint retry paths
 # ---------------------------------------------------------------------------
 
+
 class TestIOCRepositorySavepointRetry:
     def test_get_or_create_returns_existing_on_duplicate(self, tmp_path: Path) -> None:
         session = Session(create_engine(fresh_db(tmp_path), future=True))
         repo = SQLAlchemyIOCRepository(session)
         id1 = repo._get_or_create(
-            ioc_type="domains", value="evil.com",
-            is_warning=False, warning_list="", warning_description="",
+            ioc_type="domains",
+            value="evil.com",
+            is_warning=False,
+            warning_list="",
+            warning_description="",
         )
         session.commit()
         id2 = repo._get_or_create(
-            ioc_type="domains", value="evil.com",
-            is_warning=False, warning_list="", warning_description="",
+            ioc_type="domains",
+            value="evil.com",
+            is_warning=False,
+            warning_list="",
+            warning_description="",
         )
         assert id1 == id2
         session.close()
@@ -152,7 +173,13 @@ class TestIOCRepositorySavepointRetry:
         session = Session(create_engine(fresh_db(tmp_path), future=True))
         repo = SQLAlchemyIOCRepository(session)
         ids = [
-            repo._get_or_create(ioc_type="sha256", value=f"hash{i}", is_warning=False, warning_list="", warning_description="")
+            repo._get_or_create(
+                ioc_type="sha256",
+                value=f"hash{i}",
+                is_warning=False,
+                warning_list="",
+                warning_description="",
+            )
             for i in range(5)
         ]
         session.commit()
@@ -167,8 +194,10 @@ class TestSourceRepositorySavepointRetry:
         id1 = repo.get_or_create(kind="file", value="test.pdf")
         session.commit()
         id2 = repo.get_or_create(
-            kind="file", value="test.pdf",
-            mime_type="application/pdf", content_hash="abc123",
+            kind="file",
+            value="test.pdf",
+            mime_type="application/pdf",
+            content_hash="abc123",
         )
         assert id1 == id2
         session.close()
@@ -179,11 +208,15 @@ class TestSourceRepositorySavepointRetry:
         repo.get_or_create(kind="url", value="https://example.com")
         session.commit()
         repo.get_or_create(
-            kind="url", value="https://example.com",
-            mime_type="text/html", content_hash="newchash", fingerprint="fp123",
+            kind="url",
+            value="https://example.com",
+            mime_type="text/html",
+            content_hash="newchash",
+            fingerprint="fp123",
         )
         session.commit()
         from iocparser.infrastructure.persistence_models import SourceModel
+
         source = session.query(SourceModel).filter_by(value="https://example.com").first()
         assert source.mime_type == "text/html"
         assert source.content_hash == "newchash"
@@ -193,13 +226,15 @@ class TestSourceRepositorySavepointRetry:
         session = Session(create_engine(fresh_db(tmp_path), future=True))
         repo = SQLAlchemySourceRepository(session)
         id1 = repo.get_or_create(
-            kind="url", value="https://example.com/page",
+            kind="url",
+            value="https://example.com/page",
             normalized_url="https://example.com/page",
             original_url="https://example.com/page",
         )
         session.commit()
         id2 = repo.get_or_create(
-            kind="url", value="https://example.com/page",
+            kind="url",
+            value="https://example.com/page",
             normalized_url="https://example.com/page",
         )
         assert id1 == id2
@@ -209,6 +244,7 @@ class TestSourceRepositorySavepointRetry:
 # ---------------------------------------------------------------------------
 # 6. rendering_support.py — prepare_json_payload
 # ---------------------------------------------------------------------------
+
 
 class TestPrepareJsonPayload:
     def test_string_only_section_sorted(self) -> None:
@@ -250,6 +286,7 @@ class TestPrepareJsonPayload:
 # 7. cli_processing_support.py — BatchResultsCollection edge cases
 # ---------------------------------------------------------------------------
 
+
 class TestBatchResultsCollectionEdgeCases:
     def test_values_returns_all_pairs(self) -> None:
         col = BatchResultsCollection()
@@ -267,7 +304,12 @@ class TestBatchResultsCollectionEdgeCases:
 
     def test_getitem_by_source_value(self) -> None:
         col = BatchResultsCollection()
-        col.add(item_key="batch-item:1", source_value="file.txt", normal_iocs={"d": ["x"]}, warning_iocs={})
+        col.add(
+            item_key="batch-item:1",
+            source_value="file.txt",
+            normal_iocs={"d": ["x"]},
+            warning_iocs={},
+        )
         normal, _warnings = col["file.txt"]
         assert "d" in normal
 
@@ -325,16 +367,19 @@ class TestBatchResultsCollectionEdgeCases:
 # 8. shared_utils.py — _dedup_key dict branch
 # ---------------------------------------------------------------------------
 
+
 class TestDedupKeyDictBranch:
     def test_dedup_key_with_dict(self) -> None:
         key = _dedup_key({"value": "Evil.Com", "type": "domain"})
         assert "evil.com" in key
 
     def test_deduplicate_iocs_with_dicts(self) -> None:
-        iocs = {"domains": [
-            {"value": "Evil.Com"},
-            {"value": "evil.com"},
-        ]}
+        iocs = {
+            "domains": [
+                {"value": "Evil.Com"},
+                {"value": "evil.com"},
+            ]
+        }
         result = deduplicate_iocs(iocs)
         assert len(result["domains"]) == 1
 
@@ -342,6 +387,7 @@ class TestDedupKeyDictBranch:
 # ---------------------------------------------------------------------------
 # 9. worker_service.py — concurrent path
 # ---------------------------------------------------------------------------
+
 
 class TestWorkerServiceConcurrent:
     def test_concurrency_property_with_limits(self) -> None:

@@ -5,7 +5,9 @@ from iocparser.domain.models import BatchJobSummary
 from iocparser.interfaces.ports import PersistenceQueryService
 
 
-def export_persisted_history(*, persistence_query_service: PersistenceQueryService) -> dict[str, object]:
+def export_persisted_history(
+    *, persistence_query_service: PersistenceQueryService
+) -> dict[str, object]:
     """Export all persisted history."""
     return persistence_query_service.export_history()
 

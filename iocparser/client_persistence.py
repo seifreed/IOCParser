@@ -85,7 +85,9 @@ class PersistenceClient:
             sort_by=query.sort_by,
         )
 
-    def search_iocs(self, *, value: str, **options: Unpack[SearchIOCsOptions]) -> PersistedIOCSearchPage:
+    def search_iocs(
+        self, *, value: str, **options: Unpack[SearchIOCsOptions]
+    ) -> PersistedIOCSearchPage:
         query = SearchPersistedIOCsInput(
             value=value,
             limit=int(options.get("limit", 50)),
@@ -136,7 +138,9 @@ class PersistenceClient:
     def list_failed_batches(self, *, limit: int = 20) -> list[BatchJobSummary]:
         return self._typed_service.list_failed_batches(limit=limit)
 
-    def list_batch_jobs(self, *, limit: int = 20, statuses: tuple[str, ...] = ()) -> list[BatchJobSummary]:
+    def list_batch_jobs(
+        self, *, limit: int = 20, statuses: tuple[str, ...] = ()
+    ) -> list[BatchJobSummary]:
         return self._typed_service.list_batch_jobs(limit=limit, statuses=statuses)
 
     def get_batch_job(self, *, batch_job_id: int) -> BatchJobDetail | None:
@@ -146,7 +150,9 @@ class PersistenceClient:
         return self._typed_service.list_batch_runs(batch_job_id=batch_job_id)
 
     def retain_history(self, *, days: int, statuses: str | None = None) -> int:
-        return self._typed_service.retain_history(days=days, statuses=parse_string_filters(statuses))
+        return self._typed_service.retain_history(
+            days=days, statuses=parse_string_filters(statuses)
+        )
 
     def get_distributed_job(self, *, job_id: str) -> DistributedJobRecord | None:
         return self._typed_service.get_distributed_job(job_id=job_id)
@@ -164,7 +170,9 @@ class PersistenceClient:
             queue_backend=queue_backend,
         )
 
-    def list_dead_letters(self, *, limit: int = 50, queue_backend: str | None = None) -> list[DeadLetterRecord]:
+    def list_dead_letters(
+        self, *, limit: int = 50, queue_backend: str | None = None
+    ) -> list[DeadLetterRecord]:
         return self._typed_service.list_dead_letters(limit=limit, queue_backend=queue_backend)
 
 

@@ -16,17 +16,20 @@ def pipeline_worker_for(
     limits: ResourceLimits | None,
     processed_run_lookup: ProcessedRunLookup | None = None,
 ) -> PipelineWorker:
-    return worker or PipelineWorker(
-        limits=limits,
-        processed_run_lookup=processed_run_lookup,
-    )
+    return worker or PipelineWorker(limits=limits, processed_run_lookup=processed_run_lookup)
+
+
 def default_pipeline_telemetry_sink(telemetry_sink: TelemetrySink | None = None) -> TelemetrySink:
     return telemetry_sink or LoggingTelemetrySink()
+
+
 def telemetry_sink_for_mode(mode: str) -> TelemetrySink:
     normalized = mode.strip().lower()
     if normalized in {"none", "noop", "disabled"}:
         return NoOpTelemetrySink()
     return LoggingTelemetrySink()
+
+
 @contextmanager
 def guarded_pipeline_runtime(limits: ResourceLimits) -> Iterator[None]:
     with runtime_limits_guard(
@@ -36,4 +39,7 @@ def guarded_pipeline_runtime(limits: ResourceLimits) -> Iterator[None]:
     ):
         yield
 
+
+# fmt: off
 __all__ = ["default_pipeline_telemetry_sink", "guarded_pipeline_runtime", "pipeline_worker_for", "telemetry_sink_for_mode"]
+# fmt: on

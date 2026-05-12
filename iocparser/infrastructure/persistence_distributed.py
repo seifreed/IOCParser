@@ -43,10 +43,14 @@ class SQLAlchemyDistributedJobService:
     def __init__(self, db_uri: str) -> None:
         self.db_uri = db_uri
 
-    def create_or_get_job(self, *, envelope: QueueEnvelope, receipt_id: str) -> DistributedJobRecord:
+    def create_or_get_job(
+        self, *, envelope: QueueEnvelope, receipt_id: str
+    ) -> DistributedJobRecord:
         unit = SQLAlchemyUnitOfWork(self.db_uri)
         try:
-            return self._create_or_get_job_inner(envelope=envelope, receipt_id=receipt_id, unit=unit)
+            return self._create_or_get_job_inner(
+                envelope=envelope, receipt_id=receipt_id, unit=unit
+            )
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception:
@@ -55,7 +59,9 @@ class SQLAlchemyDistributedJobService:
         finally:
             unit.close()
 
-    def _create_or_get_job_inner(self, *, envelope: QueueEnvelope, receipt_id: str, unit: SQLAlchemyUnitOfWork) -> DistributedJobRecord:
+    def _create_or_get_job_inner(
+        self, *, envelope: QueueEnvelope, receipt_id: str, unit: SQLAlchemyUnitOfWork
+    ) -> DistributedJobRecord:
         stmt = job_by_id_stmt(str(envelope.request.job_id))
         model = unit.session.execute(stmt).scalar_one_or_none()
         if model is None:
@@ -74,25 +80,33 @@ class SQLAlchemyDistributedJobService:
     def get_job(self, *, job_id: str) -> DistributedJobRecord | None:
         unit = SQLAlchemyUnitOfWork(self.db_uri)
         try:
-            exact = unit.session.execute(
-                select(DistributedJobModel)
-                .where(DistributedJobModel.job_id == job_id)
-                .order_by(
-                    DistributedJobModel.submitted_at.desc(),
-                    DistributedJobModel.id.desc(),
+            exact = (
+                unit.session.execute(
+                    select(DistributedJobModel)
+                    .where(DistributedJobModel.job_id == job_id)
+                    .order_by(
+                        DistributedJobModel.submitted_at.desc(),
+                        DistributedJobModel.id.desc(),
+                    )
                 )
-            ).scalars().first()
+                .scalars()
+                .first()
+            )
             if exact is not None:
                 return model_record(exact)
             imported = list(
                 unit.session.execute(
-                    select(DistributedJobModel).where(
+                    select(DistributedJobModel)
+                    .where(
                         DistributedJobModel.job_id.like(f"{job_id}#history:%"),
-                    ).order_by(
+                    )
+                    .order_by(
                         DistributedJobModel.submitted_at.desc(),
                         DistributedJobModel.id.desc(),
                     )
-                ).scalars().all()
+                )
+                .scalars()
+                .all()
             )
             if not imported:
                 return None
@@ -111,7 +125,9 @@ class SQLAlchemyDistributedJobService:
         finally:
             unit.close()
 
-    def list_jobs(self, *, limit: int = 50, statuses: tuple[str, ...] = (), queue_backend: str | None = None) -> list[DistributedJobRecord]:
+    def list_jobs(
+        self, *, limit: int = 50, statuses: tuple[str, ...] = (), queue_backend: str | None = None
+    ) -> list[DistributedJobRecord]:
         unit = SQLAlchemyUnitOfWork(self.db_uri)
         try:
             stmt = list_jobs_stmt(limit=limit, statuses=statuses, queue_backend=queue_backend)
@@ -120,7 +136,9 @@ class SQLAlchemyDistributedJobService:
         finally:
             unit.close()
 
-    def mark_running(self, *, job_id: str, attempts: int, receipt_id: str) -> DistributedJobRecord | None:
+    def mark_running(
+        self, *, job_id: str, attempts: int, receipt_id: str
+    ) -> DistributedJobRecord | None:
         transition = running_transition(job_id=job_id, attempts=attempts, receipt_id=receipt_id)
         return self._transition(
             job_id=transition["job_id"],
@@ -202,7 +220,9 @@ class SQLAlchemyDistributedJobService:
         finally:
             unit.close()
 
-    def list_dead_letters(self, *, limit: int = 50, queue_backend: str | None = None) -> list[DeadLetterRecord]:
+    def list_dead_letters(
+        self, *, limit: int = 50, queue_backend: str | None = None
+    ) -> list[DeadLetterRecord]:
         unit = SQLAlchemyUnitOfWork(self.db_uri)
         try:
             stmt = list_dead_letters_stmt(limit=limit, queue_backend=queue_backend)

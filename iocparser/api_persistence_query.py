@@ -154,7 +154,9 @@ def search_input(value: str, options: SearchPersistedIOCOptions) -> SearchPersis
         min_severity=validated_min_severity(optional_str(options.get("min_severity"))),
         tag_mode=validated_tag_mode(optional_str(options.get("tag_mode")) or "all"),
         sort_by=validated_search_sort(optional_str(options.get("sort_by")) or "newest"),
-        search_backend=validated_search_backend(optional_str(options.get("search_backend")) or "auto"),
+        search_backend=validated_search_backend(
+            optional_str(options.get("search_backend")) or "auto"
+        ),
     )
 
 
@@ -396,7 +398,9 @@ def export_structured_persisted_diff(
     else:
         if left_run_id is None or right_run_id is None:
             raise ValueError(MISSING_DIFF_TARGET_ERROR)
-        diff = diff_persisted_runs(db_uri=db_uri, left_run_id=left_run_id, right_run_id=right_run_id, **options)
+        diff = diff_persisted_runs(
+            db_uri=db_uri, left_run_id=left_run_id, right_run_id=right_run_id, **options
+        )
     return diff.to_record()
 
 
@@ -424,7 +428,9 @@ def search_persisted_iocs(
 ) -> list[PersistedRunQueryHit]:
     return _validated_search_call(
         value,
-        lambda: _search_persisted_iocs(search_input(value, options), persistence_query_service=query_service(db_uri)),
+        lambda: _search_persisted_iocs(
+            search_input(value, options), persistence_query_service=query_service(db_uri)
+        ),
     )
 
 
@@ -436,7 +442,9 @@ def query_persisted_iocs(
 ) -> PersistedIOCSearchPage:
     return _validated_search_call(
         value,
-        lambda: _search_persisted_iocs_page(search_input(value, options), persistence_query_service=query_service(db_uri)),
+        lambda: _search_persisted_iocs_page(
+            search_input(value, options), persistence_query_service=query_service(db_uri)
+        ),
     )
 
 
@@ -458,7 +466,9 @@ def list_distributed_jobs(
     )
 
 
-def list_dead_letters(*, db_uri: str, limit: int = 50, queue_backend: str | None = None) -> list[DeadLetterRecord]:
+def list_dead_letters(
+    *, db_uri: str, limit: int = 50, queue_backend: str | None = None
+) -> list[DeadLetterRecord]:
     return query_service(db_uri).list_dead_letters(limit=limit, queue_backend=queue_backend)
 
 

@@ -74,7 +74,9 @@ class LocalHTTPServer:
                 del fmt, args
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.thread = threading.Thread(target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True)
+        self.thread = threading.Thread(
+            target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True
+        )
         self.thread.start()
         return f"http://127.0.0.1:{self.server.server_address[1]}/sample.txt"
 
@@ -89,7 +91,9 @@ class LocalHTTPServer:
 
 def test_public_api_extract_iocs_from_url_supports_filters() -> None:
     with LocalHTTPServer(b"IOC URL: https://evil.example/path Domain: sample.org") as url:
-        normal_iocs, warning_iocs = extract_iocs_from_url(url, check_warnings=False, only="urls", defang=False)
+        normal_iocs, warning_iocs = extract_iocs_from_url(
+            url, check_warnings=False, only="urls", defang=False
+        )
 
     assert normal_iocs == {"urls": ["https://evil.example/path"]}
     assert warning_iocs == {}
@@ -249,11 +253,15 @@ def test_persistence_queries_and_cli_query_paths(tmp_path: Path) -> None:
     runs = query_runs(QueryRunsInput(limit=10), persistence_query_service=service)
     assert len(runs) == 2
 
-    hits = search_persisted_iocs(SearchPersistedIOCsInput(value="beta"), persistence_query_service=service)
+    hits = search_persisted_iocs(
+        SearchPersistedIOCsInput(value="beta"), persistence_query_service=service
+    )
     assert len(hits) == 1
     assert hits[0].value == "beta.example"
 
-    export = export_persisted_run(ExportPersistedRunInput(run_id=run_ids[0]), persistence_query_service=service)
+    export = export_persisted_run(
+        ExportPersistedRunInput(run_id=run_ids[0]), persistence_query_service=service
+    )
     assert export.summary.source_value == "alpha.txt"
     assert export.result.grouped_iocs() == {"domains": ["alpha.example"]}
 
@@ -290,8 +298,16 @@ def test_cli_export_and_diff_outputs_use_new_renderers(tmp_path: Path) -> None:
     service = SQLAlchemyPersistenceService(db_uri)
     run_ids = service.persist_multiple_runs(
         [
-            ("file", "first.txt", ExtractionResult.from_grouped_payload({"domains": ["one.example"]}, {})),
-            ("file", "second.txt", ExtractionResult.from_grouped_payload({"domains": ["two.example"]}, {})),
+            (
+                "file",
+                "first.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["one.example"]}, {}),
+            ),
+            (
+                "file",
+                "second.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["two.example"]}, {}),
+            ),
         ],
         tool_version="9.9.9",
         options=PersistOptions(

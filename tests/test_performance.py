@@ -47,5 +47,6 @@ class TestBenchmarks:
         result = benchmark(extract)
         assert isinstance(result, dict)
 
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--benchmark-only"])

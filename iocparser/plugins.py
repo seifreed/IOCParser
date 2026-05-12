@@ -58,7 +58,9 @@ def register_renderer(name: str, factory: RendererFactory) -> None:
     _renderer_registry[name.lower()] = factory
 
 
-def get_renderer(name: str, *, with_context: bool = False, stix_types: str | None = None) -> OutputRenderer:
+def get_renderer(
+    name: str, *, with_context: bool = False, stix_types: str | None = None
+) -> OutputRenderer:
     """Resolve a renderer by name."""
     _load_entry_point_plugins()
     return _renderer_registry[name.lower()](with_context, stix_types)
@@ -180,9 +182,13 @@ def _register_discovered_ioc_types() -> None:
                 str(definition.get("name", plugin_name)),
                 base_type=base_type_raw,
                 aliases=_string_tuple(definition.get("aliases")),
-                severity=str(definition["severity"]) if definition.get("severity") is not None else None,
+                severity=str(definition["severity"])
+                if definition.get("severity") is not None
+                else None,
                 tags=_string_tuple(definition.get("tags")),
-                stix_pattern=str(definition["stix_pattern"]) if definition.get("stix_pattern") is not None else None,
+                stix_pattern=str(definition["stix_pattern"])
+                if definition.get("stix_pattern") is not None
+                else None,
             )
         except (ValueError, TypeError, KeyError) as exc:
             _logger.warning("Failed to register IOC type plugin '%s': %s", plugin_name, exc)
@@ -200,8 +206,12 @@ def _register_builtin_plugins() -> None:
     for name in ("text", "json", "jsonl", "csv", "stix"):
         _BUILTIN_RENDERER_NAMES.add(name)
     _BUILTIN_ENRICHER_NAMES.add("misp")
-    register_renderer("text", lambda with_context, _stix: TextOutputRenderer(include_context=with_context))
-    register_renderer("json", lambda with_context, _stix: JSONOutputRenderer(include_context=with_context))
+    register_renderer(
+        "text", lambda with_context, _stix: TextOutputRenderer(include_context=with_context)
+    )
+    register_renderer(
+        "json", lambda with_context, _stix: JSONOutputRenderer(include_context=with_context)
+    )
     register_renderer("jsonl", lambda _with_context, _stix: JSONLinesOutputRenderer())
     register_renderer("csv", lambda _with_context, _stix: CSVOutputRenderer())
     register_renderer(

@@ -54,7 +54,9 @@ def resolve_input_payload(
     args: argparse.Namespace,
     *,
     config: AppConfig | None = None,
-    process_multiple_files_input: Callable[[argparse.Namespace], tuple[GroupedIocs, GroupedWarnings, str, BatchResults]],
+    process_multiple_files_input: Callable[
+        [argparse.Namespace], tuple[GroupedIocs, GroupedWarnings, str, BatchResults]
+    ],
     process_single_input: Callable[[argparse.Namespace], tuple[GroupedIocs, GroupedWarnings, str]],
 ) -> ResolvedInputPayload:
     values = cast("Mapping[str, object]", vars(args))
@@ -67,7 +69,9 @@ def resolve_input_payload(
             reader=_cli_runtime.reader,
             warning_service=_cli_runtime.warning_service_for_args(args),
         )
-        return ResolvedInputPayload(dir_result[0], dir_result[1], dir_result[2], results=dir_result[3])
+        return ResolvedInputPayload(
+            dir_result[0], dir_result[1], dir_result[2], results=dir_result[3]
+        )
     if (
         _cli_args.get_optional_str_arg(args, "url_file")
         or _cli_args.get_optional_str_arg(args, "retry_failed_from")
@@ -80,7 +84,13 @@ def resolve_input_payload(
             downloader=_cli_runtime.downloader_for_args(args),
             db_uri=config.db_uri if config is not None else None,
         )
-        return ResolvedInputPayload(url_result[0], url_result[1], url_result[2], results=url_result[3], batch_report=url_result[4])
+        return ResolvedInputPayload(
+            url_result[0],
+            url_result[1],
+            url_result[2],
+            results=url_result[3],
+            batch_report=url_result[4],
+        )
     single = process_single_input(args)
     return ResolvedInputPayload(single[0], single[1], single[2])
 
@@ -102,20 +112,26 @@ def persist_batch_results(
             source_kind=source_kind,
         )
         return
-    persisted_run_ids = _cli_persistence.persist_many_results(
-        results,
-        config=config,
-        options=persist_options,
-        source_kind=source_kind,
-        source_metadata_map=batch_report.get("source_metadata_map"),
-        run_metadata_map=batch_report.get("run_metadata_map"),
-    ) or ()
-    failed_run_ids = _cli_persistence.persist_failed_batch_items(
-        batch_report,
-        config=config,
-        options=persist_options,
-        source_kind="url",
-    ) or ()
+    persisted_run_ids = (
+        _cli_persistence.persist_many_results(
+            results,
+            config=config,
+            options=persist_options,
+            source_kind=source_kind,
+            source_metadata_map=batch_report.get("source_metadata_map"),
+            run_metadata_map=batch_report.get("run_metadata_map"),
+        )
+        or ()
+    )
+    failed_run_ids = (
+        _cli_persistence.persist_failed_batch_items(
+            batch_report,
+            config=config,
+            options=persist_options,
+            source_kind="url",
+        )
+        or ()
+    )
     phase_timings = batch_report.get("phase_timings_ms", {})
     phase_timings["persistence"] = int((time.perf_counter() - persist_started) * 1000)
     _cli_persistence.persist_batch_job(
@@ -174,7 +190,9 @@ def finalize_cli_run(
 
     persist_options = _cli_persistence.build_persist_options(args)
     if batch_report is not None:
-        persist_batch_results(args, config, persist_options, results or BatchResultsCollection(), batch_report)
+        persist_batch_results(
+            args, config, persist_options, results or BatchResultsCollection(), batch_report
+        )
         public_report = _public_batch_report(batch_report)
         _cli_output.print_batch_report(public_report)
         _cli_output.save_batch_report(

@@ -127,7 +127,9 @@ class RabbitMQQueueAdapter:
         method, properties, body = channel.basic_get(queue=queue_name, auto_ack=False)
         if method is None or properties is None or body is None:
             return None
-        receipt = QueueReceipt("rabbitmq", queue_name, str(method.delivery_tag), str(properties.message_id or uuid4()))
+        receipt = QueueReceipt(
+            "rabbitmq", queue_name, str(method.delivery_tag), str(properties.message_id or uuid4())
+        )
         return receipt, QueueEnvelope.from_record(_load_queue_record(body))
 
     def ack(self, receipt: QueueReceipt) -> None:
@@ -139,7 +141,9 @@ class RabbitMQQueueAdapter:
         return new_receipt
 
     def dead_letter(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
-        new_receipt = self.enqueue(queue_name=f"{receipt.queue_name}{self.dead_letter_suffix}", envelope=envelope)
+        new_receipt = self.enqueue(
+            queue_name=f"{receipt.queue_name}{self.dead_letter_suffix}", envelope=envelope
+        )
         self.ack(receipt)
         return new_receipt
 

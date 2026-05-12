@@ -12,7 +12,6 @@ with no mocks, no monkeypatching, and no test doubles of any kind.
 Author: Marc Rivero | @seifreed
 """
 
-
 from iocparser.infrastructure.extraction import DefaultIOCExtractionEngine
 
 # ---------------------------------------------------------------------------
@@ -23,10 +22,7 @@ from iocparser.infrastructure.extraction import DefaultIOCExtractionEngine
 def test_extract_cidr_valid_ranges():
     """CIDR blocks with prefix lengths 0-32 must be extracted and validated."""
     engine = DefaultIOCExtractionEngine()
-    text = (
-        "Blocked networks: 192.168.1.0/24, 10.0.0.0/8, "
-        "172.16.0.0/12, 0.0.0.0/0, 203.0.113.0/24"
-    )
+    text = "Blocked networks: 192.168.1.0/24, 10.0.0.0/8, 172.16.0.0/12, 0.0.0.0/0, 203.0.113.0/24"
     result = engine.extract_all(text)
     cidrs = result.get("cidr", [])
 
@@ -278,10 +274,7 @@ def test_extract_aws_access_keys_all_prefixes():
     # Each key = 4-char prefix + exactly 16 uppercase alphanumeric chars = 20 chars total.
     # The suffix "1234567890ABCDEF" is exactly 16 chars.
     text = (
-        "Keys: AKIA1234567890ABCDEF "
-        "ABIA1234567890ABCDEF "
-        "ACCA1234567890ABCDEF "
-        "ASIA1234567890ABCDEF"
+        "Keys: AKIA1234567890ABCDEF ABIA1234567890ABCDEF ACCA1234567890ABCDEF ASIA1234567890ABCDEF"
     )
     result = engine.extract_all(text)
     keys = result.get("aws_access_keys", [])
@@ -834,7 +827,7 @@ def test_extract_sigma_rule_ids_no_match():
 def test_extract_suricata_sids_valid():
     """Suricata/Snort SID values following 'sid:' must be extracted."""
     engine = DefaultIOCExtractionEngine()
-    text = "Rule: alert tcp any any -> any 80 (msg:\"test\"; sid:2024897; rev:1;)"
+    text = 'Rule: alert tcp any any -> any 80 (msg:"test"; sid:2024897; rev:1;)'
     result = engine.extract_all(text)
     sids = result.get("suricata_sids", [])
 
@@ -845,8 +838,8 @@ def test_extract_suricata_sids_multiple():
     """Multiple SIDs across separate rules must all be extracted."""
     engine = DefaultIOCExtractionEngine()
     text = (
-        "alert tcp any any -> any 80 (msg:\"HTTP\"; sid:1000001; rev:1;)\n"
-        "alert udp any any -> any 53 (msg:\"DNS\"; sid:1000002; rev:2;)"
+        'alert tcp any any -> any 80 (msg:"HTTP"; sid:1000001; rev:1;)\n'
+        'alert udp any any -> any 53 (msg:"DNS"; sid:1000002; rev:2;)'
     )
     result = engine.extract_all(text)
     sids = result.get("suricata_sids", [])

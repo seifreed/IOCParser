@@ -77,10 +77,14 @@ class DistributedPipelineClient:
             idempotency_key=idempotency_key,
         )
 
-    def process_next(self, *, queue_name: str = "default") -> DistributedJobRecord | PipelineJobResult | None:
+    def process_next(
+        self, *, queue_name: str = "default"
+    ) -> DistributedJobRecord | PipelineJobResult | None:
         return self._service.process_next(queue_name=queue_name)
 
-    def drain(self, *, queue_name: str = "default", limit: int = 100) -> list[DistributedJobRecord | PipelineJobResult]:
+    def drain(
+        self, *, queue_name: str = "default", limit: int = 100
+    ) -> list[DistributedJobRecord | PipelineJobResult]:
         return self._service.drain(queue_name=queue_name, limit=limit)
 
     def get_job(self, *, job_id: str) -> DistributedJobRecord | None:
@@ -99,5 +103,7 @@ class DistributedPipelineClient:
             queue_backend=queue_backend,
         )
 
-    def list_dead_letters(self, *, limit: int = 50, queue_backend: str | None = None) -> list[DeadLetterRecord]:
+    def list_dead_letters(
+        self, *, limit: int = 50, queue_backend: str | None = None
+    ) -> list[DeadLetterRecord]:
         return self._service.list_dead_letters(limit=limit, queue_backend=queue_backend)

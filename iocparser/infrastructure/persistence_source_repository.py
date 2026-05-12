@@ -31,11 +31,20 @@ class SQLAlchemySourceRepository(SourceRepository):
     ) -> int:
         stmt = select(SOURCE_MODEL).where(SourceModel.kind == kind)
         if kind == "url" and normalized_url:
-            stmt = stmt.where(or_(SourceModel.normalized_url == normalized_url, SourceModel.value == value))
+            stmt = stmt.where(
+                or_(SourceModel.normalized_url == normalized_url, SourceModel.value == value)
+            )
         else:
             stmt = stmt.where(SourceModel.value == value)
         source_rows: list[SourceModel] = self.session.execute(stmt).scalars().all()
-        source = next((row for row in source_rows if kind == "url" and normalized_url and row.normalized_url == normalized_url), None)
+        source = next(
+            (
+                row
+                for row in source_rows
+                if kind == "url" and normalized_url and row.normalized_url == normalized_url
+            ),
+            None,
+        )
         if source is None:
             source = source_rows[0] if source_rows else None
         now = datetime.now(UTC)
@@ -73,9 +82,13 @@ class SQLAlchemySourceRepository(SourceRepository):
             except Exception:
                 self.session.rollback()
                 raise
-            source_rows = self.session.execute(
-                select(SOURCE_MODEL).where(SourceModel.kind == kind, SourceModel.value == value)
-            ).scalars().all()
+            source_rows = (
+                self.session.execute(
+                    select(SOURCE_MODEL).where(SourceModel.kind == kind, SourceModel.value == value)
+                )
+                .scalars()
+                .all()
+            )
             if not source_rows:
                 raise
             existing = source_rows[0]

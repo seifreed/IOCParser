@@ -81,7 +81,10 @@ class SQSQueueAdapter:
                 QueueUrl=resolved_url,
                 MessageBody=json.dumps(envelope.to_record(), sort_keys=True),
                 MessageAttributes={
-                    "job_id": {"StringValue": str(envelope.request.job_id or uuid4()), "DataType": "String"},
+                    "job_id": {
+                        "StringValue": str(envelope.request.job_id or uuid4()),
+                        "DataType": "String",
+                    },
                 },
             )
             message_id = str(response["MessageId"])
@@ -120,7 +123,10 @@ class SQSQueueAdapter:
                 QueueUrl=resolved_url,
                 MessageBody=json.dumps(envelope.to_record(), sort_keys=True),
                 MessageAttributes={
-                    "job_id": {"StringValue": str(envelope.request.job_id or uuid4()), "DataType": "String"},
+                    "job_id": {
+                        "StringValue": str(envelope.request.job_id or uuid4()),
+                        "DataType": "String",
+                    },
                 },
             )
             message_id = str(response["MessageId"])

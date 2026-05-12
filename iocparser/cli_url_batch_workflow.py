@@ -54,8 +54,13 @@ def run_url_batch_workflow(
     batch_started_wall = time.time()
     retry_report = get_optional_str_arg(request.args, "retry_failed_from")
     retry_batch_job_value: object = getattr(request.args, "retry_batch_job", None)
-    retry_batch_job = _support.int_value(retry_batch_job_value) if retry_batch_job_value is not None else None
-    job_id = get_optional_str_arg(request.args, "job_id") or f"url-batch-{int(batch_started_wall * 1000)}"
+    retry_batch_job = (
+        _support.int_value(retry_batch_job_value) if retry_batch_job_value is not None else None
+    )
+    job_id = (
+        get_optional_str_arg(request.args, "job_id")
+        or f"url-batch-{int(batch_started_wall * 1000)}"
+    )
     correlation_id = get_optional_str_arg(request.args, "correlation_id") or job_id
     urls, input_label, input_load_ms = _support.load_batch_urls(
         request.args,
@@ -196,7 +201,5 @@ def _collect_url_results(
                 "error_message": "",
             }
             state.source_metadata_map[item_key] = (
-                {**metadata, "input_value": url}
-                if metadata
-                else {"input_value": url}
+                {**metadata, "input_value": url} if metadata else {"input_value": url}
             )

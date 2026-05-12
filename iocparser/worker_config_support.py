@@ -83,17 +83,27 @@ def load_worker_file_values(config_path: Path | None) -> dict[str, object]:
         values["queue_name"] = parser.get("worker", "queue_name", fallback="default")
         values["queue_url"] = parser.get("worker", "queue_url", fallback=None)
         values["queue_path"] = parser.get("worker", "queue_path", fallback=".iocparser-queue")
-        values["dead_letter_queue_url"] = parser.get("worker", "dead_letter_queue_url", fallback=None)
-        values["poll_interval_seconds"] = parser.getfloat("worker", "poll_interval_seconds", fallback=1.0)
-        values["max_messages_per_cycle"] = parser.getint("worker", "max_messages_per_cycle", fallback=1)
+        values["dead_letter_queue_url"] = parser.get(
+            "worker", "dead_letter_queue_url", fallback=None
+        )
+        values["poll_interval_seconds"] = parser.getfloat(
+            "worker", "poll_interval_seconds", fallback=1.0
+        )
+        values["max_messages_per_cycle"] = parser.getint(
+            "worker", "max_messages_per_cycle", fallback=1
+        )
         values["max_cycles"] = parser.getint("worker", "max_cycles", fallback=None)
         values["concurrency"] = parser.getint("worker", "concurrency", fallback=1)
         values["telemetry_mode"] = parser.get("worker", "telemetry_mode", fallback="logging")
     if parser.has_section("runtime"):
-        values["max_input_size_bytes"] = parser.getint("runtime", "max_input_size_bytes", fallback=None)
+        values["max_input_size_bytes"] = parser.getint(
+            "runtime", "max_input_size_bytes", fallback=None
+        )
         values["memory_limit_bytes"] = parser.getint("runtime", "memory_limit_bytes", fallback=None)
         values["cpu_seconds"] = parser.getint("runtime", "cpu_seconds", fallback=None)
-        values["hard_timeout_seconds"] = parser.getint("runtime", "hard_timeout_seconds", fallback=None)
+        values["hard_timeout_seconds"] = parser.getint(
+            "runtime", "hard_timeout_seconds", fallback=None
+        )
         values["max_queue_size"] = parser.getint("runtime", "max_queue_size", fallback=64)
         values["skip_processed"] = parser.getboolean("runtime", "skip_processed", fallback=False)
     return values

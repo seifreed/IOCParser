@@ -30,7 +30,10 @@ from iocparser.interfaces.ports import FileWriter
 
 
 def print_run_summaries(runs: list[PersistedRunSummary]) -> None:
-    sys.stdout.write("run_id\tstatus\tsource_kind\tsource_value\tnormal_iocs\twarnings\tprocessed\tfailed\ttool_version\tstarted_at" + "\n")
+    sys.stdout.write(
+        "run_id\tstatus\tsource_kind\tsource_value\tnormal_iocs\twarnings\tprocessed\tfailed\ttool_version\tstarted_at"
+        + "\n"
+    )
     for run in runs:
         sys.stdout.write(
             f"{run.run_id}\t{run.status}\t{run.source_kind}\t{run.source_value}\t"
@@ -105,12 +108,16 @@ def print_batch_report(report: Mapping[str, object]) -> None:
     error_groups = report.get("error_groups", {})
     if isinstance(error_groups, dict) and error_groups:
         sys.stdout.write("Failure groups" + "\n")
-        for error_type, count in sorted((str(key), _int_value(value)) for key, value in error_groups.items()):
+        for error_type, count in sorted(
+            (str(key), _int_value(value)) for key, value in error_groups.items()
+        ):
             sys.stdout.write(f"  {error_type}\t{count}" + "\n")
     phase_timings = report.get("phase_timings_ms", {})
     if isinstance(phase_timings, dict) and phase_timings:
         sys.stdout.write("Phase timings (ms)" + "\n")
-        for phase, value in sorted((str(key), _int_value(val)) for key, val in phase_timings.items()):
+        for phase, value in sorted(
+            (str(key), _int_value(val)) for key, val in phase_timings.items()
+        ):
             sys.stdout.write(f"  {phase}\t{value}" + "\n")
     metrics = report.get("metrics", {})
     if isinstance(metrics, dict) and metrics:
@@ -119,7 +126,9 @@ def print_batch_report(report: Mapping[str, object]) -> None:
             sys.stdout.write(f"  {name}\t{value}" + "\n")
 
 
-def save_batch_report(report: Mapping[str, object], output_path: str | None, *, file_writer: FileWriter) -> None:
+def save_batch_report(
+    report: Mapping[str, object], output_path: str | None, *, file_writer: FileWriter
+) -> None:
     payload = {str(key): value for key, value in report.items()}
     content = json.dumps(payload, indent=2, sort_keys=True)
     if output_path == "-":
@@ -131,7 +140,9 @@ def save_batch_report(report: Mapping[str, object], output_path: str | None, *, 
     file_writer.write("iocparser_batch_report.json", content)
 
 
-def save_exported_run(args: argparse.Namespace, export: PersistedRunExport, *, file_writer: FileWriter) -> None:
+def save_exported_run(
+    args: argparse.Namespace, export: PersistedRunExport, *, file_writer: FileWriter
+) -> None:
     rendered_output, output_label, chosen_format = render_result(args, export.result)
     save_rendered_output(
         rendered_output=rendered_output,
@@ -156,14 +167,30 @@ def _render_diff_csv(
     writer.writerow(["change", "type", "value", "is_warning"])
     if diff_only != "removed":
         for record in added_records:
-            writer.writerow(["added", record.get("type", ""), record.get("raw_value", ""), record.get("is_warning", "")])
+            writer.writerow(
+                [
+                    "added",
+                    record.get("type", ""),
+                    record.get("raw_value", ""),
+                    record.get("is_warning", ""),
+                ]
+            )
     if diff_only != "added":
         for record in removed_records:
-            writer.writerow(["removed", record.get("type", ""), record.get("raw_value", ""), record.get("is_warning", "")])
+            writer.writerow(
+                [
+                    "removed",
+                    record.get("type", ""),
+                    record.get("raw_value", ""),
+                    record.get("is_warning", ""),
+                ]
+            )
     return output.getvalue()
 
 
-def _build_diff_payload(diff: PersistedRunDiff, diff_only: str) -> tuple[dict[str, object], list[dict[str, object]], list[dict[str, object]]]:
+def _build_diff_payload(
+    diff: PersistedRunDiff, diff_only: str
+) -> tuple[dict[str, object], list[dict[str, object]], list[dict[str, object]]]:
     added_records = diff.added.to_records()
     removed_records = diff.removed.to_records()
     payload: dict[str, object] = {
@@ -203,11 +230,15 @@ def _render_structured_diff(
     return json.dumps(payload, indent=4, sort_keys=True), "json"
 
 
-def save_diff_output(args: argparse.Namespace, diff: PersistedRunDiff, *, file_writer: FileWriter) -> None:
+def save_diff_output(
+    args: argparse.Namespace, diff: PersistedRunDiff, *, file_writer: FileWriter
+) -> None:
     diff_only = get_optional_str_arg(args, "diff_only") or "all"
     payload, added_records, removed_records = _build_diff_payload(diff, diff_only)
     if get_bool_arg(args, "json") or get_bool_arg(args, "jsonl") or get_bool_arg(args, "csv"):
-        rendered_output, chosen_format = _render_structured_diff(args, payload, added_records, removed_records, diff_only)
+        rendered_output, chosen_format = _render_structured_diff(
+            args, payload, added_records, removed_records, diff_only
+        )
         save_rendered_output(
             rendered_output=rendered_output,
             output_label="diff",
@@ -219,7 +250,9 @@ def save_diff_output(args: argparse.Namespace, diff: PersistedRunDiff, *, file_w
         return
     lines = [f"# Diff {diff.left_run_id} -> {diff.right_run_id}", ""]
     if diff.compared_to_previous_source_run_id is not None:
-        lines.append(f"Compared against previous run from same source: {diff.compared_to_previous_source_run_id}")
+        lines.append(
+            f"Compared against previous run from same source: {diff.compared_to_previous_source_run_id}"
+        )
         lines.append("")
     if diff_only != "removed":
         lines.extend(["## Added Counts", ""])
@@ -228,7 +261,10 @@ def save_diff_output(args: argparse.Namespace, diff: PersistedRunDiff, *, file_w
     if diff_only in {"all", "added"}:
         lines.extend(["## Added", ""])
         lines.extend(ioc.canonical_value() for ioc in diff.added.iocs)
-        lines.extend(f"warning: {warning.ioc.canonical_value()} [{warning.warning_list}]" for warning in diff.added.warnings)
+        lines.extend(
+            f"warning: {warning.ioc.canonical_value()} [{warning.warning_list}]"
+            for warning in diff.added.warnings
+        )
         lines.append("")
     if diff_only != "added":
         lines.extend(["## Removed Counts", ""])
@@ -237,7 +273,10 @@ def save_diff_output(args: argparse.Namespace, diff: PersistedRunDiff, *, file_w
     if diff_only in {"all", "removed"}:
         lines.extend(["## Removed", ""])
         lines.extend(ioc.canonical_value() for ioc in diff.removed.iocs)
-        lines.extend(f"warning: {warning.ioc.canonical_value()} [{warning.warning_list}]" for warning in diff.removed.warnings)
+        lines.extend(
+            f"warning: {warning.ioc.canonical_value()} [{warning.warning_list}]"
+            for warning in diff.removed.warnings
+        )
     save_rendered_output(
         rendered_output="\n".join(lines),
         output_label="diff",
@@ -246,6 +285,7 @@ def save_diff_output(args: argparse.Namespace, diff: PersistedRunDiff, *, file_w
         output_path=get_optional_str_arg(args, "output"),
         file_writer=file_writer,
     )
+
 
 __all__ = [
     "PersistResultsRequest",

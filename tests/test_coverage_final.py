@@ -3,6 +3,7 @@
 Uses mocks ONLY for IntegrityError (DB race conditions) and SQS (external AWS service).
 Everything else uses real code paths.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -27,31 +28,49 @@ from tests.coverage_helpers import fresh_db, persist_run_into
 class TestIOCRepoIntegrity:
     def test_retry_finds_existing(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
+
         engine = create_engine(fresh_db(tmp_path), future=True)
         session = Session(engine)
         repo = SQLAlchemyIOCRepository(session)
-        id1 = repo._get_or_create(ioc_type="md5", value="a1", is_warning=False, warning_list="", warning_description="")
+        id1 = repo._get_or_create(
+            ioc_type="md5", value="a1", is_warning=False, warning_list="", warning_description=""
+        )
         session.commit()
         orig = session.flush
         n = [0]
+
         def fail_once(*a, **k):
             n[0] += 1
             if n[0] == 2:
                 raise IntegrityError("dup", {}, Exception())
             return orig(*a, **k)
+
         with patch.object(session, "flush", side_effect=fail_once):
-            id2 = repo._get_or_create(ioc_type="md5", value="a1", is_warning=False, warning_list="", warning_description="")
+            id2 = repo._get_or_create(
+                ioc_type="md5",
+                value="a1",
+                is_warning=False,
+                warning_list="",
+                warning_description="",
+            )
         assert id1 == id2
         session.close()
 
     def test_reraises_when_not_found(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
+
         engine = create_engine(fresh_db(tmp_path), future=True)
         session = Session(engine)
         repo = SQLAlchemyIOCRepository(session)
         with patch.object(session, "flush", side_effect=IntegrityError("x", {}, Exception())):
             with pytest.raises(IntegrityError):
-                repo._get_or_create(ioc_type="sha1", value="ghost", is_warning=False, warning_list="", warning_description="")
+                repo._get_or_create(
+                    ioc_type="sha1",
+                    value="ghost",
+                    is_warning=False,
+                    warning_list="",
+                    warning_description="",
+                )
         session.close()
 
 
@@ -61,6 +80,7 @@ class TestSourceRepoIntegrity:
         from iocparser.infrastructure.persistence_source_repository import (
             SQLAlchemySourceRepository,
         )
+
         engine = create_engine(fresh_db(tmp_path), future=True)
         session = Session(engine)
         repo = SQLAlchemySourceRepository(session)
@@ -68,13 +88,24 @@ class TestSourceRepoIntegrity:
         session.commit()
         orig = session.flush
         n = [0]
+
         def fail_once(*a, **k):
             n[0] += 1
             if n[0] == 2:
                 raise IntegrityError("dup", {}, Exception())
             return orig(*a, **k)
+
         with patch.object(session, "flush", side_effect=fail_once):
-            id2 = repo.get_or_create(kind="file", value="t.pdf", mime_type="application/pdf", content_hash="ch", fingerprint="fp", input_size=99, original_url="u", normalized_url="n")
+            id2 = repo.get_or_create(
+                kind="file",
+                value="t.pdf",
+                mime_type="application/pdf",
+                content_hash="ch",
+                fingerprint="fp",
+                input_size=99,
+                original_url="u",
+                normalized_url="n",
+            )
         assert id1 == id2
         session.close()
 
@@ -82,6 +113,7 @@ class TestSourceRepoIntegrity:
         from iocparser.infrastructure.persistence_source_repository import (
             SQLAlchemySourceRepository,
         )
+
         engine = create_engine(fresh_db(tmp_path), future=True)
         session = Session(engine)
         repo = SQLAlchemySourceRepository(session)
@@ -95,12 +127,23 @@ class TestSourceRepoIntegrity:
 class TestSQSDeadLetter:
     def test_dead_letter_without_dlq_raises(self) -> None:
         from iocparser.infrastructure.queue_sqs import SQSQueueAdapter
+
         with patch("iocparser.infrastructure.queue_sqs._boto3_module") as mock_boto:
-            mock_boto.return_value.client.return_value = SimpleNamespace(send_message=lambda **k: {"MessageId": "x"})
+            mock_boto.return_value.client.return_value = SimpleNamespace(
+                send_message=lambda **k: {"MessageId": "x"}
+            )
             adapter = SQSQueueAdapter("https://sqs.example/main")
         from iocparser.domain.distributed import QueueReceipt
+
         receipt = QueueReceipt("sqs", "q", "rh", "mid")
-        envelope = SimpleNamespace(to_record=dict, request=SimpleNamespace(job_id="j1"), attempts=0, max_attempts=3, queue_name="q", queue_backend="sqs")
+        envelope = SimpleNamespace(
+            to_record=dict,
+            request=SimpleNamespace(job_id="j1"),
+            attempts=0,
+            max_attempts=3,
+            queue_name="q",
+            queue_backend="sqs",
+        )
         with pytest.raises(RuntimeError, match="dead-letter queue URL not configured"):
             adapter.dead_letter(receipt, envelope=envelope)
 
@@ -113,9 +156,12 @@ class TestPluginsEnricherOverride:
             _enricher_registry,
             _load_discovered_entry_points,
         )
+
         original = _enricher_registry.get("misp")
-        ep = SimpleNamespace(name="misp", load=lambda: (lambda: None))
-        discovered = SimpleNamespace(select=lambda group: [ep] if group == "iocparser.enrichers" else [])
+        ep = SimpleNamespace(name="misp", load=lambda: lambda: None)
+        discovered = SimpleNamespace(
+            select=lambda group: [ep] if group == "iocparser.enrichers" else []
+        )
         assert "misp" in _BUILTIN_ENRICHER_NAMES
         _load_discovered_entry_points(discovered)
         if original is not None:
@@ -126,8 +172,13 @@ class TestPluginsEnricherOverride:
 class TestWorkerConcurrentEmpty:
     def test_concurrent_empty_queue_sleeps(self) -> None:
         from iocparser.worker_service import DistributedWorkerService
-        svc = SimpleNamespace(process_next=lambda queue_name: None, limits=SimpleNamespace(max_workers=2))
-        w = DistributedWorkerService(service=svc, queue_name="t", poll_interval_seconds=0.01, max_messages_per_cycle=1)
+
+        svc = SimpleNamespace(
+            process_next=lambda queue_name: None, limits=SimpleNamespace(max_workers=2)
+        )
+        w = DistributedWorkerService(
+            service=svc, queue_name="t", poll_interval_seconds=0.01, max_messages_per_cycle=1
+        )
         assert w.run_forever(max_cycles=1) == 0
 
 
@@ -135,20 +186,28 @@ class TestWorkerConcurrentEmpty:
 class TestRendererEdgePaths:
     def test_stix_renders_warning_iocs(self) -> None:
         from iocparser.adapters.renderers_stix import STIXOutputRenderer
+
         result = ExtractionResult(
-            iocs=(), warnings=(WarningMatch(ioc=IOC.from_raw("domains", "evil.com"), warning_list="test", description="d"),),
+            iocs=(),
+            warnings=(
+                WarningMatch(
+                    ioc=IOC.from_raw("domains", "evil.com"), warning_list="test", description="d"
+                ),
+            ),
         )
         output = STIXOutputRenderer().render(result)
         assert "evil.com" in output or "domain-name" in output
 
     def test_json_renderer_with_context(self) -> None:
         from iocparser.adapters.renderers_json import JSONOutputRenderer
+
         result = ExtractionResult(iocs=(IOC.from_raw("ips", "1.2.3.4"),), warnings=())
         output = JSONOutputRenderer(include_context=True).render(result)
         assert "1.2.3.4" in output
 
     def test_stix_bundle_with_mutator(self) -> None:
         from iocparser.rendering_support import build_stix_bundle
+
         result = build_stix_bundle(
             [("ioc", SimpleNamespace(ioc_type="domains", canonical_value=lambda: "a.com"))],
             build_indicator=lambda e: None,
@@ -161,6 +220,7 @@ class TestRendererEdgePaths:
 class TestTextRendererWarning:
     def test_format_warning_string_fallback(self) -> None:
         from iocparser.adapters.renderers_text import format_warning_item
+
         assert format_warning_item("plain") == ["plain"]
 
 
@@ -170,6 +230,7 @@ class TestCliOutputCsvDiff:
         import argparse
 
         from iocparser.cli_output import _render_structured_diff
+
         args = argparse.Namespace(json=False, jsonl=False, csv=True)
         payload = {"added": [], "removed": []}
         added = [{"type": "d", "raw_value": "a.com", "is_warning": ""}]
@@ -183,11 +244,13 @@ class TestCliOutputCsvDiff:
 class TestExtractorBaseProperties:
     def test_common_file_extensions_property(self) -> None:
         from iocparser.infrastructure.extraction import IOCExtractor
+
         e = IOCExtractor(defang=False)
         assert "exe" in e.common_file_extensions
 
     def test_legitimate_with_subdomains_property(self) -> None:
         from iocparser.infrastructure.extraction import IOCExtractor
+
         e = IOCExtractor(defang=False)
         assert isinstance(e.legitimate_with_subdomains, set)
 
@@ -196,7 +259,10 @@ class TestExtractorBaseProperties:
 class TestTLDFallback:
     def test_load_valid_tlds_missing_file(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.extractor_base_runtime_support import ReferenceDataPolicy
-        policy = ReferenceDataPolicy(default_tlds=frozenset({"com", "org"}), common_file_extensions=frozenset({"exe"}))
+
+        policy = ReferenceDataPolicy(
+            default_tlds=frozenset({"com", "org"}), common_file_extensions=frozenset({"exe"})
+        )
         tlds = policy.load_valid_tlds(tmp_path / "nonexistent")
         assert "com" in tlds
 
@@ -205,6 +271,7 @@ class TestTLDFallback:
 class TestIPv6ValueError:
     def test_invalid_ipv6_filtered(self) -> None:
         from iocparser.infrastructure.extraction import IOCExtractor
+
         e = IOCExtractor(defang=False)
         result = e.extract_ipv6("Invalid IPv6: zzzz::gggg:hhhh not valid")
         assert not any("zzzz" in v for v in result)
@@ -214,14 +281,19 @@ class TestIPv6ValueError:
 class TestPersistenceSupportHelpers:
     def test_normalized_source_filter(self) -> None:
         from iocparser.infrastructure.persistence_support import normalized_source_filter
+
         assert normalized_source_filter("  Test  ") == "test"
 
     def test_url_filter_variants_none(self) -> None:
         from iocparser.infrastructure.persistence_support import _url_filter_variants
-        assert _url_filter_variants("not a url") == () or len(_url_filter_variants("not a url")) >= 0
+
+        assert (
+            _url_filter_variants("not a url") == () or len(_url_filter_variants("not a url")) >= 0
+        )
 
     def test_select_deletable_keep_latest(self) -> None:
         from iocparser.infrastructure.persistence_support import _select_deletable
+
         runs = [SimpleNamespace(source_id=1, id=i) for i in range(5)]
         assert len(_select_deletable(runs, keep_latest=2)) == 3
 
@@ -230,6 +302,7 @@ class TestPersistenceSupportHelpers:
 class TestBatchTimestampFallbacks:
     def test_batch_job_missing_timestamps(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_batch import create_batch_job
+
         engine = create_engine(fresh_db(tmp_path), future=True)
         session = Session(engine)
         report = {"total": 1, "successful": 1, "failed": 0, "items": []}
@@ -240,12 +313,19 @@ class TestBatchTimestampFallbacks:
 
     def test_batch_job_inverted_timestamps(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_batch import create_batch_job
+
         engine = create_engine(fresh_db(tmp_path), future=True)
         session = Session(engine)
         now = datetime.now(UTC)
         report = {
-            "total": 1, "successful": 0, "failed": 1, "items": [],
-            "phase_timestamps": {"started_at": now.isoformat(), "finished_at": (now - timedelta(hours=1)).isoformat()},
+            "total": 1,
+            "successful": 0,
+            "failed": 1,
+            "items": [],
+            "phase_timestamps": {
+                "started_at": now.isoformat(),
+                "finished_at": (now - timedelta(hours=1)).isoformat(),
+            },
             "duration_ms": 100,
         }
         bid = create_batch_job(session, source_kind="url", run_ids=(), report=report, config={})
@@ -258,25 +338,35 @@ class TestBatchTimestampFallbacks:
 class TestDistributedJobEdges:
     def test_mark_running_nonexistent(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
+
         svc = SQLAlchemyDistributedJobService(fresh_db(tmp_path))
         assert svc.mark_running(job_id="nope", receipt_id="r", attempts=1) is None
 
     def test_mark_dead_lettered_nonexistent(self, tmp_path: Path) -> None:
         from iocparser.domain.pipeline import PipelineErrorInfo
         from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
+
         svc = SQLAlchemyDistributedJobService(fresh_db(tmp_path))
-        assert svc.mark_dead_lettered(job_id="nope", attempts=1, error=PipelineErrorInfo("E", "c", False, "failed", "m")) is None
+        assert (
+            svc.mark_dead_lettered(
+                job_id="nope", attempts=1, error=PipelineErrorInfo("E", "c", False, "failed", "m")
+            )
+            is None
+        )
 
 
 # === persistence/query/ops: diff partial run ===
 class TestDiffPartialRun:
     def test_diff_partial_run_raises(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
+
         db_uri = fresh_db(tmp_path)
         run_id = persist_run_into(db_uri)
         from iocparser.infrastructure.persistence_schema import SQLAlchemyUnitOfWork
+
         unit = SQLAlchemyUnitOfWork(db_uri)
         from iocparser.infrastructure.persistence_schema import RunModel
+
         run = unit.session.get(RunModel, run_id)
         run.status = "partial"
         unit.commit()
@@ -290,15 +380,19 @@ class TestDiffPartialRun:
 class TestApiPersistenceValidation:
     def test_invalid_date_raises(self) -> None:
         from iocparser.api_persistence_query import list_persisted_runs
+
         with pytest.raises((ValueError, Exception)):
             list_persisted_runs(db_uri="sqlite:///:memory:", date_from="not-a-date")
 
     def test_render_diff_with_severity_filter(self, tmp_path: Path) -> None:
         from iocparser.api_persistence_query import render_persisted_diff
+
         db_uri = fresh_db(tmp_path)
         r1 = persist_run_into(db_uri, ioc_value="a.com")
         r2 = persist_run_into(db_uri, ioc_value="b.com")
-        result = render_persisted_diff(db_uri=db_uri, left_run_id=r1, right_run_id=r2, output_format="json")
+        result = render_persisted_diff(
+            db_uri=db_uri, left_run_id=r1, right_run_id=r2, output_format="json"
+        )
         assert isinstance(result, str)
 
 
@@ -308,8 +402,10 @@ class TestMigrationRev0008:
         from sqlalchemy import inspect
 
         from iocparser.infrastructure.persistence_migration_steps import upgrade_to_version
+
         engine = create_engine(f"sqlite:///{tmp_path / 'rev8.db'}", future=True)
         from iocparser.infrastructure.persistence_migration_steps import create_latest_schema
+
         create_latest_schema(engine)
         inspector = inspect(engine)
         upgrade_to_version(engine, inspector, 8)
@@ -320,6 +416,7 @@ class TestMigrationRev0008:
 class TestHTTPDownloadMetadata:
     def test_download_metadata_empty_when_no_download(self) -> None:
         from iocparser.infrastructure.http_download import RequestsURLDownloader
+
         d = RequestsURLDownloader()
         assert d.download_metadata() == {}
 
@@ -330,10 +427,17 @@ class TestCliDispatchPaths:
         import argparse
 
         from iocparser.cli_args_inputs import has_input_args
+
         args = argparse.Namespace(
-            file=None, url=None, multiple=None, directory=None,
-            url_file=None, stdin=False, retry_failed_from=None,
-            retry_batch_job=None, url_direct=None,
+            file=None,
+            url=None,
+            multiple=None,
+            directory=None,
+            url_file=None,
+            stdin=False,
+            retry_failed_from=None,
+            retry_batch_job=None,
+            url_direct=None,
         )
         assert has_input_args(args) is False
 
@@ -342,11 +446,13 @@ class TestCliDispatchPaths:
 class TestCliProcessingSupportEdges:
     def test_batch_downloader_returns_same(self) -> None:
         from iocparser.cli_processing_support import batch_downloader
+
         d = SimpleNamespace(download=lambda url: url)
         assert batch_downloader(d) is d
 
     def test_download_metadata_without_method(self) -> None:
         from iocparser.cli_processing_support import download_metadata
+
         d = SimpleNamespace()
         assert download_metadata(d) == {}
 
@@ -355,13 +461,16 @@ class TestCliProcessingSupportEdges:
 class TestCliPersistenceIntCoercion:
     def test_int_run_metadata_value_with_string(self) -> None:
         from iocparser.cli_output_rendering import int_run_metadata_value
+
         assert int_run_metadata_value({"k": "42"}, "k", 0) == 42
 
     def test_optional_int_run_metadata_value_none(self) -> None:
         from iocparser.cli_output_rendering import optional_int_run_metadata_value
+
         assert optional_int_run_metadata_value({"k": None}, "k") is None
 
     def test_optional_str_run_metadata_value(self) -> None:
         from iocparser.cli_output_rendering import optional_str_run_metadata_value
+
         assert optional_str_run_metadata_value({"k": 42}, "k") == "42"
         assert optional_str_run_metadata_value({"k": None}, "k") is None

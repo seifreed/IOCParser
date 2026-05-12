@@ -8,7 +8,9 @@ from iocparser.domain.values import IndicatorValue, indicator_value_for
 from iocparser.shared_utils import deduplicate_iocs
 
 
-def classify_ioc(ioc_type: IOCType | IOCTypeName | str, *, is_warning: bool = False) -> tuple[str, tuple[str, ...]]:
+def classify_ioc(
+    ioc_type: IOCType | IOCTypeName | str, *, is_warning: bool = False
+) -> tuple[str, tuple[str, ...]]:
     """Classify an IOC with a simple severity and tags."""
     custom_type = get_custom_ioc_type(ioc_type)
     if custom_type is not None:
@@ -22,13 +24,33 @@ def classify_ioc(ioc_type: IOCType | IOCTypeName | str, *, is_warning: bool = Fa
                 tags.append("warning-list-match")
         return severity, tuple(tags)
     tags = [ioc_type_name(ioc_type)]
-    if ioc_type in {IOCType.CVE, IOCType.MITRE_ATTACK, IOCType.YARA, IOCType.REGISTRY, IOCType.MUTEX}:
+    if ioc_type in {
+        IOCType.CVE,
+        IOCType.MITRE_ATTACK,
+        IOCType.YARA,
+        IOCType.REGISTRY,
+        IOCType.MUTEX,
+    }:
         severity = "high"
         tags.append("behavioral")
-    elif ioc_type in {IOCType.URL, IOCType.DOMAIN, IOCType.HOST, IOCType.IP, IOCType.IPV6, IOCType.EMAIL}:
+    elif ioc_type in {
+        IOCType.URL,
+        IOCType.DOMAIN,
+        IOCType.HOST,
+        IOCType.IP,
+        IOCType.IPV6,
+        IOCType.EMAIL,
+    }:
         severity = "medium"
         tags.append("network")
-    elif ioc_type in {IOCType.MD5, IOCType.SHA1, IOCType.SHA256, IOCType.SHA512, IOCType.SSDEEP, IOCType.IMPHASH}:
+    elif ioc_type in {
+        IOCType.MD5,
+        IOCType.SHA1,
+        IOCType.SHA256,
+        IOCType.SHA512,
+        IOCType.SSDEEP,
+        IOCType.IMPHASH,
+    }:
         severity = "medium"
         tags.append("artifact")
     else:
@@ -234,7 +256,9 @@ class ExtractionResult:
     ) -> ExtractionResult:
         """Filter and sort the result for analyst-facing outputs."""
 
-        normalized_severities = {severity.strip().lower() for severity in severities if severity.strip()}
+        normalized_severities = {
+            severity.strip().lower() for severity in severities if severity.strip()
+        }
         normalized_tags = {tag.strip().lower() for tag in tags if tag.strip()}
 
         def matches(ioc: IOC) -> bool:
@@ -248,7 +272,7 @@ class ExtractionResult:
         def trim(ioc: IOC) -> IOC:
             if max_evidence is None:
                 return ioc
-            return replace(ioc, evidence=ioc.evidence[:max(0, max_evidence)])
+            return replace(ioc, evidence=ioc.evidence[: max(0, max_evidence)])
 
         def order_key(item: IOC | WarningMatch) -> tuple[str, str, str]:
             ioc = item if isinstance(item, IOC) else item.ioc
@@ -283,7 +307,9 @@ class ExtractionResult:
         """Return IOC counts grouped by type."""
         counter: Counter[str] = Counter(ioc_type_name(ioc.ioc_type) for ioc in self.iocs)
         if include_warnings:
-            warning_counts = Counter(ioc_type_name(warning.ioc.ioc_type) for warning in self.warnings)
+            warning_counts = Counter(
+                ioc_type_name(warning.ioc.ioc_type) for warning in self.warnings
+            )
             counter.update(warning_counts)
         return dict(sorted(counter.items()))
 

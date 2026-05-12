@@ -58,7 +58,11 @@ class PersistResultsRequest:
     tool_version: str
     source_metadata: dict[str, object] | None = None
     run_metadata: dict[str, int | str | None] | None = None
-def source_metadata_values(source_metadata: dict[str, object]) -> tuple[str | None, str | None, str | None, int | None]:
+
+
+def source_metadata_values(
+    source_metadata: dict[str, object],
+) -> tuple[str | None, str | None, str | None, int | None]:
     original_url = source_metadata.get("original_url")
     normalized_url = source_metadata.get("normalized_url")
     mime_type = source_metadata.get("mime_type")
@@ -71,7 +75,9 @@ def source_metadata_values(source_metadata: dict[str, object]) -> tuple[str | No
     )
 
 
-def int_run_metadata_value(run_metadata: dict[str, int | str | None], key: str, default: int) -> int:
+def int_run_metadata_value(
+    run_metadata: dict[str, int | str | None], key: str, default: int
+) -> int:
     raw_value = run_metadata.get(key)
     if raw_value is None:
         return default
@@ -80,7 +86,9 @@ def int_run_metadata_value(run_metadata: dict[str, int | str | None], key: str, 
     return int(raw_value)
 
 
-def optional_int_run_metadata_value(run_metadata: dict[str, int | str | None], key: str) -> int | None:
+def optional_int_run_metadata_value(
+    run_metadata: dict[str, int | str | None], key: str
+) -> int | None:
     raw_value = run_metadata.get(key)
     if raw_value is None:
         return None
@@ -89,11 +97,15 @@ def optional_int_run_metadata_value(run_metadata: dict[str, int | str | None], k
     return int(raw_value)
 
 
-def optional_str_run_metadata_value(run_metadata: dict[str, int | str | None], key: str) -> str | None:
+def optional_str_run_metadata_value(
+    run_metadata: dict[str, int | str | None], key: str
+) -> str | None:
     raw_value = run_metadata.get(key)
     if raw_value is None:
         return None
     return str(raw_value)
+
+
 def persist_results_request(request: PersistResultsRequest) -> int | None:
     if not request.config.persist:
         return None
@@ -124,7 +136,9 @@ def persist_results_request(request: PersistResultsRequest) -> int | None:
                 normalized_url=normalized_url,
                 mime_type=mime_type,
                 input_size=input_size,
-                content_hash=str(metadata["content_hash"]) if metadata.get("content_hash") else None,
+                content_hash=str(metadata["content_hash"])
+                if metadata.get("content_hash")
+                else None,
                 fingerprint=str(metadata["fingerprint"]) if metadata.get("fingerprint") else None,
             ),
             result=ExtractionResult.from_grouped_payload(request.normal_iocs, request.warning_iocs),
@@ -134,16 +148,21 @@ def persist_results_request(request: PersistResultsRequest) -> int | None:
             processed_items=int_run_metadata_value(effective_run_metadata, "processed_items", 1),
             successful_items=int_run_metadata_value(effective_run_metadata, "successful_items", 1),
             failed_items=int_run_metadata_value(effective_run_metadata, "failed_items", 0),
-            partial_error_count=int_run_metadata_value(effective_run_metadata, "partial_error_count", 0),
+            partial_error_count=int_run_metadata_value(
+                effective_run_metadata, "partial_error_count", 0
+            ),
             status=optional_str_run_metadata_value(effective_run_metadata, "status"),
-            error_message=optional_str_run_metadata_value(effective_run_metadata, "error_message") or "",
+            error_message=optional_str_run_metadata_value(effective_run_metadata, "error_message")
+            or "",
         ),
         unit_of_work=SQLAlchemyUnitOfWork(request.config.db_uri),
     )
     return persisted.run_id
 
 
-def filter_result_for_output(args: argparse.Namespace, result: ExtractionResult) -> ExtractionResult:
+def filter_result_for_output(
+    args: argparse.Namespace, result: ExtractionResult
+) -> ExtractionResult:
     namespace: Mapping[str, object] = vars(args)
     raw_max_evidence = namespace.get("max_evidence")
     severities = parse_string_filters(get_optional_str_arg(args, "severity"))
@@ -174,10 +193,15 @@ def render_summary(result: ExtractionResult) -> str:
         f"{'IOC Type':<{name_width}} | {'Count':>{count_width}}",
         f"{'-' * name_width}-+-{'-' * count_width}",
     ]
-    lines.extend(f"{ioc_type:<{name_width}} | {count:>{count_width}}" for ioc_type, count in counts.items())
+    lines.extend(
+        f"{ioc_type:<{name_width}} | {count:>{count_width}}" for ioc_type, count in counts.items()
+    )
     if result.warnings:
         lines.extend(["", "## Warning Matches", ""])
-        lines.extend(f"- {warning.ioc.canonical_value()} [{warning.warning_list}]" for warning in result.warnings)
+        lines.extend(
+            f"- {warning.ioc.canonical_value()} [{warning.warning_list}]"
+            for warning in result.warnings
+        )
     return "\n".join(lines)
 
 
@@ -186,9 +210,15 @@ def render_result(args: argparse.Namespace, result: ExtractionResult) -> tuple[s
     result = filter_result_for_output(args, result)
     plugin_renderer = get_optional_str_arg(args, "renderer")
     if plugin_renderer:
-        renderer = get_renderer(plugin_renderer, with_context=include_context, stix_types=get_optional_str_arg(args, "stix_types"))
+        renderer = get_renderer(
+            plugin_renderer,
+            with_context=include_context,
+            stix_types=get_optional_str_arg(args, "stix_types"),
+        )
         return renderer.render(result), plugin_renderer, plugin_renderer
-    if get_bool_arg(args, "summary") and not any(get_bool_arg(args, name) for name in ("json", "jsonl", "csv", "stix")):
+    if get_bool_arg(args, "summary") and not any(
+        get_bool_arg(args, name) for name in ("json", "jsonl", "csv", "stix")
+    ):
         return render_summary(result), "summary", "text"
     if get_bool_arg(args, "stix"):
         renderer = get_renderer("stix", stix_types=get_optional_str_arg(args, "stix_types"))
@@ -222,7 +252,9 @@ def save_rendered_output(
     if output_path:
         file_writer.write(output_path, rendered_output)
         return output_path
-    output_filename = get_output_filename(input_display, is_json=chosen_format == "json", output_format=chosen_format)
+    output_filename = get_output_filename(
+        input_display, is_json=chosen_format == "json", output_format=chosen_format
+    )
     file_writer.write(output_filename, rendered_output)
     return output_filename
 
@@ -248,7 +280,9 @@ def print_warning_lists(warnings: dict[str, list[dict[str, str]]]) -> None:
     for ioc_type, type_warnings in warnings.items():
         _write(f"\n{color_yellow}IOCs of type {ioc_type} with warnings:{style_reset}")
         for warning in type_warnings:
-            _write(f"  {color_red}- {warning['value']} - List: {warning['warning_list']}{style_reset}")
+            _write(
+                f"  {color_red}- {warning['value']} - List: {warning['warning_list']}{style_reset}"
+            )
             _write(f"    {color_yellow}Description: {warning['description']}{style_reset}")
 
 
@@ -263,7 +297,10 @@ def display_results(
             _write(f"    {color_cyan}- {ioc_type}: {len(ioc_list)}{style_reset}")
     if warning_iocs:
         print_warning_lists(warning_iocs)
-        logger.warning("Found %s potential false positives", sum(len(values) for values in warning_iocs.values()))
+        logger.warning(
+            "Found %s potential false positives",
+            sum(len(values) for values in warning_iocs.values()),
+        )
 
 
 def persist_results(request: PersistResultsRequest) -> int | None:

@@ -151,7 +151,9 @@ def test_pipeline_worker_enforces_size_limit() -> None:
 def test_pipeline_worker_enforces_time_limit_and_invalid_kind() -> None:
     timed = PipelineWorker(limits=ResourceLimits(max_input_seconds=0.0))
     timed_result = timed.process(
-        PipelineJobRequest(input_kind="text", source_value="ioc hxxp://evil.example", check_warnings=False),
+        PipelineJobRequest(
+            input_kind="text", source_value="ioc hxxp://evil.example", check_warnings=False
+        ),
     )
     assert timed_result.status == "failed"
     assert timed_result.error is not None
@@ -245,7 +247,9 @@ def test_pipeline_error_classification_covers_stable_codes() -> None:
         (ValidationError("bad"), "VALIDATION_FAILED"),
         (RuntimeError("boom"), "UNEXPECTED_FAILURE"),
     ]
-    assert [classify_pipeline_exception(exc).code for exc, _ in cases] == [code for _, code in cases]
+    assert [classify_pipeline_exception(exc).code for exc, _ in cases] == [
+        code for _, code in cases
+    ]
 
 
 def test_pipeline_job_result_and_error_info_to_record() -> None:
@@ -301,16 +305,22 @@ def test_pipeline_worker_handles_file_url_and_backpressure(tmp_path: Path, capsy
     url_worker = PipelineWorker()
     url_worker.client.downloader = _Downloader(file_path)
     url_result = url_worker.process(
-        PipelineJobRequest(input_kind="url", source_value="https://example.test/feed.txt", check_warnings=False),
+        PipelineJobRequest(
+            input_kind="url", source_value="https://example.test/feed.txt", check_warnings=False
+        ),
     )
     assert url_result.status == "success"
 
     worker._inflight = 1
     with pytest.raises(RuntimeError, match="at capacity"):
-        worker.process(PipelineJobRequest(input_kind="text", source_value="x", check_warnings=False))
+        worker.process(
+            PipelineJobRequest(input_kind="text", source_value="x", check_warnings=False)
+        )
     worker._inflight = 0
 
-    print_batch_report({"schema_version": BATCH_REPORT_SCHEMA_VERSION, "total": 1, "successful": 1, "failed": 0})
+    print_batch_report(
+        {"schema_version": BATCH_REPORT_SCHEMA_VERSION, "total": 1, "successful": 1, "failed": 0}
+    )
     assert "Batch report schema" in capsys.readouterr().out
 
 

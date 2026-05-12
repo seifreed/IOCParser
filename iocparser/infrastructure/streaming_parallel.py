@@ -44,7 +44,9 @@ class ParallelStreamingExtractor:
             return str(file_path), result
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            future_to_file = {executor.submit(process_file, file_path): file_path for file_path in file_paths}
+            future_to_file = {
+                executor.submit(process_file, file_path): file_path for file_path in file_paths
+            }
             for future in as_completed(future_to_file):
                 file_path = future_to_file[future]
                 try:

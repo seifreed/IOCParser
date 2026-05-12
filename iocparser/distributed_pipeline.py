@@ -6,7 +6,7 @@ from iocparser.application.distributed_use_cases import (
     DistributedPipelineCoordinator,
     idempotency_key_for,
 )
-from iocparser.domain.distributed import DeadLetterRecord, DistributedJobRecord
+from iocparser.domain.distributed import DistributedJobRecord
 from iocparser.domain.pipeline import PipelineJobRequest, PipelineJobResult, ResourceLimits
 from iocparser.infrastructure.runtime import (
     bind_request_db_uri,
@@ -23,6 +23,7 @@ from iocparser.interfaces.ports import (
 from iocparser.pipeline_worker import PipelineWorker
 
 DEFAULT_QUEUE_BACKEND = "filesystem"
+
 
 @dataclass(frozen=True)
 class DistributedPipelineBoundaries:
@@ -112,27 +113,11 @@ class DistributedPipelineService(DistributedPipelineCoordinator):
             idempotency_key=idempotency_key,
         )
 
-    def process_next(self, *, queue_name: str = "default") -> DistributedJobRecord | PipelineJobResult | None:
+    def process_next(
+        self, *, queue_name: str = "default"
+    ) -> DistributedJobRecord | PipelineJobResult | None:
         with guarded_pipeline_runtime(self.limits):
             return super().process_next(queue_name=queue_name)
-
-    def drain(self, *, queue_name: str = "default", limit: int = 100) -> list[DistributedJobRecord | PipelineJobResult]:
-        return super().drain(queue_name=queue_name, limit=limit)
-
-    def get_job(self, *, job_id: str) -> DistributedJobRecord | None:
-        return super().get_job(job_id=job_id)
-
-    def list_jobs(
-        self,
-        *,
-        limit: int = 50,
-        statuses: tuple[str, ...] = (),
-        queue_backend: str | None = None,
-    ) -> list[DistributedJobRecord]:
-        return super().list_jobs(limit=limit, statuses=statuses, queue_backend=queue_backend)
-
-    def list_dead_letters(self, *, limit: int = 50, queue_backend: str | None = None) -> list[DeadLetterRecord]:
-        return super().list_dead_letters(limit=limit, queue_backend=queue_backend)
 
     def _idempotency_key(self, request: PipelineJobRequest) -> str:
         return idempotency_key_for(request, digester=self.content_digester)

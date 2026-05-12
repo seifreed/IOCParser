@@ -20,6 +20,10 @@ def joined_type_filters(
     exclude_types: tuple[IOCType | IOCTypeName, ...],
 ) -> tuple[str | None, str | None]:
     """Serialize include/exclude IOC filters for plugin-facing APIs."""
-    only = ",".join(ioc_type_name(ioc_type) for ioc_type in include_types) if include_types else None
-    exclude = ",".join(ioc_type_name(ioc_type) for ioc_type in exclude_types) if exclude_types else None
+    only = (
+        ",".join(ioc_type_name(ioc_type) for ioc_type in include_types) if include_types else None
+    )
+    exclude = (
+        ",".join(ioc_type_name(ioc_type) for ioc_type in exclude_types) if exclude_types else None
+    )
     return only, exclude

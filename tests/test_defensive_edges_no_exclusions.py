@@ -187,7 +187,9 @@ def test_application_use_cases_propagate_process_interruptions() -> None:
 
     unit = SimpleNamespace(
         source_repository=SourceRepository(),
-        ioc_repository=SimpleNamespace(get_or_create_normal=lambda _r: [], get_or_create_warnings=lambda _r: []),
+        ioc_repository=SimpleNamespace(
+            get_or_create_normal=lambda _r: [], get_or_create_warnings=lambda _r: []
+        ),
         run_repository=SimpleNamespace(create_run=lambda **_k: 1, attach_iocs=lambda **_k: None),
         commit=lambda: None,
         rollback=lambda: None,
@@ -522,13 +524,17 @@ def test_queue_adapters_close_and_preserve_interruptions(monkeypatch: pytest.Mon
     assert closed == [True]
 
 
-def test_streaming_mmap_boundary_and_interruptions(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_streaming_mmap_boundary_and_interruptions(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from iocparser.infrastructure.streaming import StreamingIOCExtractor
 
     boundary_file = tmp_path / "utf8.txt"
     boundary_file.write_bytes("aé".encode())
     progress: list[int] = []
-    extractor = StreamingIOCExtractor(chunk_size=2, overlap=0, defang=False, progress_callback=progress.append)
+    extractor = StreamingIOCExtractor(
+        chunk_size=2, overlap=0, defang=False, progress_callback=progress.append
+    )
     assert extractor.extract_from_mmap(boundary_file) == {}
     assert progress
 
@@ -575,7 +581,9 @@ def test_pipeline_worker_and_service_preserve_operational_interruptions() -> Non
     with pytest.raises(MemoryError):
         PipelineWorker(client=MemoryFailingClient()).process(request)
 
-    service = SimpleNamespace(limits=SimpleNamespace(max_workers="many"), process_next=lambda **_k: None)
+    service = SimpleNamespace(
+        limits=SimpleNamespace(max_workers="many"), process_next=lambda **_k: None
+    )
     worker_service = DistributedWorkerService(
         service=service,
         queue_name="default",
@@ -750,17 +758,20 @@ def test_history_private_edges_with_real_models(tmp_path) -> None:
             )
             session.add(failed)
             session.flush()
-            assert ops._existing_failed_batch_item(
-                session,
-                {
-                    "source_value": "https://failed.example",
-                    "error_type": "RuntimeError",
-                    "error_message": "failed",
-                    "retry_attempt": 2,
-                    "created_at": now,
-                },
-                batch_job_id=batch.id,
-            ) == failed
+            assert (
+                ops._existing_failed_batch_item(
+                    session,
+                    {
+                        "source_value": "https://failed.example",
+                        "error_type": "RuntimeError",
+                        "error_message": "failed",
+                        "retry_attempt": 2,
+                        "created_at": now,
+                    },
+                    batch_job_id=batch.id,
+                )
+                == failed
+            )
 
             source = SourceModel(
                 kind="file",
@@ -991,4 +1002,6 @@ def test_history_import_skip_and_same_origin_batch_paths() -> None:
         )
         == 0
     )
-    assert ops._import_failed_batch_items(SimpleNamespace(), [{"batch_job_id": 3}], batch_map={}) == 0
+    assert (
+        ops._import_failed_batch_items(SimpleNamespace(), [{"batch_job_id": 3}], batch_map={}) == 0
+    )

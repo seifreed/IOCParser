@@ -99,8 +99,12 @@ def _handle_schema_inspection(args: argparse.Namespace, db_uri: str | None) -> b
     return True
 
 
-def _handle_history_io(args: argparse.Namespace, config: AppConfig, *, file_writer: FileWriter) -> bool:
-    export_path = _cli_args.get_optional_str_arg(args, "export_history") or _cli_args.get_optional_str_arg(args, "archive_history")
+def _handle_history_io(
+    args: argparse.Namespace, config: AppConfig, *, file_writer: FileWriter
+) -> bool:
+    export_path = _cli_args.get_optional_str_arg(
+        args, "export_history"
+    ) or _cli_args.get_optional_str_arg(args, "archive_history")
     if export_path:
         payload = uc_export_persisted_history(persistence_query_service=_query_service_for(config))
         content = json.dumps(payload, indent=2, sort_keys=True)
@@ -110,10 +114,14 @@ def _handle_history_io(args: argparse.Namespace, config: AppConfig, *, file_writ
             file_writer.write(export_path, content)
             _cli_output.print_status_line("history_exported", export_path)
         return True
-    import_path = _cli_args.get_optional_str_arg(args, "import_history") or _cli_args.get_optional_str_arg(args, "restore_history")
+    import_path = _cli_args.get_optional_str_arg(
+        args, "import_history"
+    ) or _cli_args.get_optional_str_arg(args, "restore_history")
     if not import_path:
         return False
-    imported = uc_import_persisted_history(_history_payload(import_path), persistence_query_service=_query_service_for(config))
+    imported = uc_import_persisted_history(
+        _history_payload(import_path), persistence_query_service=_query_service_for(config)
+    )
     imported_count = int(imported.get("imported", imported.get("runs_imported", 0)))
     skipped_count = int(imported.get("skipped", imported.get("runs_skipped", 0)))
     _cli_output.print_json_payload({"imported": imported_count, "skipped": skipped_count})
@@ -151,11 +159,16 @@ def _handle_history_maintenance(args: argparse.Namespace, config: AppConfig) -> 
 
 def print_schema_revisions() -> None:
     _cli_output.print_text_lines(
-        [f"{revision.version}\t{revision.name}\t{revision.description}" for revision in revision_history()],
+        [
+            f"{revision.version}\t{revision.name}\t{revision.description}"
+            for revision in revision_history()
+        ],
     )
 
 
-def handle_schema_commands(args: argparse.Namespace, config: AppConfig, *, file_writer: FileWriter) -> bool:
+def handle_schema_commands(
+    args: argparse.Namespace, config: AppConfig, *, file_writer: FileWriter
+) -> bool:
     """Handle schema and history maintenance CLI commands."""
     db_uri = config.db_uri
     return (

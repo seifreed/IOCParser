@@ -29,4 +29,7 @@ class LocalFileWriter(FileWriter):
         output_file.resolve().parent.mkdir(parents=True, exist_ok=True)
         output_file.write_text(content, encoding="utf-8")
 
+
+# fmt: off
 __all__ = ["InMemoryTelemetrySink", "LocalFileWriter", "LoggingTelemetrySink", "NoOpTelemetrySink", "bind_request_db_uri", "default_pipeline_telemetry_sink", "distributed_service_dependencies", "get_logger", "guarded_pipeline_runtime", "pipeline_worker_for", "runtime_limits_guard", "setup_logger", "telemetry_sink_for_mode", "telemetry_sink_for_worker_mode"]
+# fmt: on

@@ -44,7 +44,9 @@ def _build_evidence(text_content: str, value: str, *, source: str = "") -> tuple
     evidences: list[IOCEvidence] = []
     for index, line in enumerate(text_content.splitlines(), start=1):
         if any(variant in line for variant in search_variants):
-            evidences.append(IOCEvidence(excerpt=line.strip()[:240], line_number=index, source=source))
+            evidences.append(
+                IOCEvidence(excerpt=line.strip()[:240], line_number=index, source=source)
+            )
             if len(evidences) >= 3:
                 return tuple(evidences)
 
@@ -60,7 +62,9 @@ def _build_evidence(text_content: str, value: str, *, source: str = "") -> tuple
     return tuple(evidences)
 
 
-def _build_result_from_raw_iocs(raw_iocs: dict[str, list[str]], text_content: str) -> ExtractionResult:
+def _build_result_from_raw_iocs(
+    raw_iocs: dict[str, list[str]], text_content: str
+) -> ExtractionResult:
     """Build a normalized result with evidence and classification."""
     iocs = []
     for ioc_type, values in raw_iocs.items():
@@ -190,7 +194,9 @@ def persist_run(
             "successful_items": request.successful_items,
             "failed_items": request.failed_items,
             "partial_error_count": request.partial_error_count,
-            "duration_ms": request.duration_ms if request.duration_ms is not None else int((time.perf_counter() - started_at) * 1000),
+            "duration_ms": request.duration_ms
+            if request.duration_ms is not None
+            else int((time.perf_counter() - started_at) * 1000),
             "status": status,
             "error_message": request.error_message,
         }

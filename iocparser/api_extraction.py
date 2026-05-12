@@ -152,7 +152,9 @@ def extract_url_result(
     )
 
 
-def grouped_payload(result: ExtractionResult) -> tuple[dict[str, list[str | dict[str, str]]], dict[str, list[dict[str, str]]]]:
+def grouped_payload(
+    result: ExtractionResult,
+) -> tuple[dict[str, list[str | dict[str, str]]], dict[str, list[dict[str, str]]]]:
     return result.grouped_iocs(), result.grouped_warnings()
 
 

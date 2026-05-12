@@ -95,7 +95,9 @@ def create_batch_job(
     retry_attempt = _batch_retry_attempt(items)
     duration_ms = _int_report_value(report, "duration_ms", 0)
     started_at, finished_at = _batch_timestamps(report, duration_ms=duration_ms)
-    error_summary: Counter[str] = Counter(str(item.get("error_type", "unknown")) for item in failures)
+    error_summary: Counter[str] = Counter(
+        str(item.get("error_type", "unknown")) for item in failures
+    )
     metrics = _dict_report_value(report, "metrics")
     serialized_config = dict(config) if config is not None else {}
     serialized_error_summary: dict[str, int] = dict(sorted(error_summary.items()))
@@ -164,7 +166,9 @@ def _batch_retry_attempt(items: object) -> int:
     if not isinstance(items, list):
         return 0
     attempts = [
-        _int_report_value({key: value for key, value in item.items() if isinstance(key, str)}, "retry_attempt", 0)
+        _int_report_value(
+            {key: value for key, value in item.items() if isinstance(key, str)}, "retry_attempt", 0
+        )
         for item in items
         if isinstance(item, dict)
     ]
@@ -195,10 +199,24 @@ def list_failed_batch_jobs(session: Session, *, limit: int = 20) -> list[tuple[B
         .limit(limit)
     )
     jobs: list[BatchJobModel] = list(session.execute(stmt).scalars().all())
-    return [(job, session.query(FailedBatchItemModel).filter(FailedBatchItemModel.batch_job_id == job.id).count()) for job in jobs]
+    return [
+        (
+            job,
+            session.query(FailedBatchItemModel)
+            .filter(FailedBatchItemModel.batch_job_id == job.id)
+            .count(),
+        )
+        for job in jobs
+    ]
 
 
 def load_failed_batch_items(session: Session, *, batch_job_id: int) -> list[FailedBatchItemModel]:
     """Load failed items for a batch job."""
     stmt = select(FailedBatchItemModel).where(FailedBatchItemModel.batch_job_id == batch_job_id)
-    return list(session.execute(stmt.order_by(FailedBatchItemModel.created_at.asc(), FailedBatchItemModel.id.asc())).scalars().all())
+    return list(
+        session.execute(
+            stmt.order_by(FailedBatchItemModel.created_at.asc(), FailedBatchItemModel.id.asc())
+        )
+        .scalars()
+        .all()
+    )

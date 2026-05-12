@@ -200,7 +200,9 @@ class TestMISPWarningLists:
             (f"value-{index}", "domains"): (False, None) for index in range(5000)
         }
 
-        warning_lists._cache_check_value(("fresh", "domains"), (True, {"name": "List", "description": "Desc"}))
+        warning_lists._cache_check_value(
+            ("fresh", "domains"), (True, {"name": "List", "description": "Desc"})
+        )
 
         assert warning_lists._warning_lookup_cache == {
             ("fresh", "domains"): (True, {"name": "List", "description": "Desc"})

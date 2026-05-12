@@ -273,7 +273,9 @@ def process_url_payload(request: UrlProcessingRequest) -> SingleInputPayload:
             reader=request.reader,
             extractor_engine=request.extractor_engine,
             temporary_resource_cleaner=request.temporary_resource_cleaner,
-            warning_service=request.warning_service if request.context.options.check_warnings else None,
+            warning_service=request.warning_service
+            if request.context.options.check_warnings
+            else None,
         )
     return SingleInputPayload(
         normal_iocs=result.grouped_iocs(),

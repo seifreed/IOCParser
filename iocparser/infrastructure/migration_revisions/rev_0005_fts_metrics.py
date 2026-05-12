@@ -10,7 +10,9 @@ def apply(engine: Engine, inspector: Inspector) -> None:
     if "batch_jobs" in set(inspector.get_table_names()):
         batch_columns = {str(column["name"]) for column in inspector.get_columns("batch_jobs")}
         if "metrics_json" not in batch_columns:
-            statements.append("ALTER TABLE batch_jobs ADD COLUMN metrics_json TEXT NOT NULL DEFAULT '{}'")
+            statements.append(
+                "ALTER TABLE batch_jobs ADD COLUMN metrics_json TEXT NOT NULL DEFAULT '{}'"
+            )
     dialect = engine.dialect.name
     if dialect == "sqlite" and "iocs" in table_names:
         statements.extend(
@@ -43,4 +45,6 @@ def apply(engine: Engine, inspector: Inspector) -> None:
         for statement in statements:
             connection.execute(text(statement))
         if dialect == "sqlite" and "iocs" in table_names:
-            connection.execute(text("INSERT INTO ioc_search_fts(ioc_search_fts) VALUES ('rebuild')"))
+            connection.execute(
+                text("INSERT INTO ioc_search_fts(ioc_search_fts) VALUES ('rebuild')")
+            )

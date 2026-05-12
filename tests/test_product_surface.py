@@ -170,7 +170,9 @@ class FlakyLocalHTTPServer:
                 del fmt, args
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.thread = threading.Thread(target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True)
+        self.thread = threading.Thread(
+            target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True
+        )
         self.thread.start()
         return f"http://127.0.0.1:{self.server.server_address[1]}/feed.txt"
 
@@ -206,7 +208,9 @@ class SlowLocalHTTPServer:
                 del fmt, args
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.thread = threading.Thread(target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True)
+        self.thread = threading.Thread(
+            target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True
+        )
         self.thread.start()
         return f"http://127.0.0.1:{self.server.server_address[1]}/slow.txt"
 
@@ -240,7 +244,9 @@ class StableLocalHTTPServer:
                 del fmt, args
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.thread = threading.Thread(target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True)
+        self.thread = threading.Thread(
+            target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True
+        )
         self.thread.start()
         return f"http://127.0.0.1:{self.server.server_address[1]}/feed.txt"
 
@@ -258,11 +264,21 @@ def test_public_query_api_and_diff_previous_source(tmp_path: Path) -> None:
     service = SQLAlchemyPersistenceService(db_uri)
     run_ids = service.persist_multiple_runs(
         [
-            ("file", "alpha.txt", ExtractionResult.from_grouped_payload({"domains": ["alpha.example"]}, {})),
-            ("file", "alpha.txt", ExtractionResult.from_grouped_payload({"domains": ["beta.example"]}, {})),
+            (
+                "file",
+                "alpha.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["alpha.example"]}, {}),
+            ),
+            (
+                "file",
+                "alpha.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["beta.example"]}, {}),
+            ),
         ],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
 
     runs = list_persisted_runs(
@@ -291,7 +307,9 @@ def test_public_query_api_and_diff_previous_source(tmp_path: Path) -> None:
     exported = export_persisted_run(db_uri=db_uri, run_id=run_ids[0])
     assert exported.summary.source_value == "alpha.txt"
 
-    direct_diff = diff_persisted_runs(db_uri=db_uri, left_run_id=run_ids[0], right_run_id=run_ids[1])
+    direct_diff = diff_persisted_runs(
+        db_uri=db_uri, left_run_id=run_ids[0], right_run_id=run_ids[1]
+    )
     assert direct_diff.added.grouped_iocs() == {"domains": ["beta.example"]}
 
     diff = diff_run_against_previous_source(db_uri=db_uri, run_id=run_ids[1])
@@ -303,7 +321,9 @@ def test_public_query_api_and_diff_previous_source(tmp_path: Path) -> None:
     assert run_page.has_next is True
     assert run_page.page == 1
 
-    hit_page = query_persisted_iocs(db_uri=db_uri, value=".example", limit=1, offset=1, sort_by="source")
+    hit_page = query_persisted_iocs(
+        db_uri=db_uri, value=".example", limit=1, offset=1, sort_by="source"
+    )
     assert hit_page.total == 2
     assert hit_page.offset == 1
     assert len(hit_page.items) == 1
@@ -321,7 +341,9 @@ def test_diff_previous_source_skips_partial_prior_runs(tmp_path: Path) -> None:
             source_value="alpha.txt",
             normal_iocs={"domains": ["alpha.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
             run_metadata={"status": "success"},
         )
@@ -333,9 +355,16 @@ def test_diff_previous_source_skips_partial_prior_runs(tmp_path: Path) -> None:
             source_value="alpha.txt",
             normal_iocs={"domains": ["beta.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
-            run_metadata={"status": "partial", "partial_error_count": 1, "failed_items": 0, "successful_items": 1},
+            run_metadata={
+                "status": "partial",
+                "partial_error_count": 1,
+                "failed_items": 0,
+                "successful_items": 1,
+            },
         )
     )
     latest_run_id = persist_results(
@@ -345,7 +374,9 @@ def test_diff_previous_source_skips_partial_prior_runs(tmp_path: Path) -> None:
             source_value="alpha.txt",
             normal_iocs={"domains": ["gamma.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
             run_metadata={"status": "success"},
         )
@@ -353,11 +384,15 @@ def test_diff_previous_source_skips_partial_prior_runs(tmp_path: Path) -> None:
     assert latest_run_id is not None
 
     diff = diff_run_against_previous_source(db_uri=db_uri, run_id=latest_run_id)
-    exported = export_persisted_run(db_uri=db_uri, run_id=diff.compared_to_previous_source_run_id or 0)
+    exported = export_persisted_run(
+        db_uri=db_uri, run_id=diff.compared_to_previous_source_run_id or 0
+    )
     assert exported.result.grouped_iocs() == {"domains": ["alpha.example"]}
 
 
-def test_url_batch_preserves_duplicate_inputs_through_report_and_persistence(tmp_path: Path) -> None:
+def test_url_batch_preserves_duplicate_inputs_through_report_and_persistence(
+    tmp_path: Path,
+) -> None:
     from iocparser import cli_dispatch_workflow as workflow
 
     db_uri = f"sqlite:///{tmp_path / 'duplicate-urls.sqlite'}"
@@ -384,7 +419,9 @@ def test_url_batch_preserves_duplicate_inputs_through_report_and_persistence(tmp
     workflow.persist_batch_results(
         args,
         config,
-        PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="text"),
+        PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="text"
+        ),
         results,
         report,
     )
@@ -396,10 +433,15 @@ def test_url_batch_preserves_duplicate_inputs_through_report_and_persistence(tmp
     assert len(duplicate_entries) == 2
     assert len({entry.item_key for entry in duplicate_entries}) == 2
     assert all(not entry.item_key.startswith("\0") for entry in duplicate_entries)
-    assert all(entry.normal_iocs["urls"] == ["hxxps://duplicate[.]example/path"] for entry in duplicate_entries)
+    assert all(
+        entry.normal_iocs["urls"] == ["hxxps://duplicate[.]example/path"]
+        for entry in duplicate_entries
+    )
 
 
-def test_successful_retry_uses_original_batch_url_for_retry_history_when_completed_url_changes(tmp_path: Path) -> None:
+def test_successful_retry_uses_original_batch_url_for_retry_history_when_completed_url_changes(
+    tmp_path: Path,
+) -> None:
     from iocparser import cli_dispatch_workflow
     from iocparser import cli_url_batch_workflow as workflow
 
@@ -412,7 +454,10 @@ def test_successful_retry_uses_original_batch_url_for_retry_history_when_complet
             del url
             content = "IOC URL: https://redirected.example/path"
             self.temp_path.write_text(content, encoding="utf-8")
-            self._metadata = {"final_url": "https://redirected.example/path", "input_size": len(content)}
+            self._metadata = {
+                "final_url": "https://redirected.example/path",
+                "input_size": len(content),
+            }
             return str(self.temp_path)
 
         def download_metadata(self) -> dict[str, object]:
@@ -456,12 +501,20 @@ def test_successful_retry_uses_original_batch_url_for_retry_history_when_complet
 
     cli_dispatch_workflow.persist_batch_results(
         args,
-        load_config(cli_persist=True, cli_db_uri=f"sqlite:///{tmp_path / 'redirect-retry.sqlite'}", cli_config_path=None),
-        PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        load_config(
+            cli_persist=True,
+            cli_db_uri=f"sqlite:///{tmp_path / 'redirect-retry.sqlite'}",
+            cli_config_path=None,
+        ),
+        PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
         results,
         report,
     )
-    runs = SQLAlchemyPersistenceService(f"sqlite:///{tmp_path / 'redirect-retry.sqlite'}").list_runs(limit=10)
+    runs = SQLAlchemyPersistenceService(
+        f"sqlite:///{tmp_path / 'redirect-retry.sqlite'}"
+    ).list_runs(limit=10)
     assert len(runs) == 1
     assert runs[0].source_value == original_url
 
@@ -476,7 +529,9 @@ def test_source_value_file_filter_preserves_case_sensitive_identity(tmp_path: Pa
             source_value="Report-A.txt",
             normal_iocs={"domains": ["alpha.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
         )
     )
@@ -487,12 +542,16 @@ def test_source_value_file_filter_preserves_case_sensitive_identity(tmp_path: Pa
             source_value="report-a.txt",
             normal_iocs={"domains": ["beta.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
         )
     )
 
-    queried_runs = query_persisted_runs(db_uri=db_uri, limit=10, source_kind="file", source_value="Report-A.txt")
+    queried_runs = query_persisted_runs(
+        db_uri=db_uri, limit=10, source_kind="file", source_value="Report-A.txt"
+    )
     assert queried_runs.total == 1
     assert queried_runs.items[0].source_value == "Report-A.txt"
 
@@ -505,18 +564,23 @@ def test_source_value_file_filter_preserves_case_sensitive_identity(tmp_path: Pa
     assert queried_hits.total == 1
     assert queried_hits.items[0].source_value == "Report-A.txt"
 
-    assert prune_persisted_runs(
-        db_uri=db_uri,
-        before="2999-01-01T00:00:00",
-        source_kind="file",
-        source_value="Report-A.txt",
-    ) == 1
+    assert (
+        prune_persisted_runs(
+            db_uri=db_uri,
+            before="2999-01-01T00:00:00",
+            source_kind="file",
+            source_value="Report-A.txt",
+        )
+        == 1
+    )
     remaining = query_persisted_runs(db_uri=db_uri, limit=10)
     assert remaining.total == 1
     assert remaining.items[0].source_value == "report-a.txt"
 
 
-def test_multiple_files_preserve_duplicate_paths_through_results_and_persistence(tmp_path: Path) -> None:
+def test_multiple_files_preserve_duplicate_paths_through_results_and_persistence(
+    tmp_path: Path,
+) -> None:
     file_path = tmp_path / "duplicate.txt"
     file_path.write_text("IOC URL: https://files.example/path", encoding="utf-8")
     args = _args(multiple=[str(file_path), str(file_path)], persist=True)
@@ -536,7 +600,9 @@ def test_multiple_files_preserve_duplicate_paths_through_results_and_persistence
     persist_many_results(
         results,
         config=load_config(cli_persist=True, cli_db_uri=db_uri, cli_config_path=None),
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="text"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="text"
+        ),
         source_kind="file",
     )
     runs = SQLAlchemyPersistenceService(db_uri).list_runs(limit=10)
@@ -546,10 +612,14 @@ def test_multiple_files_preserve_duplicate_paths_through_results_and_persistence
     duplicate_entries = [entry for entry in results.entries if entry.source_value == str(file_path)]
     assert len(duplicate_entries) == 2
     assert len({entry.item_key for entry in duplicate_entries}) == 2
-    assert all(entry.normal_iocs["urls"] == ["hxxps://files[.]example/path"] for entry in duplicate_entries)
+    assert all(
+        entry.normal_iocs["urls"] == ["hxxps://files[.]example/path"] for entry in duplicate_entries
+    )
 
 
-def test_equivalent_urls_reuse_same_persisted_source_for_previous_source_diff(tmp_path: Path) -> None:
+def test_equivalent_urls_reuse_same_persisted_source_for_previous_source_diff(
+    tmp_path: Path,
+) -> None:
     db_uri = f"sqlite:///{tmp_path / 'normalized-source.sqlite'}"
     persist_results(
         PersistResultsRequest(
@@ -558,7 +628,9 @@ def test_equivalent_urls_reuse_same_persisted_source_for_previous_source_diff(tm
             source_value="HTTPS://Example.TEST/report",
             normal_iocs={"domains": ["alpha.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
             source_metadata={"normalized_url": "https://example.test/report"},
         )
@@ -570,7 +642,9 @@ def test_equivalent_urls_reuse_same_persisted_source_for_previous_source_diff(tm
             source_value="https://example.test/report",
             normal_iocs={"domains": ["beta.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
             source_metadata={"normalized_url": "https://example.test/report"},
         )
@@ -581,9 +655,16 @@ def test_equivalent_urls_reuse_same_persisted_source_for_previous_source_diff(tm
     diff = diff_run_against_previous_source(db_uri=db_uri, run_id=runs[0].run_id)
     assert diff.compared_to_previous_source_run_id == runs[1].run_id
     assert diff.added.grouped_iocs() == {"domains": ["beta.example"]}
-    queried_runs = query_persisted_runs(db_uri=db_uri, limit=10, source_kind="url", source_value="https://example.test/report/")
+    queried_runs = query_persisted_runs(
+        db_uri=db_uri, limit=10, source_kind="url", source_value="https://example.test/report/"
+    )
     assert queried_runs.total == 2
-    queried_hits = query_persisted_iocs(db_uri=db_uri, value=".example", source_kind="url", source_value="https://example.test/report/")
+    queried_hits = query_persisted_iocs(
+        db_uri=db_uri,
+        value=".example",
+        source_kind="url",
+        source_value="https://example.test/report/",
+    )
     assert queried_hits.total == 2
 
 
@@ -597,7 +678,9 @@ def test_source_value_url_filter_matches_exact_canonical_source(tmp_path: Path) 
             source_value="https://example.test/report",
             normal_iocs={"domains": ["alpha.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
         )
     )
@@ -608,12 +691,16 @@ def test_source_value_url_filter_matches_exact_canonical_source(tmp_path: Path) 
             source_value="https://example.test/report-old",
             normal_iocs={"domains": ["beta.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
         )
     )
 
-    queried_runs = query_persisted_runs(db_uri=db_uri, limit=10, source_kind="url", source_value="https://example.test/report")
+    queried_runs = query_persisted_runs(
+        db_uri=db_uri, limit=10, source_kind="url", source_value="https://example.test/report"
+    )
     assert queried_runs.total == 1
     assert queried_runs.items[0].source_value == "https://example.test/report"
 
@@ -626,15 +713,20 @@ def test_source_value_url_filter_matches_exact_canonical_source(tmp_path: Path) 
     assert queried_hits.total == 1
     assert queried_hits.items[0].source_value == "https://example.test/report"
 
-    assert prune_persisted_runs(
-        db_uri=db_uri,
-        before="2999-01-01T00:00:00",
-        source_kind="url",
-        source_value="https://example.test/report",
-    ) == 1
+    assert (
+        prune_persisted_runs(
+            db_uri=db_uri,
+            before="2999-01-01T00:00:00",
+            source_kind="url",
+            source_value="https://example.test/report",
+        )
+        == 1
+    )
 
 
-def test_source_value_url_like_string_does_not_auto_promote_without_url_source_kind(tmp_path: Path) -> None:
+def test_source_value_url_like_string_does_not_auto_promote_without_url_source_kind(
+    tmp_path: Path,
+) -> None:
     db_uri = f"sqlite:///{tmp_path / 'literal-url-like-source-filter.sqlite'}"
     config = load_config(cli_persist=True, cli_db_uri=db_uri, cli_config_path=None)
     persist_results(
@@ -644,7 +736,9 @@ def test_source_value_url_like_string_does_not_auto_promote_without_url_source_k
             source_value="https://example.test/report",
             normal_iocs={"domains": ["literal.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
         )
     )
@@ -655,14 +749,20 @@ def test_source_value_url_like_string_does_not_auto_promote_without_url_source_k
             source_value="HTTPS://Example.TEST/report",
             normal_iocs={"domains": ["canonical.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
             source_metadata={"normalized_url": "https://example.test/report"},
         )
     )
 
-    file_runs = query_persisted_runs(db_uri=db_uri, limit=10, source_value="https://example.test/report")
-    file_hits = query_persisted_iocs(db_uri=db_uri, value=".example", source_value="https://example.test/report")
+    file_runs = query_persisted_runs(
+        db_uri=db_uri, limit=10, source_value="https://example.test/report"
+    )
+    file_hits = query_persisted_iocs(
+        db_uri=db_uri, value=".example", source_value="https://example.test/report"
+    )
 
     assert file_runs.total == 1
     assert file_runs.items[0].source_kind == "file"
@@ -670,7 +770,9 @@ def test_source_value_url_like_string_does_not_auto_promote_without_url_source_k
     assert file_hits.items[0].source_kind == "file"
 
 
-def test_url_sources_reuse_same_identity_across_direct_and_downloader_style_normalization(tmp_path: Path) -> None:
+def test_url_sources_reuse_same_identity_across_direct_and_downloader_style_normalization(
+    tmp_path: Path,
+) -> None:
     db_uri = f"sqlite:///{tmp_path / 'normalized-source-producers.sqlite'}"
     persist_results(
         PersistResultsRequest(
@@ -679,7 +781,9 @@ def test_url_sources_reuse_same_identity_across_direct_and_downloader_style_norm
             source_value="https://example.test/report",
             normal_iocs={"domains": ["alpha.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
             source_metadata={"normalized_url": "HTTPS://Example.TEST/report#frag"},
         )
@@ -691,7 +795,9 @@ def test_url_sources_reuse_same_identity_across_direct_and_downloader_style_norm
             source_value="https://example.test/report",
             normal_iocs={"domains": ["beta.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
         )
     )
@@ -707,16 +813,28 @@ def test_persist_multiple_runs_reuses_canonical_url_identity(tmp_path: Path) -> 
     service = SQLAlchemyPersistenceService(db_uri)
     run_ids = service.persist_multiple_runs(
         [
-            ("url", "HTTPS://Example.TEST/report#frag", ExtractionResult.from_grouped_payload({"domains": ["alpha.example"]}, {})),
-            ("url", "https://example.test/report", ExtractionResult.from_grouped_payload({"domains": ["beta.example"]}, {})),
+            (
+                "url",
+                "HTTPS://Example.TEST/report#frag",
+                ExtractionResult.from_grouped_payload({"domains": ["alpha.example"]}, {}),
+            ),
+            (
+                "url",
+                "https://example.test/report",
+                ExtractionResult.from_grouped_payload({"domains": ["beta.example"]}, {}),
+            ),
         ],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
 
     compared = service.diff_run_against_previous_source(run_id=run_ids[1])
     assert compared.compared_to_previous_source_run_id == run_ids[0]
-    queried_runs = query_persisted_runs(db_uri=db_uri, limit=10, source_kind="url", source_value="https://example.test/report/")
+    queried_runs = query_persisted_runs(
+        db_uri=db_uri, limit=10, source_kind="url", source_value="https://example.test/report/"
+    )
     assert queried_runs.total == 2
 
 
@@ -754,14 +872,22 @@ def test_public_batch_report_uses_urls_and_hides_internal_batch_maps() -> None:
             "failures": {"batch-item:1": "boom"},
             "error_groups": {"ValueError": 1},
             "items": [
-                {"url": "https://bad.example", "status": "failed", "error": "boom", "item_key": "batch-item:1"},
+                {
+                    "url": "https://bad.example",
+                    "status": "failed",
+                    "error": "boom",
+                    "item_key": "batch-item:1",
+                },
                 {"url": "https://ok.example", "status": "ok", "item_key": "batch-item:2"},
             ],
             "source_metadata_map": {"batch-item:1": {"input_value": "https://bad.example"}},
             "run_metadata_map": {"batch-item:1": {"status": "failed"}},
             "duration_ms": 10,
             "phase_timings_ms": {"execution": 10},
-            "phase_timestamps": {"started_at": "2026-01-01T00:00:00", "finished_at": "2026-01-01T00:00:10"},
+            "phase_timestamps": {
+                "started_at": "2026-01-01T00:00:00",
+                "finished_at": "2026-01-01T00:00:10",
+            },
             "metrics": {"throughput_items_per_second": 2.0},
         }
     )
@@ -787,14 +913,27 @@ def test_public_batch_report_preserves_duplicate_failed_urls_in_summary() -> Non
             "failures": {"batch-item:1": "boom", "batch-item:2": "boom-again"},
             "error_groups": {"ValueError": 2},
             "items": [
-                {"url": "https://bad.example", "status": "failed", "error": "boom", "item_key": "batch-item:1"},
-                {"url": "https://bad.example", "status": "failed", "error": "boom-again", "item_key": "batch-item:2"},
+                {
+                    "url": "https://bad.example",
+                    "status": "failed",
+                    "error": "boom",
+                    "item_key": "batch-item:1",
+                },
+                {
+                    "url": "https://bad.example",
+                    "status": "failed",
+                    "error": "boom-again",
+                    "item_key": "batch-item:2",
+                },
             ],
             "source_metadata_map": {"batch-item:1": {"input_value": "https://bad.example"}},
             "run_metadata_map": {"batch-item:1": {"status": "failed"}},
             "duration_ms": 10,
             "phase_timings_ms": {"execution": 10},
-            "phase_timestamps": {"started_at": "2026-01-01T00:00:00", "finished_at": "2026-01-01T00:00:10"},
+            "phase_timestamps": {
+                "started_at": "2026-01-01T00:00:00",
+                "finished_at": "2026-01-01T00:00:10",
+            },
             "metrics": {"throughput_items_per_second": 2.0},
         }
     )
@@ -820,8 +959,20 @@ def test_public_batch_report_preserves_input_order_for_duplicate_failed_urls() -
             "results": BatchResultsCollection(),
             "failures": {"batch-item:2": "second", "batch-item:1": "first"},
             "item_reports": [
-                {"url": "https://bad.example", "status": "failed", "error": "second", "item_key": "batch-item:2", "input_index": 2},
-                {"url": "https://bad.example", "status": "failed", "error": "first", "item_key": "batch-item:1", "input_index": 1},
+                {
+                    "url": "https://bad.example",
+                    "status": "failed",
+                    "error": "second",
+                    "item_key": "batch-item:2",
+                    "input_index": 2,
+                },
+                {
+                    "url": "https://bad.example",
+                    "status": "failed",
+                    "error": "first",
+                    "item_key": "batch-item:1",
+                    "input_index": 1,
+                },
             ],
             "source_metadata_map": {"batch-item:1": {"input_value": "https://bad.example"}},
             "run_metadata_map": {"batch-item:1": {"status": "failed"}},
@@ -836,7 +987,9 @@ def test_public_batch_report_preserves_input_order_for_duplicate_failed_urls() -
     assert [item["error"] for item in report["items"]] == ["first", "second"]
 
 
-def test_batch_results_collection_rejects_ambiguous_key_between_internal_item_key_and_source_value() -> None:
+def test_batch_results_collection_rejects_ambiguous_key_between_internal_item_key_and_source_value() -> (
+    None
+):
     results = BatchResultsCollection()
     results.add(
         item_key="batch-item:1",
@@ -890,7 +1043,9 @@ def test_public_rich_extraction_api(tmp_path: Path) -> None:
                     del fmt, args
 
             self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-            self.thread = threading.Thread(target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True)
+            self.thread = threading.Thread(
+                target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True
+            )
             self.thread.start()
             return f"http://127.0.0.1:{self.server.server_address[1]}/report.txt"
 
@@ -916,7 +1071,9 @@ def test_render_result_supports_summary_and_analyst_filters() -> None:
         ),
         warnings=(
             WarningMatch(
-                ioc=IOC.from_raw("ips", "198.51.100.10", severity="informational", tags=("warning-list-match",)),
+                ioc=IOC.from_raw(
+                    "ips", "198.51.100.10", severity="informational", tags=("warning-list-match",)
+                ),
                 warning_list="Known Benign",
                 description="Resolver",
             ),
@@ -950,11 +1107,21 @@ def test_save_diff_output_supports_counts_and_selective_sections(tmp_path: Path)
     diff = SQLAlchemyPersistenceService(f"sqlite:///{tmp_path / 'diff.db'}")
     run_ids = diff.persist_multiple_runs(
         [
-            ("file", "same.txt", ExtractionResult.from_grouped_payload({"domains": ["old.example"]}, {})),
-            ("file", "same.txt", ExtractionResult.from_grouped_payload({"domains": ["new.example"]}, {})),
+            (
+                "file",
+                "same.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["old.example"]}, {}),
+            ),
+            (
+                "file",
+                "same.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["new.example"]}, {}),
+            ),
         ],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="text"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="text"
+        ),
     )
     compared = diff.diff_run_against_previous_source(run_id=run_ids[1])
     buffer = StringIO()
@@ -978,11 +1145,21 @@ def test_diff_previous_source_uses_run_id_to_break_started_at_ties(tmp_path: Pat
     service = SQLAlchemyPersistenceService(db_uri)
     run_ids = service.persist_multiple_runs(
         [
-            ("file", "same.txt", ExtractionResult.from_grouped_payload({"domains": ["old.example"]}, {})),
-            ("file", "same.txt", ExtractionResult.from_grouped_payload({"domains": ["new.example"]}, {})),
+            (
+                "file",
+                "same.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["old.example"]}, {}),
+            ),
+            (
+                "file",
+                "same.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["new.example"]}, {}),
+            ),
         ],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="text"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="text"
+        ),
     )
 
     unit = SQLAlchemyUnitOfWork(db_uri)
@@ -1022,8 +1199,8 @@ def test_load_config_supports_extended_defaults(tmp_path: Path) -> None:
             "url_backoff=0.01\n"
             "rate_limit=0.02\n"
             "user_agent=IOCParser-Test/1.0\n"
-            "headers_json={\"X-Test\": \"1\"}\n"
-            "cookies_json={\"session\": \"cookie\"}\n"
+            'headers_json={"X-Test": "1"}\n'
+            'cookies_json={"session": "cookie"}\n'
             "proxy=http://127.0.0.1:8080\n"
             "allow_redirects=false\n"
             "tls_verify=false\n"
@@ -1042,8 +1219,8 @@ def test_load_config_supports_extended_defaults(tmp_path: Path) -> None:
     assert config.url_workers == 8
     assert config.rate_limit == 0.02
     assert config.user_agent == "IOCParser-Test/1.0"
-    assert config.headers_json == "{\"X-Test\": \"1\"}"
-    assert config.cookies_json == "{\"session\": \"cookie\"}"
+    assert config.headers_json == '{"X-Test": "1"}'
+    assert config.cookies_json == '{"session": "cookie"}'
     assert config.proxy == "http://127.0.0.1:8080"
     assert config.allow_redirects is False
     assert config.tls_verify is False
@@ -1083,8 +1260,8 @@ def test_load_config_supports_extended_defaults(tmp_path: Path) -> None:
     assert args.streaming is True
     assert args.url_workers == 8
     assert args.user_agent == "IOCParser-Test/1.0"
-    assert args.headers_json == "{\"X-Test\": \"1\"}"
-    assert args.cookies_json == "{\"session\": \"cookie\"}"
+    assert args.headers_json == '{"X-Test": "1"}'
+    assert args.cookies_json == '{"session": "cookie"}'
     assert args.proxy == "http://127.0.0.1:8080"
     assert args.allow_redirects is False
     assert args.tls_verify is False
@@ -1179,7 +1356,9 @@ def test_cli_query_and_persist_helpers_cover_new_paths(tmp_path: Path) -> None:
             source_value=str(sample),
             normal_iocs={"domains": ["alpha.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
         )
     )
@@ -1190,7 +1369,9 @@ def test_cli_query_and_persist_helpers_cover_new_paths(tmp_path: Path) -> None:
             source_value="https://example.test/report",
             normal_iocs={"domains": ["beta.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
         )
     )
@@ -1201,7 +1382,9 @@ def test_cli_query_and_persist_helpers_cover_new_paths(tmp_path: Path) -> None:
             source_value="https://example.test/report",
             normal_iocs={"domains": ["gamma.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
         )
     )
@@ -1221,7 +1404,12 @@ def test_cli_query_and_persist_helpers_cover_new_paths(tmp_path: Path) -> None:
     )
     query_args.db_uri = db_uri
     query_args.config = None
-    assert cli_queries.handle_query_commands(query_args, load_config(None, db_uri, None), file_writer=_Writer()) is True
+    assert (
+        cli_queries.handle_query_commands(
+            query_args, load_config(None, db_uri, None), file_writer=_Writer()
+        )
+        is True
+    )
 
     unreadable = tmp_path / "unreadable.txt"
     unreadable.write_text("IOC domain: denied.example\n", encoding="utf-8")
@@ -1234,7 +1422,9 @@ def test_cli_query_and_persist_helpers_cover_new_paths(tmp_path: Path) -> None:
                 source_value=str(unreadable),
                 normal_iocs={"domains": ["denied.example"]},
                 warning_iocs={},
-                options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+                options=PersistOptions(
+                    defang=False, check_warnings=False, force_update=False, output_format="json"
+                ),
                 tool_version="5.0.0",
             )
         )
@@ -1243,7 +1433,11 @@ def test_cli_query_and_persist_helpers_cover_new_paths(tmp_path: Path) -> None:
 
 
 def test_parse_string_filters_supports_sequences() -> None:
-    assert parse_string_filters(["high,medium", "informational"]) == ("high", "medium", "informational")
+    assert parse_string_filters(["high,medium", "informational"]) == (
+        "high",
+        "medium",
+        "informational",
+    )
     assert parse_string_filters("high,medium") == ("high", "medium")
 
 
@@ -1253,9 +1447,17 @@ def test_persistence_query_service_raises_for_missing_runs(tmp_path: Path) -> No
         service.diff_run_against_previous_source(run_id=999)
 
     run_ids = service.persist_multiple_runs(
-        [("file", "lonely.txt", ExtractionResult.from_grouped_payload({"domains": ["solo.example"]}, {}))],
+        [
+            (
+                "file",
+                "lonely.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["solo.example"]}, {}),
+            )
+        ],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
     with pytest.raises(ValueError, match="No previous run found"):
         service.diff_run_against_previous_source(run_id=run_ids[0])
@@ -1277,7 +1479,9 @@ def test_public_render_api_and_semantic_diff_filters(tmp_path: Path) -> None:
                 ioc=IOC.from_raw(
                     "ips",
                     "198.51.100.10",
-                    evidence=(IOCEvidence(excerpt="198.51.100.10", line_number=4, source="alpha.txt"),),
+                    evidence=(
+                        IOCEvidence(excerpt="198.51.100.10", line_number=4, source="alpha.txt"),
+                    ),
                     severity="informational",
                     tags=("warning-list-match", "network"),
                 ),
@@ -1293,7 +1497,9 @@ def test_public_render_api_and_semantic_diff_filters(tmp_path: Path) -> None:
             ("file", "alpha.txt", updated),
         ],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=True, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=True, force_update=False, output_format="json"
+        ),
     )
 
     rendered_run = render_persisted_run(
@@ -1366,7 +1572,9 @@ def test_public_render_api_and_semantic_diff_filters(tmp_path: Path) -> None:
     )
     assert "alpha.example" in removed_diff
 
-    warning_only_diff = diff_persisted_runs(db_uri=db_uri, left_run_id=run_ids[1], right_run_id=run_ids[0])
+    warning_only_diff = diff_persisted_runs(
+        db_uri=db_uri, left_run_id=run_ids[1], right_run_id=run_ids[0]
+    )
     assert warning_only_diff.added_warning_counts["ips"] == 1
     assert warning_only_diff.removed_warning_counts == {}
 
@@ -1388,7 +1596,9 @@ def test_query_filters_and_previous_successful_baseline(tmp_path: Path) -> None:
                 ioc=IOC.from_raw(
                     "domains",
                     "flagged.example",
-                    evidence=(IOCEvidence(excerpt="flagged.example", line_number=2, source="batch"),),
+                    evidence=(
+                        IOCEvidence(excerpt="flagged.example", line_number=2, source="batch"),
+                    ),
                     severity="informational",
                     tags=("warning-list-match", "network"),
                 ),
@@ -1400,7 +1610,9 @@ def test_query_filters_and_previous_successful_baseline(tmp_path: Path) -> None:
     service.persist_multiple_runs(
         [("file", "sample.txt", warning_result)],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=True, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=True, force_update=False, output_format="json"
+        ),
     )
     unit_of_work = SQLAlchemyUnitOfWork(db_uri)
     try:
@@ -1408,7 +1620,9 @@ def test_query_filters_and_previous_successful_baseline(tmp_path: Path) -> None:
         failed_run_id = unit_of_work.run_repository.create_run(
             source_id=source_id,
             tool_version="5.0.0",
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             metadata={
                 "normal_ioc_count": 0,
                 "warning_ioc_count": 0,
@@ -1421,7 +1635,9 @@ def test_query_filters_and_previous_successful_baseline(tmp_path: Path) -> None:
         success_run_id = unit_of_work.run_repository.create_run(
             source_id=source_id,
             tool_version="5.0.0",
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             metadata={
                 "normal_ioc_count": 1,
                 "warning_ioc_count": 0,
@@ -1433,11 +1649,15 @@ def test_query_filters_and_previous_successful_baseline(tmp_path: Path) -> None:
         )
         fresh_result = ExtractionResult(iocs=(IOC.from_raw("urls", "https://fresh.example"),))
         ioc_ids = unit_of_work.ioc_repository.get_or_create_normal(fresh_result)
-        unit_of_work.run_repository.attach_iocs(run_id=success_run_id, ioc_ids=ioc_ids, result=fresh_result)
+        unit_of_work.run_repository.attach_iocs(
+            run_id=success_run_id, ioc_ids=ioc_ids, result=fresh_result
+        )
         latest_run_id = unit_of_work.run_repository.create_run(
             source_id=source_id,
             tool_version="5.0.0",
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             metadata={
                 "normal_ioc_count": 1,
                 "warning_ioc_count": 0,
@@ -1449,7 +1669,9 @@ def test_query_filters_and_previous_successful_baseline(tmp_path: Path) -> None:
         )
         latest_result = ExtractionResult(iocs=(IOC.from_raw("domains", "latest.example"),))
         latest_ids = unit_of_work.ioc_repository.get_or_create_normal(latest_result)
-        unit_of_work.run_repository.attach_iocs(run_id=latest_run_id, ioc_ids=latest_ids, result=latest_result)
+        unit_of_work.run_repository.attach_iocs(
+            run_id=latest_run_id, ioc_ids=latest_ids, result=latest_result
+        )
         unit_of_work.commit()
     finally:
         unit_of_work.close()
@@ -1540,7 +1762,12 @@ def test_batch_report_and_partial_url_failures_are_printed(tmp_path: Path) -> No
     assert "affected_runs=1" in buffer.getvalue()
     report_path = tmp_path / "batch.json"
     save_batch_report(
-        {"total": 1, "successful": 1, "failed": 0, "items": [{"url": "https://ok", "status": "ok"}]},
+        {
+            "total": 1,
+            "successful": 1,
+            "failed": 0,
+            "items": [{"url": "https://ok", "status": "ok"}],
+        },
         str(report_path),
         file_writer=_Writer(),
     )
@@ -1634,7 +1861,9 @@ def test_schema_migration_status_and_retry_failed_batch(tmp_path: Path) -> None:
             source_value="https://failed.example/report",
             normal_iocs={},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
             run_metadata={
                 "status": "failed",
@@ -1662,8 +1891,12 @@ def test_schema_migration_status_and_retry_failed_batch(tmp_path: Path) -> None:
     versioned_db = tmp_path / "versioned.sqlite"
     versioned = sqlite3.connect(versioned_db)
     try:
-        versioned.execute("CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)")
-        versioned.execute("INSERT INTO schema_migrations(version, applied_at) VALUES (1, '2026-01-01T00:00:00+00:00')")
+        versioned.execute(
+            "CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"
+        )
+        versioned.execute(
+            "INSERT INTO schema_migrations(version, applied_at) VALUES (1, '2026-01-01T00:00:00+00:00')"
+        )
         versioned.executescript(
             """
             CREATE TABLE runs (
@@ -1726,7 +1959,9 @@ def test_schema_migration_status_and_retry_failed_batch(tmp_path: Path) -> None:
             f'{{"items": [{{"url": "{url}", "status": "failed", "error": "HTTP 500"}}]}}',
             encoding="utf-8",
         )
-        args = _args(retry_failed_from=str(report_path), url_workers=1, url_retries=1, url_backoff=0.001)
+        args = _args(
+            retry_failed_from=str(report_path), url_workers=1, url_retries=1, url_backoff=0.001
+        )
         normal_iocs, warning_iocs, label, _, report = process_url_file_input_with_report(
             args,
             reader=MagicTextSourceReader(),
@@ -1779,11 +2014,21 @@ def test_delete_and_prune_persisted_runs(tmp_path: Path) -> None:
     service = SQLAlchemyPersistenceService(db_uri)
     run_ids = service.persist_multiple_runs(
         [
-            ("file", "one.txt", ExtractionResult.from_grouped_payload({"domains": ["one.example"]}, {})),
-            ("file", "one.txt", ExtractionResult.from_grouped_payload({"domains": ["two.example"]}, {})),
+            (
+                "file",
+                "one.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["one.example"]}, {}),
+            ),
+            (
+                "file",
+                "one.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["two.example"]}, {}),
+            ),
         ],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
     assert delete_persisted_run(db_uri=db_uri, run_id=run_ids[0]) is True
     assert delete_persisted_run(db_uri=db_uri, run_id=9999) is False
@@ -1816,11 +2061,21 @@ def test_plugin_registry_and_structured_records(tmp_path: Path) -> None:
     service = SQLAlchemyPersistenceService(db_uri)
     run_ids = service.persist_multiple_runs(
         [
-            ("file", "one.txt", ExtractionResult.from_grouped_payload({"domains": ["one.example"]}, {})),
-            ("file", "one.txt", ExtractionResult.from_grouped_payload({"domains": ["two.example"]}, {})),
+            (
+                "file",
+                "one.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["one.example"]}, {}),
+            ),
+            (
+                "file",
+                "one.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["two.example"]}, {}),
+            ),
         ],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
     summary = service.list_runs(limit=1)[0]
     assert summary.to_record()["run_id"] == run_ids[1]
@@ -1846,9 +2101,27 @@ def test_plugin_registry_and_structured_records(tmp_path: Path) -> None:
         @staticmethod
         def select(*, group: str):
             if group == "iocparser.renderers":
-                return [type("EP", (), {"name": "entry-renderer", "load": staticmethod(lambda: lambda _ctx, _stix: get_renderer("json"))})()]
+                return [
+                    type(
+                        "EP",
+                        (),
+                        {
+                            "name": "entry-renderer",
+                            "load": staticmethod(lambda: lambda _ctx, _stix: get_renderer("json")),
+                        },
+                    )()
+                ]
             if group == "iocparser.enrichers":
-                return [type("EP", (), {"name": "entry-enricher", "load": staticmethod(lambda: lambda: get_enricher("misp"))})()]
+                return [
+                    type(
+                        "EP",
+                        (),
+                        {
+                            "name": "entry-enricher",
+                            "load": staticmethod(lambda: lambda: get_enricher("misp")),
+                        },
+                    )()
+                ]
             return []
 
     plugins_module._plugin_state["entry_points_loaded"] = False
@@ -1874,7 +2147,9 @@ def test_internal_http_mapping_and_static_timeout_helpers() -> None:
 
 
 def test_matches_advanced_filters_rejects_missing_tags() -> None:
-    hit = SQLAlchemyPersistenceService("sqlite:///:memory:")  # lightweight owner for namespace consistency
+    hit = SQLAlchemyPersistenceService(
+        "sqlite:///:memory:"
+    )  # lightweight owner for namespace consistency
     del hit
     from iocparser.domain.models import PersistedRunQueryHit
 
@@ -1922,7 +2197,9 @@ def test_persist_failed_batch_items_creates_failed_runs(tmp_path: Path) -> None:
             },
         },
         config=config,
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
     runs = query_persisted_runs(db_uri=db_uri, limit=10)
     assert runs.items[0].status == "failed"
@@ -1930,22 +2207,30 @@ def test_persist_failed_batch_items_creates_failed_runs(tmp_path: Path) -> None:
     persist_failed_batch_items(
         {"items": ["bad-shape"], "run_metadata_map": {}},
         config=config,
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
     persist_failed_batch_items(
         {"items": "bad-shape", "run_metadata_map": {}},
         config=config,
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
     persist_failed_batch_items(
         {"items": [{"status": "failed", "error": "missing-url"}], "run_metadata_map": {}},
         config=config,
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
     persist_failed_batch_items(
         {"items": [{"url": "https://bad2.example", "status": "failed"}], "run_metadata_map": []},
         config=config,
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
 
 
@@ -1959,7 +2244,9 @@ def test_cli_dispatch_workflow_persists_failed_batch_items(tmp_path: Path) -> No
     db_uri = f"sqlite:///{tmp_path / 'dispatch-failed-batches.db'}"
     config = load_config(cli_persist=True, cli_db_uri=db_uri, cli_config_path=None)
     args = _args(retry_failed_from=str(tmp_path / "retry-report.json"), persist=True)
-    options = PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json")
+    options = PersistOptions(
+        defang=False, check_warnings=False, force_update=False, output_format="json"
+    )
     results = {
         "https://ok.example": (
             {"urls": ["hxxps://ok[.]example"]},
@@ -2073,12 +2360,16 @@ def test_composite_warning_service_combines_results() -> None:
     class FirstService:
         def separate(self, iocs, *, force_update: bool = False):
             del force_update
-            return ExtractionResult(iocs=iocs[1:], warnings=(WarningMatch(ioc=iocs[0], warning_list="first"),))
+            return ExtractionResult(
+                iocs=iocs[1:], warnings=(WarningMatch(ioc=iocs[0], warning_list="first"),)
+            )
 
     class SecondService:
         def separate(self, iocs, *, force_update: bool = False):
             del force_update
-            return ExtractionResult(iocs=(), warnings=(WarningMatch(ioc=iocs[0], warning_list="second"),))
+            return ExtractionResult(
+                iocs=(), warnings=(WarningMatch(ioc=iocs[0], warning_list="second"),)
+            )
 
     original = (
         IOC.from_raw("domains", "alpha.example"),

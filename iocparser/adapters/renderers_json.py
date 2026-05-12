@@ -18,7 +18,10 @@ class JSONOutputRenderer(OutputRenderer):
         self.include_context = include_context
 
     def render(self, result: ExtractionResult) -> str:
-        grouped = {ioc_type_name(ioc_type): list(values) for ioc_type, values in result.canonical_by_type().items()}
+        grouped = {
+            ioc_type_name(ioc_type): list(values)
+            for ioc_type, values in result.canonical_by_type().items()
+        }
         warnings = result.grouped_warnings()
         payload: dict[str, object] = {
             "schema_version": RESULT_SCHEMA_VERSION,
@@ -28,7 +31,11 @@ class JSONOutputRenderer(OutputRenderer):
             "total_count": result.total_count(),
         }
         for key, values in grouped.items():
-            payload[key] = sorted(str(v) for v in values) if values and all(isinstance(v, str) for v in values) else list(values)
+            payload[key] = (
+                sorted(str(v) for v in values)
+                if values and all(isinstance(v, str) for v in values)
+                else list(values)
+            )
         if warnings:
             payload["warning_list_matches"] = warnings
         if self.include_context:
@@ -40,7 +47,9 @@ class JSONLinesOutputRenderer(OutputRenderer):
     """Render extraction results as JSON lines."""
 
     def render(self, result: ExtractionResult) -> str:
-        return "\n".join(json.dumps(jsonl_record(record), sort_keys=True) for record in result.to_records())
+        return "\n".join(
+            json.dumps(jsonl_record(record), sort_keys=True) for record in result.to_records()
+        )
 
 
 class CSVOutputRenderer(OutputRenderer):

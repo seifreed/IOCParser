@@ -151,7 +151,9 @@ def test_worker_service_run_once_and_forever(tmp_path: Path) -> None:
     stop_event.set()
     assert worker_service.run_forever(stop_event=stop_event, max_cycles=1) == 0
     empty_service = DistributedWorkerService(
-        service=DistributedPipelineService(queue_adapter=FilesystemQueueAdapter(tmp_path / "empty")),
+        service=DistributedPipelineService(
+            queue_adapter=FilesystemQueueAdapter(tmp_path / "empty")
+        ),
         queue_name="empty",
         poll_interval_seconds=0.0,
         max_messages_per_cycle=1,
@@ -230,8 +232,6 @@ def test_worker_service_from_config_and_main(tmp_path: Path) -> None:
         os.sys.argv = original_argv
 
 
-
-
 def test_worker_service_survives_thread_exception():
     """Worker loop must not die when a thread raises an exception."""
     calls = [0]
@@ -242,29 +242,41 @@ def test_worker_service_survives_thread_exception():
             raise RuntimeError("boom")
 
     svc = _SimpleNamespace(process_next=fail_once, limits=_SimpleNamespace(max_workers=2))
-    w = DistributedWorkerService(service=svc, queue_name="t", poll_interval_seconds=0.0, max_messages_per_cycle=1)
+    w = DistributedWorkerService(
+        service=svc, queue_name="t", poll_interval_seconds=0.0, max_messages_per_cycle=1
+    )
     assert w.run_forever(max_cycles=2) == 0
 
 
 def test_worker_service_single_worker_sleep_on_empty():
     """Single-worker path must sleep when no messages are processed."""
     svc = _SimpleNamespace(process_next=lambda *_args, **_kwargs: None)
-    w = DistributedWorkerService(service=svc, queue_name="s", poll_interval_seconds=0.0, max_messages_per_cycle=1)
+    w = DistributedWorkerService(
+        service=svc, queue_name="s", poll_interval_seconds=0.0, max_messages_per_cycle=1
+    )
     assert w.concurrency == 1
     assert w.run_forever(max_cycles=2) == 0
 
 
 def test_worker_service_concurrent_positive_result():
     """Concurrent path must take short sleep when messages are processed."""
-    svc = _SimpleNamespace(process_next=lambda *_args, **_kwargs: "ok", limits=_SimpleNamespace(max_workers=2))
-    w = DistributedWorkerService(service=svc, queue_name="c", poll_interval_seconds=0.0, max_messages_per_cycle=1)
+    svc = _SimpleNamespace(
+        process_next=lambda *_args, **_kwargs: "ok", limits=_SimpleNamespace(max_workers=2)
+    )
+    w = DistributedWorkerService(
+        service=svc, queue_name="c", poll_interval_seconds=0.0, max_messages_per_cycle=1
+    )
     assert w.run_forever(max_cycles=2) == 4
 
 
 def test_worker_service_survives_run_once_exception():
     """Concurrent loop must survive when run_once itself raises."""
-    svc = _SimpleNamespace(process_next=lambda *_args, **_kwargs: None, limits=_SimpleNamespace(max_workers=2))
-    w = DistributedWorkerService(service=svc, queue_name="r", poll_interval_seconds=0.0, max_messages_per_cycle=1)
+    svc = _SimpleNamespace(
+        process_next=lambda *_args, **_kwargs: None, limits=_SimpleNamespace(max_workers=2)
+    )
+    w = DistributedWorkerService(
+        service=svc, queue_name="r", poll_interval_seconds=0.0, max_messages_per_cycle=1
+    )
     original_run_once = w.run_once
 
     def exploding_run_once():
@@ -277,8 +289,12 @@ def test_worker_service_survives_run_once_exception():
 
 def test_worker_service_propagates_keyboard_interrupt_run_once():
     """run_once must propagate KeyboardInterrupt without silencing."""
-    svc = _SimpleNamespace(process_next=lambda **_kwargs: (_ for _ in ()).throw(KeyboardInterrupt()))
-    w = DistributedWorkerService(service=svc, queue_name="k", poll_interval_seconds=0.0, max_messages_per_cycle=1)
+    svc = _SimpleNamespace(
+        process_next=lambda **_kwargs: (_ for _ in ()).throw(KeyboardInterrupt())
+    )
+    w = DistributedWorkerService(
+        service=svc, queue_name="k", poll_interval_seconds=0.0, max_messages_per_cycle=1
+    )
     with pytest.raises(KeyboardInterrupt):
         w.run_once()
 
@@ -294,15 +310,22 @@ def test_worker_service_propagates_keyboard_interrupt_forever():
     class _FakeExecutor:
         def __init__(self, max_workers=1):
             pass
+
         def __enter__(self):
             return self
+
         def __exit__(self, *args):
             return False
+
         def submit(self, *_args, **_kwargs):
             return future
 
-    svc = _SimpleNamespace(process_next=lambda **_kwargs: None, limits=_SimpleNamespace(max_workers=2))
-    w = DistributedWorkerService(service=svc, queue_name="k", poll_interval_seconds=0.0, max_messages_per_cycle=1)
+    svc = _SimpleNamespace(
+        process_next=lambda **_kwargs: None, limits=_SimpleNamespace(max_workers=2)
+    )
+    w = DistributedWorkerService(
+        service=svc, queue_name="k", poll_interval_seconds=0.0, max_messages_per_cycle=1
+    )
     with patch("concurrent.futures.ThreadPoolExecutor", _FakeExecutor):
         with pytest.raises(KeyboardInterrupt):
             w.run_forever(max_cycles=1)

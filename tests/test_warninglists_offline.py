@@ -10,7 +10,9 @@ from iocparser.infrastructure.warninglists import MISPWarningLists, WarningListL
 
 
 class OfflineWarningLists(MISPWarningLists):
-    def __init__(self, data_dir: Path, *, cache_duration: int = 24, force_update: bool = False) -> None:
+    def __init__(
+        self, data_dir: Path, *, cache_duration: int = 24, force_update: bool = False
+    ) -> None:
         self.cache_duration = cache_duration
         self.force_update = force_update
         self.warning_lists = {}
@@ -27,7 +29,9 @@ class OfflineWarningLists(MISPWarningLists):
 
 
 class TrackingWarningLists(OfflineWarningLists):
-    def __init__(self, data_dir: Path, *, cache_duration: int = 24, force_update: bool = False) -> None:
+    def __init__(
+        self, data_dir: Path, *, cache_duration: int = 24, force_update: bool = False
+    ) -> None:
         super().__init__(data_dir, cache_duration=cache_duration, force_update=force_update)
         self.updated = False
 
@@ -57,7 +61,9 @@ class WarningListServer:
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self) -> None:
                 if self.path == "/contents/lists":
-                    body = json.dumps([{"name": name, "type": "dir"} for name in directories]).encode("utf-8")
+                    body = json.dumps(
+                        [{"name": name, "type": "dir"} for name in directories]
+                    ).encode("utf-8")
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self.send_header("Content-Length", str(len(body)))
@@ -101,7 +107,9 @@ class WarningListServer:
 
 def test_load_or_update_lists_uses_valid_cache_without_network(tmp_path: Path) -> None:
     warning_lists = TrackingWarningLists(tmp_path)
-    warning_lists.cache_metadata_file.write_text(json.dumps({"last_update": time.time()}), encoding="utf-8")
+    warning_lists.cache_metadata_file.write_text(
+        json.dumps({"last_update": time.time()}), encoding="utf-8"
+    )
     warning_lists.cache_file.write_text(
         json.dumps(
             {

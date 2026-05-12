@@ -3,7 +3,6 @@
 Regression tests for artifact validation bug fixes
 """
 
-
 from iocparser.infrastructure.extractor_artifacts import DEFAULT_ARTIFACT_POLICY
 
 

@@ -60,12 +60,24 @@ class STIXOutputRenderer(OutputRenderer):
             IOCType.TLSH: _builder("[file:hashes.'TLSH' = '{value}']"),
         }
 
-    def _build_indicator(self, ioc_type: IOCType | str, value: str, warning: WarningMatch | None) -> Indicator | None:
+    def _build_indicator(
+        self, ioc_type: IOCType | str, value: str, warning: WarningMatch | None
+    ) -> Indicator | None:
         if self.allowed_types is not None and ioc_type not in self.allowed_types:
             return None
         lookup_type = get_custom_ioc_type(ioc_type) if isinstance(ioc_type, str) else None
-        base_lookup_type = lookup_type.base_type if lookup_type is not None else ioc_type if isinstance(ioc_type, IOCType) else None
-        builder = self.PATTERN_BUILDERS.get(base_lookup_type) if isinstance(base_lookup_type, IOCType) else None
+        base_lookup_type = (
+            lookup_type.base_type
+            if lookup_type is not None
+            else ioc_type
+            if isinstance(ioc_type, IOCType)
+            else None
+        )
+        builder = (
+            self.PATTERN_BUILDERS.get(base_lookup_type)
+            if isinstance(base_lookup_type, IOCType)
+            else None
+        )
         if builder is None and lookup_type is not None and lookup_type.stix_pattern:
             captured_pattern = str(lookup_type.stix_pattern)
 
@@ -94,7 +106,9 @@ class STIXOutputRenderer(OutputRenderer):
         )
 
     def render(self, result: ExtractionResult) -> str:
-        entries = [("ioc", ioc) for ioc in result.iocs] + [("warning", warning) for warning in result.warnings]
+        entries = [("ioc", ioc) for ioc in result.iocs] + [
+            ("warning", warning) for warning in result.warnings
+        ]
         return build_stix_bundle(
             entries,
             build_indicator=lambda entry: build_entry_indicator(self, entry),
@@ -102,13 +116,19 @@ class STIXOutputRenderer(OutputRenderer):
         )
 
 
-def build_entry_indicator(renderer: STIXOutputRenderer, entry: tuple[str, object]) -> Indicator | None:
+def build_entry_indicator(
+    renderer: STIXOutputRenderer, entry: tuple[str, object]
+) -> Indicator | None:
     entry_kind, payload = entry
     if entry_kind == "ioc" and hasattr(payload, "ioc_type") and hasattr(payload, "canonical_value"):
-        return renderer._build_indicator(cast("IOC", payload).ioc_type, cast("IOC", payload).canonical_value(), None)
+        return renderer._build_indicator(
+            cast("IOC", payload).ioc_type, cast("IOC", payload).canonical_value(), None
+        )
     if entry_kind == "warning" and hasattr(payload, "ioc"):
         warning = cast("WarningMatch", payload)
-        return renderer._build_indicator(warning.ioc.ioc_type, warning.ioc.canonical_value(), warning)
+        return renderer._build_indicator(
+            warning.ioc.ioc_type, warning.ioc.canonical_value(), warning
+        )
     return None
 
 

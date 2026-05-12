@@ -81,7 +81,11 @@ class MagicTextSourceReader(TextSourceReader):
             if detected:
                 return detected
 
-            if "text/plain" in file_type.lower() and file_path.suffix.lower() in {".html", ".htm", ".xml"}:
+            if "text/plain" in file_type.lower() and file_path.suffix.lower() in {
+                ".html",
+                ".htm",
+                ".xml",
+            }:
                 return "html"
         except (OSError, ValueError, MagicExceptionType) as exc:
             logger.warning("Error detecting file type: %s, falling back to extension", exc)

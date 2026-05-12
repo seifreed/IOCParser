@@ -58,7 +58,9 @@ class NetworkHeuristicPolicy:
                 return False
         return True
 
-    def parse_url_candidate(self, value: str, *, clean_defanged: Callable[[str], str]) -> tuple[str, str] | None:
+    def parse_url_candidate(
+        self, value: str, *, clean_defanged: Callable[[str], str]
+    ) -> tuple[str, str] | None:
         try:
             from iocparser.shared_utils import refang_ioc
 
@@ -69,7 +71,9 @@ class NetworkHeuristicPolicy:
         return parsed.netloc.lower(), parsed.path.lower()
 
     def is_file_sharing_url(self, domain: str) -> bool:
-        return any(domain == site or domain.endswith(f".{site}") for site in self.file_sharing_sites)
+        return any(
+            domain == site or domain.endswith(f".{site}") for site in self.file_sharing_sites
+        )
 
     def is_suspicious_code_hosting_url(self, domain: str, path: str) -> bool:
         if not ("github.com" in domain or "gitlab.com" in domain or "bitbucket.org" in domain):
@@ -177,40 +181,75 @@ class NetworkHeuristicPolicy:
         clean_ips: list[str] = []
         for ip in raw_ips:
             clean_ip = self.normalize_ip_candidate(clean_defanged(ip))
-            if not self.is_valid_ipv4(clean_ip.split("."), octet_count=octet_count, max_octet=max_octet):
+            if not self.is_valid_ipv4(
+                clean_ip.split("."), octet_count=octet_count, max_octet=max_octet
+            ):
                 continue
             clean_ips.append(defang_dotted(clean_ip) if defang else clean_ip)
         return _dedup_case_insensitive(clean_ips)
 
 
 DEFAULT_NETWORK_POLICY = NetworkHeuristicPolicy(
-    file_sharing_sites=frozenset({
-        "pastebin.com",
-        "paste.ee",
-        "hastebin.com",
-        "gist.github.com",
-        "drive.google.com",
-        "docs.google.com",
-        "dropbox.com",
-        "box.com",
-        "mediafire.com",
-        "mega.nz",
-        "wetransfer.com",
-        "sendspace.com",
-        "discord.com",
-        "discord.gg",
-        "telegram.me",
-        "t.me",
-        "transfer.sh",
-        "file.io",
-        "anonfiles.com",
-        "bayfiles.com",
-    }),
+    file_sharing_sites=frozenset(
+        {
+            "pastebin.com",
+            "paste.ee",
+            "hastebin.com",
+            "gist.github.com",
+            "drive.google.com",
+            "docs.google.com",
+            "dropbox.com",
+            "box.com",
+            "mediafire.com",
+            "mega.nz",
+            "wetransfer.com",
+            "sendspace.com",
+            "discord.com",
+            "discord.gg",
+            "telegram.me",
+            "t.me",
+            "transfer.sh",
+            "file.io",
+            "anonfiles.com",
+            "bayfiles.com",
+        }
+    ),
     suspicious_path_keywords=(
-        "malware", "exploit", "payload", "shellcode", "backdoor", "c2", "c&c", "rat", "trojan", "ransomware",
-        "crypter", "loader", "dropper", "injector", "rootkit", "keylogger", "stealer", "miner", "botnet", "virus",
-        "worm", "hack", "crack", "keygen", "poc", "cve-", "vulnerability", "pentest", "redteam", "bypass",
-        "mimikatz", "cobalt", "empire", "metasploit", "dsefix",
+        "malware",
+        "exploit",
+        "payload",
+        "shellcode",
+        "backdoor",
+        "c2",
+        "c&c",
+        "rat",
+        "trojan",
+        "ransomware",
+        "crypter",
+        "loader",
+        "dropper",
+        "injector",
+        "rootkit",
+        "keylogger",
+        "stealer",
+        "miner",
+        "botnet",
+        "virus",
+        "worm",
+        "hack",
+        "crack",
+        "keygen",
+        "poc",
+        "cve-",
+        "vulnerability",
+        "pentest",
+        "redteam",
+        "bypass",
+        "mimikatz",
+        "cobalt",
+        "empire",
+        "metasploit",
+        "dsefix",
     ),
     documentation_domains=(
         "docs.microsoft.com",
@@ -295,7 +334,9 @@ def _extract_urls(self: ExtractorBase, text: str) -> list[str]:
 
 
 def _extract_emails(self: ExtractorBase, text: str) -> list[str]:
-    return DEFAULT_NETWORK_POLICY.extracted_emails(raw_emails=self._extract_pattern(text, "emails"), defang=self.defang)
+    return DEFAULT_NETWORK_POLICY.extracted_emails(
+        raw_emails=self._extract_pattern(text, "emails"), defang=self.defang
+    )
 
 
 NETWORK_EXTRACTION_METHODS: tuple[str, ...] = (

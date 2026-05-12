@@ -35,13 +35,42 @@ MIN_HOSTNAME_LENGTH = 3
 LARGE_TEXT_THRESHOLD = 10000
 
 PROGRAMMING_KEYWORDS = {
-    "addEventListener", "getElementById", "querySelector",
-    "prototype", "constructor", "toString", "valueOf", "typeof", "instanceof", "undefined", "gform",
-    "innerHTML", "outerHTML", "appendChild", "removeChild", "createElement",
+    "addEventListener",
+    "getElementById",
+    "querySelector",
+    "prototype",
+    "constructor",
+    "toString",
+    "valueOf",
+    "typeof",
+    "instanceof",
+    "undefined",
+    "gform",
+    "innerHTML",
+    "outerHTML",
+    "appendChild",
+    "removeChild",
+    "createElement",
 }
 SUSPICIOUS_SUBDOMAIN_KEYWORDS = [
-    "malware", "c2", "payload", "evil", "bad", "attack", "exploit", "trojan", "virus", "worm", "botnet",
-    "phishing", "scam", "backdoor", "rootkit", "keylogger", "ransomware", "crypter",
+    "malware",
+    "c2",
+    "payload",
+    "evil",
+    "bad",
+    "attack",
+    "exploit",
+    "trojan",
+    "virus",
+    "worm",
+    "botnet",
+    "phishing",
+    "scam",
+    "backdoor",
+    "rootkit",
+    "keylogger",
+    "ransomware",
+    "crypter",
 ]
 
 
@@ -65,7 +94,9 @@ class HashValidationPolicy:
                 return False
             try:
                 text = decoded.decode("ascii", errors="strict")
-                printable_chars = sum(1 for char in text if 32 <= ord(char) <= 126 or char in "\t\n\r")
+                printable_chars = sum(
+                    1 for char in text if 32 <= ord(char) <= 126 or char in "\t\n\r"
+                )
                 return (printable_chars / len(text)) <= self.printable_ratio_threshold
             except UnicodeDecodeError:
                 return True
@@ -296,7 +327,9 @@ class ExtractorBase:
         Returns:
             List of domains
         """
-        return self.reference_data.extract_domains_from_text(text, extract_pattern=self._extract_pattern)
+        return self.reference_data.extract_domains_from_text(
+            text, extract_pattern=self._extract_pattern
+        )
 
     def _extract_hash(self, text: str, hash_type: str, *, validate: bool = True) -> list[str]:
         """
@@ -339,7 +372,11 @@ class ExtractionAggregateMixin:
         from iocparser.infrastructure.extractor_network import NETWORK_EXTRACTION_METHODS
 
         methods: list[tuple[str, Callable[[str], list[str]]]] = []
-        for category_methods in (HASH_EXTRACTION_METHODS, NETWORK_EXTRACTION_METHODS, ARTIFACT_EXTRACTION_METHODS):
+        for category_methods in (
+            HASH_EXTRACTION_METHODS,
+            NETWORK_EXTRACTION_METHODS,
+            ARTIFACT_EXTRACTION_METHODS,
+        ):
             for method_name in category_methods:
                 methods.append((method_name.removeprefix("extract_"), getattr(self, method_name)))
         self._cached_extraction_methods = methods

@@ -78,7 +78,9 @@ class SQLAlchemyRunRepository(RunRepository):
                 domain_ioc = metadata_ioc(item)
                 severity = domain_ioc.severity
                 tags_json = serialize_tags(domain_ioc.tags)
-                tags_search = " ".join(sorted(tag.strip().lower() for tag in domain_ioc.tags if tag))
+                tags_search = " ".join(
+                    sorted(tag.strip().lower() for tag in domain_ioc.tags if tag)
+                )
                 evidence_json = serialize_evidence(domain_ioc.evidence)
             self.session.add(
                 RUN_IOC_MODEL(

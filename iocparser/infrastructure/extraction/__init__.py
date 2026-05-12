@@ -31,6 +31,7 @@ class DefaultIOCExtractionEngine(IOCExtractionEngine):
     def extract_all(self, text_content: str, *, defang: bool = True) -> dict[str, list[str]]:
         return IOCExtractor(defang=defang).extract_all(text_content)
 
+
 __all__ = [
     "ArtifactExtractionMixin",
     "DefaultIOCExtractionEngine",

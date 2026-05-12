@@ -79,7 +79,9 @@ class BatchResultsCollection:
     def __getitem__(self, key: str) -> tuple[GroupedIocs, GroupedWarnings]:
         for entry in self.entries:
             if entry.item_key == key:
-                source_matches = [candidate for candidate in self.entries if candidate.source_value == key]
+                source_matches = [
+                    candidate for candidate in self.entries if candidate.source_value == key
+                ]
                 if len(source_matches) == 1 and source_matches[0] is not entry:
                     raise KeyError(key)
                 return entry.normal_iocs, entry.warning_iocs
@@ -94,7 +96,11 @@ class BatchResultsCollection:
             return False
         item_key_matches = [entry for entry in self.entries if entry.item_key == key]
         source_matches = [entry for entry in self.entries if entry.source_value == key]
-        if len(item_key_matches) == 1 and len(source_matches) == 1 and item_key_matches[0] is not source_matches[0]:
+        if (
+            len(item_key_matches) == 1
+            and len(source_matches) == 1
+            and item_key_matches[0] is not source_matches[0]
+        ):
             return False
         if item_key_matches:
             return True
@@ -172,7 +178,9 @@ def plugin_client(
     raw_postprocessors = values.get("postprocessor", [])
     raw_enrichers = values.get("enricher", [])
     extractor_values = raw_extractors if isinstance(raw_extractors, list | tuple) else ()
-    postprocessor_values = raw_postprocessors if isinstance(raw_postprocessors, list | tuple) else ()
+    postprocessor_values = (
+        raw_postprocessors if isinstance(raw_postprocessors, list | tuple) else ()
+    )
     enricher_values = raw_enrichers if isinstance(raw_enrichers, list | tuple) else ()
     extractor_names = tuple(str(name) for name in extractor_values if isinstance(name, str))
     postprocessor_names = tuple(str(name) for name in postprocessor_values if isinstance(name, str))

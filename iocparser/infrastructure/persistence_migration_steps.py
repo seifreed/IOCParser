@@ -96,7 +96,9 @@ def ensure_version_table(engine: Engine) -> None:
 
 def current_version(engine: Engine) -> int:
     with engine.begin() as connection:
-        row = connection.execute(text("SELECT MAX(version) FROM schema_migrations")).scalar_one_or_none()
+        row = connection.execute(
+            text("SELECT MAX(version) FROM schema_migrations")
+        ).scalar_one_or_none()
         return _coerce_version_row(row)
 
 
@@ -144,7 +146,9 @@ def upgrade_to_version(engine: Engine, inspector: Inspector, version: int) -> No
 def upgrade_to_v2(engine: Engine, inspector: Inspector) -> None:
     statements: list[str] = []
     if not has_column(inspector, "runs", "status"):
-        statements.append("ALTER TABLE runs ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'success'")
+        statements.append(
+            "ALTER TABLE runs ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'success'"
+        )
     if not has_column(inspector, "runs", "error_message"):
         statements.append("ALTER TABLE runs ADD COLUMN error_message TEXT NOT NULL DEFAULT ''")
     run_statements(engine, statements)
@@ -234,7 +238,9 @@ def upgrade_to_v4(engine: Engine, inspector: Inspector) -> None:
             ),
         )
     if not has_column(inspector, "runs", "batch_job_id"):
-        statements.append("ALTER TABLE runs ADD COLUMN batch_job_id INTEGER REFERENCES batch_jobs(id)")
+        statements.append(
+            "ALTER TABLE runs ADD COLUMN batch_job_id INTEGER REFERENCES batch_jobs(id)"
+        )
     statements.append("CREATE INDEX IF NOT EXISTS ix_runs_batch_job ON runs(batch_job_id)")
     run_statements(engine, statements)
 

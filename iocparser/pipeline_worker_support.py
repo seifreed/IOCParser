@@ -100,7 +100,9 @@ class RunRepositoryAdapter:
             metadata=normalized_metadata,
         )
 
-    def attach_iocs(self, *, run_id: int, ioc_ids: list[int], result: ExtractionResult | None = None) -> None:
+    def attach_iocs(
+        self, *, run_id: int, ioc_ids: list[int], result: ExtractionResult | None = None
+    ) -> None:
         bridged_result: ExtractionResultLike | None = None
         if result is not None:
             bridged_result = RepositoryResult(
@@ -131,7 +133,9 @@ class PipelineProcessedRunLookup:
         return self._service.export_run(run_id=run_id)
 
 
-def normalize_run_metadata(metadata: Mapping[str, object] | None) -> dict[str, int | str | None] | None:
+def normalize_run_metadata(
+    metadata: Mapping[str, object] | None,
+) -> dict[str, int | str | None] | None:
     if metadata is None:
         return None
     normalized: dict[str, int | str | None] = {}
@@ -176,7 +180,9 @@ def prepared_temp_file(prepared: PreparedInput) -> str:
 
 def enforce_size_limit(*, limits: ResourceLimits, input_size_bytes: int) -> None:
     if limits.max_input_size_bytes is not None and input_size_bytes > limits.max_input_size_bytes:
-        raise size_limit_error(input_size_bytes=input_size_bytes, configured_limit=limits.max_input_size_bytes)
+        raise size_limit_error(
+            input_size_bytes=input_size_bytes, configured_limit=limits.max_input_size_bytes
+        )
 
 
 def input_deadline_error(source_value: str) -> IOCTimeoutError:
@@ -192,7 +198,9 @@ def missing_temp_file_error() -> ValueError:
 
 
 def size_limit_error(*, input_size_bytes: int, configured_limit: int) -> ValidationError:
-    return ValidationError(f"Input size {input_size_bytes} exceeds configured limit {configured_limit}")
+    return ValidationError(
+        f"Input size {input_size_bytes} exceeds configured limit {configured_limit}"
+    )
 
 
 def unsupported_input_kind_error(input_kind: str) -> ValueError:
@@ -238,7 +246,9 @@ class ExtractionClient(Protocol):
     def extract_result_from_file(self, file_path: str, **kwargs: object) -> ExtractionResult: ...
 
 
-def _prepare_url_input(*, client: ExtractionClient, limits: ResourceLimits, url: str) -> PreparedInput:
+def _prepare_url_input(
+    *, client: ExtractionClient, limits: ResourceLimits, url: str
+) -> PreparedInput:
     temp_file = client.downloader.download(url)
     metadata = dict(client.downloader.last_download_metadata or {})
     input_size = metadata_int(metadata, "input_size") or 0
@@ -253,7 +263,9 @@ def _prepare_url_input(*, client: ExtractionClient, limits: ResourceLimits, url:
     )
 
 
-def prepare_input(*, client: ExtractionClient, limits: ResourceLimits, request: PipelineJobRequest) -> PreparedInput:
+def prepare_input(
+    *, client: ExtractionClient, limits: ResourceLimits, request: PipelineJobRequest
+) -> PreparedInput:
     if request.input_kind == "text":
         return _prepare_text_input(limits=limits, text=request.source_value)
     if request.input_kind == "file":
@@ -261,6 +273,7 @@ def prepare_input(*, client: ExtractionClient, limits: ResourceLimits, request: 
     if request.input_kind == "url":
         return _prepare_url_input(client=client, limits=limits, url=request.source_value)
     raise unsupported_input_kind_error(request.input_kind)
+
 
 @dataclass(frozen=True)
 class ProcessContext:
@@ -331,8 +344,12 @@ def persist_result(
                 source=Source.from_raw(
                     request.input_kind,
                     request.source_value,
-                    original_url=original_url if isinstance(original_url, str) and original_url else None,
-                    normalized_url=normalized_url if isinstance(normalized_url, str) and normalized_url else None,
+                    original_url=original_url
+                    if isinstance(original_url, str) and original_url
+                    else None,
+                    normalized_url=normalized_url
+                    if isinstance(normalized_url, str) and normalized_url
+                    else None,
                     mime_type=mime_type if isinstance(mime_type, str) and mime_type else None,
                     input_size=input_size,
                     content_hash=prepared.content_hash,
@@ -358,7 +375,9 @@ def persist_result(
         unit.close()
 
 
-def extract_result(*, client: ExtractionClient, request: PipelineJobRequest, prepared: PreparedInput) -> ExtractionResult:
+def extract_result(
+    *, client: ExtractionClient, request: PipelineJobRequest, prepared: PreparedInput
+) -> ExtractionResult:
     if request.input_kind == "text":
         return client.extract_result_from_text(
             request.source_value,
@@ -394,7 +413,10 @@ def extract_result(*, client: ExtractionClient, request: PipelineJobRequest, pre
 
 
 def ensure_input_deadline(*, limits: ResourceLimits, started: float, source_value: str) -> None:
-    if limits.max_input_seconds is not None and (time.perf_counter() - started) > limits.max_input_seconds:
+    if (
+        limits.max_input_seconds is not None
+        and (time.perf_counter() - started) > limits.max_input_seconds
+    ):
         raise input_deadline_error(source_value)
 
 

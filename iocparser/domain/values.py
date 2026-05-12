@@ -86,7 +86,14 @@ def indicator_value_for(ioc_type: IOCType | IOCTypeName | str, raw: str) -> Indi
         return HostValue(raw)
     if ioc_type == IOCType.URL:
         return UrlValue(raw)
-    if ioc_type in {IOCType.MD5, IOCType.SHA1, IOCType.SHA256, IOCType.SHA512, IOCType.SSDEEP, IOCType.IMPHASH}:
+    if ioc_type in {
+        IOCType.MD5,
+        IOCType.SHA1,
+        IOCType.SHA256,
+        IOCType.SHA512,
+        IOCType.SSDEEP,
+        IOCType.IMPHASH,
+    }:
         return HashValue(raw)
     if ioc_type in {IOCType.IP, IOCType.IPV6}:
         return IpValue(raw)

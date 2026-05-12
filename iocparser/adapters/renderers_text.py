@@ -17,7 +17,10 @@ class TextOutputRenderer(OutputRenderer):
         self.include_context = include_context
 
     def render(self, result: ExtractionResult) -> str:
-        grouped = {ioc_type_name(ioc_type): list(values) for ioc_type, values in result.canonical_by_type().items()}
+        grouped = {
+            ioc_type_name(ioc_type): list(values)
+            for ioc_type, values in result.canonical_by_type().items()
+        }
         warning_grouped = result.grouped_warnings()
         context_map: dict[tuple[str, str], list[str]] = {}
         if self.include_context:
@@ -33,8 +36,14 @@ class TextOutputRenderer(OutputRenderer):
                     for evidence in evidence_items
                     if isinstance(evidence, dict) and evidence.get("excerpt")
                 ]
-                for variant in {raw_val, raw_val.lower(), canonical_val, canonical_val.lower(),
-                                refang_ioc(raw_val), refang_ioc(raw_val).lower()}:
+                for variant in {
+                    raw_val,
+                    raw_val.lower(),
+                    canonical_val,
+                    canonical_val.lower(),
+                    refang_ioc(raw_val),
+                    refang_ioc(raw_val).lower(),
+                }:
                     context_map.setdefault((section, variant), excerpts)
 
         def _lookup(section_key: str, item: str) -> list[str]:

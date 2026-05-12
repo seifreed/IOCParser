@@ -56,7 +56,9 @@ def installed_module(name: str, module: object):
             sys.modules[name] = previous
 
 
-def _envelope(job_id: str | None = None, *, attempts: int = 0, idempotency_key: str | None = None) -> QueueEnvelope:
+def _envelope(
+    job_id: str | None = None, *, attempts: int = 0, idempotency_key: str | None = None
+) -> QueueEnvelope:
     return QueueEnvelope(
         request=PipelineJobRequest(
             input_kind="text",
@@ -145,7 +147,9 @@ def test_filesystem_queue_empty_and_race_branch(tmp_path: Path) -> None:
 def test_distributed_pipeline_without_database_covers_empty_and_retry_paths(tmp_path: Path) -> None:
     queue = FilesystemQueueAdapter(tmp_path / "queue")
     service = DistributedPipelineService(queue_adapter=queue)
-    request = PipelineJobRequest(input_kind="text", source_value="ioc", persist=False, check_warnings=False)
+    request = PipelineJobRequest(
+        input_kind="text", source_value="ioc", persist=False, check_warnings=False
+    )
 
     queued = service.submit(request, queue_name="volatile")
     assert queued["queue_backend"] == "filesystem"
@@ -175,7 +179,9 @@ def test_distributed_pipeline_file_and_url_idempotency_keys(tmp_path: Path) -> N
     file_path.write_text("same bytes", encoding="utf-8")
     service = DistributedPipelineService(queue_adapter=FilesystemQueueAdapter(tmp_path / "queue"))
     file_request = PipelineJobRequest(input_kind="file", source_value=str(file_path), persist=False)
-    url_request = PipelineJobRequest(input_kind="url", source_value="https://example.invalid/path", persist=False)
+    url_request = PipelineJobRequest(
+        input_kind="url", source_value="https://example.invalid/path", persist=False
+    )
     assert len(service._idempotency_key(file_request)) == 64
     assert len(service._idempotency_key(url_request)) == 64
 
@@ -183,12 +189,18 @@ def test_distributed_pipeline_file_and_url_idempotency_keys(tmp_path: Path) -> N
 def test_persistence_service_and_public_distributed_wrappers(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'distributed.sqlite'}"
     service = SQLAlchemyDistributedJobService(db_uri)
-    first = service.create_or_get_job(envelope=_envelope("job-1", idempotency_key="idem-1"), receipt_id="r1")
-    updated = service.create_or_get_job(envelope=_envelope("job-1", idempotency_key="idem-1"), receipt_id="r2")
+    first = service.create_or_get_job(
+        envelope=_envelope("job-1", idempotency_key="idem-1"), receipt_id="r1"
+    )
+    updated = service.create_or_get_job(
+        envelope=_envelope("job-1", idempotency_key="idem-1"), receipt_id="r2"
+    )
     assert first.job_id == updated.job_id
     assert updated.receipt_id == "r2"
 
-    duplicate = service.create_or_get_job(envelope=_envelope("job-2", idempotency_key="idem-1"), receipt_id="r3")
+    duplicate = service.create_or_get_job(
+        envelope=_envelope("job-2", idempotency_key="idem-1"), receipt_id="r3"
+    )
     assert duplicate.job_id == "job-1"
     assert service.mark_running(job_id="missing", attempts=1, receipt_id="x") is None
 
@@ -210,30 +222,43 @@ def test_persistence_service_and_public_distributed_wrappers(tmp_path: Path) -> 
     )
     assert failed is not None
     assert failed.status == "failed"
-    assert service.mark_dead_lettered(
-        job_id="job-1",
-        attempts=2,
-        error=PipelineErrorInfo(
-            code="INPUT_TIMEOUT",
-            category="timeout",
-            retryable=True,
-            status="failed",
-            message="timeout",
-        ),
-    ).status == JOB_STATUS_DEAD_LETTERED
-    assert service.mark_dead_lettered(
-        job_id="missing",
-        attempts=1,
-        error=PipelineErrorInfo(
-            code="INPUT_TIMEOUT",
-            category="timeout",
-            retryable=True,
-            status="failed",
-            message="timeout",
-        ),
-    ) is None
+    assert (
+        service.mark_dead_lettered(
+            job_id="job-1",
+            attempts=2,
+            error=PipelineErrorInfo(
+                code="INPUT_TIMEOUT",
+                category="timeout",
+                retryable=True,
+                status="failed",
+                message="timeout",
+            ),
+        ).status
+        == JOB_STATUS_DEAD_LETTERED
+    )
+    assert (
+        service.mark_dead_lettered(
+            job_id="missing",
+            attempts=1,
+            error=PipelineErrorInfo(
+                code="INPUT_TIMEOUT",
+                category="timeout",
+                retryable=True,
+                status="failed",
+                message="timeout",
+            ),
+        )
+        is None
+    )
 
-    assert len(service.list_jobs(limit=10, statuses=(JOB_STATUS_DEAD_LETTERED,), queue_backend="filesystem")) == 1
+    assert (
+        len(
+            service.list_jobs(
+                limit=10, statuses=(JOB_STATUS_DEAD_LETTERED,), queue_backend="filesystem"
+            )
+        )
+        == 1
+    )
     assert len(service.list_dead_letters(limit=10, queue_backend="filesystem")) == 1
 
     client = PersistenceClient(db_uri)
@@ -242,7 +267,10 @@ def test_persistence_service_and_public_distributed_wrappers(tmp_path: Path) -> 
     assert len(client.list_dead_letters(limit=10, queue_backend="filesystem")) == 1
 
     assert get_distributed_job(db_uri=db_uri, job_id="job-1").status == JOB_STATUS_DEAD_LETTERED
-    assert len(list_distributed_jobs(db_uri=db_uri, limit=10, statuses=(JOB_STATUS_DEAD_LETTERED,))) == 1
+    assert (
+        len(list_distributed_jobs(db_uri=db_uri, limit=10, statuses=(JOB_STATUS_DEAD_LETTERED,)))
+        == 1
+    )
     assert len(list_dead_letters(db_uri=db_uri, limit=10, queue_backend="filesystem")) == 1
 
 
@@ -287,14 +315,20 @@ def test_commit_new_job_or_fetch_handles_integrity_error(tmp_path: Path) -> None
     # Cover the defensive re-raise when IntegrityError happens but no row is found
     unit3 = SQLAlchemyUnitOfWork(db_uri)
     model3 = build_new_job(envelope=_envelope("job-race-3"), receipt_id="r3")
+
     def fake_execute(_self, _stmt):
         class _Result:
             def scalar_one_or_none(self):
                 return None
+
         return _Result()
 
     with pytest.MonkeyPatch().context() as mp:
-        mp.setattr(SQLAlchemyUnitOfWork, "commit", lambda self: (_ for _ in ()).throw(IntegrityError("dup", "", "")))
+        mp.setattr(
+            SQLAlchemyUnitOfWork,
+            "commit",
+            lambda self: (_ for _ in ()).throw(IntegrityError("dup", "", "")),
+        )
         mp.setattr(type(unit3.session), "execute", fake_execute)
         with pytest.raises(IntegrityError):
             commit_new_job_or_fetch(unit3, model3, "job-race-3")
@@ -345,13 +379,17 @@ def test_imported_history_does_not_satisfy_live_idempotency_lookup(tmp_path: Pat
     target_db_uri = f"sqlite:///{tmp_path / 'distributed-idem-target.sqlite'}"
 
     source_service = SQLAlchemyDistributedJobService(source_db_uri)
-    source_service.create_or_get_job(envelope=_envelope("job-1", idempotency_key="idem-1"), receipt_id="r1")
+    source_service.create_or_get_job(
+        envelope=_envelope("job-1", idempotency_key="idem-1"), receipt_id="r1"
+    )
 
     target_client = PersistenceClient(target_db_uri)
     target_client.import_history(PersistenceClient(source_db_uri).export_history())
 
     target_service = SQLAlchemyDistributedJobService(target_db_uri)
-    created = target_service.create_or_get_job(envelope=_envelope("job-2", idempotency_key="idem-1"), receipt_id="r2")
+    created = target_service.create_or_get_job(
+        envelope=_envelope("job-2", idempotency_key="idem-1"), receipt_id="r2"
+    )
 
     assert created.job_id == "job-2"
     jobs = list_distributed_jobs(db_uri=target_db_uri, limit=10)
@@ -388,7 +426,9 @@ def test_queue_factory_and_optional_queue_adapters() -> None:
             del durable
             self.queues.setdefault(queue, [])
 
-        def basic_publish(self, *, exchange: str, routing_key: str, body: bytes, properties: object) -> None:
+        def basic_publish(
+            self, *, exchange: str, routing_key: str, body: bytes, properties: object
+        ) -> None:
             del exchange
             self.queues.setdefault(routing_key, []).append((properties, body))
 
@@ -435,19 +475,36 @@ def test_queue_factory_and_optional_queue_adapters() -> None:
         def __init__(self) -> None:
             self.queues: dict[str, list[dict[str, str]]] = {}
 
-        def send_message(self, *, QueueUrl: str, MessageBody: str, MessageAttributes: dict[str, object] | None = None):
+        def send_message(
+            self,
+            *,
+            QueueUrl: str,
+            MessageBody: str,
+            MessageAttributes: dict[str, object] | None = None,
+        ):
             receipt = f"rh-{len(self.queues.setdefault(QueueUrl, [])) + 1}"
             message = {"Body": MessageBody, "ReceiptHandle": receipt, "MessageId": f"msg-{receipt}"}
             self.queues[QueueUrl].append(message)
             return {"MessageId": message["MessageId"]}
 
-        def receive_message(self, *, QueueUrl: str, MaxNumberOfMessages: int, WaitTimeSeconds: int, MessageAttributeNames: list[str]):
+        def receive_message(
+            self,
+            *,
+            QueueUrl: str,
+            MaxNumberOfMessages: int,
+            WaitTimeSeconds: int,
+            MessageAttributeNames: list[str],
+        ):
             del MaxNumberOfMessages, WaitTimeSeconds, MessageAttributeNames
             items = self.queues.get(QueueUrl, [])
             return {"Messages": items[:1]} if items else {}
 
         def delete_message(self, *, QueueUrl: str, ReceiptHandle: str) -> None:
-            self.queues[QueueUrl] = [item for item in self.queues.get(QueueUrl, []) if item["ReceiptHandle"] != ReceiptHandle]
+            self.queues[QueueUrl] = [
+                item
+                for item in self.queues.get(QueueUrl, [])
+                if item["ReceiptHandle"] != ReceiptHandle
+            ]
 
     class FakeBoto3:
         def __init__(self) -> None:
@@ -462,7 +519,9 @@ def test_queue_factory_and_optional_queue_adapters() -> None:
             self.id = task_id
 
     class FakeCeleryApp:
-        def send_task(self, task_name: str, *, args: list[object], queue: str, task_id: str) -> FakeAsyncResult:
+        def send_task(
+            self, task_name: str, *, args: list[object], queue: str, task_id: str
+        ) -> FakeAsyncResult:
             del task_name, args, queue
             return FakeAsyncResult(task_id)
 
@@ -491,7 +550,11 @@ def test_queue_factory_and_optional_queue_adapters() -> None:
         rabbit.close()
 
     with installed_module("boto3", FakeBoto3()):
-        sqs = create_queue_adapter("sqs", queue_url="https://sqs.example/jobs", dead_letter_queue_url="https://sqs.example/jobs-dead")
+        sqs = create_queue_adapter(
+            "sqs",
+            queue_url="https://sqs.example/jobs",
+            dead_letter_queue_url="https://sqs.example/jobs-dead",
+        )
         assert isinstance(sqs, SQSQueueAdapter)
         assert sqs.dequeue(queue_name="ignored") is None
         receipt = sqs.enqueue(queue_name="ignored", envelope=envelope)

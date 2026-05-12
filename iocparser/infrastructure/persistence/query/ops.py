@@ -20,7 +20,6 @@ from iocparser.domain.models import (
     PersistedRunsPage,
     PersistedRunSummary,
     PersistOptions,
-    ioc_type_name,
 )
 from iocparser.domain.sources import Source
 from iocparser.infrastructure.persistence.history import (
@@ -50,6 +49,7 @@ from iocparser.infrastructure.persistence.history import (
 from iocparser.infrastructure.persistence.history import (
     retain_history as _retain_history,
 )
+from iocparser.infrastructure.persistence.query.diff import diff_run_exports
 from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
 from iocparser.infrastructure.persistence_fts import build_fts_query, has_fts_table
 from iocparser.infrastructure.persistence_schema import (
@@ -116,7 +116,11 @@ def query_runs_page(query: RunPageQuery) -> PersistedRunsPage:
     unit_of_work = SQLAlchemyUnitOfWork(query.db_uri)
     try:
         stmt: RunSelect = select(RunModel).join(SourceModel, RunModel.source_id == SourceModel.id)
-        count_stmt = select(func.count()).select_from(RunModel).join(SourceModel, RunModel.source_id == SourceModel.id)
+        count_stmt = (
+            select(func.count())
+            .select_from(RunModel)
+            .join(SourceModel, RunModel.source_id == SourceModel.id)
+        )
         for clause in _run_filter_clauses(
             date_from=query.date_from,
             date_to=query.date_to,
@@ -127,7 +131,11 @@ def query_runs_page(query: RunPageQuery) -> PersistedRunsPage:
             count_stmt = count_stmt.where(clause)
         stmt = _order_run_stmt(stmt, sort_by=query.sort_by)
         total = _coerce_count(unit_of_work.session.execute(count_stmt).scalar_one())
-        runs = unit_of_work.session.execute(stmt.offset(max(0, query.offset)).limit(query.limit)).scalars().all()
+        runs = (
+            unit_of_work.session.execute(stmt.offset(max(0, query.offset)).limit(query.limit))
+            .scalars()
+            .all()
+        )
         return PersistedRunsPage(
             items=tuple(build_summary(unit_of_work.session, run) for run in runs),
             total=total,
@@ -169,28 +177,34 @@ def search_iocs_page(query: IOCSearchPageQuery) -> PersistedIOCSearchPage:
             stmt = stmt.where(RunIOCModel.severity.in_(query.severity))
         if query.tags:
             tag_filters = [
-                RunIOCModel.tags_search.like(_escaped_like_pattern(tag.strip().lower()), escape="\\")
+                RunIOCModel.tags_search.like(
+                    _escaped_like_pattern(tag.strip().lower()), escape="\\"
+                )
                 for tag in query.tags
                 if tag.strip()
             ]
             if tag_filters:
-                stmt = stmt.where(or_(*tag_filters) if query.tag_mode == "any" else and_(*tag_filters))
+                stmt = stmt.where(
+                    or_(*tag_filters) if query.tag_mode == "any" else and_(*tag_filters)
+                )
         for tag in query.exclude_tags:
             normalized_tag = tag.strip().lower()
             if normalized_tag:
-                stmt = stmt.where(RunIOCModel.tags_search.not_like(_escaped_like_pattern(normalized_tag), escape="\\"))
+                stmt = stmt.where(
+                    RunIOCModel.tags_search.not_like(
+                        _escaped_like_pattern(normalized_tag), escape="\\"
+                    )
+                )
         if query.min_severity:
             threshold = SEVERITY_ORDER.get(query.min_severity.lower(), 0)
-            allowed = tuple(
-                name
-                for name, rank in SEVERITY_ORDER.items()
-                if rank >= threshold
-            )
+            allowed = tuple(name for name, rank in SEVERITY_ORDER.items() if rank >= threshold)
             stmt = stmt.where(RunIOCModel.severity.in_(allowed))
         stmt = _order_search_stmt(stmt, sort_by=query.sort_by)
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = _coerce_count(unit_of_work.session.execute(count_stmt).scalar_one())
-        rows = unit_of_work.session.execute(stmt.offset(max(0, query.offset)).limit(query.limit)).all()
+        rows = unit_of_work.session.execute(
+            stmt.offset(max(0, query.offset)).limit(query.limit)
+        ).all()
         return PersistedIOCSearchPage(
             items=tuple(build_query_hits(rows)),
             total=total,
@@ -224,7 +238,12 @@ def _order_run_stmt(stmt: RunSelect, *, sort_by: str) -> RunSelect:
     if sort_by == "oldest":
         return stmt.order_by(RunModel.started_at.asc(), RunModel.id.asc())
     if sort_by == "source":
-        return stmt.order_by(SourceModel.kind.asc(), SourceModel.value.asc(), RunModel.started_at.desc(), RunModel.id.desc())
+        return stmt.order_by(
+            SourceModel.kind.asc(),
+            SourceModel.value.asc(),
+            RunModel.started_at.desc(),
+            RunModel.id.desc(),
+        )
     return stmt.order_by(RunModel.started_at.desc(), RunModel.id.desc())
 
 
@@ -232,17 +251,17 @@ def _order_search_stmt(stmt: SearchSelect, *, sort_by: str) -> SearchSelect:
     if sort_by == "oldest":
         return stmt.order_by(RunModel.started_at.asc(), RunModel.id.asc())
     if sort_by == "source":
-        return stmt.order_by(SourceModel.kind.asc(), SourceModel.value.asc(), RunModel.started_at.desc(), RunModel.id.desc())
+        return stmt.order_by(
+            SourceModel.kind.asc(),
+            SourceModel.value.asc(),
+            RunModel.started_at.desc(),
+            RunModel.id.desc(),
+        )
     return stmt.order_by(RunModel.started_at.desc(), RunModel.id.desc())
 
 
 def _escaped_like_pattern(normalized_value: str) -> str:
-    escaped = (
-        normalized_value
-        .replace("\\", "\\\\")
-        .replace("%", "\\%")
-        .replace("_", "\\_")
-    )
+    escaped = normalized_value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     return f"%{escaped}%"
 
 
@@ -262,7 +281,9 @@ def _apply_search_backend(
             "iocs.id IN (SELECT rowid FROM ioc_search_fts WHERE ioc_search_fts MATCH :fts_query)",
         )
         return stmt.where(filter_clause).params(fts_query=fts_query)
-    return stmt.where(IOCModel.value_search.like(_escaped_like_pattern(normalized_value), escape="\\"))
+    return stmt.where(
+        IOCModel.value_search.like(_escaped_like_pattern(normalized_value), escape="\\")
+    )
 
 
 def _coerce_count(value: object) -> int:
@@ -272,11 +293,7 @@ def _coerce_count(value: object) -> int:
         return int(value)
     if value is None:
         return 0
-    raise _count_type_error(value)
-
-
-def _count_type_error(value: object) -> TypeError:
-    return TypeError(f"Expected integer count, got {type(value).__name__}: {value!r}")
+    raise TypeError(f"Expected integer count, got {type(value).__name__}: {value!r}")
 
 
 class SQLAlchemyPersistenceService(PersistenceQueryService):
@@ -293,7 +310,9 @@ class SQLAlchemyPersistenceService(PersistenceQueryService):
     def list_failed_batch_items(self, *, batch_job_id: int) -> list[FailedBatchItem]:
         return _list_failed_batch_items(self.db_uri, batch_job_id=batch_job_id)
 
-    def list_batch_jobs(self, *, limit: int = 20, statuses: tuple[str, ...] = ()) -> list[BatchJobSummary]:
+    def list_batch_jobs(
+        self, *, limit: int = 20, statuses: tuple[str, ...] = ()
+    ) -> list[BatchJobSummary]:
         return _list_batch_jobs(self.db_uri, limit=limit, statuses=statuses)
 
     def get_batch_job(self, *, batch_job_id: int) -> BatchJobDetail | None:
@@ -365,7 +384,9 @@ class SQLAlchemyPersistenceService(PersistenceQueryService):
                 )
                 ioc_ids = unit_of_work.ioc_repository.get_or_create_normal(result)
                 ioc_ids.extend(unit_of_work.ioc_repository.get_or_create_warnings(result))
-                unit_of_work.run_repository.attach_iocs(run_id=run_id, ioc_ids=ioc_ids, result=result)
+                unit_of_work.run_repository.attach_iocs(
+                    run_id=run_id, ioc_ids=ioc_ids, result=result
+                )
                 unit_of_work.commit()
                 run_ids.append(run_id)
             finally:
@@ -523,7 +544,11 @@ class SQLAlchemyPersistenceService(PersistenceQueryService):
             return None
         unit_of_work = SQLAlchemyUnitOfWork(self.db_uri)
         try:
-            stmt = select(RunModel).join(SourceModel, RunModel.source_id == SourceModel.id).where(RunModel.status == status)
+            stmt = (
+                select(RunModel)
+                .join(SourceModel, RunModel.source_id == SourceModel.id)
+                .where(RunModel.status == status)
+            )
             if fingerprint:
                 stmt = stmt.where(SourceModel.fingerprint == fingerprint)
             if content_hash:
@@ -554,27 +579,11 @@ class SQLAlchemyPersistenceService(PersistenceQueryService):
         """Diff two persisted runs."""
         left = self.export_run(run_id=left_run_id)
         right = self.export_run(run_id=right_run_id)
-        left_ioc_keys = {(ioc_type_name(ioc.ioc_type), ioc.value.raw): ioc for ioc in left.result.iocs}
-        right_ioc_keys = {(ioc_type_name(ioc.ioc_type), ioc.value.raw): ioc for ioc in right.result.iocs}
-        left_warning_keys = {
-            (ioc_type_name(warning.ioc.ioc_type), warning.ioc.value.raw, warning.warning_list, warning.description): warning
-            for warning in left.result.warnings
-        }
-        right_warning_keys = {
-            (ioc_type_name(warning.ioc.ioc_type), warning.ioc.value.raw, warning.warning_list, warning.description): warning
-            for warning in right.result.warnings
-        }
-        return PersistedRunDiff(
+        return diff_run_exports(
+            left,
+            right,
             left_run_id=left_run_id,
             right_run_id=right_run_id,
-            added=ExtractionResult(
-                iocs=tuple(ioc for key, ioc in right_ioc_keys.items() if key not in left_ioc_keys),
-                warnings=tuple(warning for key, warning in right_warning_keys.items() if key not in left_warning_keys),
-            ),
-            removed=ExtractionResult(
-                iocs=tuple(ioc for key, ioc in left_ioc_keys.items() if key not in right_ioc_keys),
-                warnings=tuple(warning for key, warning in left_warning_keys.items() if key not in right_warning_keys),
-            ),
         )
 
     def diff_run_against_previous_source(self, *, run_id: int) -> PersistedRunDiff:
@@ -630,10 +639,16 @@ class SQLAlchemyPersistenceService(PersistenceQueryService):
         statuses: tuple[str, ...] = (),
         queue_backend: str | None = None,
     ) -> list[DistributedJobRecord]:
-        return self._distributed_service().list_jobs(limit=limit, statuses=statuses, queue_backend=queue_backend)
+        return self._distributed_service().list_jobs(
+            limit=limit, statuses=statuses, queue_backend=queue_backend
+        )
 
-    def list_dead_letters(self, *, limit: int = 50, queue_backend: str | None = None) -> list[DeadLetterRecord]:
-        return self._distributed_service().list_dead_letters(limit=limit, queue_backend=queue_backend)
+    def list_dead_letters(
+        self, *, limit: int = 50, queue_backend: str | None = None
+    ) -> list[DeadLetterRecord]:
+        return self._distributed_service().list_dead_letters(
+            limit=limit, queue_backend=queue_backend
+        )
 
     def delete_run(self, *, run_id: int) -> bool:
         """Delete a persisted run by id."""
@@ -670,11 +685,14 @@ class SQLAlchemyPersistenceService(PersistenceQueryService):
         finally:
             unit_of_work.close()
 
-    def export_history(self) -> dict[str, object]: return _export_history(self.db_uri)
+    def export_history(self) -> dict[str, object]:
+        return _export_history(self.db_uri)
 
-    def import_history(self, payload: dict[str, object]) -> dict[str, int]: return _import_history(self.db_uri, payload)
+    def import_history(self, payload: dict[str, object]) -> dict[str, int]:
+        return _import_history(self.db_uri, payload)
 
-    def compact_history(self) -> None: _compact_history(self.db_uri)
+    def compact_history(self) -> None:
+        _compact_history(self.db_uri)
 
     def retain_history(self, *, days: int, statuses: tuple[str, ...] = ()) -> int:
         return _retain_history(self.db_uri, days=days, statuses=statuses)

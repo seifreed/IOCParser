@@ -64,7 +64,9 @@ def validate_schema(engine: Engine) -> list[str]:
         problems.append(f"missing table: {FTS_TABLE}")
     version = schema_version(engine)
     if version != CURRENT_SCHEMA_VERSION:
-        problems.append(f"schema version drift: current={version} expected={CURRENT_SCHEMA_VERSION}")
+        problems.append(
+            f"schema version drift: current={version} expected={CURRENT_SCHEMA_VERSION}"
+        )
     return problems
 
 

@@ -85,12 +85,16 @@ class RequestsURLDownloader(URLDownloader):
         self.timeout: int | tuple[float, float] = timeout if timeout is not None else cfg.timeout
         self.retries = max(0, retries if retries is not None else cfg.retries)
         self.backoff = max(0.0, backoff if backoff is not None else cfg.backoff)
-        self.rate_limit_delay = max(0.0, rate_limit_delay if rate_limit_delay is not None else cfg.rate_limit_delay)
+        self.rate_limit_delay = max(
+            0.0, rate_limit_delay if rate_limit_delay is not None else cfg.rate_limit_delay
+        )
         self.headers = dict(headers if headers is not None else cfg.headers)
         self.cookies = dict(cookies if cookies is not None else cfg.cookies)
         self.user_agent = user_agent if user_agent is not None else cfg.user_agent
         self.proxies = dict(proxies if proxies is not None else cfg.proxies)
-        self.allow_redirects = allow_redirects if allow_redirects is not None else cfg.allow_redirects
+        self.allow_redirects = (
+            allow_redirects if allow_redirects is not None else cfg.allow_redirects
+        )
         self.verify: bool | str = verify if verify is not None else cfg.verify
         self.cert: str | None = cast("str | None", cert) if cert is not self._UNSET else cfg.cert
         self._rate_limit_lock = Lock()
@@ -216,7 +220,9 @@ class RequestsURLDownloader(URLDownloader):
                 return self._download_once(url, parsed_url, temp_dir, attempt + 1)
             except Timeout as exc:
                 if attempt < self.retries:
-                    logger.warning("Timeout downloading %s, retry %s/%s", url, attempt + 1, self.retries)
+                    logger.warning(
+                        "Timeout downloading %s, retry %s/%s", url, attempt + 1, self.retries
+                    )
                     if self.backoff:
                         timeout_delay: float = self.backoff * (2.0**attempt)
                         time.sleep(timeout_delay)
@@ -224,7 +230,9 @@ class RequestsURLDownloader(URLDownloader):
                 raise IOCTimeoutError("Download", url) from exc
             except RequestException as exc:
                 if attempt < self.retries:
-                    logger.warning("Request error downloading %s, retry %s/%s", url, attempt + 1, self.retries)
+                    logger.warning(
+                        "Request error downloading %s, retry %s/%s", url, attempt + 1, self.retries
+                    )
                     if self.backoff:
                         retry_delay: float = self.backoff * (2.0**attempt)
                         time.sleep(retry_delay)
@@ -234,7 +242,9 @@ class RequestsURLDownloader(URLDownloader):
                 raise DownloadError(url, str(exc), error_type="unexpected") from exc
         raise DownloadError(url, "Unreachable download state", error_type="unexpected")
 
-    def _download_once(self, url: str, parsed_url: ParseResult, temp_dir: Path, attempt_count: int) -> str:
+    def _download_once(
+        self, url: str, parsed_url: ParseResult, temp_dir: Path, attempt_count: int
+    ) -> str:
         self._respect_rate_limit()
         logger.info("Downloading content from %s", url)
         started_at = time.perf_counter()

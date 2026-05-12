@@ -26,7 +26,6 @@ from iocparser.infrastructure.utils import deduplicate_iocs_with_state
 logger = get_logger(__name__)
 
 
-
 class StreamingIOCExtractor:
     """
     Streaming IOC extractor for processing large files efficiently.
@@ -214,7 +213,9 @@ class StreamingIOCExtractor:
                         is_text=True,
                     ):
                         chunk_iocs = self.extractor.extract_all(chunk)
-                        chunk_iocs = self._filter_overlap_artifacts(chunk, chunk_iocs, prefix_length)
+                        chunk_iocs = self._filter_overlap_artifacts(
+                            chunk, chunk_iocs, prefix_length
+                        )
                         unique_iocs = self._deduplicate_iocs(chunk_iocs)
                         if unique_iocs:
                             if yield_chunks:
@@ -348,6 +349,7 @@ class StreamingIOCExtractor:
             raise
 
         return dict(all_iocs)
+
 
 __all__ = [
     "ParallelStreamingExtractor",

@@ -90,8 +90,12 @@ def job_by_id_stmt(job_id: str) -> Select[DistributedJobModel]:
     return select(DistributedJobModel).where(DistributedJobModel.job_id == job_id).with_for_update()
 
 
-def list_jobs_stmt(*, limit: int, statuses: tuple[str, ...], queue_backend: str | None) -> Select[DistributedJobModel]:
-    stmt = select(DistributedJobModel).order_by(DistributedJobModel.submitted_at.desc()).limit(limit)
+def list_jobs_stmt(
+    *, limit: int, statuses: tuple[str, ...], queue_backend: str | None
+) -> Select[DistributedJobModel]:
+    stmt = (
+        select(DistributedJobModel).order_by(DistributedJobModel.submitted_at.desc()).limit(limit)
+    )
     if statuses:
         stmt = stmt.where(DistributedJobModel.status.in_(statuses))
     if queue_backend:
@@ -100,7 +104,9 @@ def list_jobs_stmt(*, limit: int, statuses: tuple[str, ...], queue_backend: str 
 
 
 def list_dead_letters_stmt(*, limit: int, queue_backend: str | None) -> Select[DeadLetterJobModel]:
-    stmt = select(DeadLetterJobModel).order_by(DeadLetterJobModel.dead_lettered_at.desc()).limit(limit)
+    stmt = (
+        select(DeadLetterJobModel).order_by(DeadLetterJobModel.dead_lettered_at.desc()).limit(limit)
+    )
     if queue_backend:
         stmt = stmt.where(DeadLetterJobModel.queue_backend == queue_backend)
     return stmt
@@ -125,7 +131,9 @@ def build_new_job(*, envelope: QueueEnvelope, receipt_id: str) -> DistributedJob
     )
 
 
-def update_envelope(model: DistributedJobModel, *, envelope: QueueEnvelope, receipt_id: str) -> None:
+def update_envelope(
+    model: DistributedJobModel, *, envelope: QueueEnvelope, receipt_id: str
+) -> None:
     model.receipt_id = receipt_id
     model.payload_json = json.dumps(envelope.to_record(), sort_keys=True)
 
@@ -169,7 +177,9 @@ def commit_new_job_or_fetch(
         raise
 
 
-def dead_letter_model(model: DistributedJobModel, *, attempts: int, error: PipelineErrorInfo) -> DeadLetterJobModel:
+def dead_letter_model(
+    model: DistributedJobModel, *, attempts: int, error: PipelineErrorInfo
+) -> DeadLetterJobModel:
     timestamp = datetime.now(UTC)
     model.status = JOB_STATUS_DEAD_LETTERED
     model.attempts = attempts

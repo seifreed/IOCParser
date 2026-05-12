@@ -87,7 +87,11 @@ class PipelineWorker:
             phase_timings_ms["prepare"] = int((time.perf_counter() - prepare_started) * 1000)
             processed_run_lookup = self.processed_run_lookup
             db_uri = request.db_uri
-            if processed_run_lookup is None and self.processed_run_lookup_factory is not None and db_uri:
+            if (
+                processed_run_lookup is None
+                and self.processed_run_lookup_factory is not None
+                and db_uri
+            ):
                 processed_run_lookup = self.processed_run_lookup_factory(db_uri)
             skipped = maybe_skipped_result(
                 context=context,
@@ -101,10 +105,14 @@ class PipelineWorker:
             extract_started = time.perf_counter()
             result = extract_result(client=self.client, request=request, prepared=prepared)
             phase_timings_ms["extract"] = int((time.perf_counter() - extract_started) * 1000)
-            ensure_input_deadline(limits=self.limits, started=started, source_value=request.source_value)
+            ensure_input_deadline(
+                limits=self.limits, started=started, source_value=request.source_value
+            )
 
             persist_started = time.perf_counter()
-            run_id = persist_result(request=request, prepared=prepared, result=result, started=started)
+            run_id = persist_result(
+                request=request, prepared=prepared, result=result, started=started
+            )
             if run_id is not None:
                 phase_timings_ms["persist"] = int((time.perf_counter() - persist_started) * 1000)
             return success_result(

@@ -129,12 +129,16 @@ class PersistedRunDiff:
 
     @property
     def added_warning_counts(self) -> dict[str, int]:
-        counter: Counter[str] = Counter(ioc_type_name(warning.ioc.ioc_type) for warning in self.added.warnings)
+        counter: Counter[str] = Counter(
+            ioc_type_name(warning.ioc.ioc_type) for warning in self.added.warnings
+        )
         return dict(sorted(counter.items()))
 
     @property
     def removed_warning_counts(self) -> dict[str, int]:
-        counter: Counter[str] = Counter(ioc_type_name(warning.ioc.ioc_type) for warning in self.removed.warnings)
+        counter: Counter[str] = Counter(
+            ioc_type_name(warning.ioc.ioc_type) for warning in self.removed.warnings
+        )
         return dict(sorted(counter.items()))
 
     def to_record(self) -> dict[str, object]:

@@ -56,7 +56,9 @@ class TestDuplicateRemoval:
 
         try:
             args = self.create_test_args([file1, file2])
-            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(args, reader=cli_reader, warning_service=None)
+            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(
+                args, reader=cli_reader, warning_service=None
+            )
 
             # Check domains are deduplicated (accounting for defanging)
             if "domains" in normal_iocs:
@@ -105,7 +107,9 @@ class TestDuplicateRemoval:
 
         try:
             args = self.create_test_args([file1, file2])
-            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(args, reader=cli_reader, warning_service=None)
+            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(
+                args, reader=cli_reader, warning_service=None
+            )
 
             # Check that we have results
             assert len(normal_iocs) > 0, "Should have extracted some IOCs"
@@ -142,7 +146,9 @@ class TestDuplicateRemoval:
 
         try:
             args = self.create_test_args([file1, file2])
-            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(args, reader=cli_reader, warning_service=None)
+            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(
+                args, reader=cli_reader, warning_service=None
+            )
 
             if "domains" in normal_iocs:
                 domains = normal_iocs["domains"]
@@ -171,7 +177,9 @@ class TestDuplicateRemoval:
 
         try:
             args = self.create_test_args([file1, file2])
-            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(args, reader=cli_reader, warning_service=None)
+            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(
+                args, reader=cli_reader, warning_service=None
+            )
 
             # Should handle gracefully without errors
             assert isinstance(normal_iocs, dict), "Should return dict even with no IOCs"
@@ -203,7 +211,9 @@ class TestDuplicateRemoval:
             import time
 
             start_time = time.time()
-            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(args, reader=cli_reader, warning_service=None)
+            normal_iocs, _warning_iocs, _display, _results = process_multiple_files_input(
+                args, reader=cli_reader, warning_service=None
+            )
             end_time = time.time()
 
             # Should complete in reasonable time (< 5 seconds for this small test)

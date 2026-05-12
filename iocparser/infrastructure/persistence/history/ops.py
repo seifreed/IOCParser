@@ -108,7 +108,7 @@ def _json_int_map(raw_value: str) -> dict[str, int]:
     return {key: int(value) for key, value in decoded.items() if _is_int_like(value)}  # type: ignore[call-overload]
 
 
-def _payload_fingerprint(payload: dict[str, object]) -> str:
+def _payload_fingerprint(payload: Mapping[str, object]) -> str:
     filtered_payload = {
         key: value
         for key, value in payload.items()
@@ -118,13 +118,19 @@ def _payload_fingerprint(payload: dict[str, object]) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
+def _select_rows(session: Session, model: HistoryModelType) -> list[dict[str, object]]:
+    return [_row_dict(row) for row in session.execute(select(model)).scalars().all()]
+
+
 def _archive_id(payload: dict[str, object]) -> str:
     raw_value = payload.get(HISTORY_ARCHIVE_ID_KEY)
     if isinstance(raw_value, str) and raw_value.strip():
         return raw_value.strip()
     origin_id = payload.get(HISTORY_ORIGIN_ID_KEY)
     if isinstance(origin_id, str) and origin_id.strip():
-        return hashlib.sha256(f"{origin_id.strip()}:{_payload_fingerprint(payload)}".encode()).hexdigest()
+        return hashlib.sha256(
+            f"{origin_id.strip()}:{_payload_fingerprint(payload)}".encode()
+        ).hexdigest()
     return f"legacy:{_payload_fingerprint(payload)}"
 
 
@@ -206,7 +212,9 @@ def _existing_source(session: Session, row: dict[str, object]) -> SourceModel | 
     identity = _source_identity(row)
     if identity[0] == "url":
         value = str(row.get("value", ""))
-        normalized_url = str(row.get("normalized_url", "")) if row.get("normalized_url") is not None else None
+        normalized_url = (
+            str(row.get("normalized_url", "")) if row.get("normalized_url") is not None else None
+        )
         stmt = select(SourceModel).where(SourceModel.kind == "url")
         clauses = []
         if value:
@@ -227,7 +235,9 @@ def _existing_source(session: Session, row: dict[str, object]) -> SourceModel | 
                 return candidate
         return None
     return session.execute(
-        select(SourceModel).where(SourceModel.kind == str(identity[0]), SourceModel.value == str(identity[1]))
+        select(SourceModel).where(
+            SourceModel.kind == str(identity[0]), SourceModel.value == str(identity[1])
+        )
     ).scalar_one_or_none()
 
 
@@ -399,37 +409,49 @@ def _existing_run(
     original_id: int | None,
     same_origin: bool,
 ) -> RunModel | None:
-    candidates = session.execute(
-        select(RunModel).where(
-            RunModel.source_id == source_id,
-            RunModel.batch_job_id == batch_job_id,
-            RunModel.started_at == row.get("started_at"),
-            RunModel.finished_at == row.get("finished_at"),
-            RunModel.tool_version == str(row.get("tool_version", "")),
-            RunModel.normal_ioc_count == int(row.get("normal_ioc_count", 0)),  # type: ignore[call-overload]
-            RunModel.warning_ioc_count == int(row.get("warning_ioc_count", 0)),  # type: ignore[call-overload]
-            RunModel.processed_items == int(row.get("processed_items", 0)),  # type: ignore[call-overload]
-            RunModel.successful_items == int(row.get("successful_items", 0)),  # type: ignore[call-overload]
-            RunModel.failed_items == int(row.get("failed_items", 0)),  # type: ignore[call-overload]
-            RunModel.partial_error_count == int(row.get("partial_error_count", 0)),  # type: ignore[call-overload]
-            RunModel.duration_ms == int(row.get("duration_ms", 0)),  # type: ignore[call-overload]
-            RunModel.status == str(row.get("status", "")),
-            RunModel.error_message == str(row.get("error_message", "")),
+    candidates = (
+        session.execute(
+            select(RunModel).where(
+                RunModel.source_id == source_id,
+                RunModel.batch_job_id == batch_job_id,
+                RunModel.started_at == row.get("started_at"),
+                RunModel.finished_at == row.get("finished_at"),
+                RunModel.tool_version == str(row.get("tool_version", "")),
+                RunModel.normal_ioc_count == int(row.get("normal_ioc_count", 0)),  # type: ignore[call-overload]
+                RunModel.warning_ioc_count == int(row.get("warning_ioc_count", 0)),  # type: ignore[call-overload]
+                RunModel.processed_items == int(row.get("processed_items", 0)),  # type: ignore[call-overload]
+                RunModel.successful_items == int(row.get("successful_items", 0)),  # type: ignore[call-overload]
+                RunModel.failed_items == int(row.get("failed_items", 0)),  # type: ignore[call-overload]
+                RunModel.partial_error_count == int(row.get("partial_error_count", 0)),  # type: ignore[call-overload]
+                RunModel.duration_ms == int(row.get("duration_ms", 0)),  # type: ignore[call-overload]
+                RunModel.status == str(row.get("status", "")),
+                RunModel.error_message == str(row.get("error_message", "")),
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for candidate in candidates:
-        if _json_without_import_marker(candidate.options_json) != _json_without_import_marker(row.get("options_json", "{}")):
+        if _json_without_import_marker(candidate.options_json) != _json_without_import_marker(
+            row.get("options_json", "{}")
+        ):
             continue
         marker = _json_import_marker(candidate.options_json)
         if marker is not None and marker == {"archive_id": archive_id, "original_id": original_id}:
             return candidate
-        if same_origin and marker is None and _run_ioc_signature(session, run_id=candidate.id) == ioc_signature:
+        if (
+            same_origin
+            and marker is None
+            and _run_ioc_signature(session, run_id=candidate.id) == ioc_signature
+        ):
             return candidate
     return None
 
 
 def _existing_run_ioc(session: Session, *, run_id: int, ioc_id: int) -> RunIOCModel | None:
-    return session.execute(select(RunIOCModel).where(RunIOCModel.run_id == run_id, RunIOCModel.ioc_id == ioc_id)).scalar_one_or_none()
+    return session.execute(
+        select(RunIOCModel).where(RunIOCModel.run_id == run_id, RunIOCModel.ioc_id == ioc_id)
+    ).scalar_one_or_none()
 
 
 def _existing_failed_batch_item(
@@ -459,16 +481,20 @@ def _existing_distributed_job(
 ) -> DistributedJobModel | None:
     original_id = row.get("id")
     public_job_id = str(row.get("job_id", ""))
-    candidates = session.execute(
-        select(DistributedJobModel).where(
-            DistributedJobModel.job_id.in_(
-                (
-                    public_job_id,
-                    _distributed_internal_job_id(job_id=public_job_id, archive_id=archive_id),
+    candidates = (
+        session.execute(
+            select(DistributedJobModel).where(
+                DistributedJobModel.job_id.in_(
+                    (
+                        public_job_id,
+                        _distributed_internal_job_id(job_id=public_job_id, archive_id=archive_id),
+                    )
                 )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for candidate in candidates:
         marker = _json_import_marker(candidate.payload_json or "{}")
         if marker == {"archive_id": archive_id, "original_id": original_id}:
@@ -487,32 +513,36 @@ def _existing_dead_letter_job(
 ) -> DeadLetterJobModel | None:
     original_id = row.get("id")
     public_job_id = str(row.get("job_id", ""))
-    candidates = session.execute(
-        select(DeadLetterJobModel).where(
-            DeadLetterJobModel.job_id.in_(
-                (
-                    public_job_id,
-                    _distributed_internal_job_id(job_id=public_job_id, archive_id=archive_id),
-                )
-            ),
-            DeadLetterJobModel.dead_lettered_at == row.get("dead_lettered_at"),
-            DeadLetterJobModel.correlation_id == str(row.get("correlation_id", "")),
-            DeadLetterJobModel.queue_backend == str(row.get("queue_backend", "")),
-            DeadLetterJobModel.queue_name == str(row.get("queue_name", "")),
-            DeadLetterJobModel.source_value == str(row.get("source_value", "")),
-            DeadLetterJobModel.attempts == int(row.get("attempts", 0)),  # type: ignore[call-overload]
-            DeadLetterJobModel.max_attempts == int(row.get("max_attempts", 0)),  # type: ignore[call-overload]
-            DeadLetterJobModel.error_code == str(row.get("error_code", "")),
-            DeadLetterJobModel.error_category == str(row.get("error_category", "")),
-            DeadLetterJobModel.error_message == str(row.get("error_message", "")),
-            DeadLetterJobModel.retryable == bool(row.get("retryable", False)),
+    candidates = (
+        session.execute(
+            select(DeadLetterJobModel).where(
+                DeadLetterJobModel.job_id.in_(
+                    (
+                        public_job_id,
+                        _distributed_internal_job_id(job_id=public_job_id, archive_id=archive_id),
+                    )
+                ),
+                DeadLetterJobModel.dead_lettered_at == row.get("dead_lettered_at"),
+                DeadLetterJobModel.correlation_id == str(row.get("correlation_id", "")),
+                DeadLetterJobModel.queue_backend == str(row.get("queue_backend", "")),
+                DeadLetterJobModel.queue_name == str(row.get("queue_name", "")),
+                DeadLetterJobModel.source_value == str(row.get("source_value", "")),
+                DeadLetterJobModel.attempts == int(row.get("attempts", 0)),  # type: ignore[call-overload]
+                DeadLetterJobModel.max_attempts == int(row.get("max_attempts", 0)),  # type: ignore[call-overload]
+                DeadLetterJobModel.error_code == str(row.get("error_code", "")),
+                DeadLetterJobModel.error_category == str(row.get("error_category", "")),
+                DeadLetterJobModel.error_message == str(row.get("error_message", "")),
+                DeadLetterJobModel.retryable == bool(row.get("retryable", False)),
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for candidate in candidates:
         marker = _json_import_marker(candidate.payload_json or "{}")
-        if _json_without_import_marker(candidate.payload_json or "{}") != _json_without_import_marker(
-            row.get("payload_json", "{}")
-        ):
+        if _json_without_import_marker(
+            candidate.payload_json or "{}"
+        ) != _json_without_import_marker(row.get("payload_json", "{}")):
             continue
         if marker == {"archive_id": archive_id, "original_id": original_id}:
             return candidate
@@ -580,28 +610,34 @@ def _import_batch_jobs(
             "archive_id": archive_id,
             "original_id": original_id,
         }
-        existing_matches = session.execute(
-            select(BatchJobModel.id).where(
-                BatchJobModel.source_kind == str(typed.get("source_kind", "")),
-                BatchJobModel.started_at == typed.get("started_at"),
-                BatchJobModel.finished_at == typed.get("finished_at"),
-                BatchJobModel.total_inputs == int(typed.get("total_inputs", 0)),  # type: ignore[call-overload]
-                BatchJobModel.successful_inputs == int(typed.get("successful_inputs", 0)),  # type: ignore[call-overload]
-                BatchJobModel.failed_inputs == int(typed.get("failed_inputs", 0)),  # type: ignore[call-overload]
-                BatchJobModel.retry_attempt == int(typed.get("retry_attempt", 0)),  # type: ignore[call-overload]
-                BatchJobModel.status == str(typed.get("status", "")),
-                BatchJobModel.error_summary_json == str(typed.get("error_summary_json", "{}")),
-                BatchJobModel.metrics_json == str(typed.get("metrics_json", "{}")),
-            ).order_by(BatchJobModel.id.asc())
-        ).scalars().all()
+        existing_matches = (
+            session.execute(
+                select(BatchJobModel.id)
+                .where(
+                    BatchJobModel.source_kind == str(typed.get("source_kind", "")),
+                    BatchJobModel.started_at == typed.get("started_at"),
+                    BatchJobModel.finished_at == typed.get("finished_at"),
+                    BatchJobModel.total_inputs == int(typed.get("total_inputs", 0)),  # type: ignore[call-overload]
+                    BatchJobModel.successful_inputs == int(typed.get("successful_inputs", 0)),  # type: ignore[call-overload]
+                    BatchJobModel.failed_inputs == int(typed.get("failed_inputs", 0)),  # type: ignore[call-overload]
+                    BatchJobModel.retry_attempt == int(typed.get("retry_attempt", 0)),  # type: ignore[call-overload]
+                    BatchJobModel.status == str(typed.get("status", "")),
+                    BatchJobModel.error_summary_json == str(typed.get("error_summary_json", "{}")),
+                    BatchJobModel.metrics_json == str(typed.get("metrics_json", "{}")),
+                )
+                .order_by(BatchJobModel.id.asc())
+            )
+            .scalars()
+            .all()
+        )
         existing = None
         for batch_job_id in existing_matches:
             candidate = session.get(BatchJobModel, batch_job_id)
             if candidate is None:
                 continue
-            if _batch_job_config_without_import_marker(candidate.config_json) != _batch_job_config_without_import_marker(
-                typed.get("config_json", "{}")
-            ):
+            if _batch_job_config_without_import_marker(
+                candidate.config_json
+            ) != _batch_job_config_without_import_marker(typed.get("config_json", "{}")):
                 continue
             candidate_config = _json_object(candidate.config_json)
             if candidate_config.get(HISTORY_IMPORT_MARKER_KEY) == import_marker:
@@ -612,11 +648,7 @@ def _import_batch_jobs(
                 break
         if existing is None:
             batch_job = BatchJobModel(
-                **{
-                    key: value
-                    for key, value in typed.items()
-                    if key not in {"id", "config_json"}
-                },
+                **{key: value for key, value in typed.items() if key not in {"id", "config_json"}},
                 config_json=_batch_job_config_with_import_marker(
                     typed.get("config_json"),
                     archive_id=archive_id,
@@ -669,7 +701,9 @@ def _import_runs(
         if source_id is None:
             continue
         original_batch_id = typed.get("batch_job_id")
-        batch_job_id = batch_map.get(int(original_batch_id)) if isinstance(original_batch_id, int) else None
+        batch_job_id = (
+            batch_map.get(int(original_batch_id)) if isinstance(original_batch_id, int) else None
+        )
         original_id = typed.get("id")
         ioc_signature = (
             tuple(
@@ -733,7 +767,11 @@ def _import_run_iocs(
             continue
         session.add(
             RunIOCModel(
-                **{key: value for key, value in typed.items() if key not in {"id", "run_id", "ioc_id"}},
+                **{
+                    key: value
+                    for key, value in typed.items()
+                    if key not in {"id", "run_id", "ioc_id"}
+                },
                 run_id=run_id,
                 ioc_id=ioc_id,
             )
@@ -763,18 +801,22 @@ def _import_failed_batch_items(
             int(typed.get("retry_attempt", 0)),  # type: ignore[call-overload]
             typed.get("created_at"),
         )
-        existing_matches = session.execute(
-            select(FailedBatchItemModel.id)
-            .where(
-                FailedBatchItemModel.batch_job_id == batch_job_id,
-                FailedBatchItemModel.source_value == signature[1],
-                FailedBatchItemModel.error_type == signature[2],
-                FailedBatchItemModel.error_message == signature[3],
-                FailedBatchItemModel.retry_attempt == signature[4],
-                FailedBatchItemModel.created_at == signature[5],
+        existing_matches = (
+            session.execute(
+                select(FailedBatchItemModel.id)
+                .where(
+                    FailedBatchItemModel.batch_job_id == batch_job_id,
+                    FailedBatchItemModel.source_value == signature[1],
+                    FailedBatchItemModel.error_type == signature[2],
+                    FailedBatchItemModel.error_message == signature[3],
+                    FailedBatchItemModel.retry_attempt == signature[4],
+                    FailedBatchItemModel.created_at == signature[5],
+                )
+                .order_by(FailedBatchItemModel.id.asc())
             )
-            .order_by(FailedBatchItemModel.id.asc())
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         seen_count = seen_signatures.get(signature, 0)
         if seen_count < len(existing_matches):
             seen_signatures[signature] = seen_count + 1
@@ -801,7 +843,9 @@ def _import_distributed_jobs(
     inserted = 0
     for row in rows:
         typed = _typed_row(row)
-        existing = _existing_distributed_job(session, typed, archive_id=archive_id, same_origin=same_origin)
+        existing = _existing_distributed_job(
+            session, typed, archive_id=archive_id, same_origin=same_origin
+        )
         if existing is not None:
             continue
         original_run_id = typed.get("run_id")
@@ -840,7 +884,12 @@ def _import_dead_letter_jobs(
     inserted = 0
     for row in rows:
         typed = _typed_row(row)
-        if _existing_dead_letter_job(session, typed, archive_id=archive_id, same_origin=same_origin) is not None:
+        if (
+            _existing_dead_letter_job(
+                session, typed, archive_id=archive_id, same_origin=same_origin
+            )
+            is not None
+        ):
             continue
         original_id = typed.get("id")
         session.add(
@@ -969,8 +1018,12 @@ def _row_dict(model: HistoryModel) -> dict[str, object]:
             "run_id": model.run_id,
             "submitted_at": model.submitted_at.isoformat(),
             "started_at": model.started_at.isoformat() if model.started_at is not None else None,
-            "completed_at": model.completed_at.isoformat() if model.completed_at is not None else None,
-            "dead_lettered_at": model.dead_lettered_at.isoformat() if model.dead_lettered_at is not None else None,
+            "completed_at": model.completed_at.isoformat()
+            if model.completed_at is not None
+            else None,
+            "dead_lettered_at": model.dead_lettered_at.isoformat()
+            if model.dead_lettered_at is not None
+            else None,
         }
     return {
         "id": model.id,
@@ -995,22 +1048,18 @@ def export_history(db_uri: str) -> dict[str, object]:
         origin_id = _history_origin_id(session)
         session.commit()
         payload = {
-            "sources": [_row_dict(source) for source in session.execute(select(SourceModel)).scalars().all()],
-            "runs": [_row_dict(run) for run in session.execute(select(RunModel)).scalars().all()],
-            "iocs": [_row_dict(ioc) for ioc in session.execute(select(IOCModel)).scalars().all()],
-            "run_iocs": [_row_dict(run_ioc) for run_ioc in session.execute(select(RunIOCModel)).scalars().all()],
-            "batch_jobs": [_row_dict(job) for job in session.execute(select(BatchJobModel)).scalars().all()],
-            "failed_batch_items": [
-                _row_dict(item) for item in session.execute(select(FailedBatchItemModel)).scalars().all()
-            ],
-            "distributed_jobs": [
-                _row_dict(job) for job in session.execute(select(DistributedJobModel)).scalars().all()
-            ],
-            "dead_letter_jobs": [
-                _row_dict(job) for job in session.execute(select(DeadLetterJobModel)).scalars().all()
-            ],
+            "sources": _select_rows(session, SourceModel),
+            "runs": _select_rows(session, RunModel),
+            "iocs": _select_rows(session, IOCModel),
+            "run_iocs": _select_rows(session, RunIOCModel),
+            "batch_jobs": _select_rows(session, BatchJobModel),
+            "failed_batch_items": _select_rows(session, FailedBatchItemModel),
+            "distributed_jobs": _select_rows(session, DistributedJobModel),
+            "dead_letter_jobs": _select_rows(session, DeadLetterJobModel),
         }
-        archive_id = hashlib.sha256(f"{origin_id}:{_payload_fingerprint(payload)}".encode()).hexdigest()  # type: ignore[arg-type]
+        archive_id = hashlib.sha256(
+            f"{origin_id}:{_payload_fingerprint(payload)}".encode()
+        ).hexdigest()
         return {
             HISTORY_ORIGIN_ID_KEY: origin_id,
             HISTORY_ARCHIVE_ID_KEY: archive_id,
@@ -1022,7 +1071,9 @@ def import_history(db_uri: str, payload: dict[str, object]) -> dict[str, int]:
     with _managed_session(db_uri) as session:
         same_origin = _same_origin_archive(session, payload)
         archive_id = _archive_id(payload)
-        if _is_legacy_archive(payload) and _has_legacy_archive_collision(session, archive_id=archive_id):
+        if _is_legacy_archive(payload) and _has_legacy_archive_collision(
+            session, archive_id=archive_id
+        ):
             raise ValueError(AMBIGUOUS_LEGACY_HISTORY_ARCHIVE)
         run_ioc_rows = _payload_rows(payload, "run_iocs")
         source_count, source_map = _import_sources(session, _payload_rows(payload, "sources"))
@@ -1105,9 +1156,16 @@ def retain_history(db_uri: str, *, days: int, statuses: tuple[str, ...] = ()) ->
 
 def list_failed_batches(db_uri: str, *, limit: int = 20) -> list[BatchJobSummary]:
     with _managed_session(db_uri) as session:
-        jobs = session.execute(
-            select(BatchJobModel).where(BatchJobModel.failed_inputs > 0).order_by(BatchJobModel.started_at.desc()).limit(limit)
-        ).scalars().all()
+        jobs = (
+            session.execute(
+                select(BatchJobModel)
+                .where(BatchJobModel.failed_inputs > 0)
+                .order_by(BatchJobModel.started_at.desc())
+                .limit(limit)
+            )
+            .scalars()
+            .all()
+        )
         return [_batch_job_summary(session, job) for job in jobs]
 
 
@@ -1126,7 +1184,9 @@ def list_failed_batch_items(db_uri: str, *, batch_job_id: int) -> list[FailedBat
         ]
 
 
-def list_batch_jobs(db_uri: str, *, limit: int = 20, statuses: tuple[str, ...] = ()) -> list[BatchJobSummary]:
+def list_batch_jobs(
+    db_uri: str, *, limit: int = 20, statuses: tuple[str, ...] = ()
+) -> list[BatchJobSummary]:
     with _managed_session(db_uri) as session:
         stmt = select(BatchJobModel).order_by(BatchJobModel.started_at.desc()).limit(limit)
         if statuses:
@@ -1159,7 +1219,11 @@ def get_batch_job(db_uri: str, *, batch_job_id: int) -> BatchJobDetail | None:
 
 def list_batch_runs(db_uri: str, *, batch_job_id: int) -> list[PersistedRunSummary]:
     with _managed_session(db_uri) as session:
-        stmt = select(RunModel).where(RunModel.batch_job_id == batch_job_id).order_by(RunModel.started_at.asc())
+        stmt = (
+            select(RunModel)
+            .where(RunModel.batch_job_id == batch_job_id)
+            .order_by(RunModel.started_at.asc())
+        )
         return [build_summary(session, run) for run in session.execute(stmt).scalars().all()]
 
 

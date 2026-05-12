@@ -165,11 +165,15 @@ def test_stix_output_renderer_deduplicates_patterns_and_keeps_warning_metadata()
     assert all(item["pattern_type"] == "stix" for item in objects)
     assert not any("header.payload.signature" in item["pattern"] for item in objects)
 
-    ip_indicator = next(item for item in objects if item["pattern"] == "[ipv4-addr:value = '198.51.100.7']")
+    ip_indicator = next(
+        item for item in objects if item["pattern"] == "[ipv4-addr:value = '198.51.100.7']"
+    )
     assert ip_indicator["x_warning_list"] == "Known Benign"
     assert ip_indicator["x_warning_description"] == "Public resolver"
 
-    domain_indicator = next(item for item in objects if item["pattern"] == "[domain-name:value = 'example.com']")
+    domain_indicator = next(
+        item for item in objects if item["pattern"] == "[domain-name:value = 'example.com']"
+    )
     assert "x_warning_list" not in domain_indicator
 
 

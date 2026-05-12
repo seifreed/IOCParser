@@ -93,7 +93,11 @@ def test_distributed_pipeline_filesystem_queue_e2e(tmp_path: Path) -> None:
     assert len(jobs) == 1
     assert jobs[0].status == JOB_STATUS_COMPLETED
     assert jobs[0].run_id is not None
-    assert [event["name"] for event in telemetry.events] == ["job_submitted", "job_started", "job_completed"]
+    assert [event["name"] for event in telemetry.events] == [
+        "job_submitted",
+        "job_started",
+        "job_completed",
+    ]
 
 
 def test_filesystem_queue_dequeue_survives_race_condition(tmp_path: Path) -> None:

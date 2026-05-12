@@ -98,7 +98,9 @@ def process_multiple_files(
     )
 
 
-def process_multiple_files_input(args: argparse.Namespace) -> tuple[GroupedIocs, GroupedWarnings, str, BatchResults]:
+def process_multiple_files_input(
+    args: argparse.Namespace,
+) -> tuple[GroupedIocs, GroupedWarnings, str, BatchResults]:
     return _cli_processing.process_multiple_files_input(
         args,
         reader=_cli_runtime.reader,

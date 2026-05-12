@@ -49,7 +49,9 @@ def list_failed_batch_jobs(*, db_uri: str, limit: int = 20) -> list[BatchJobSumm
     )
 
 
-def list_batch_jobs(*, db_uri: str, limit: int = 20, statuses: str | None = None) -> list[BatchJobSummary]:
+def list_batch_jobs(
+    *, db_uri: str, limit: int = 20, statuses: str | None = None
+) -> list[BatchJobSummary]:
     return _list_batch_jobs(
         ListBatchJobsInput(limit=limit, statuses=parse_string_filters(statuses)),
         persistence_query_service=query_service(db_uri),

@@ -135,9 +135,13 @@ def _handle_search_ioc(args: argparse.Namespace, config: AppConfig) -> bool:
             source_kind=_cli_args.get_optional_str_arg(args, "source_kind"),
             source_value=_cli_args.get_optional_str_arg(args, "source_value"),
             ioc_type=_cli_args.get_optional_str_arg(args, "ioc_type"),
-            severity=_cli_args.parse_string_filters(_cli_args.get_optional_str_arg(args, "severity")),
+            severity=_cli_args.parse_string_filters(
+                _cli_args.get_optional_str_arg(args, "severity")
+            ),
             tags=_cli_args.parse_string_filters(_cli_args.get_optional_str_arg(args, "tag")),
-            exclude_tags=_cli_args.parse_string_filters(_cli_args.get_optional_str_arg(args, "exclude_tag")),
+            exclude_tags=_cli_args.parse_string_filters(
+                _cli_args.get_optional_str_arg(args, "exclude_tag")
+            ),
             min_severity=_cli_args.get_optional_str_arg(args, "min_severity"),
             tag_mode=_cli_args.get_optional_str_arg(args, "tag_mode") or "all",
             sort_by=_cli_args.get_optional_str_arg(args, "query_sort") or "newest",
@@ -152,7 +156,9 @@ def _handle_search_ioc(args: argparse.Namespace, config: AppConfig) -> bool:
     return True
 
 
-def _handle_diff_runs(args: argparse.Namespace, config: AppConfig, *, file_writer: FileWriter) -> bool:
+def _handle_diff_runs(
+    args: argparse.Namespace, config: AppConfig, *, file_writer: FileWriter
+) -> bool:
     current_diff_run_ids = _diff_run_ids(args)
     if current_diff_run_ids is None:
         return False
@@ -163,8 +169,12 @@ def _handle_diff_runs(args: argparse.Namespace, config: AppConfig, *, file_write
             only_added=_cli_args.get_optional_str_arg(args, "diff_only") == "added",
             only_removed=_cli_args.get_optional_str_arg(args, "diff_only") == "removed",
             only_warnings=_cli_args.get_bool_arg(args, "diff_warnings_only"),
-            ioc_types=_cli_args.parse_string_filters(_cli_args.get_optional_str_arg(args, "ioc_type")),
-            severity=_cli_args.parse_string_filters(_cli_args.get_optional_str_arg(args, "severity")),
+            ioc_types=_cli_args.parse_string_filters(
+                _cli_args.get_optional_str_arg(args, "ioc_type")
+            ),
+            severity=_cli_args.parse_string_filters(
+                _cli_args.get_optional_str_arg(args, "severity")
+            ),
             tags=_cli_args.parse_string_filters(_cli_args.get_optional_str_arg(args, "tag")),
         ),
         persistence_query_service=_query_service_for(config),
@@ -173,7 +183,9 @@ def _handle_diff_runs(args: argparse.Namespace, config: AppConfig, *, file_write
     return True
 
 
-def _handle_diff_latest(args: argparse.Namespace, config: AppConfig, *, file_writer: FileWriter) -> bool:
+def _handle_diff_latest(
+    args: argparse.Namespace, config: AppConfig, *, file_writer: FileWriter
+) -> bool:
     diff_latest_run_id = _optional_int_attr(args, "diff_latest")
     if diff_latest_run_id is None:
         return False
@@ -183,8 +195,12 @@ def _handle_diff_latest(args: argparse.Namespace, config: AppConfig, *, file_wri
             only_added=_cli_args.get_optional_str_arg(args, "diff_only") == "added",
             only_removed=_cli_args.get_optional_str_arg(args, "diff_only") == "removed",
             only_warnings=_cli_args.get_bool_arg(args, "diff_warnings_only"),
-            ioc_types=_cli_args.parse_string_filters(_cli_args.get_optional_str_arg(args, "ioc_type")),
-            severity=_cli_args.parse_string_filters(_cli_args.get_optional_str_arg(args, "severity")),
+            ioc_types=_cli_args.parse_string_filters(
+                _cli_args.get_optional_str_arg(args, "ioc_type")
+            ),
+            severity=_cli_args.parse_string_filters(
+                _cli_args.get_optional_str_arg(args, "severity")
+            ),
             tags=_cli_args.parse_string_filters(_cli_args.get_optional_str_arg(args, "tag")),
         ),
         persistence_query_service=_query_service_for(config),
@@ -193,14 +209,18 @@ def _handle_diff_latest(args: argparse.Namespace, config: AppConfig, *, file_wri
     return True
 
 
-def _handle_export_run(args: argparse.Namespace, config: AppConfig, *, file_writer: FileWriter) -> bool:
+def _handle_export_run(
+    args: argparse.Namespace, config: AppConfig, *, file_writer: FileWriter
+) -> bool:
     export_run_id = _optional_int_attr(args, "export_run")
     if export_run_id is None:
         return False
     export = uc_export_persisted_run(
         ExportPersistedRunInput(
             run_id=export_run_id,
-            severity=_cli_args.parse_string_filters(_cli_args.get_optional_str_arg(args, "severity")),
+            severity=_cli_args.parse_string_filters(
+                _cli_args.get_optional_str_arg(args, "severity")
+            ),
             tags=_cli_args.parse_string_filters(_cli_args.get_optional_str_arg(args, "tag")),
             include_normal=not _cli_args.get_bool_arg(args, "only_warnings"),
             include_warnings=not _cli_args.get_bool_arg(args, "only_normal"),
@@ -219,7 +239,9 @@ def _handle_list_batches(args: argparse.Namespace, config: AppConfig) -> bool:
     jobs = uc_list_batch_jobs(
         ListBatchJobsInput(
             limit=_cli_args.get_int_arg(args, "batch_limit", 20),
-            statuses=_cli_args.parse_string_filters(_cli_args.get_optional_str_arg(args, "prune_status")),
+            statuses=_cli_args.parse_string_filters(
+                _cli_args.get_optional_str_arg(args, "prune_status")
+            ),
         ),
         persistence_query_service=_query_service_for(config),
     )
@@ -234,7 +256,10 @@ def _handle_batch_job_detail(args: argparse.Namespace, config: AppConfig) -> boo
     batch_job_id = _optional_int_attr(args, "batch_job")
     if batch_job_id is None:
         return False
-    detail = uc_get_batch_job(BatchJobInput(batch_job_id=batch_job_id), persistence_query_service=_query_service_for(config))
+    detail = uc_get_batch_job(
+        BatchJobInput(batch_job_id=batch_job_id),
+        persistence_query_service=_query_service_for(config),
+    )
     if detail is None:
         _raise_batch_job_not_found()
     if _cli_args.get_bool_arg(args, "json"):
@@ -248,7 +273,10 @@ def _handle_batch_runs(args: argparse.Namespace, config: AppConfig) -> bool:
     batch_runs_id = _optional_int_attr(args, "batch_runs")
     if batch_runs_id is None:
         return False
-    runs = uc_list_batch_runs(BatchJobInput(batch_job_id=batch_runs_id), persistence_query_service=_query_service_for(config))
+    runs = uc_list_batch_runs(
+        BatchJobInput(batch_job_id=batch_runs_id),
+        persistence_query_service=_query_service_for(config),
+    )
     if _cli_args.get_bool_arg(args, "json"):
         _cli_output.print_json_payload({"items": [run.to_record() for run in runs]})
     else:
@@ -278,7 +306,9 @@ def _handle_prune_runs(args: argparse.Namespace, config: AppConfig) -> bool:
             keep_latest=_cli_args.get_int_arg(args, "keep_latest", 0),
             source_kind=_cli_args.get_optional_str_arg(args, "source_kind"),
             source_value=_cli_args.get_optional_str_arg(args, "source_value"),
-            statuses=_cli_args.parse_string_filters(_cli_args.get_optional_str_arg(args, "prune_status")),
+            statuses=_cli_args.parse_string_filters(
+                _cli_args.get_optional_str_arg(args, "prune_status")
+            ),
         ),
         persistence_query_service=_query_service_for(config),
     )

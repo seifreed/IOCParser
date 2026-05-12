@@ -44,10 +44,9 @@ def _apply_boolean_defaults(args: argparse.Namespace, config: AppConfig) -> None
 
 
 def _apply_output_defaults(args: argparse.Namespace, config: AppConfig) -> None:
-    if (
-        not any(get_bool_arg(args, name) for name in ("json", "jsonl", "csv", "stix"))
-        and config.output_format in {"json", "jsonl", "csv", "stix"}
-    ):
+    if not any(
+        get_bool_arg(args, name) for name in ("json", "jsonl", "csv", "stix")
+    ) and config.output_format in {"json", "jsonl", "csv", "stix"}:
         setattr(args, config.output_format, True)
 
 
@@ -109,7 +108,11 @@ def parse_http_mapping(value: object, *, separator: str) -> dict[str, str]:
             return {}
         if stripped.startswith("{"):
             parsed: object = json.loads(stripped)
-            return {str(key): str(item) for key, item in parsed.items()} if isinstance(parsed, dict) else {}
+            return (
+                {str(key): str(item) for key, item in parsed.items()}
+                if isinstance(parsed, dict)
+                else {}
+            )
         items = [stripped]
     elif isinstance(value, (list, tuple)):
         items = [str(item) for item in value if str(item).strip()]

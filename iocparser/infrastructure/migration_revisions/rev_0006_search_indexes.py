@@ -8,7 +8,9 @@ def apply(engine: Engine, inspector: Inspector) -> None:
     table_names = set(inspector.get_table_names())
     statements: list[str] = []
     if "sources" in table_names:
-        statements.append("CREATE INDEX IF NOT EXISTS ix_sources_value_search ON sources(value_search)")
+        statements.append(
+            "CREATE INDEX IF NOT EXISTS ix_sources_value_search ON sources(value_search)"
+        )
     if "iocs" in table_names:
         statements.extend(
             (

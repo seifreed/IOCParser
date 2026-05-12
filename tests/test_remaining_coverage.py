@@ -230,7 +230,9 @@ def test_network_and_base_edge_paths_cover_remaining_branches() -> None:
     assert extractor.extract_ipv6("ignored") == ["2001:db8::1"]
     assert extractor.extract_hosts("ignored") == ["evil-example.com"]
 
-    dynamic_extractor_cls = type("DynamicExtractor", (IOCExtractor,), {"__module__": "missing.module"})
+    dynamic_extractor_cls = type(
+        "DynamicExtractor", (IOCExtractor,), {"__module__": "missing.module"}
+    )
     dynamic = dynamic_extractor_cls(defang=False)
     assert dynamic.reference_data.data_dir.name == "data"
 

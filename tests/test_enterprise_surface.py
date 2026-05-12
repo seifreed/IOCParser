@@ -112,7 +112,9 @@ class _HTTPServer:
                 del fmt, args
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.thread = threading.Thread(target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True)
+        self.thread = threading.Thread(
+            target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True
+        )
         self.thread.start()
         return f"http://127.0.0.1:{self.server.server_address[1]}/feed.txt"
 
@@ -133,7 +135,9 @@ class ExtraExtractor:
 
 class ExtraPostProcessor:
     def process(self, result: ExtractionResult) -> ExtractionResult:
-        return ExtractionResult(iocs=(*result.iocs, IOC.from_raw("ips", "203.0.113.200")), warnings=result.warnings)
+        return ExtractionResult(
+            iocs=(*result.iocs, IOC.from_raw("ips", "203.0.113.200")), warnings=result.warnings
+        )
 
 
 def _setup_batch_history(db_uri: str, *, failed_url: str = "https://fail.example") -> int:
@@ -141,7 +145,9 @@ def _setup_batch_history(db_uri: str, *, failed_url: str = "https://fail.example
     run_ids = persist_many_results(
         {"https://ok.example": ({"domains": ["ok.example"]}, {})},
         config=config,
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
         source_kind="url",
         run_metadata_map={"https://ok.example": {"duration_ms": 11, "status": "success"}},
     )
@@ -156,10 +162,14 @@ def _setup_batch_history(db_uri: str, *, failed_url: str = "https://fail.example
                     "retry_attempt": 1,
                 },
             ],
-            "run_metadata_map": {failed_url: {"duration_ms": 0, "status": "failed", "failed_items": 1}},
+            "run_metadata_map": {
+                failed_url: {"duration_ms": 0, "status": "failed", "failed_items": 1}
+            },
         },
         config=config,
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
         source_kind="url",
     )
     batch_job_id = persist_batch_job(
@@ -169,7 +179,12 @@ def _setup_batch_history(db_uri: str, *, failed_url: str = "https://fail.example
             "failed": 1,
             "duration_ms": 12,
             "items": [
-                {"url": "https://ok.example", "status": "ok", "duration_ms": 11, "retry_attempt": 0},
+                {
+                    "url": "https://ok.example",
+                    "status": "ok",
+                    "duration_ms": 11,
+                    "retry_attempt": 0,
+                },
                 {
                     "url": failed_url,
                     "status": "failed",
@@ -201,7 +216,12 @@ def test_custom_ioc_types_fts_and_public_batch_api(tmp_path: Path) -> None:
     )
     register_ioc_type_plugin(
         "wallet-tag",
-        lambda: {"name": "wallet_tags", "base_type": "urls", "aliases": ("wallet-tag",), "tags": ("wallet",)},
+        lambda: {
+            "name": "wallet_tags",
+            "base_type": "urls",
+            "aliases": ("wallet-tag",),
+            "tags": ("wallet",),
+        },
     )
     plugin_definition = get_ioc_type_plugin("wallet-tag")
     assert plugin_definition["name"] == "wallet_tags"
@@ -210,7 +230,10 @@ def test_custom_ioc_types_fts_and_public_batch_api(tmp_path: Path) -> None:
     telegram = IOC.from_raw("telegram", "hxxps://t.me/evil")
     assert telegram.ioc_type.value == "telegram_handles"
     assert "social" in telegram.tags
-    assert indicator_value_for(telegram.ioc_type, "hxxps://t.me/evil").canonical() == "https://t.me/evil"
+    assert (
+        indicator_value_for(telegram.ioc_type, "hxxps://t.me/evil").canonical()
+        == "https://t.me/evil"
+    )
     warning_severity, warning_tags = classify_ioc(telegram.ioc_type, is_warning=True)
     assert warning_severity == "informational"
     assert "warning-list-match" in warning_tags
@@ -223,10 +246,16 @@ def test_custom_ioc_types_fts_and_public_batch_api(tmp_path: Path) -> None:
     assert ioc_type_name("raw-string") == "raw-string"
 
     stix = get_renderer("stix")
-    rendered = stix.render(ExtractionResult(iocs=(telegram,), warnings=(WarningMatch(ioc=telegram, warning_list="demo"),)))
+    rendered = stix.render(
+        ExtractionResult(
+            iocs=(telegram,), warnings=(WarningMatch(ioc=telegram, warning_list="demo"),)
+        )
+    )
     assert "telegram_handles indicator" in rendered
     register_custom_ioc_type("domain_alias", base_type="domains")
-    rendered_domain = stix.render(ExtractionResult(iocs=(IOC.from_raw("domain_alias", "evil.example"),), warnings=()))
+    rendered_domain = stix.render(
+        ExtractionResult(iocs=(IOC.from_raw("domain_alias", "evil.example"),), warnings=())
+    )
     assert "domain-name:value" in rendered_domain
 
     db_uri = f"sqlite:///{tmp_path / 'fts.sqlite'}"
@@ -259,8 +288,13 @@ def test_custom_ioc_types_fts_and_public_batch_api(tmp_path: Path) -> None:
     assert runs
     assert detail.to_record()["effective_config"]["renderer"] == "json"
     assert list_batch_jobs(ListBatchJobsInput(limit=5), persistence_query_service=service)
-    assert get_batch_job(BatchJobInput(batch_job_id=batch_job_id), persistence_query_service=service) is not None
-    assert list_batch_runs(BatchJobInput(batch_job_id=batch_job_id), persistence_query_service=service)
+    assert (
+        get_batch_job(BatchJobInput(batch_job_id=batch_job_id), persistence_query_service=service)
+        is not None
+    )
+    assert list_batch_runs(
+        BatchJobInput(batch_job_id=batch_job_id), persistence_query_service=service
+    )
     assert list_batch_jobs_history(db_uri, limit=5)
     assert get_batch_job_history(db_uri, batch_job_id=batch_job_id) is not None
     assert list_batch_runs_history(db_uri, batch_job_id=batch_job_id)
@@ -272,7 +306,9 @@ def test_custom_ioc_types_fts_and_public_batch_api(tmp_path: Path) -> None:
     assert get_batch_job_history(db_uri, batch_job_id=999999) is None
 
 
-def test_cli_plugin_paths_and_batch_queries(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_cli_plugin_paths_and_batch_queries(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     register_extractor("extra-cli", ExtraExtractor)
     register_postprocessor("extra-post", ExtraPostProcessor)
     file_path = tmp_path / "sample.txt"
@@ -306,7 +342,9 @@ def test_cli_plugin_paths_and_batch_queries(tmp_path: Path, capsys: pytest.Captu
     finally:
         cli_processing.sys.stdin = original_stdin
 
-    file_args = SimpleNamespace(stdin=False, file=str(file_path), url=None, url_direct=None, **common)
+    file_args = SimpleNamespace(
+        stdin=False, file=str(file_path), url=None, url_direct=None, **common
+    )
     normal_iocs, _, _ = cli_processing.process_single_input(
         file_args,
         reader=api_extraction._reader,
@@ -317,7 +355,9 @@ def test_cli_plugin_paths_and_batch_queries(tmp_path: Path, capsys: pytest.Captu
     assert "203.0.113.200" in normal_iocs["ips"]
 
     multiple_args = SimpleNamespace(multiple=[str(file_path)], parallel=1, **common)
-    merged_normal, _, _, _ = cli_processing.process_multiple_files_input(multiple_args, reader=api_extraction._reader, warning_service=None)
+    merged_normal, _, _, _ = cli_processing.process_multiple_files_input(
+        multiple_args, reader=api_extraction._reader, warning_service=None
+    )
     assert "plugin-added.example" in merged_normal["domains"]
 
     with _HTTPServer(b"Remote hxxps://remote.example") as url:
@@ -376,18 +416,22 @@ def test_cli_plugin_paths_and_batch_queries(tmp_path: Path, capsys: pytest.Captu
         report_path = tmp_path / "urls.txt"
         report_path.write_text(url + "\n", encoding="utf-8")
         args.url_file = str(report_path)
-        normal_iocs, _, input_display, _, report = cli_processing.process_url_file_input_with_report(
-            args,
-            reader=api_extraction._reader,
-            warning_service=None,
-            downloader=RequestsURLDownloader(),
-            db_uri=db_uri,
+        normal_iocs, _, input_display, _, report = (
+            cli_processing.process_url_file_input_with_report(
+                args,
+                reader=api_extraction._reader,
+                warning_service=None,
+                downloader=RequestsURLDownloader(),
+                db_uri=db_uri,
+            )
         )
         assert input_display.startswith(("0 retried batch", "1 retried batch"))
         assert "metrics" in report
         assert "phase_timings_ms" in report
         with pytest.raises(ValidationError, match="No failed URLs found"):
-            cli_processing._failed_urls_from_batch(db_uri, batch_job_id=batch_job_id, error_type_filter="Other")
+            cli_processing._failed_urls_from_batch(
+                db_uri, batch_job_id=batch_job_id, error_type_filter="Other"
+            )
 
     list_plugins_args = SimpleNamespace(init=False, force_update=False, list_plugins=True)
     cli_dispatch.run_cli(
@@ -505,7 +549,15 @@ def test_cli_plugin_paths_and_batch_queries(tmp_path: Path, capsys: pytest.Captu
     assert cli_schema.handle_schema_commands(schema_args, config, file_writer=_Writer()) is True
     assert json.loads(capsys.readouterr().out)["items"]
 
-    cli_output.print_batch_report({"total": 1, "successful": 1, "failed": 0, "phase_timings_ms": {"persist": 5}, "metrics": {"throughput": 1}})
+    cli_output.print_batch_report(
+        {
+            "total": 1,
+            "successful": 1,
+            "failed": 0,
+            "phase_timings_ms": {"persist": 5},
+            "metrics": {"throughput": 1},
+        }
+    )
     cli_output.print_batch_job_detail(
         BatchJobDetail(
             batch_job_id=batch_job_id,
@@ -525,7 +577,7 @@ def test_cli_plugin_paths_and_batch_queries(tmp_path: Path, capsys: pytest.Captu
     )
     output = capsys.readouterr().out
     assert "Phase timings (ms)" in output
-    assert "metrics\t{\"duration_ms\": 10}" in output
+    assert 'metrics\t{"duration_ms": 10}' in output
 
     blank_engine = create_engine(f"sqlite:///{tmp_path / 'blank-no-fts.sqlite'}", future=True)
     with Session(blank_engine) as blank_session:
@@ -551,10 +603,13 @@ def test_plugin_entry_points_and_query_filter_edges() -> None:
             assert kwargs["search_backend"] == "fts"
             return []
 
-    assert search_persisted_iocs(
-        SearchPersistedIOCsInput(value="ok", search_backend="fts"),
-        persistence_query_service=SearchService(),
-    ) == []
+    assert (
+        search_persisted_iocs(
+            SearchPersistedIOCsInput(value="ok", search_backend="fts"),
+            persistence_query_service=SearchService(),
+        )
+        == []
+    )
 
     diff = PersistedRunDiff(
         left_run_id=1,
@@ -570,7 +625,9 @@ def test_plugin_entry_points_and_query_filter_edges() -> None:
             return diff
 
     added_only = diff_persisted_runs(
-        DiffPersistedRunsInput(left_run_id=1, right_run_id=2, ioc_types=("domains",), only_added=True),
+        DiffPersistedRunsInput(
+            left_run_id=1, right_run_id=2, ioc_types=("domains",), only_added=True
+        ),
         persistence_query_service=DiffService(),
     )
     removed_only = diff_persisted_runs(

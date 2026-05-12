@@ -65,7 +65,9 @@ def render_text_output(
                     output.append(f"  Context: {excerpt}")
     if warning_grouped:
         output.append("\n# Warning List Matches\n")
-        output.append("The following indicators were found in warning lists and might be false positives:\n")
+        output.append(
+            "The following indicators were found in warning lists and might be false positives:\n"
+        )
         for section_key, section_title in SECTION_ORDER:
             warnings = warning_grouped.get(section_key)
             if not warnings:
@@ -90,7 +92,9 @@ def prepare_json_payload(
                 continue
         payload[key] = list(value)
     if warning_iocs:
-        payload["warning_list_matches"] = {key: list(values) for key, values in warning_iocs.items()}
+        payload["warning_list_matches"] = {
+            key: list(values) for key, values in warning_iocs.items()
+        }
     return payload
 
 

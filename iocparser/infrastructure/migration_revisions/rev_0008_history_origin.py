@@ -16,4 +16,3 @@ def apply(engine: Engine, inspector: Inspector) -> None:
             )
             """
         )
-

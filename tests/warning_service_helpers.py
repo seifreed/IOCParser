@@ -55,7 +55,9 @@ class StaticWarningListService:
 
 
 @contextmanager
-def swap_warning_service(module: object, service: StaticWarningListService) -> Iterator[StaticWarningListService]:
+def swap_warning_service(
+    module: object, service: StaticWarningListService
+) -> Iterator[StaticWarningListService]:
     """Temporarily replace a module-level warning service."""
     original_holder = list(api_extraction_module._warning_service_holder)
     had_module_service = hasattr(module, "_warning_service")

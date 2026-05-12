@@ -33,7 +33,9 @@ class MISPWarningListService(WarningListService):
             grouped_iocs.setdefault(ioc_type, []).append(ioc.value.raw)
             by_key[(ioc_type, ioc.value.raw)].append(ioc)
 
-        normal_iocs, warning_iocs = self._get_lists(force_update=force_update).separate_iocs_by_warnings(
+        normal_iocs, warning_iocs = self._get_lists(
+            force_update=force_update
+        ).separate_iocs_by_warnings(
             grouped_iocs,
         )
 
@@ -65,7 +67,9 @@ class MISPWarningListService(WarningListService):
                         tags=tags,
                     )
                 else:
-                    severity, tags = classify_ioc(IOC.from_raw(ioc_type, value).ioc_type, is_warning=True)
+                    severity, tags = classify_ioc(
+                        IOC.from_raw(ioc_type, value).ioc_type, is_warning=True
+                    )
                     matched_ioc = IOC.from_raw(ioc_type, value, severity=severity, tags=tags)
                 warnings.append(
                     WarningMatch(

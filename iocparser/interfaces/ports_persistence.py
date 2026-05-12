@@ -61,7 +61,9 @@ class RunRepository(Protocol):
     ) -> int:
         """Create a new extraction run and return its id."""
 
-    def attach_iocs(self, *, run_id: int, ioc_ids: list[int], result: ExtractionResult | None = None) -> None:
+    def attach_iocs(
+        self, *, run_id: int, ioc_ids: list[int], result: ExtractionResult | None = None
+    ) -> None:
         """Attach IOC ids to a run."""
 
 
@@ -218,7 +220,9 @@ class PersistenceQueryService(Protocol):
     def list_failed_batch_items(self, *, batch_job_id: int) -> list[FailedBatchItem]:
         """List failed items for a batch job."""
 
-    def list_batch_jobs(self, *, limit: int = 20, statuses: tuple[str, ...] = ()) -> list[BatchJobSummary]:
+    def list_batch_jobs(
+        self, *, limit: int = 20, statuses: tuple[str, ...] = ()
+    ) -> list[BatchJobSummary]:
         """List persisted batch jobs."""
 
     def get_batch_job(self, *, batch_job_id: int) -> BatchJobDetail | None:

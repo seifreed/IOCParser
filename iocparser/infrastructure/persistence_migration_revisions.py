@@ -19,8 +19,12 @@ SCHEMA_REVISIONS = (
     SchemaRevision(4, "batch-jobs", "Batch jobs, failed items, and run batch linkage"),
     SchemaRevision(5, "fts-batch-metrics", "SQLite FTS IOC index and batch metrics"),
     SchemaRevision(6, "search-scale", "Additional search and batch indexes for large histories"),
-    SchemaRevision(7, "distributed-jobs", "Distributed queue lifecycle and dead-letter persistence"),
-    SchemaRevision(8, "history-origin", "Stable history origin metadata for export/import identity"),
+    SchemaRevision(
+        7, "distributed-jobs", "Distributed queue lifecycle and dead-letter persistence"
+    ),
+    SchemaRevision(
+        8, "history-origin", "Stable history origin metadata for export/import identity"
+    ),
 )
 
 CURRENT_SCHEMA_VERSION = SCHEMA_REVISIONS[-1].version

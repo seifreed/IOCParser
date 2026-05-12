@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import suppress
 from uuid import uuid4
 
+from iocparser.application.distributed_idempotency import idempotency_key_for
 from iocparser.domain.distributed import (
     DeadLetterRecord,
     DistributedJobRecord,
@@ -21,6 +22,9 @@ from iocparser.interfaces.ports import (
 
 def _phase_metrics(result: PipelineJobResult) -> dict[str, object]:
     return dict(result.phase_timings_ms)
+
+
+__all__ = ["DistributedPipelineCoordinator", "idempotency_key_for"]
 
 
 class DistributedPipelineCoordinator:
@@ -73,15 +77,22 @@ class DistributedPipelineCoordinator:
             queue_name=queue_name,
             attempts=0,
             max_attempts=max_attempts,
-            idempotency_key=idempotency_key or idempotency_key_for(normalized_request, digester=self.content_digester),
+            idempotency_key=idempotency_key
+            or idempotency_key_for(normalized_request, digester=self.content_digester),
         )
         if self.job_service is not None and envelope.idempotency_key:
-            existing = self.job_service.find_by_idempotency_key(idempotency_key=envelope.idempotency_key)
+            existing = self.job_service.find_by_idempotency_key(
+                idempotency_key=envelope.idempotency_key
+            )
             if existing is not None:
                 self._emit("job_deduplicated", envelope, {"existing_job_id": existing.job_id})
                 return existing
         receipt = self.queue_adapter.enqueue(queue_name=queue_name, envelope=envelope)
-        stored = self.job_service.create_or_get_job(envelope=envelope, receipt_id=receipt.receipt_id) if self.job_service else None
+        stored = (
+            self.job_service.create_or_get_job(envelope=envelope, receipt_id=receipt.receipt_id)
+            if self.job_service
+            else None
+        )
         self._emit("job_submitted", envelope, {"receipt_id": receipt.receipt_id})
         return stored or {
             "job_id": job_id,
@@ -90,7 +101,9 @@ class DistributedPipelineCoordinator:
             "queue_name": queue_name,
         }
 
-    def process_next(self, *, queue_name: str = "default") -> DistributedJobRecord | PipelineJobResult | None:
+    def process_next(
+        self, *, queue_name: str = "default"
+    ) -> DistributedJobRecord | PipelineJobResult | None:
         item = self.queue_adapter.dequeue(queue_name=queue_name)
         if item is None:
             return None
@@ -117,10 +130,16 @@ class DistributedPipelineCoordinator:
                     else None
                 )
                 self.queue_adapter.ack(receipt)
-                self._emit("job_completed", envelope, {"status": result.status, "run_id": result.run_id})
+                self._emit(
+                    "job_completed", envelope, {"status": result.status, "run_id": result.run_id}
+                )
                 return stored or result
 
-            should_retry = bool(result.error and result.error.retryable and (envelope.attempts + 1) < envelope.max_attempts)
+            should_retry = bool(
+                result.error
+                and result.error.retryable
+                and (envelope.attempts + 1) < envelope.max_attempts
+            )
             if should_retry:
                 stored = (
                     self.job_service.mark_failed(
@@ -168,7 +187,10 @@ class DistributedPipelineCoordinator:
             self._emit(
                 "job_dead_lettered",
                 envelope,
-                {"receipt_id": dead_receipt.receipt_id, "error_code": result.error.code if result.error else ""},
+                {
+                    "receipt_id": dead_receipt.receipt_id,
+                    "error_code": result.error.code if result.error else "",
+                },
             )
             return stored or result
         except (KeyboardInterrupt, SystemExit):
@@ -176,6 +198,7 @@ class DistributedPipelineCoordinator:
         except Exception as exc:
             if self.job_service is not None:
                 from iocparser.pipeline_errors import classify_pipeline_exception
+
                 self.job_service.mark_dead_lettered(
                     job_id=str(envelope.request.job_id),
                     attempts=envelope.attempts + 1,
@@ -183,7 +206,11 @@ class DistributedPipelineCoordinator:
                 )
             with suppress(Exception):
                 self.queue_adapter.dead_letter(receipt, envelope=envelope)
-            self._emit("job_dead_lettered", envelope, {"receipt_id": receipt.receipt_id, "error_code": "unhandled"})
+            self._emit(
+                "job_dead_lettered",
+                envelope,
+                {"receipt_id": receipt.receipt_id, "error_code": "unhandled"},
+            )
             raise
 
     def drain(
@@ -210,38 +237,31 @@ class DistributedPipelineCoordinator:
         statuses: tuple[str, ...] = (),
         queue_backend: str | None = None,
     ) -> list[DistributedJobRecord]:
-        return self.job_service.list_jobs(limit=limit, statuses=statuses, queue_backend=queue_backend) if self.job_service else []
+        return (
+            self.job_service.list_jobs(limit=limit, statuses=statuses, queue_backend=queue_backend)
+            if self.job_service
+            else []
+        )
 
-    def list_dead_letters(self, *, limit: int = 50, queue_backend: str | None = None) -> list[DeadLetterRecord]:
-        return self.job_service.list_dead_letters(limit=limit, queue_backend=queue_backend) if self.job_service else []
+    def list_dead_letters(
+        self, *, limit: int = 50, queue_backend: str | None = None
+    ) -> list[DeadLetterRecord]:
+        return (
+            self.job_service.list_dead_letters(limit=limit, queue_backend=queue_backend)
+            if self.job_service
+            else []
+        )
 
     def _emit(self, name: str, envelope: QueueEnvelope, attributes: dict[str, object]) -> None:
         self.telemetry_sink.emit(
             TelemetryEvent(
                 name=name,
                 job_id=str(envelope.request.job_id or ""),
-                correlation_id=str(envelope.request.correlation_id or envelope.request.job_id or ""),
+                correlation_id=str(
+                    envelope.request.correlation_id or envelope.request.job_id or ""
+                ),
                 queue_backend=envelope.queue_backend,
                 queue_name=envelope.queue_name,
                 attributes=attributes,
             ),
         )
-
-
-def idempotency_key_for(request: PipelineJobRequest, *, digester: ContentDigester | None) -> str:
-    """Build a stable idempotency key for a pipeline request."""
-    if digester is None:
-        return (
-            f"{request.input_kind}:{request.source_value}"
-            f":cw={request.check_warnings}"
-            f":fu={request.force_update}"
-            f":df={request.defang}"
-            f":o={request.only or ''}"
-            f":e={request.exclude or ''}"
-            f":eo={request.emit_only}"
-        )
-    if request.input_kind == "text":
-        return digester.digest_text(request.source_value)
-    if request.input_kind == "file":
-        return digester.digest_file(request.source_value)
-    return digester.digest_text(request.source_value)

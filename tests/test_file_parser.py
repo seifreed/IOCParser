@@ -260,7 +260,10 @@ class TestPDFParser:
         assert PDFParser._extract_table_text(None) == ""
         assert PDFParser._extract_table_text([]) == ""
         assert PDFParser._extract_table_text([[], [None, None]]) == ""
-        assert PDFParser._extract_table_text([["ioc", None], ["value", "203.0.113.5"]]) == "ioc\nvalue 203.0.113.5\n"
+        assert (
+            PDFParser._extract_table_text([["ioc", None], ["value", "203.0.113.5"]])
+            == "ioc\nvalue 203.0.113.5\n"
+        )
 
 
 class TestHTMLParser:
@@ -683,7 +686,9 @@ class TestHTMLParserURLFetching:
     """Test HTML parser URL fetching functionality."""
 
     class _LocalHTTPServer:
-        def __init__(self, *, body: bytes, status: int = 200, content_type: str = "text/html") -> None:
+        def __init__(
+            self, *, body: bytes, status: int = 200, content_type: str = "text/html"
+        ) -> None:
             self.body = body
             self.status = status
             self.content_type = content_type
@@ -729,7 +734,9 @@ class TestHTMLParserURLFetching:
         Validates that HTTP URL fetching code path works.
         Note: This test requires network access and uses a real lightweight service.
         """
-        with self._LocalHTTPServer(body=b"<html><body><h1>Local Page</h1><p>ioc.example</p></body></html>") as test_url:
+        with self._LocalHTTPServer(
+            body=b"<html><body><h1>Local Page</h1><p>ioc.example</p></body></html>"
+        ) as test_url:
             parser = HTMLParser(test_url)
             extracted_text = parser.extract_text()
         assert len(extracted_text) > 0
@@ -742,7 +749,9 @@ class TestHTMLParserURLFetching:
 
         Validates HTTPS URL fetching with real request.
         """
-        with self._LocalHTTPServer(body=b"<html><body><h1>HTTPS-like Page</h1></body></html>") as test_url:
+        with self._LocalHTTPServer(
+            body=b"<html><body><h1>HTTPS-like Page</h1></body></html>"
+        ) as test_url:
             parser = HTMLParser(test_url)
             extracted_text = parser.extract_text()
         assert len(extracted_text) > 0

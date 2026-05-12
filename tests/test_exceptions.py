@@ -176,7 +176,9 @@ class TestUnexpectedDownloadError:
 
         # Arrange: Function that raises unexpected download error
         def download_file() -> None:
-            raise DownloadError("http://evil.com/malware.zip", "Timeout after 30 seconds", error_type="unexpected")
+            raise DownloadError(
+                "http://evil.com/malware.zip", "Timeout after 30 seconds", error_type="unexpected"
+            )
 
         # Act & Assert: Should raise DownloadError
         with pytest.raises(DownloadError) as exc_info:

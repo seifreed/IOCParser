@@ -66,8 +66,12 @@ class ArtifactHeuristicPolicy:
         return validated
 
     def real_filenames(self, matches: list[str]) -> list[str]:
-        filenames = [match for match in matches if isinstance(match, str) and "." in match and len(match) > 4]
-        return _dedup_case_insensitive([match for match in filenames if match.lower() not in self.legitimate_process_names])
+        filenames = [
+            match for match in matches if isinstance(match, str) and "." in match and len(match) > 4
+        ]
+        return _dedup_case_insensitive(
+            [match for match in filenames if match.lower() not in self.legitimate_process_names]
+        )
 
     def valid_filepaths(self, raw_paths: list[str]) -> list[str]:
         valid_paths: list[str] = []
@@ -92,7 +96,9 @@ class ArtifactHeuristicPolicy:
             if "." in mac and len(mac.replace(".", "")) == 12:
                 hex_only = mac.replace(".", "")
                 if all(char in "0123456789abcdefABCDEF" for char in hex_only):
-                    valid_macs.append(":".join(hex_only[index : index + 2] for index in range(0, 12, 2)))
+                    valid_macs.append(
+                        ":".join(hex_only[index : index + 2] for index in range(0, 12, 2))
+                    )
                 continue
             normalized = mac.replace("-", ":").lower()
             hex_only = normalized.replace(":", "")
@@ -101,7 +107,8 @@ class ArtifactHeuristicPolicy:
             if ":" in normalized:
                 parts = normalized.split(":")
                 if len(parts) == 6 and all(
-                    len(part) == 2 and all(char in "0123456789abcdef" for char in part) for part in parts
+                    len(part) == 2 and all(char in "0123456789abcdef" for char in part)
+                    for part in parts
                 ):
                     valid_macs.append(normalized)
         return _dedup_case_insensitive(valid_macs)
@@ -157,7 +164,9 @@ class ArtifactHeuristicPolicy:
         valid_serials: list[str] = []
         for candidate in candidates:
             if ":" not in candidate and len(candidate) >= 16:
-                normalized = ":".join(candidate[index : index + 2] for index in range(0, len(candidate), 2))
+                normalized = ":".join(
+                    candidate[index : index + 2] for index in range(0, len(candidate), 2)
+                )
             else:
                 normalized = candidate
             if ":" in normalized:
@@ -166,7 +175,9 @@ class ArtifactHeuristicPolicy:
                     len(part) == 2 and all(char in "0123456789abcdefABCDEF" for char in part)
                     for part in parts
                 ):
-                    if len(parts) != 6 and all(char in "0123456789abcdefABCDEF" for char in normalized.replace(":", "")):
+                    if len(parts) != 6 and all(
+                        char in "0123456789abcdefABCDEF" for char in normalized.replace(":", "")
+                    ):
                         valid_serials.append(normalized.lower())
         return _dedup_case_insensitive(valid_serials)
 
@@ -194,15 +205,29 @@ class ArtifactPatternRule:
 
 
 ARTIFACT_PATTERN_RULES: tuple[ArtifactPatternRule, ...] = (
-    ArtifactPatternRule("extract_bitcoin", "bitcoin", "Extract Bitcoin addresses from text.", DEFAULT_ARTIFACT_POLICY.bitcoin_addresses),
+    ArtifactPatternRule(
+        "extract_bitcoin",
+        "bitcoin",
+        "Extract Bitcoin addresses from text.",
+        DEFAULT_ARTIFACT_POLICY.bitcoin_addresses,
+    ),
     ArtifactPatternRule("extract_ethereum", "ethereum", "Extract Ethereum addresses from text."),
     ArtifactPatternRule("extract_monero", "monero", "Extract Monero addresses from text."),
     ArtifactPatternRule("extract_cves", "cves", "Extract CVE identifiers from text."),
-    ArtifactPatternRule("extract_mitre_attack", "mitre_attack", "Extract MITRE ATT&CK technique IDs from text."),
+    ArtifactPatternRule(
+        "extract_mitre_attack", "mitre_attack", "Extract MITRE ATT&CK technique IDs from text."
+    ),
     ArtifactPatternRule("extract_registry", "registry", "Extract Windows registry keys from text."),
     ArtifactPatternRule("extract_mutex", "mutex", "Extract mutex names from text."),
-    ArtifactPatternRule("extract_service_names", "service_names", "Extract Windows service names from text.", unique=True),
-    ArtifactPatternRule("extract_named_pipes", "named_pipes", "Extract Windows named pipes from text."),
+    ArtifactPatternRule(
+        "extract_service_names",
+        "service_names",
+        "Extract Windows service names from text.",
+        unique=True,
+    ),
+    ArtifactPatternRule(
+        "extract_named_pipes", "named_pipes", "Extract Windows named pipes from text."
+    ),
     ArtifactPatternRule(
         "extract_filenames",
         "filenames",
@@ -221,7 +246,9 @@ ARTIFACT_PATTERN_RULES: tuple[ArtifactPatternRule, ...] = (
         "Extract MAC addresses from text.",
         DEFAULT_ARTIFACT_POLICY.valid_mac_addresses,
     ),
-    ArtifactPatternRule("extract_user_agents", "user_agents", "Extract user agent strings from text."),
+    ArtifactPatternRule(
+        "extract_user_agents", "user_agents", "Extract user agent strings from text."
+    ),
     ArtifactPatternRule(
         "extract_yara_rules",
         "yara",
@@ -242,26 +269,60 @@ ARTIFACT_PATTERN_RULES: tuple[ArtifactPatternRule, ...] = (
         "Extract CIDR ranges from text.",
         DEFAULT_ARTIFACT_POLICY.valid_cidr,
     ),
-    ArtifactPatternRule("extract_mitre_software", "mitre_software", "Extract MITRE ATT&CK software IDs from text."),
-    ArtifactPatternRule("extract_mitre_groups", "mitre_groups", "Extract MITRE ATT&CK group IDs from text."),
-    ArtifactPatternRule("extract_mitre_mitigations", "mitre_mitigations", "Extract MITRE ATT&CK mitigation IDs from text."),
-    ArtifactPatternRule("extract_mitre_datasources", "mitre_datasources", "Extract MITRE ATT&CK data source IDs from text."),
-    ArtifactPatternRule("extract_onion_addresses", "onion_addresses", "Extract Tor .onion addresses from text."),
-    ArtifactPatternRule("extract_aws_access_keys", "aws_access_keys", "Extract AWS access key IDs from text."),
+    ArtifactPatternRule(
+        "extract_mitre_software", "mitre_software", "Extract MITRE ATT&CK software IDs from text."
+    ),
+    ArtifactPatternRule(
+        "extract_mitre_groups", "mitre_groups", "Extract MITRE ATT&CK group IDs from text."
+    ),
+    ArtifactPatternRule(
+        "extract_mitre_mitigations",
+        "mitre_mitigations",
+        "Extract MITRE ATT&CK mitigation IDs from text.",
+    ),
+    ArtifactPatternRule(
+        "extract_mitre_datasources",
+        "mitre_datasources",
+        "Extract MITRE ATT&CK data source IDs from text.",
+    ),
+    ArtifactPatternRule(
+        "extract_onion_addresses", "onion_addresses", "Extract Tor .onion addresses from text."
+    ),
+    ArtifactPatternRule(
+        "extract_aws_access_keys", "aws_access_keys", "Extract AWS access key IDs from text."
+    ),
     ArtifactPatternRule("extract_pdb_paths", "pdb_paths", "Extract PDB debug paths from text."),
     ArtifactPatternRule("extract_ja3", "ja3", "Extract JA3 TLS client fingerprints from text."),
     ArtifactPatternRule("extract_ja3s", "ja3s", "Extract JA3S TLS server fingerprints from text."),
     ArtifactPatternRule("extract_ja4", "ja4", "Extract JA4+ TLS fingerprints from text."),
-    ArtifactPatternRule("extract_hassh", "hassh", "Extract HASSH SSH client fingerprints from text."),
-    ArtifactPatternRule("extract_hassh_server", "hassh_server", "Extract HASSH server SSH fingerprints from text."),
+    ArtifactPatternRule(
+        "extract_hassh", "hassh", "Extract HASSH SSH client fingerprints from text."
+    ),
+    ArtifactPatternRule(
+        "extract_hassh_server", "hassh_server", "Extract HASSH server SSH fingerprints from text."
+    ),
     ArtifactPatternRule("extract_jarm", "jarm", "Extract JARM TLS fingerprints from text."),
     ArtifactPatternRule("extract_aws_arns", "aws_arns", "Extract AWS ARNs from text."),
-    ArtifactPatternRule("extract_gcp_service_accounts", "gcp_service_accounts", "Extract GCP service account emails from text."),
-    ArtifactPatternRule("extract_azure_app_ids", "azure_app_ids", "Extract Azure AD app/tenant IDs from text."),
-    ArtifactPatternRule("extract_docker_images", "docker_images", "Extract Docker image references with digest from text."),
+    ArtifactPatternRule(
+        "extract_gcp_service_accounts",
+        "gcp_service_accounts",
+        "Extract GCP service account emails from text.",
+    ),
+    ArtifactPatternRule(
+        "extract_azure_app_ids", "azure_app_ids", "Extract Azure AD app/tenant IDs from text."
+    ),
+    ArtifactPatternRule(
+        "extract_docker_images",
+        "docker_images",
+        "Extract Docker image references with digest from text.",
+    ),
     ArtifactPatternRule("extract_tlsh", "tlsh", "Extract TLSH hashes from text."),
-    ArtifactPatternRule("extract_sigma_rule_ids", "sigma_rule_ids", "Extract Sigma detection rule UUIDs from text."),
-    ArtifactPatternRule("extract_suricata_sids", "suricata_sids", "Extract Suricata/Snort rule SIDs from text."),
+    ArtifactPatternRule(
+        "extract_sigma_rule_ids", "sigma_rule_ids", "Extract Sigma detection rule UUIDs from text."
+    ),
+    ArtifactPatternRule(
+        "extract_suricata_sids", "suricata_sids", "Extract Suricata/Snort rule SIDs from text."
+    ),
     ArtifactPatternRule(
         "extract_snort_rules",
         "snort_rules",
@@ -275,7 +336,9 @@ ARTIFACT_PATTERN_RULES: tuple[ArtifactPatternRule, ...] = (
         DEFAULT_ARTIFACT_POLICY.valid_sigma_rules,
     ),
 )
-ARTIFACT_EXTRACTION_METHODS: tuple[str, ...] = tuple(rule.method_name for rule in ARTIFACT_PATTERN_RULES)
+ARTIFACT_EXTRACTION_METHODS: tuple[str, ...] = tuple(
+    rule.method_name for rule in ARTIFACT_PATTERN_RULES
+)
 
 
 def _pattern_rule_method(rule: ArtifactPatternRule) -> Callable[[ExtractorBase, str], list[str]]:

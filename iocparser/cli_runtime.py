@@ -112,8 +112,16 @@ def downloader_for_args(args: argparse.Namespace) -> RequestsURLDownloader:
     timeout: int | tuple[float, float]
     if connect_timeout is not None or read_timeout is not None:
         timeout = (
-            float(connect_timeout if connect_timeout is not None else RequestsURLDownloader.default_connect_timeout()),
-            float(read_timeout if read_timeout is not None else RequestsURLDownloader.default_read_timeout()),
+            float(
+                connect_timeout
+                if connect_timeout is not None
+                else RequestsURLDownloader.default_connect_timeout()
+            ),
+            float(
+                read_timeout
+                if read_timeout is not None
+                else RequestsURLDownloader.default_read_timeout()
+            ),
         )
     else:
         timeout = RequestsURLDownloader.default_timeout()
@@ -125,7 +133,9 @@ def downloader_for_args(args: argparse.Namespace) -> RequestsURLDownloader:
         headers=headers,
         cookies=cookies,
         user_agent=get_optional_str_arg(args, "user_agent"),
-        proxies={"http": proxy, "https": proxy} if (proxy := get_optional_str_arg(args, "proxy")) else None,
+        proxies={"http": proxy, "https": proxy}
+        if (proxy := get_optional_str_arg(args, "proxy"))
+        else None,
         allow_redirects=get_bool_arg(args, "allow_redirects"),
         verify=verify,
         cert=get_optional_str_arg(args, "tls_cert"),
@@ -161,4 +171,6 @@ def handle_misp_init_with(factory: type[MISPWarningLists]) -> None:
     import sys
 
     for category, lists in sorted(categories.items()):
-        sys.stdout.write(f"{color_cyan}  {category.capitalize()}: {len(lists)} lists{style_reset}\n")
+        sys.stdout.write(
+            f"{color_cyan}  {category.capitalize()}: {len(lists)} lists{style_reset}\n"
+        )

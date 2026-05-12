@@ -121,7 +121,9 @@ class RecordingRunRepository:
             raise RuntimeError("boom")
         return 99
 
-    def attach_iocs(self, *, run_id: int, ioc_ids: list[int], result: ExtractionResult | None = None) -> None:
+    def attach_iocs(
+        self, *, run_id: int, ioc_ids: list[int], result: ExtractionResult | None = None
+    ) -> None:
         del result
         self.attach_calls.append((run_id, ioc_ids))
 
@@ -237,8 +239,14 @@ def test_extract_from_files_returns_empty_result_for_partial_failures(tmp_path: 
 
     results = extract_from_files(
         [
-            ExtractFileInput(str(existing_file), ExtractionOptions(file_type="text", defang=False, check_warnings=False)),
-            ExtractFileInput(str(missing_file), ExtractionOptions(file_type="text", defang=False, check_warnings=False)),
+            ExtractFileInput(
+                str(existing_file),
+                ExtractionOptions(file_type="text", defang=False, check_warnings=False),
+            ),
+            ExtractFileInput(
+                str(missing_file),
+                ExtractionOptions(file_type="text", defang=False, check_warnings=False),
+            ),
         ],
         reader=reader,
         extractor_engine=DefaultIOCExtractionEngine(),

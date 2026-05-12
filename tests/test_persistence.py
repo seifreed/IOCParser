@@ -86,7 +86,9 @@ def test_repositories_reuse_existing_source_and_iocs(tmp_path) -> None:
     first_warning_ids = unit_of_work.ioc_repository.get_or_create_warnings(result)
     unit_of_work.commit()
 
-    same_source_id = unit_of_work.source_repository.get_or_create(kind="file", value="/tmp/sample.txt")
+    same_source_id = unit_of_work.source_repository.get_or_create(
+        kind="file", value="/tmp/sample.txt"
+    )
     second_ids = unit_of_work.ioc_repository.get_or_create_normal(result)
     second_warning_ids = unit_of_work.ioc_repository.get_or_create_warnings(result)
     unit_of_work.commit()

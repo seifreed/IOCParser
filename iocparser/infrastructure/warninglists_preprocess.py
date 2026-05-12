@@ -70,7 +70,9 @@ class WarningListPreprocessMixin:
                 continue
             pattern_str = str(pattern)
             if not self._is_safe_regex(pattern_str):
-                self._get_logger().warning("Skipping potentially unsafe regex pattern: %s", pattern_str)
+                self._get_logger().warning(
+                    "Skipping potentially unsafe regex pattern: %s", pattern_str
+                )
                 continue
             try:
                 compiled_patterns.append(re.compile(pattern_str, re.IGNORECASE))

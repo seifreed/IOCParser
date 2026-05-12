@@ -154,7 +154,10 @@ def test_cli_processing_support_helpers_cover_filters_and_plugin_creation() -> N
         exclude_types=(IOCType.IP,),
     )
     assert joined_type_filters(options) == ("domains,urls", "ips")
-    assert plugin_client(None, reader=MagicTextSourceReader(), downloader=None, warning_service=None) is None
+    assert (
+        plugin_client(None, reader=MagicTextSourceReader(), downloader=None, warning_service=None)
+        is None
+    )
 
     args = argparse.Namespace(extractor=["demo"], postprocessor=(), enricher=())
     client = plugin_client(
@@ -301,7 +304,10 @@ def test_cli_and_schema_integer_helpers_raise_validation_errors() -> None:
 
 def test_runtime_and_worker_config_support_helpers_cover_error_branches(tmp_path: Path) -> None:
     os_environ = sys.modules["os"].environ
-    previous = {key: os_environ.get(key) for key in ("IOC_INT_ENV", "IOC_FLOAT_ENV", "IOC_BOOL_ENV", "IOCPARSER_CONFIG")}
+    previous = {
+        key: os_environ.get(key)
+        for key in ("IOC_INT_ENV", "IOC_FLOAT_ENV", "IOC_BOOL_ENV", "IOCPARSER_CONFIG")
+    }
     try:
         os_environ["IOC_INT_ENV"] = "7"
         os_environ["IOC_FLOAT_ENV"] = "1.5"
@@ -373,7 +379,9 @@ def test_persistence_helper_functions_cover_conversion_edges() -> None:
     assert record_json_object("[]") == {}
     assert _json_int_map(json.dumps({"a": "2"})) == {"a": 2}
     assert _json_list("{}") == []
-    evidence = _evidence_from_json(json.dumps([1, {"excerpt": "x", "line_number": 4, "source": "s"}]))
+    evidence = _evidence_from_json(
+        json.dumps([1, {"excerpt": "x", "line_number": 4, "source": "s"}])
+    )
     assert evidence[0].excerpt == "x"
 
     assert _int_metadata_value({"count": "4"}, "count", 0) == 4
@@ -507,7 +515,9 @@ def test_pipeline_worker_private_helpers_cover_remaining_branches() -> None:
     assert adapter.create_run(source_id=1, tool_version="1", options=object(), metadata=None) == 7
     adapter.create_run(source_id=1, tool_version="1", options=object(), metadata={"x": object()})
     assert inner.metadata == {"x": str(inner.metadata["x"])}
-    adapter.attach_iocs(run_id=1, ioc_ids=[1], result=ExtractionResult(iocs=(IOC.from_raw("domains", "a.test"),)))
+    adapter.attach_iocs(
+        run_id=1, ioc_ids=[1], result=ExtractionResult(iocs=(IOC.from_raw("domains", "a.test"),))
+    )
     assert inner.attached is not None
 
     assert _metadata_int({}, "input_size") is None
@@ -557,9 +567,12 @@ def test_renderers_cover_custom_stix_and_record_helpers() -> None:
     indicator = renderer._build_indicator(no_stix_name, "fallback.test", None)
     assert indicator is not None
     fallback_bundle = json.loads(
-        STIXOutputRenderer().render(ExtractionResult(iocs=(IOC.from_raw(no_stix_name, "fallback.test"),)))
+        STIXOutputRenderer().render(
+            ExtractionResult(iocs=(IOC.from_raw(no_stix_name, "fallback.test"),))
+        )
     )
     assert fallback_bundle["x_iocparser_format"] == "stix"
+
     class _WeirdContextResult(ExtractionResult):
         def to_records(self) -> list[dict[str, object]]:
             return [{"type": "domains", "raw_value": "ctx.test", "evidence": "bad"}]
@@ -577,7 +590,9 @@ def test_schema_version_accepts_string_rows(tmp_path: Path) -> None:
     sqlite_db_uri = f"sqlite:///{tmp_path / 'schema.sqlite'}"
     engine = create_engine(sqlite_db_uri, future=True)
     with engine.begin() as connection:
-        connection.execute(text("CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY)"))
+        connection.execute(
+            text("CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY)")
+        )
         connection.execute(text("DELETE FROM schema_migrations"))
         connection.execute(text("INSERT INTO schema_migrations(version) VALUES ('7')"))
     assert schema_version(engine) == 7
@@ -597,7 +612,9 @@ def test_repository_helpers_cover_remaining_metadata_branches() -> None:
         value = "domains"
 
     assert _ioc_type_name(_TypeValue()) == "domains"
-    assert int((finished_at_from_duration(1500) - finished_at_from_duration(0)).total_seconds()) in {1, 2}
+    assert int(
+        (finished_at_from_duration(1500) - finished_at_from_duration(0)).total_seconds()
+    ) in {1, 2}
 
 
 def test_worker_config_defaults_cover_none_branches() -> None:

@@ -107,7 +107,9 @@ class ParallelStreamingExtractorProto(Protocol):
 
 
 class StreamingExtractorCtor(Protocol):
-    def __call__(self, *, chunk_size: int, overlap: int, defang: bool) -> StreamingExtractorProto: ...
+    def __call__(
+        self, *, chunk_size: int, overlap: int, defang: bool
+    ) -> StreamingExtractorProto: ...
 
 
 class ParallelStreamingExtractorCtor(Protocol):
@@ -143,6 +145,8 @@ class PluginClient(Protocol):
         only: str | None,
         exclude: str | None,
     ) -> ExtractionResult: ...
+
+
 def _joined_type_filters(options: ProcessingOptions) -> tuple[str | None, str | None]:
     return shared_joined_type_filters(options.to_domain())
 
@@ -185,7 +189,9 @@ def _parallel_streaming_extractor(
 ) -> ParallelStreamingExtractorProto:
     module = import_module("iocparser.infrastructure.streaming")
     extractor_type = cast("ParallelStreamingExtractorCtor", module.ParallelStreamingExtractor)
-    return extractor_type(max_workers=max_workers, chunk_size=chunk_size, overlap=overlap, defang=defang)
+    return extractor_type(
+        max_workers=max_workers, chunk_size=chunk_size, overlap=overlap, defang=defang
+    )
 
 
 def _thread_pool_batch_executor(*, max_workers: int) -> ThreadPoolFileBatchExecutor:
@@ -223,14 +229,20 @@ def _streaming_result(
 ) -> ExtractionResult:
     extractor = _streaming_extractor(chunk_size=chunk_size, overlap=overlap, defang=options.defang)
     raw_iocs = extractor.extract_from_file(file_path)
-    result = ExtractionResult.from_grouped_payload(raw_iocs, {}).filter_types(options.include_types, options.exclude_types)
+    result = ExtractionResult.from_grouped_payload(raw_iocs, {}).filter_types(
+        options.include_types, options.exclude_types
+    )
     if options.check_warnings and warning_service is not None:
         return warning_service.separate(result.iocs, force_update=options.force_update)
     return result
 
 
-def _directory_multiple_namespace(args: argparse.Namespace, files: Sequence[Path]) -> argparse.Namespace:
-    values = {str(key): value for key, value in vars(args).items()} | {"multiple": [str(path) for path in files]}
+def _directory_multiple_namespace(
+    args: argparse.Namespace, files: Sequence[Path]
+) -> argparse.Namespace:
+    values = {str(key): value for key, value in vars(args).items()} | {
+        "multiple": [str(path) for path in files]
+    }
     return argparse.Namespace(**cast("Mapping[str, object]", values))
 
 
@@ -305,7 +317,9 @@ def process_multiple_files(
                     options.exclude_types,
                 )
                 if request.check_warnings and warning_service is not None:
-                    result = warning_service.separate(result.iocs, force_update=request.force_update)
+                    result = warning_service.separate(
+                        result.iocs, force_update=request.force_update
+                    )
                 results.add(
                     item_key=path,
                     source_value=path,
@@ -340,7 +354,10 @@ def process_multiple_files(
                 )
         else:
             extracted_results = _extract_from_files()(
-                [ExtractFileInput(file_path=str(file_path), options=options.to_domain()) for file_path in file_paths],
+                [
+                    ExtractFileInput(file_path=str(file_path), options=options.to_domain())
+                    for file_path in file_paths
+                ],
                 reader=reader,
                 extractor_engine=extractor_engine,
                 batch_executor=_thread_pool_batch_executor(max_workers=request.max_workers),
@@ -462,9 +479,13 @@ def process_directory_payload(
     directory = Path(get_optional_str_arg(args, "directory") or "")
     if not directory.is_dir():
         raise FileExistenceError(str(directory))
-    files = _directory_files(directory, get_optional_str_arg(args, "glob") or "*", get_bool_arg(args, "recursive"))
+    files = _directory_files(
+        directory, get_optional_str_arg(args, "glob") or "*", get_bool_arg(args, "recursive")
+    )
     if not files:
         message = f"No files matched in directory: {directory}"
         raise ValidationError(message)
     multiple_args = _directory_multiple_namespace(args, files)
-    return process_multiple_files_payload(multiple_args, reader=reader, warning_service=warning_service)
+    return process_multiple_files_payload(
+        multiple_args, reader=reader, warning_service=warning_service
+    )

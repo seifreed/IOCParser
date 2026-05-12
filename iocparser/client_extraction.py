@@ -73,14 +73,24 @@ def merge_extraction_results(base: ExtractionResult, extra: ExtractionResult) ->
 
     ioc_map = {(ioc_type_name(ioc.ioc_type), ioc.value.raw): ioc for ioc in base.iocs}
     warning_map = {
-        (ioc_type_name(warning.ioc.ioc_type), warning.ioc.value.raw, warning.warning_list, warning.description): warning
+        (
+            ioc_type_name(warning.ioc.ioc_type),
+            warning.ioc.value.raw,
+            warning.warning_list,
+            warning.description,
+        ): warning
         for warning in base.warnings
     }
     for ioc in extra.iocs:
         ioc_map.setdefault((ioc_type_name(ioc.ioc_type), ioc.value.raw), ioc)
     for warning in extra.warnings:
         warning_map.setdefault(
-            (ioc_type_name(warning.ioc.ioc_type), warning.ioc.value.raw, warning.warning_list, warning.description),
+            (
+                ioc_type_name(warning.ioc.ioc_type),
+                warning.ioc.value.raw,
+                warning.warning_list,
+                warning.description,
+            ),
             warning,
         )
     return ExtractionResult(iocs=tuple(ioc_map.values()), warnings=tuple(warning_map.values()))
@@ -150,7 +160,9 @@ def extract_text_result(
     base_result = extract_from_text(
         ExtractTextInput(text_content=text_content, options=options),
         extractor_engine=extractor_engine,
-        warning_service=warning_service_for(enabled=request.check_warnings, enrichers=plugins.enrichers),
+        warning_service=warning_service_for(
+            enabled=request.check_warnings, enrichers=plugins.enrichers
+        ),
     )
     return apply_plugins(
         text_content=text_content,
@@ -180,7 +192,9 @@ def extract_file_result(
     result = extract_from_text(
         ExtractTextInput(text_content=text_content, options=options),
         extractor_engine=adapters.extractor_engine,
-        warning_service=warning_service_for(enabled=options.check_warnings, enrichers=plugins.enrichers),
+        warning_service=warning_service_for(
+            enabled=options.check_warnings, enrichers=plugins.enrichers
+        ),
     )
     return apply_plugins(
         text_content=text_content,
@@ -233,7 +247,9 @@ def apply_plugins(
 ) -> ExtractionResult:
     merged = result
     for name in extractors:
-        merged = merge_extraction_results(merged, get_extractor(name).extract(text_content, defang=options.defang))
+        merged = merge_extraction_results(
+            merged, get_extractor(name).extract(text_content, defang=options.defang)
+        )
     for name in postprocessors:
         merged = get_postprocessor(name).process(merged)
     return merged.filter_types(options.include_types, options.exclude_types)
@@ -246,7 +262,9 @@ class IOCParserClient:
     reader: TextSourceReader = field(default_factory=MagicTextSourceReader)
     downloader: URLDownloader = field(default_factory=RequestsURLDownloader)
     extractor_engine: IOCExtractionEngine = field(default_factory=DefaultIOCExtractionEngine)
-    temporary_resource_cleaner: TemporaryResourceCleaner = field(default_factory=TemporaryFileCleaner)
+    temporary_resource_cleaner: TemporaryResourceCleaner = field(
+        default_factory=TemporaryFileCleaner
+    )
     enrichers: tuple[str, ...] = ("misp",)
     extractors: tuple[str, ...] = ()
     postprocessors: tuple[str, ...] = ()
@@ -288,7 +306,9 @@ class IOCParserClient:
     def _warning_service(self, enabled: bool) -> WarningListService | None:
         return warning_service_for(enabled=enabled, enrichers=self.enrichers)
 
-    def _apply_plugins(self, text_content: str, options: ExtractionOptions, result: ExtractionResult) -> ExtractionResult:
+    def _apply_plugins(
+        self, text_content: str, options: ExtractionOptions, result: ExtractionResult
+    ) -> ExtractionResult:
         return apply_plugins(
             text_content=text_content,
             options=options,
@@ -367,6 +387,7 @@ class IOCParserClient:
                 exclude=exclude,
             ),
         )
+
 
 __all__ = [
     "ClientExtractionAdapters",

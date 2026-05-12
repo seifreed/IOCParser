@@ -126,7 +126,9 @@ class _HTTPServer:
                 del fmt, args
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.thread = threading.Thread(target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True)
+        self.thread = threading.Thread(
+            target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True
+        )
         self.thread.start()
         return f"http://127.0.0.1:{self.server.server_address[1]}/feed.txt"
 
@@ -147,7 +149,9 @@ class DemoExtractor:
 
 class DemoPostProcessor:
     def process(self, result: ExtractionResult) -> ExtractionResult:
-        return ExtractionResult(iocs=(*result.iocs, IOC.from_raw("ips", "203.0.113.55")), warnings=result.warnings)
+        return ExtractionResult(
+            iocs=(*result.iocs, IOC.from_raw("ips", "203.0.113.55")), warnings=result.warnings
+        )
 
 
 def _persist_result(
@@ -162,9 +166,13 @@ def _persist_result(
     persisted = persist_run(
         PersistRunInput(
             source=Source.from_raw("file", source_value),
-            result=ExtractionResult(iocs=(IOC.from_raw("domains", ioc_value, severity=severity, tags=tags),)),
+            result=ExtractionResult(
+                iocs=(IOC.from_raw("domains", ioc_value, severity=severity, tags=tags),)
+            ),
             tool_version="5.0.0",
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             status=status,
             failed_items=1 if status == "failed" else 0,
             successful_items=0 if status == "failed" else 1,
@@ -177,8 +185,16 @@ def _persist_result(
 
 def test_search_page_uses_sql_side_filters_and_indexes(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'search.sqlite'}"
-    _persist_result(db_uri, source_value="Report-A.txt", ioc_value="Alpha.example", severity="high", tags=("phishing",))
-    _persist_result(db_uri, source_value="Other.txt", ioc_value="Beta.example", severity="low", tags=("benign",))
+    _persist_result(
+        db_uri,
+        source_value="Report-A.txt",
+        ioc_value="Alpha.example",
+        severity="high",
+        tags=("phishing",),
+    )
+    _persist_result(
+        db_uri, source_value="Other.txt", ioc_value="Beta.example", severity="low", tags=("benign",)
+    )
 
     page = query_persisted_iocs(
         db_uri=db_uri,
@@ -193,9 +209,13 @@ def test_search_page_uses_sql_side_filters_and_indexes(tmp_path: Path) -> None:
     assert page.items[0].value == "Alpha.example"
 
     connection = sqlite3.connect(tmp_path / "search.sqlite")
-    source_indexes = {row[1] for row in connection.execute("PRAGMA index_list('sources')").fetchall()}
+    source_indexes = {
+        row[1] for row in connection.execute("PRAGMA index_list('sources')").fetchall()
+    }
     ioc_indexes = {row[1] for row in connection.execute("PRAGMA index_list('iocs')").fetchall()}
-    run_ioc_indexes = {row[1] for row in connection.execute("PRAGMA index_list('run_iocs')").fetchall()}
+    run_ioc_indexes = {
+        row[1] for row in connection.execute("PRAGMA index_list('run_iocs')").fetchall()
+    }
     assert "ix_sources_kind_value_search" in source_indexes
     assert "ix_iocs_type_value_search" in ioc_indexes
     assert "ix_run_iocs_tags_search" in run_ioc_indexes
@@ -298,7 +318,9 @@ def test_like_search_treats_percent_and_underscore_as_literals(tmp_path: Path) -
 def test_tag_filters_treat_percent_and_underscore_as_literals(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'tag-like-literals.sqlite'}"
     _persist_result(db_uri, source_value="first.txt", ioc_value="first.example", tags=("tag%prod",))
-    _persist_result(db_uri, source_value="second.txt", ioc_value="second.example", tags=("tagxprod",))
+    _persist_result(
+        db_uri, source_value="second.txt", ioc_value="second.example", tags=("tagxprod",)
+    )
     _persist_result(db_uri, source_value="third.txt", ioc_value="third.example", tags=("team_1",))
     _persist_result(db_uri, source_value="fourth.txt", ioc_value="fourth.example", tags=("teama1",))
 
@@ -338,8 +360,16 @@ def test_query_pagination_is_stable_when_runs_share_started_at(tmp_path: Path) -
     ioc_page_3 = query_persisted_iocs(db_uri=db_uri, value=".example", limit=1, offset=2)
 
     expected_order = [third_run_id, second_run_id, first_run_id]
-    assert [runs_page_1.items[0].run_id, runs_page_2.items[0].run_id, runs_page_3.items[0].run_id] == expected_order
-    assert [ioc_page_1.items[0].run_id, ioc_page_2.items[0].run_id, ioc_page_3.items[0].run_id] == expected_order
+    assert [
+        runs_page_1.items[0].run_id,
+        runs_page_2.items[0].run_id,
+        runs_page_3.items[0].run_id,
+    ] == expected_order
+    assert [
+        ioc_page_1.items[0].run_id,
+        ioc_page_2.items[0].run_id,
+        ioc_page_3.items[0].run_id,
+    ] == expected_order
 
 
 def test_migration_revision_history_and_validation(tmp_path: Path) -> None:
@@ -356,7 +386,10 @@ def test_migration_revision_history_and_validation(tmp_path: Path) -> None:
     from sqlalchemy import create_engine
 
     assert schema_version(create_engine(f"sqlite:///{blank_db}", future=True)) == 0
-    assert any("schema version drift" in problem for problem in validate_schema(create_engine(f"sqlite:///{blank_db}", future=True)))
+    assert any(
+        "schema version drift" in problem
+        for problem in validate_schema(create_engine(f"sqlite:///{blank_db}", future=True))
+    )
     partial_db = tmp_path / "partial-schema.sqlite"
     partial = sqlite3.connect(partial_db)
     partial.execute(
@@ -367,26 +400,45 @@ def test_migration_revision_history_and_validation(tmp_path: Path) -> None:
     assert migrate_db_uri(f"sqlite:///{partial_db}") == CURRENT_SCHEMA_VERSION
     broken_db = tmp_path / "broken.sqlite"
     broken = sqlite3.connect(broken_db)
-    broken.execute("CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)")
+    broken.execute(
+        "CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"
+    )
     broken.execute("INSERT INTO schema_migrations(version, applied_at) VALUES (4, 'now')")
-    broken.execute("CREATE TABLE runs (id INTEGER PRIMARY KEY, source_id INTEGER, started_at TEXT, finished_at TEXT, tool_version TEXT, options_json TEXT, status TEXT, error_message TEXT)")
-    broken.execute("CREATE TABLE sources (id INTEGER PRIMARY KEY, kind TEXT, value TEXT, value_search TEXT, first_seen TEXT, last_seen TEXT)")
-    broken.execute("CREATE TABLE iocs (id INTEGER PRIMARY KEY, ioc_type TEXT, value TEXT, value_search TEXT, is_warning INTEGER, warning_list TEXT, warning_description TEXT)")
-    broken.execute("CREATE TABLE run_iocs (id INTEGER PRIMARY KEY, run_id INTEGER, ioc_id INTEGER, severity TEXT, tags_json TEXT, evidence_json TEXT)")
-    broken.execute("CREATE TABLE batch_jobs (id INTEGER PRIMARY KEY, source_kind TEXT, started_at TEXT, finished_at TEXT, total_inputs INTEGER, successful_inputs INTEGER, failed_inputs INTEGER, retry_attempt INTEGER, status TEXT, config_json TEXT, error_summary_json TEXT)")
-    broken.execute("CREATE TABLE failed_batch_items (id INTEGER PRIMARY KEY, batch_job_id INTEGER, source_value TEXT, error_type TEXT, error_message TEXT, retry_attempt INTEGER, created_at TEXT)")
+    broken.execute(
+        "CREATE TABLE runs (id INTEGER PRIMARY KEY, source_id INTEGER, started_at TEXT, finished_at TEXT, tool_version TEXT, options_json TEXT, status TEXT, error_message TEXT)"
+    )
+    broken.execute(
+        "CREATE TABLE sources (id INTEGER PRIMARY KEY, kind TEXT, value TEXT, value_search TEXT, first_seen TEXT, last_seen TEXT)"
+    )
+    broken.execute(
+        "CREATE TABLE iocs (id INTEGER PRIMARY KEY, ioc_type TEXT, value TEXT, value_search TEXT, is_warning INTEGER, warning_list TEXT, warning_description TEXT)"
+    )
+    broken.execute(
+        "CREATE TABLE run_iocs (id INTEGER PRIMARY KEY, run_id INTEGER, ioc_id INTEGER, severity TEXT, tags_json TEXT, evidence_json TEXT)"
+    )
+    broken.execute(
+        "CREATE TABLE batch_jobs (id INTEGER PRIMARY KEY, source_kind TEXT, started_at TEXT, finished_at TEXT, total_inputs INTEGER, successful_inputs INTEGER, failed_inputs INTEGER, retry_attempt INTEGER, status TEXT, config_json TEXT, error_summary_json TEXT)"
+    )
+    broken.execute(
+        "CREATE TABLE failed_batch_items (id INTEGER PRIMARY KEY, batch_job_id INTEGER, source_value TEXT, error_type TEXT, error_message TEXT, retry_attempt INTEGER, created_at TEXT)"
+    )
     broken.commit()
     broken.close()
     broken_engine = create_engine(f"sqlite:///{broken_db}", future=True)
     from sqlalchemy import inspect
 
-    assert any("run_iocs missing column: tags_search" in problem for problem in validate_schema(broken_engine))
+    assert any(
+        "run_iocs missing column: tags_search" in problem
+        for problem in validate_schema(broken_engine)
+    )
     assert _has_column(inspect(broken_engine), "missing", "nope") is False
 
 
 def test_history_export_import_compact_and_retain(tmp_path: Path) -> None:
     source_db = f"sqlite:///{tmp_path / 'source.sqlite'}"
-    _persist_result(source_db, source_value="failed.txt", ioc_value="failed.example", status="failed")
+    _persist_result(
+        source_db, source_value="failed.txt", ioc_value="failed.example", status="failed"
+    )
     exported = export_persisted_history(db_uri=source_db)
     assert exported["runs"]
 
@@ -394,7 +446,9 @@ def test_history_export_import_compact_and_retain(tmp_path: Path) -> None:
     imported = import_persisted_history(db_uri=restored_db, payload=exported)
     assert imported["runs"] >= 1
     archive_path = archive_history(restored_db, str(tmp_path / "archive.json"))
-    restored_counts = restore_history(f"sqlite:///{tmp_path / 'restored_again.sqlite'}", archive_path)
+    restored_counts = restore_history(
+        f"sqlite:///{tmp_path / 'restored_again.sqlite'}", archive_path
+    )
     assert restored_counts["runs"] >= 1
     compact_persisted_history(db_uri=restored_db)
     affected = retain_persisted_history(db_uri=restored_db, days=0, statuses="failed")
@@ -425,16 +479,30 @@ def test_batch_job_persistence_and_failed_batch_listing(tmp_path: Path) -> None:
             },
         ],
         "run_metadata_map": {
-            "https://ok.example": {"duration_ms": 12, "successful_items": 1, "failed_items": 0, "status": "success"},
-            "https://fail.example": {"duration_ms": 0, "successful_items": 0, "failed_items": 1, "status": "failed"},
+            "https://ok.example": {
+                "duration_ms": 12,
+                "successful_items": 1,
+                "failed_items": 0,
+                "status": "success",
+            },
+            "https://fail.example": {
+                "duration_ms": 0,
+                "successful_items": 0,
+                "failed_items": 1,
+                "status": "failed",
+            },
         },
         "source_metadata_map": {},
         "error_groups": {"IOCTimeoutError": 1},
         "failures": {"https://fail.example": "timeout"},
     }
-    options = PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json")
+    options = PersistOptions(
+        defang=False, check_warnings=False, force_update=False, output_format="json"
+    )
     ok_run_ids = persist_many_results(results, config=config, options=options, source_kind="url")
-    failed_run_ids = persist_failed_batch_items(report, config=config, options=options, source_kind="url")
+    failed_run_ids = persist_failed_batch_items(
+        report, config=config, options=options, source_kind="url"
+    )
     batch_job_id = persist_batch_job(
         report,
         config=config,
@@ -448,7 +516,16 @@ def test_batch_job_persistence_and_failed_batch_listing(tmp_path: Path) -> None:
     assert jobs[0].error_summary == {"IOCTimeoutError": 1}
     failed_items = list_failed_batch_items(db_uri, batch_job_id=batch_job_id)
     assert failed_items[0].retry_attempt == 1
-    assert persist_batch_job(report, config=load_config(False, None, None), source_kind="url", run_ids=(), effective_config={}) is None
+    assert (
+        persist_batch_job(
+            report,
+            config=load_config(False, None, None),
+            source_kind="url",
+            run_ids=(),
+            effective_config={},
+        )
+        is None
+    )
 
 
 def test_batch_job_persistence_uses_report_status_and_max_retry_attempt(tmp_path: Path) -> None:
@@ -462,8 +539,18 @@ def test_batch_job_persistence_uses_report_status_and_max_retry_attempt(tmp_path
         "status": "failed",
         "duration_ms": 50,
         "items": [
-            {"url": "https://fail-one.example", "status": "failed", "error": "timeout", "retry_attempt": 2},
-            {"url": "https://fail-two.example", "status": "failed", "error": "boom", "retry_attempt": 1},
+            {
+                "url": "https://fail-one.example",
+                "status": "failed",
+                "error": "timeout",
+                "retry_attempt": 2,
+            },
+            {
+                "url": "https://fail-two.example",
+                "status": "failed",
+                "error": "boom",
+                "retry_attempt": 1,
+            },
         ],
     }
     batch_job_id = persist_batch_job(
@@ -575,7 +662,9 @@ def test_retry_attempt_for_url_uses_failed_batch_history(tmp_path: Path) -> None
             "run_metadata_map": {"https://retry.example": {"status": "failed", "failed_items": 1}},
         },
         config=config,
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
         source_kind="url",
     )
     batch_job_id = persist_batch_job(
@@ -601,12 +690,15 @@ def test_retry_attempt_for_url_uses_failed_batch_history(tmp_path: Path) -> None
         effective_config={},
     )
     assert batch_job_id is not None
-    assert retry_attempt_for_url(
-        "https://retry.example",
-        None,
-        retry_batch_job=batch_job_id,
-        db_uri=db_uri,
-    ) == 3
+    assert (
+        retry_attempt_for_url(
+            "https://retry.example",
+            None,
+            retry_batch_job=batch_job_id,
+            db_uri=db_uri,
+        )
+        == 3
+    )
 
 
 def test_cli_schema_commands_and_history_io(tmp_path: Path, capsys) -> None:
@@ -615,19 +707,44 @@ def test_cli_schema_commands_and_history_io(tmp_path: Path, capsys) -> None:
     config = load_config(True, db_uri, None)
     writer = _Writer()
 
-    assert handle_schema_commands(SimpleNamespace(schema_version=True), config, file_writer=writer) is True
+    assert (
+        handle_schema_commands(SimpleNamespace(schema_version=True), config, file_writer=writer)
+        is True
+    )
     assert "schema_version" in capsys.readouterr().out
-    assert handle_schema_commands(SimpleNamespace(schema_version=False, migrate=True), config, file_writer=writer) is True
+    assert (
+        handle_schema_commands(
+            SimpleNamespace(schema_version=False, migrate=True), config, file_writer=writer
+        )
+        is True
+    )
     assert "migrated_to" in capsys.readouterr().out
-    assert handle_schema_commands(SimpleNamespace(schema_version=False, migrate=False, validate_schema=True), config, file_writer=writer) is True
+    assert (
+        handle_schema_commands(
+            SimpleNamespace(schema_version=False, migrate=False, validate_schema=True),
+            config,
+            file_writer=writer,
+        )
+        is True
+    )
     assert "schema_valid" in capsys.readouterr().out
     broken_db = tmp_path / "schema-broken.sqlite"
     broken_db.touch()
     broken_config = load_config(True, f"sqlite:///{broken_db}", None)
-    assert handle_schema_commands(SimpleNamespace(schema_version=False, migrate=False, validate_schema=True), broken_config, file_writer=writer) is True
+    assert (
+        handle_schema_commands(
+            SimpleNamespace(schema_version=False, migrate=False, validate_schema=True),
+            broken_config,
+            file_writer=writer,
+        )
+        is True
+    )
     assert "missing table" in capsys.readouterr().out
-    assert handle_schema_commands(SimpleNamespace(export_history="-"), config, file_writer=writer) is True
-    assert "\"runs\"" in capsys.readouterr().out
+    assert (
+        handle_schema_commands(SimpleNamespace(export_history="-"), config, file_writer=writer)
+        is True
+    )
+    assert '"runs"' in capsys.readouterr().out
 
     export_path = tmp_path / "history.json"
     args = SimpleNamespace(
@@ -709,7 +826,14 @@ def test_cli_schema_commands_and_history_io(tmp_path: Path, capsys) -> None:
             "successful": 0,
             "failed": 1,
             "duration_ms": 1,
-            "items": [{"url": "https://bad.example", "status": "failed", "error": "boom", "error_type": "Timeout"}],
+            "items": [
+                {
+                    "url": "https://bad.example",
+                    "status": "failed",
+                    "error": "boom",
+                    "error_type": "Timeout",
+                }
+            ],
         },
         config=failed_config,
         source_kind="url",
@@ -746,9 +870,15 @@ def test_cli_schema_validation_errors_and_noop() -> None:
     with pytest.raises(ValidationError):
         handle_schema_commands(SimpleNamespace(schema_version=True), config, file_writer=writer)
     with pytest.raises(ValidationError):
-        handle_schema_commands(SimpleNamespace(schema_version=False, migrate=True), config, file_writer=writer)
+        handle_schema_commands(
+            SimpleNamespace(schema_version=False, migrate=True), config, file_writer=writer
+        )
     with pytest.raises(ValidationError):
-        handle_schema_commands(SimpleNamespace(schema_version=False, migrate=False, validate_schema=True), config, file_writer=writer)
+        handle_schema_commands(
+            SimpleNamespace(schema_version=False, migrate=False, validate_schema=True),
+            config,
+            file_writer=writer,
+        )
     with pytest.raises(ValidationError):
         handle_schema_commands(SimpleNamespace(export_history="-"), config, file_writer=writer)
     assert (
@@ -780,15 +910,29 @@ def test_retry_failed_report_can_filter_by_error_type_and_text(tmp_path: Path) -
         json.dumps(
             {
                 "items": [
-                    {"url": "https://one.example", "status": "failed", "error": "timeout waiting", "error_type": "IOCTimeoutError"},
-                    {"url": "https://two.example", "status": "failed", "error": "tls verify failed", "error_type": "NetworkDownloadError"},
+                    {
+                        "url": "https://one.example",
+                        "status": "failed",
+                        "error": "timeout waiting",
+                        "error_type": "IOCTimeoutError",
+                    },
+                    {
+                        "url": "https://two.example",
+                        "status": "failed",
+                        "error": "tls verify failed",
+                        "error_type": "NetworkDownloadError",
+                    },
                 ],
             },
         ),
         encoding="utf-8",
     )
-    assert _failed_urls_from_report(report_path, error_type_filter="IOCTimeoutError") == ["https://one.example"]
-    assert _failed_urls_from_report(report_path, error_substring="verify") == ["https://two.example"]
+    assert _failed_urls_from_report(report_path, error_type_filter="IOCTimeoutError") == [
+        "https://one.example"
+    ]
+    assert _failed_urls_from_report(report_path, error_substring="verify") == [
+        "https://two.example"
+    ]
     assert _failed_urls_from_report(
         report_path,
         error_type_filter="NetworkDownloadError",
@@ -814,7 +958,9 @@ def test_retry_failed_report_can_filter_by_error_type_and_text(tmp_path: Path) -
 def test_clients_wrap_reusable_services_and_plugin_pipeline(tmp_path: Path) -> None:
     register_extractor("demo-extractor", DemoExtractor)
     register_postprocessor("demo-post", DemoPostProcessor)
-    parser_client = IOCParserClient(enrichers=(), extractors=("demo-extractor",), postprocessors=("demo-post",))
+    parser_client = IOCParserClient(
+        enrichers=(), extractors=("demo-extractor",), postprocessors=("demo-post",)
+    )
     result = parser_client.extract_result_from_text("plain text without IOCs", check_warnings=False)
     assert {ioc.value.raw for ioc in result.iocs} == {"plugin.example", "203.0.113.55"}
     file_path = tmp_path / "client.txt"
@@ -826,17 +972,24 @@ def test_clients_wrap_reusable_services_and_plugin_pipeline(tmp_path: Path) -> N
     assert "demo-post" in postprocessor_names()
     assert isinstance(get_extractor("demo-extractor"), DemoExtractor)
     assert isinstance(get_postprocessor("demo-post"), DemoPostProcessor)
+
     class _WarningExtractor:
         def extract(self, *_args, **_kwargs):
             return ExtractionResult(
-                warnings=(WarningMatch(ioc=IOC.from_raw("domains", "warn.example"), warning_list="demo"),),
+                warnings=(
+                    WarningMatch(ioc=IOC.from_raw("domains", "warn.example"), warning_list="demo"),
+                ),
             )
 
     register_extractor(
         "demo-warning",
         _WarningExtractor,
     )
-    assert IOCParserClient(enrichers=(), extractors=("demo-warning",)).extract_result_from_text("x", check_warnings=False).warnings
+    assert (
+        IOCParserClient(enrichers=(), extractors=("demo-warning",))
+        .extract_result_from_text("x", check_warnings=False)
+        .warnings
+    )
 
     class PassThroughEnricher:
         def separate(self, iocs, *, force_update: bool = False):
@@ -847,7 +1000,10 @@ def test_clients_wrap_reusable_services_and_plugin_pipeline(tmp_path: Path) -> N
 
     register_enricher("demo-enricher-a", PassThroughEnricher)
     register_enricher("demo-enricher-b", PassThroughEnricher)
-    assert IOCParserClient(enrichers=("demo-enricher-a", "demo-enricher-b"))._warning_service(True) is not None
+    assert (
+        IOCParserClient(enrichers=("demo-enricher-a", "demo-enricher-b"))._warning_service(True)
+        is not None
+    )
 
     db_uri = f"sqlite:///{tmp_path / 'client.sqlite'}"
     _persist_result(db_uri, source_value="client.txt", ioc_value="client.example")
@@ -900,7 +1056,16 @@ def test_batch_report_and_filter_helpers(capsys) -> None:
     print_batch_report(report)
     print_text_lines(["alpha", "beta"])
     print_failed_batch_jobs(
-        [SimpleNamespace(batch_job_id=1, status="failed", source_kind="url", total_inputs=2, failed_inputs=1, retry_attempt=2)],
+        [
+            SimpleNamespace(
+                batch_job_id=1,
+                status="failed",
+                source_kind="url",
+                total_inputs=2,
+                failed_inputs=1,
+                retry_attempt=2,
+            )
+        ],
     )
     save_batch_report(report, "-", file_writer=_Writer())
     save_batch_report(report, None, file_writer=_Writer())
@@ -918,48 +1083,70 @@ def test_batch_report_and_filter_helpers(capsys) -> None:
         severity="medium",
         tags=("phishing",),
     )
-    assert matches_advanced_filters(hit, tags=("phishing",), exclude_tags=(), min_severity="low", tag_mode="all") is True
-    assert matches_advanced_filters(hit, tags=("phishing",), exclude_tags=("phishing",), min_severity=None, tag_mode="all") is False
-    assert matches_advanced_filters(hit, tags=(), exclude_tags=(), min_severity=None, tag_mode="all") is True
-    assert BatchJobSummary(
-        batch_job_id=1,
-        source_kind="url",
-        started_at=__import__("datetime").datetime.now(),
-        finished_at=__import__("datetime").datetime.now(),
-        total_inputs=1,
-        successful_inputs=0,
-        failed_inputs=1,
-        retry_attempt=0,
-        status="failed",
-        error_summary={"Timeout": 1},
-    ).to_record()["batch_job_id"] == 1
-    assert FailedBatchItem(
-        batch_job_id=1,
-        source_value="u",
-        error_type="Timeout",
-        error_message="boom",
-        retry_attempt=0,
-        created_at=__import__("datetime").datetime.now(),
-    ).to_record()["error_type"] == "Timeout"
-    assert BatchDashboard(
-        lookback_hours=24,
-        group_by="hour",
-        total_jobs=1,
-        failed_jobs=1,
-        partial_jobs=0,
-        failure_rate=1.0,
-        alerts=("failure-rate",),
-        windows=(
-            BatchDashboardWindow(
-                started_at="2026-03-10T10:00:00+00:00",
-                total_jobs=1,
-                failed_jobs=1,
-                partial_jobs=0,
-                failure_rate=1.0,
-                average_duration_ms=10,
+    assert (
+        matches_advanced_filters(
+            hit, tags=("phishing",), exclude_tags=(), min_severity="low", tag_mode="all"
+        )
+        is True
+    )
+    assert (
+        matches_advanced_filters(
+            hit, tags=("phishing",), exclude_tags=("phishing",), min_severity=None, tag_mode="all"
+        )
+        is False
+    )
+    assert (
+        matches_advanced_filters(hit, tags=(), exclude_tags=(), min_severity=None, tag_mode="all")
+        is True
+    )
+    assert (
+        BatchJobSummary(
+            batch_job_id=1,
+            source_kind="url",
+            started_at=__import__("datetime").datetime.now(),
+            finished_at=__import__("datetime").datetime.now(),
+            total_inputs=1,
+            successful_inputs=0,
+            failed_inputs=1,
+            retry_attempt=0,
+            status="failed",
+            error_summary={"Timeout": 1},
+        ).to_record()["batch_job_id"]
+        == 1
+    )
+    assert (
+        FailedBatchItem(
+            batch_job_id=1,
+            source_value="u",
+            error_type="Timeout",
+            error_message="boom",
+            retry_attempt=0,
+            created_at=__import__("datetime").datetime.now(),
+        ).to_record()["error_type"]
+        == "Timeout"
+    )
+    assert (
+        BatchDashboard(
+            lookback_hours=24,
+            group_by="hour",
+            total_jobs=1,
+            failed_jobs=1,
+            partial_jobs=0,
+            failure_rate=1.0,
+            alerts=("failure-rate",),
+            windows=(
+                BatchDashboardWindow(
+                    started_at="2026-03-10T10:00:00+00:00",
+                    total_jobs=1,
+                    failed_jobs=1,
+                    partial_jobs=0,
+                    failure_rate=1.0,
+                    average_duration_ms=10,
+                ),
             ),
-        ),
-    ).to_record()["windows"][0]["average_duration_ms"] == 10
+        ).to_record()["windows"][0]["average_duration_ms"]
+        == 10
+    )
 
 
 def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_path: Path) -> None:
@@ -973,7 +1160,14 @@ def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_pa
             "successful": 0,
             "failed": 1,
             "duration_ms": 1,
-            "items": [{"url": "https://bad.example", "status": "failed", "error": "boom", "error_type": "Timeout"}],
+            "items": [
+                {
+                    "url": "https://bad.example",
+                    "status": "failed",
+                    "error": "boom",
+                    "error_type": "Timeout",
+                }
+            ],
         },
         config=load_config(True, db_uri, None),
         source_kind="url",
@@ -993,11 +1187,14 @@ def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_pa
 
     from iocparser import cli_dispatch_workflow as workflow
 
-    assert workflow.resolve_input_payload(
-        SimpleNamespace(multiple=[], directory=None, url_file=None, retry_failed_from=None),
-        process_multiple_files_input=lambda _args: None,
-        process_single_input=lambda _args: ({}, {}, "stdin"),
-    ).results is None
+    assert (
+        workflow.resolve_input_payload(
+            SimpleNamespace(multiple=[], directory=None, url_file=None, retry_failed_from=None),
+            process_multiple_files_input=lambda _args: None,
+            process_single_input=lambda _args: ({}, {}, "stdin"),
+        ).results
+        is None
+    )
 
 
 def test_import_history_remaps_foreign_keys_on_primary_key_collision(tmp_path: Path) -> None:
@@ -1011,7 +1208,9 @@ def test_import_history_remaps_foreign_keys_on_primary_key_collision(tmp_path: P
             source_value="imported.txt",
             normal_iocs={"domains": ["imported.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
         )
     )
@@ -1022,7 +1221,9 @@ def test_import_history_remaps_foreign_keys_on_primary_key_collision(tmp_path: P
             source_value="existing.txt",
             normal_iocs={"domains": ["existing.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
         )
     )
@@ -1067,8 +1268,18 @@ def test_retry_attempt_for_duplicate_urls_from_batch_job_uses_stable_order(tmp_p
             "status": "failed",
             "duration_ms": 10,
             "items": [
-                {"url": "https://dup.example", "status": "failed", "error": "timeout-1", "retry_attempt": 1},
-                {"url": "https://dup.example", "status": "failed", "error": "timeout-2", "retry_attempt": 3},
+                {
+                    "url": "https://dup.example",
+                    "status": "failed",
+                    "error": "timeout-1",
+                    "retry_attempt": 1,
+                },
+                {
+                    "url": "https://dup.example",
+                    "status": "failed",
+                    "error": "timeout-2",
+                    "retry_attempt": 3,
+                },
             ],
         },
         config=config,
@@ -1078,23 +1289,31 @@ def test_retry_attempt_for_duplicate_urls_from_batch_job_uses_stable_order(tmp_p
     )
     assert batch_job_id is not None
 
-    assert retry_attempt_for_url(
-        "https://dup.example",
-        None,
-        retry_batch_job=batch_job_id,
-        db_uri=db_uri,
-        occurrence=1,
-    ) == 2
-    assert retry_attempt_for_url(
-        "https://dup.example",
-        None,
-        retry_batch_job=batch_job_id,
-        db_uri=db_uri,
-        occurrence=2,
-    ) == 4
+    assert (
+        retry_attempt_for_url(
+            "https://dup.example",
+            None,
+            retry_batch_job=batch_job_id,
+            db_uri=db_uri,
+            occurrence=1,
+        )
+        == 2
+    )
+    assert (
+        retry_attempt_for_url(
+            "https://dup.example",
+            None,
+            retry_batch_job=batch_job_id,
+            db_uri=db_uri,
+            occurrence=2,
+        )
+        == 4
+    )
 
 
-def test_import_history_keeps_distinct_runs_with_same_metadata_but_different_iocs(tmp_path: Path) -> None:
+def test_import_history_keeps_distinct_runs_with_same_metadata_but_different_iocs(
+    tmp_path: Path,
+) -> None:
     source_db_uri = f"sqlite:///{tmp_path / 'history-same-metadata-source.sqlite'}"
     target_db_uri = f"sqlite:///{tmp_path / 'history-same-metadata-target.sqlite'}"
 
@@ -1105,7 +1324,9 @@ def test_import_history_keeps_distinct_runs_with_same_metadata_but_different_ioc
             source_value="same.txt",
             normal_iocs={"domains": ["alpha.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
             run_metadata={"duration_ms": 10},
         )
@@ -1117,7 +1338,9 @@ def test_import_history_keeps_distinct_runs_with_same_metadata_but_different_ioc
             source_value="same.txt",
             normal_iocs={"domains": ["beta.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
             run_metadata={"duration_ms": 10},
         )
@@ -1128,13 +1351,19 @@ def test_import_history_keeps_distinct_runs_with_same_metadata_but_different_ioc
     runs = query_persisted_runs(db_uri=target_db_uri, limit=10)
     assert len(runs.items) == 2
     exported_values = {
-        tuple(PersistenceClient(target_db_uri).export_run(run_id=run.run_id).result.grouped_iocs()["domains"])
+        tuple(
+            PersistenceClient(target_db_uri)
+            .export_run(run_id=run.run_id)
+            .result.grouped_iocs()["domains"]
+        )
         for run in runs.items
     }
     assert exported_values == {("alpha.example",), ("beta.example",)}
 
 
-def test_import_history_keeps_distinct_runs_with_same_iocs_but_different_run_ioc_metadata(tmp_path: Path) -> None:
+def test_import_history_keeps_distinct_runs_with_same_iocs_but_different_run_ioc_metadata(
+    tmp_path: Path,
+) -> None:
     source_db_uri = f"sqlite:///{tmp_path / 'history-same-ioc-metadata-source.sqlite'}"
     target_db_uri = f"sqlite:///{tmp_path / 'history-same-ioc-metadata-target.sqlite'}"
     source_config = load_config(True, source_db_uri, None)
@@ -1146,7 +1375,9 @@ def test_import_history_keeps_distinct_runs_with_same_iocs_but_different_run_ioc
             source_value="same.txt",
             normal_iocs={"domains": ["same.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
             run_metadata={"duration_ms": 10},
         )
@@ -1158,7 +1389,9 @@ def test_import_history_keeps_distinct_runs_with_same_iocs_but_different_run_ioc
             source_value="same.txt",
             normal_iocs={"domains": ["same.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
             run_metadata={"duration_ms": 10},
         )
@@ -1188,16 +1421,15 @@ def test_import_history_keeps_distinct_runs_with_same_iocs_but_different_run_ioc
     assert len(runs.items) == 2
     target_unit = SQLAlchemyUnitOfWork(target_db_uri)
     try:
-        tags = {
-            row.tags_json
-            for row in target_unit.session.query(RunIOCModel).all()
-        }
+        tags = {row.tags_json for row in target_unit.session.query(RunIOCModel).all()}
         assert tags == {'["tag-a"]', '["tag-b"]'}
     finally:
         target_unit.close()
 
 
-def test_import_history_preserves_duplicate_failed_batch_items_with_same_payload(tmp_path: Path) -> None:
+def test_import_history_preserves_duplicate_failed_batch_items_with_same_payload(
+    tmp_path: Path,
+) -> None:
     source_db_uri = f"sqlite:///{tmp_path / 'history-failed-items-source.sqlite'}"
     target_db_uri = f"sqlite:///{tmp_path / 'history-failed-items-target.sqlite'}"
     config = load_config(True, source_db_uri, None)
@@ -1209,8 +1441,20 @@ def test_import_history_preserves_duplicate_failed_batch_items_with_same_payload
             "status": "failed",
             "duration_ms": 10,
             "items": [
-                {"url": "https://dup.example", "status": "failed", "error": "boom", "error_type": "Timeout", "retry_attempt": 1},
-                {"url": "https://dup.example", "status": "failed", "error": "boom", "error_type": "Timeout", "retry_attempt": 1},
+                {
+                    "url": "https://dup.example",
+                    "status": "failed",
+                    "error": "boom",
+                    "error_type": "Timeout",
+                    "retry_attempt": 1,
+                },
+                {
+                    "url": "https://dup.example",
+                    "status": "failed",
+                    "error": "boom",
+                    "error_type": "Timeout",
+                    "retry_attempt": 1,
+                },
             ],
         },
         config=config,
@@ -1225,14 +1469,18 @@ def test_import_history_preserves_duplicate_failed_batch_items_with_same_payload
     assert counts["failed_batch_items"] == 2
     imported_jobs = list_failed_batch_jobs(db_uri=target_db_uri, limit=10)
     assert len(imported_jobs) == 1
-    imported_items = list_failed_batch_items(target_db_uri, batch_job_id=imported_jobs[0].batch_job_id)
+    imported_items = list_failed_batch_items(
+        target_db_uri, batch_job_id=imported_jobs[0].batch_job_id
+    )
     assert len(imported_items) == 2
 
     repeated = import_history_raw(target_db_uri, payload)
     assert repeated["failed_batch_items"] == 0
 
 
-def test_import_history_preserves_distinct_batch_jobs_with_identical_aggregate(tmp_path: Path) -> None:
+def test_import_history_preserves_distinct_batch_jobs_with_identical_aggregate(
+    tmp_path: Path,
+) -> None:
     source_db_uri = f"sqlite:///{tmp_path / 'history-batch-jobs-source.sqlite'}"
     target_db_uri = f"sqlite:///{tmp_path / 'history-batch-jobs-target.sqlite'}"
     config = load_config(True, source_db_uri, None)
@@ -1247,7 +1495,13 @@ def test_import_history_preserves_distinct_batch_jobs_with_identical_aggregate(t
             "finished_at": "2026-01-02T03:04:05.010000+00:00",
         },
         "items": [
-            {"url": "https://dup.example", "status": "failed", "error": "boom", "error_type": "Timeout", "retry_attempt": 1},
+            {
+                "url": "https://dup.example",
+                "status": "failed",
+                "error": "boom",
+                "error_type": "Timeout",
+                "retry_attempt": 1,
+            },
         ],
     }
     first_job_id = persist_batch_job(
@@ -1278,7 +1532,9 @@ def test_import_history_preserves_distinct_batch_jobs_with_identical_aggregate(t
     assert repeated["batch_jobs"] == 0
 
 
-def test_import_history_keeps_identical_batch_jobs_from_distinct_payloads_separate(tmp_path: Path) -> None:
+def test_import_history_keeps_identical_batch_jobs_from_distinct_payloads_separate(
+    tmp_path: Path,
+) -> None:
     first_source_db_uri = f"sqlite:///{tmp_path / 'history-batch-jobs-first.sqlite'}"
     second_source_db_uri = f"sqlite:///{tmp_path / 'history-batch-jobs-second.sqlite'}"
     target_db_uri = f"sqlite:///{tmp_path / 'history-batch-jobs-merged.sqlite'}"
@@ -1294,11 +1550,29 @@ def test_import_history_keeps_identical_batch_jobs_from_distinct_payloads_separa
             "finished_at": "2026-01-02T03:04:05.010000+00:00",
         },
         "items": [
-            {"url": "https://dup.example", "status": "failed", "error": "boom", "error_type": "Timeout", "retry_attempt": 1},
+            {
+                "url": "https://dup.example",
+                "status": "failed",
+                "error": "boom",
+                "error_type": "Timeout",
+                "retry_attempt": 1,
+            },
         ],
     }
-    persist_batch_job(identical_report, config=load_config(True, first_source_db_uri, None), source_kind="url", run_ids=(), effective_config={})
-    persist_batch_job(identical_report, config=load_config(True, second_source_db_uri, None), source_kind="url", run_ids=(), effective_config={})
+    persist_batch_job(
+        identical_report,
+        config=load_config(True, first_source_db_uri, None),
+        source_kind="url",
+        run_ids=(),
+        effective_config={},
+    )
+    persist_batch_job(
+        identical_report,
+        config=load_config(True, second_source_db_uri, None),
+        source_kind="url",
+        run_ids=(),
+        effective_config={},
+    )
 
     first_payload = export_persisted_history(db_uri=first_source_db_uri)
     second_payload = export_persisted_history(db_uri=second_source_db_uri)
@@ -1310,7 +1584,9 @@ def test_import_history_keeps_identical_batch_jobs_from_distinct_payloads_separa
     assert len(imported_jobs) == 2
 
 
-def test_import_history_keeps_identical_runs_from_distinct_payloads_separate(tmp_path: Path) -> None:
+def test_import_history_keeps_identical_runs_from_distinct_payloads_separate(
+    tmp_path: Path,
+) -> None:
     first_source_db_uri = f"sqlite:///{tmp_path / 'history-runs-first.sqlite'}"
     second_source_db_uri = f"sqlite:///{tmp_path / 'history-runs-second.sqlite'}"
     target_db_uri = f"sqlite:///{tmp_path / 'history-runs-target.sqlite'}"
@@ -1323,7 +1599,9 @@ def test_import_history_keeps_identical_runs_from_distinct_payloads_separate(tmp
                 source_value="same.txt",
                 normal_iocs={"domains": ["same.example"]},
                 warning_iocs={},
-                options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+                options=PersistOptions(
+                    defang=False, check_warnings=False, force_update=False, output_format="json"
+                ),
                 tool_version="5.0.0",
                 run_metadata={"duration_ms": 10},
             )
@@ -1352,10 +1630,22 @@ def test_export_history_is_idempotent_for_same_snapshot_from_same_db(tmp_path: P
             "finished_at": "2026-01-02T03:04:05.010000+00:00",
         },
         "items": [
-            {"url": "https://dup.example", "status": "failed", "error": "boom", "error_type": "Timeout", "retry_attempt": 1},
+            {
+                "url": "https://dup.example",
+                "status": "failed",
+                "error": "boom",
+                "error_type": "Timeout",
+                "retry_attempt": 1,
+            },
         ],
     }
-    persist_batch_job(report, config=load_config(True, source_db_uri, None), source_kind="url", run_ids=(), effective_config={})
+    persist_batch_job(
+        report,
+        config=load_config(True, source_db_uri, None),
+        source_kind="url",
+        run_ids=(),
+        effective_config={},
+    )
 
     first_payload = export_persisted_history(db_uri=source_db_uri)
     second_payload = export_persisted_history(db_uri=source_db_uri)
@@ -1382,10 +1672,22 @@ def test_import_history_legacy_payload_reimport_is_rejected_as_ambiguous(tmp_pat
             "finished_at": "2026-01-02T03:04:05.010000+00:00",
         },
         "items": [
-            {"url": "https://dup.example", "status": "failed", "error": "boom", "error_type": "Timeout", "retry_attempt": 1},
+            {
+                "url": "https://dup.example",
+                "status": "failed",
+                "error": "boom",
+                "error_type": "Timeout",
+                "retry_attempt": 1,
+            },
         ],
     }
-    persist_batch_job(report, config=load_config(True, source_db_uri, None), source_kind="url", run_ids=(), effective_config={})
+    persist_batch_job(
+        report,
+        config=load_config(True, source_db_uri, None),
+        source_kind="url",
+        run_ids=(),
+        effective_config={},
+    )
 
     legacy_payload = export_persisted_history(db_uri=source_db_uri)
     legacy_payload.pop("__history_archive_id__", None)
@@ -1397,7 +1699,9 @@ def test_import_history_legacy_payload_reimport_is_rejected_as_ambiguous(tmp_pat
     assert len(list_failed_batch_jobs(db_uri=target_db_uri, limit=10)) == 1
 
 
-def test_import_history_legacy_run_payload_reimport_is_rejected_as_ambiguous(tmp_path: Path) -> None:
+def test_import_history_legacy_run_payload_reimport_is_rejected_as_ambiguous(
+    tmp_path: Path,
+) -> None:
     source_db_uri = f"sqlite:///{tmp_path / 'history-legacy-run-source.sqlite'}"
     target_db_uri = f"sqlite:///{tmp_path / 'history-legacy-run-target.sqlite'}"
 
@@ -1408,7 +1712,9 @@ def test_import_history_legacy_run_payload_reimport_is_rejected_as_ambiguous(tmp
             source_value="legacy.txt",
             normal_iocs={"domains": ["legacy.example"]},
             warning_iocs={},
-            options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
             tool_version="5.0.0",
         )
     )
@@ -1423,7 +1729,9 @@ def test_import_history_legacy_run_payload_reimport_is_rejected_as_ambiguous(tmp
     assert query_persisted_runs(db_uri=target_db_uri, limit=10).total == 1
 
 
-def test_import_history_legacy_dead_letter_payload_reimport_is_rejected_as_ambiguous(tmp_path: Path) -> None:
+def test_import_history_legacy_dead_letter_payload_reimport_is_rejected_as_ambiguous(
+    tmp_path: Path,
+) -> None:
     source_db_uri = f"sqlite:///{tmp_path / 'history-legacy-dead-source.sqlite'}"
     target_db_uri = f"sqlite:///{tmp_path / 'history-legacy-dead-target.sqlite'}"
     service = SQLAlchemyDistributedJobService(source_db_uri)
@@ -1460,7 +1768,9 @@ def test_import_history_legacy_dead_letter_payload_reimport_is_rejected_as_ambig
     assert len(PersistenceClient(target_db_uri).list_dead_letters(limit=10)) == 1
 
 
-def test_import_history_keeps_identical_distributed_jobs_from_distinct_payloads_separate(tmp_path: Path) -> None:
+def test_import_history_keeps_identical_distributed_jobs_from_distinct_payloads_separate(
+    tmp_path: Path,
+) -> None:
     first_source_db_uri = f"sqlite:///{tmp_path / 'history-dist-first.sqlite'}"
     second_source_db_uri = f"sqlite:///{tmp_path / 'history-dist-second.sqlite'}"
     target_db_uri = f"sqlite:///{tmp_path / 'history-dist-target.sqlite'}"
@@ -1493,7 +1803,9 @@ def test_import_history_keeps_identical_distributed_jobs_from_distinct_payloads_
     assert [job.job_id for job in jobs] == ["job-1", "job-1"]
 
 
-def test_import_history_keeps_identical_dead_letter_jobs_from_distinct_payloads_separate(tmp_path: Path) -> None:
+def test_import_history_keeps_identical_dead_letter_jobs_from_distinct_payloads_separate(
+    tmp_path: Path,
+) -> None:
     first_source_db_uri = f"sqlite:///{tmp_path / 'history-dead-first.sqlite'}"
     second_source_db_uri = f"sqlite:///{tmp_path / 'history-dead-second.sqlite'}"
     target_db_uri = f"sqlite:///{tmp_path / 'history-dead-target.sqlite'}"
@@ -1537,7 +1849,9 @@ def test_import_history_keeps_identical_dead_letter_jobs_from_distinct_payloads_
     assert [item.job_id for item in dead_letters] == ["job-1", "job-1"]
 
 
-def test_import_history_keeps_distinct_dead_letter_jobs_with_same_short_signature(tmp_path: Path) -> None:
+def test_import_history_keeps_distinct_dead_letter_jobs_with_same_short_signature(
+    tmp_path: Path,
+) -> None:
     target_db_uri = f"sqlite:///{tmp_path / 'history-dead-dedupe.sqlite'}"
     payload = {
         "dead_letter_jobs": [
@@ -1554,7 +1868,9 @@ def test_import_history_keeps_distinct_dead_letter_jobs_with_same_short_signatur
                 "error_category": "timeout",
                 "error_message": "timeout",
                 "retryable": True,
-                "payload_json": json.dumps({"request": {"job_id": "job-1", "source_value": "https://same.example/a"}}),
+                "payload_json": json.dumps(
+                    {"request": {"job_id": "job-1", "source_value": "https://same.example/a"}}
+                ),
                 "dead_lettered_at": "2026-01-01T00:00:00+00:00",
             },
             {
@@ -1570,7 +1886,9 @@ def test_import_history_keeps_distinct_dead_letter_jobs_with_same_short_signatur
                 "error_category": "timeout",
                 "error_message": "timeout",
                 "retryable": False,
-                "payload_json": json.dumps({"request": {"job_id": "job-1", "source_value": "https://same.example/b"}}),
+                "payload_json": json.dumps(
+                    {"request": {"job_id": "job-1", "source_value": "https://same.example/b"}}
+                ),
                 "dead_lettered_at": "2026-01-01T00:00:00+00:00",
             },
         ]
@@ -1594,10 +1912,22 @@ def test_history_export_and_batch_detail_hide_internal_import_marker(tmp_path: P
         "status": "failed",
         "duration_ms": 10,
         "items": [
-            {"url": "https://dup.example", "status": "failed", "error": "boom", "error_type": "Timeout", "retry_attempt": 1},
+            {
+                "url": "https://dup.example",
+                "status": "failed",
+                "error": "boom",
+                "error_type": "Timeout",
+                "retry_attempt": 1,
+            },
         ],
     }
-    persist_batch_job(report, config=load_config(True, source_db_uri, None), source_kind="url", run_ids=(), effective_config={"url_workers": 2})
+    persist_batch_job(
+        report,
+        config=load_config(True, source_db_uri, None),
+        source_kind="url",
+        run_ids=(),
+        effective_config={"url_workers": 2},
+    )
 
     payload = export_persisted_history(db_uri=source_db_uri)
     import_history_raw(target_db_uri, payload)
@@ -1606,19 +1936,35 @@ def test_history_export_and_batch_detail_hide_internal_import_marker(tmp_path: P
     assert "__history_import__" not in batch_config
 
     imported_jobs = list_failed_batch_jobs(db_uri=target_db_uri, limit=10)
-    detail = PersistenceClient(target_db_uri).get_batch_job(batch_job_id=imported_jobs[0].batch_job_id)
+    detail = PersistenceClient(target_db_uri).get_batch_job(
+        batch_job_id=imported_jobs[0].batch_job_id
+    )
     assert detail is not None
     assert "__history_import__" not in detail.effective_config
 
 
-def test_persist_failed_batch_items_uses_item_key_metadata_for_duplicate_urls(tmp_path: Path) -> None:
+def test_persist_failed_batch_items_uses_item_key_metadata_for_duplicate_urls(
+    tmp_path: Path,
+) -> None:
     db_uri = f"sqlite:///{tmp_path / 'duplicate-failed-metadata.sqlite'}"
     config = load_config(True, db_uri, None)
     persist_failed_batch_items(
         {
             "items": [
-                {"item_key": "batch-item:1", "url": "https://dup.example", "status": "failed", "error": "boom", "duration_ms": 11},
-                {"item_key": "batch-item:2", "url": "https://dup.example", "status": "failed", "error": "boom", "duration_ms": 22},
+                {
+                    "item_key": "batch-item:1",
+                    "url": "https://dup.example",
+                    "status": "failed",
+                    "error": "boom",
+                    "duration_ms": 11,
+                },
+                {
+                    "item_key": "batch-item:2",
+                    "url": "https://dup.example",
+                    "status": "failed",
+                    "error": "boom",
+                    "duration_ms": 22,
+                },
             ],
             "run_metadata_map": {
                 "batch-item:1": {"duration_ms": 11, "error_message": "boom"},
@@ -1626,7 +1972,9 @@ def test_persist_failed_batch_items_uses_item_key_metadata_for_duplicate_urls(tm
             },
         },
         config=config,
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
 
     runs = query_persisted_runs(db_uri=db_uri, limit=10)

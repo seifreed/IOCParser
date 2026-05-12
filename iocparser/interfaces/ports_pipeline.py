@@ -48,13 +48,17 @@ class PipelineProcessor(Protocol):
 class DistributedJobService(Protocol):
     """Port for persisting and querying distributed job lifecycle."""
 
-    def create_or_get_job(self, *, envelope: QueueEnvelope, receipt_id: str) -> DistributedJobRecord:
+    def create_or_get_job(
+        self, *, envelope: QueueEnvelope, receipt_id: str
+    ) -> DistributedJobRecord:
         """Create or update a queued job record."""
 
     def find_by_idempotency_key(self, *, idempotency_key: str) -> DistributedJobRecord | None:
         """Find a prior queued/running/completed job by idempotency key."""
 
-    def mark_running(self, *, job_id: str, attempts: int, receipt_id: str) -> DistributedJobRecord | None:
+    def mark_running(
+        self, *, job_id: str, attempts: int, receipt_id: str
+    ) -> DistributedJobRecord | None:
         """Transition a job to running."""
 
     def mark_completed(

@@ -107,7 +107,10 @@ class WarningListCacheMixin:
         warning_lists: dict[str, WarningListDict] = {}
         failed_downloads: list[str] = []
         with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = [executor.submit(self._download_single_list, directory) for directory in list_directories]
+            futures = [
+                executor.submit(self._download_single_list, directory)
+                for directory in list_directories
+            ]
             for future in tqdm(
                 as_completed(futures),
                 total=len(list_directories),
@@ -150,7 +153,9 @@ class WarningListCacheMixin:
             self.warning_lists = warning_lists
             self._write_cache()
             self._log_failed_downloads(failed_downloads)
-            current_logger.info("Successfully updated %s MISP warning lists", len(self.warning_lists))
+            current_logger.info(
+                "Successfully updated %s MISP warning lists", len(self.warning_lists)
+            )
         except (OSError, ValueError, requests.RequestException, json.JSONDecodeError):
             current_logger.exception("Could not update warning lists")
             if self.cache_file.exists():

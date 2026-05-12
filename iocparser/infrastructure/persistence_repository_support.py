@@ -134,7 +134,9 @@ def result_items(result: ExtractionResultLike | ExtractionResult | None) -> list
     if result is None:
         return []
     normal_items: list[MetadataItem] = [cast("MetadataItem", ioc) for ioc in result.iocs]
-    warning_items: list[MetadataItem] = [cast("MetadataItem", warning) for warning in result.warnings]
+    warning_items: list[MetadataItem] = [
+        cast("MetadataItem", warning) for warning in result.warnings
+    ]
     return normal_items + warning_items
 
 

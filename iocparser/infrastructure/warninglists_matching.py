@@ -54,7 +54,9 @@ class WarningListMatchingMixin:
     def _get_logger(self) -> Logger:
         return get_mixin_logger(self, logger)
 
-    def _ensure_warning_lookup_cache(self) -> dict[tuple[str, str], tuple[bool, dict[str, str] | None]]:
+    def _ensure_warning_lookup_cache(
+        self,
+    ) -> dict[tuple[str, str], tuple[bool, dict[str, str] | None]]:
         try:
             return self._warning_lookup_cache
         except AttributeError:
@@ -167,7 +169,9 @@ class WarningListMatchingMixin:
             if list_id not in compiled_regex or list_id not in self.warning_lists:
                 continue
             for pattern in compiled_regex[list_id]:
-                if pattern.search(clean_value) or (extracted_domain and pattern.search(extracted_domain)):
+                if pattern.search(clean_value) or (
+                    extracted_domain and pattern.search(extracted_domain)
+                ):
                     return self._build_warning_response(self.warning_lists[list_id], list_id)
         return None
 
@@ -205,7 +209,9 @@ class WarningListMatchingMixin:
             misp_types = self._get_misp_types_for_ioc(ioc_type)
             if not self._is_list_applicable(warning_list, misp_types, ioc_type):
                 continue
-            result = self._check_against_warning_list(clean_value, extracted_domain, warning_list, list_id)
+            result = self._check_against_warning_list(
+                clean_value, extracted_domain, warning_list, list_id
+            )
             if result:
                 return result
         return None
@@ -282,7 +288,10 @@ class WarningListMatchingMixin:
             return False
         for misp_type in misp_types:
             for warning_attr in attrs_list:
-                if misp_type.lower() == warning_attr.lower() or misp_type.lower() in warning_attr.lower().split("|"):
+                if (
+                    misp_type.lower() == warning_attr.lower()
+                    or misp_type.lower() in warning_attr.lower().split("|")
+                ):
                     return True
         return ioc_type in ["ips", "ipv6"] and warning_list.get("type") == "cidr"
 

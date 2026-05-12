@@ -153,7 +153,8 @@ def load_result(session: Session, run_id: int) -> ExtractionResult:
                         model.ioc_type,
                         model.value,
                         evidence=evidence,
-                        severity=run_ioc.severity or classify_ioc(inferred_type, is_warning=True)[0],
+                        severity=run_ioc.severity
+                        or classify_ioc(inferred_type, is_warning=True)[0],
                         tags=tags,
                     ),
                     warning_list=model.warning_list,
@@ -173,7 +174,9 @@ def load_result(session: Session, run_id: int) -> ExtractionResult:
     return ExtractionResult(iocs=tuple(normal_iocs), warnings=tuple(warnings))
 
 
-def build_query_hits(rows: list[tuple[RunModel, SourceModel, IOCModel, RunIOCModel]]) -> list[PersistedRunQueryHit]:
+def build_query_hits(
+    rows: list[tuple[RunModel, SourceModel, IOCModel, RunIOCModel]],
+) -> list[PersistedRunQueryHit]:
     """Build persisted query hits from joined ORM rows."""
     return [
         PersistedRunQueryHit(
@@ -212,7 +215,9 @@ def matches_advanced_filters(
         return False
     if min_severity is None:
         return True
-    return SEVERITY_ORDER.get((hit.severity or "").lower(), -1) >= SEVERITY_ORDER.get(min_severity.lower(), 0)
+    return SEVERITY_ORDER.get((hit.severity or "").lower(), -1) >= SEVERITY_ORDER.get(
+        min_severity.lower(), 0
+    )
 
 
 def delete_run(session: Session, run_id: int) -> bool:
@@ -229,21 +234,29 @@ def cleanup_orphaned_records(session: Session) -> int:
     """Remove IOC and source records that are no longer referenced by any run."""
     from sqlalchemy import exists
 
-    orphaned_iocs = session.execute(
-        select(IOCModel.id).where(
-            ~exists(select(RunIOCModel.id).where(RunIOCModel.ioc_id == IOCModel.id))
+    orphaned_iocs = (
+        session.execute(
+            select(IOCModel.id).where(
+                ~exists(select(RunIOCModel.id).where(RunIOCModel.ioc_id == IOCModel.id))
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     deleted = 0
     if orphaned_iocs:
         session.execute(delete(IOCModel).where(IOCModel.id.in_(orphaned_iocs)))
         deleted += len(orphaned_iocs)
 
-    orphaned_sources = session.execute(
-        select(SourceModel.id).where(
-            ~exists(select(RunModel.id).where(RunModel.source_id == SourceModel.id))
+    orphaned_sources = (
+        session.execute(
+            select(SourceModel.id).where(
+                ~exists(select(RunModel.id).where(RunModel.source_id == SourceModel.id))
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     if orphaned_sources:
         session.execute(delete(SourceModel).where(SourceModel.id.in_(orphaned_sources)))
         deleted += len(orphaned_sources)
@@ -292,7 +305,9 @@ def prune_runs(
     statuses: tuple[str, ...] = (),
 ) -> int:
     """Prune persisted runs and return the number of deleted rows."""
-    stmt = _build_prune_query(before=before, source_kind=source_kind, source_value=source_value, statuses=statuses)
+    stmt = _build_prune_query(
+        before=before, source_kind=source_kind, source_value=source_value, statuses=statuses
+    )
     runs = session.execute(stmt).scalars().all()
     deletable = _select_deletable(runs, keep_latest)
     deleted = sum(1 for run in deletable if delete_run(session, run.id))

@@ -62,13 +62,16 @@ def _decision_points_for(path: Path) -> int:
 
 def test_domain_does_not_depend_on_application_or_infrastructure() -> None:
     domain_dir = IOCPARSER_ROOT / "domain"
-    forbidden = ("iocparser.application", "iocparser.infrastructure", "iocparser.adapters", "iocparser.cli")
+    forbidden = (
+        "iocparser.application",
+        "iocparser.infrastructure",
+        "iocparser.adapters",
+        "iocparser.cli",
+    )
     for path in domain_dir.glob("*.py"):
         imports = _imports_for(path)
         assert not any(
-            imported.startswith(prefix)
-            for imported in imports
-            for prefix in forbidden
+            imported.startswith(prefix) for imported in imports for prefix in forbidden
         ), f"{path.name} imports forbidden outer-layer modules: {sorted(imports)}"
 
 
@@ -78,9 +81,7 @@ def test_application_depends_on_ports_not_infrastructure() -> None:
     for path in application_dir.glob("*.py"):
         imports = _imports_for(path)
         assert not any(
-            imported.startswith(prefix)
-            for imported in imports
-            for prefix in forbidden
+            imported.startswith(prefix) for imported in imports for prefix in forbidden
         ), f"{path.name} imports forbidden infrastructure modules: {sorted(imports)}"
 
 
@@ -95,9 +96,7 @@ def test_new_layers_do_not_import_removed_modules_package() -> None:
         for path in layer_dir.glob("*.py"):
             imports = _imports_for(path)
             assert not any(
-                imported.startswith(prefix)
-                for imported in imports
-                for prefix in forbidden
+                imported.startswith(prefix) for imported in imports for prefix in forbidden
             ), f"{path.name} imports removed modules package entries: {sorted(imports)}"
 
 
@@ -124,10 +123,16 @@ def test_grouped_infrastructure_subpackages_stay_small_enough_to_review() -> Non
         IOCPARSER_ROOT / "infrastructure" / "migration_revisions": 80,
     }
     for directory, limit in limits.items():
-        globber = directory.glob if directory == IOCPARSER_ROOT / "infrastructure" / "persistence" else directory.rglob
+        globber = (
+            directory.glob
+            if directory == IOCPARSER_ROOT / "infrastructure" / "persistence"
+            else directory.rglob
+        )
         for path in globber("*.py"):
             line_count = len(path.read_text(encoding="utf-8").splitlines())
-            assert line_count <= limit, f"{path.relative_to(REPO_ROOT)} is too large ({line_count} lines > {limit})"
+            assert line_count <= limit, (
+                f"{path.relative_to(REPO_ROOT)} is too large ({line_count} lines > {limit})"
+            )
 
 
 def test_public_facades_stay_thin() -> None:
@@ -153,7 +158,9 @@ def test_public_facades_stay_thin() -> None:
     }
     for path, limit in facade_limits.items():
         line_count = len(path.read_text(encoding="utf-8").splitlines())
-        assert line_count <= limit, f"{path.name} stopped being a thin facade ({line_count} lines > {limit})"
+        assert line_count <= limit, (
+            f"{path.name} stopped being a thin facade ({line_count} lines > {limit})"
+        )
 
 
 def test_domain_models_facade_only_reexports_domain_symbols() -> None:
@@ -191,7 +198,9 @@ def test_public_root_facade_only_reexports_public_api_and_boundary_symbols() -> 
     )
     # Allow bare "from iocparser import ..." re-exports in __init__.py
     bare_import_ok = {"iocparser"}
-    assert all(imported in bare_import_ok or imported.startswith(allowed_prefixes) for imported in imports)
+    assert all(
+        imported in bare_import_ok or imported.startswith(allowed_prefixes) for imported in imports
+    )
 
     for node in _top_level_nodes(path):
         assert not isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)), (
@@ -201,12 +210,16 @@ def test_public_root_facade_only_reexports_public_api_and_boundary_symbols() -> 
 
 def test_public_root_all_focuses_on_core_api_surface() -> None:
     root = REPO_ROOT / "iocparser" / "__init__.py"
-    exports = ast.literal_eval(next(
-        node.value
-        for node in ast.parse(root.read_text(encoding="utf-8")).body
-        if isinstance(node, ast.Assign)
-        and any(isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets)
-    ))
+    exports = ast.literal_eval(
+        next(
+            node.value
+            for node in ast.parse(root.read_text(encoding="utf-8")).body
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets
+            )
+        )
+    )
     pipeline_exports = {
         "DistributedPipelineClient",
         "DistributedPipelineService",
@@ -239,8 +252,7 @@ def test_cli_facade_only_depends_on_cli_boundary_and_public_domain_types() -> No
         "iocparser",
     )
     assert all(
-        imported == "iocparser" or imported.startswith(allowed_prefixes)
-        for imported in imports
+        imported == "iocparser" or imported.startswith(allowed_prefixes) for imported in imports
     ), f"cli.py imports unexpected modules for a facade: {sorted(imports)}"
 
 
@@ -328,7 +340,9 @@ def test_domain_and_application_avoid_io_and_process_shortcuts() -> None:
                 for imported in imports
                 for prefix in forbidden_import_prefixes
             ), f"{path.name} imports forbidden operational dependencies: {sorted(imports)}"
-            assert not (calls & forbidden_calls), f"{path.name} calls forbidden operational shortcuts: {sorted(calls)}"
+            assert not (calls & forbidden_calls), (
+                f"{path.name} calls forbidden operational shortcuts: {sorted(calls)}"
+            )
 
 
 def test_print_is_confined_to_cli_boundary() -> None:
@@ -343,7 +357,9 @@ def test_print_is_confined_to_cli_boundary() -> None:
         if "__pycache__" in path.parts or path in allowed:
             continue
         calls = _call_names_for(path)
-        assert "print" not in calls, f"{path.relative_to(REPO_ROOT)} uses print() outside the CLI boundary"
+        assert "print" not in calls, (
+            f"{path.relative_to(REPO_ROOT)} uses print() outside the CLI boundary"
+        )
 
 
 def test_sys_exit_is_confined_to_entrypoint() -> None:
@@ -352,7 +368,9 @@ def test_sys_exit_is_confined_to_entrypoint() -> None:
         if "__pycache__" in path.parts or path == allowed:
             continue
         calls = _call_names_for(path)
-        assert "sys.exit" not in calls, f"{path.relative_to(REPO_ROOT)} uses sys.exit() outside __main__.py"
+        assert "sys.exit" not in calls, (
+            f"{path.relative_to(REPO_ROOT)} uses sys.exit() outside __main__.py"
+        )
 
 
 def test_modules_package_is_removed() -> None:
@@ -369,18 +387,32 @@ def test_repository_no_longer_imports_modules_package() -> None:
             assert not any(
                 imported == "iocparser.modules" or imported.startswith("iocparser.modules.")
                 for imported in imports
-            ), f"{path.relative_to(REPO_ROOT)} still imports removed modules package: {sorted(imports)}"
+            ), (
+                f"{path.relative_to(REPO_ROOT)} still imports removed modules package: {sorted(imports)}"
+            )
 
 
 def test_public_root_does_not_advertise_removed_root_classes() -> None:
     root = REPO_ROOT / "iocparser" / "__init__.py"
-    exports = ast.literal_eval(next(
-        node.value
-        for node in ast.parse(root.read_text(encoding="utf-8")).body
-        if isinstance(node, ast.Assign)
-        and any(isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets)
-    ))
-    removed_exports = {"IOCExtractor", "PDFParser", "HTMLParser", "MISPWarningLists", "JSONFormatter", "TextFormatter", "STIXFormatter"}
+    exports = ast.literal_eval(
+        next(
+            node.value
+            for node in ast.parse(root.read_text(encoding="utf-8")).body
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets
+            )
+        )
+    )
+    removed_exports = {
+        "IOCExtractor",
+        "PDFParser",
+        "HTMLParser",
+        "MISPWarningLists",
+        "JSONFormatter",
+        "TextFormatter",
+        "STIXFormatter",
+    }
     assert not (set(exports) & removed_exports)
 
 
@@ -402,7 +434,9 @@ def test_hotspots_stay_within_decision_point_budget() -> None:
     }
     for path, limit in budgets.items():
         decisions = _decision_points_for(path)
-        assert decisions <= limit, f"{path.relative_to(REPO_ROOT)} is too complex ({decisions} > {limit})"
+        assert decisions <= limit, (
+            f"{path.relative_to(REPO_ROOT)} is too complex ({decisions} > {limit})"
+        )
 
 
 def test_public_api_compatibility_doc_exists_and_references_canonical_modules() -> None:

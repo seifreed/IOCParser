@@ -91,7 +91,22 @@ class StaticQueryService:
         sort_by: str = "newest",
         search_backend: str = "auto",
     ) -> list[PersistedRunQueryHit]:
-        del limit, offset, date_from, date_to, source_kind, source_value, ioc_type, severity, tags, exclude_tags, min_severity, tag_mode, sort_by, search_backend
+        del (
+            limit,
+            offset,
+            date_from,
+            date_to,
+            source_kind,
+            source_value,
+            ioc_type,
+            severity,
+            tags,
+            exclude_tags,
+            min_severity,
+            tag_mode,
+            sort_by,
+            search_backend,
+        )
         return [
             PersistedRunQueryHit(
                 run_id=1,
@@ -181,14 +196,20 @@ def _query_args(**overrides: object) -> argparse.Namespace:
 def test_query_use_cases_delegate_to_query_service() -> None:
     service = StaticQueryService()
     assert query_runs(QueryRunsInput(limit=1), persistence_query_service=service)[0].run_id == 1
-    assert search_persisted_iocs(
-        SearchPersistedIOCsInput(value="alpha"),
-        persistence_query_service=service,
-    )[0].value == "alpha"
-    assert export_persisted_run(
-        ExportPersistedRunInput(run_id=1),
-        persistence_query_service=service,
-    ).summary.source_value == "sample.txt"
+    assert (
+        search_persisted_iocs(
+            SearchPersistedIOCsInput(value="alpha"),
+            persistence_query_service=service,
+        )[0].value
+        == "alpha"
+    )
+    assert (
+        export_persisted_run(
+            ExportPersistedRunInput(run_id=1),
+            persistence_query_service=service,
+        ).summary.source_value
+        == "sample.txt"
+    )
     assert diff_persisted_runs(
         DiffPersistedRunsInput(left_run_id=1, right_run_id=2),
         persistence_query_service=service,
@@ -196,8 +217,15 @@ def test_query_use_cases_delegate_to_query_service() -> None:
 
 
 def test_cli_persistence_builds_all_output_formats_and_persists(tmp_path: Path) -> None:
-    for flag, output_format in (("stix", "stix"), ("jsonl", "jsonl"), ("csv", "csv"), ("json", "json")):
-        args = _query_args(**{flag: True, "no_defang": False, "no_check_warnings": False, "force_update": False})
+    for flag, output_format in (
+        ("stix", "stix"),
+        ("jsonl", "jsonl"),
+        ("csv", "csv"),
+        ("json", "json"),
+    ):
+        args = _query_args(
+            **{flag: True, "no_defang": False, "no_check_warnings": False, "force_update": False}
+        )
         assert cli_persistence.build_persist_options(args).output_format == output_format
 
     text_args = _query_args(no_defang=True, no_check_warnings=True, force_update=True)
@@ -211,7 +239,9 @@ def test_cli_persistence_builds_all_output_formats_and_persists(tmp_path: Path) 
     cli_persistence.persist_many_results(
         {"sample.txt": ({"domains": ["alpha.example"]}, {})},
         config=config,
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
     service = SQLAlchemyPersistenceService(config.db_uri)
     assert service.list_runs(limit=5)[0].source_value == "sample.txt"
@@ -251,7 +281,9 @@ def test_cli_output_helpers_cover_text_and_export_paths(tmp_path: Path) -> None:
 
     writer = MemoryWriter()
     export = PersistedRunExport(summary=StaticQueryService().summary, result=result)
-    cli_output.save_exported_run(_query_args(output=str(tmp_path / "export.json"), json=True), export, file_writer=writer)
+    cli_output.save_exported_run(
+        _query_args(output=str(tmp_path / "export.json"), json=True), export, file_writer=writer
+    )
     assert writer.writes
     assert writer.writes[0][0].endswith("export.json")
 
@@ -261,8 +293,12 @@ def test_cli_output_helpers_cover_text_and_export_paths(tmp_path: Path) -> None:
         added=ExtractionResult(iocs=(IOC.from_raw("domains", "beta.example"),)),
         removed=ExtractionResult(iocs=(IOC.from_raw("domains", "alpha.example"),)),
     )
-    cli_output.save_diff_output(_query_args(output=str(tmp_path / "diff.txt")), diff, file_writer=writer)
-    cli_output.save_diff_output(_query_args(output=str(tmp_path / "diff.jsonl"), jsonl=True), diff, file_writer=writer)
+    cli_output.save_diff_output(
+        _query_args(output=str(tmp_path / "diff.txt")), diff, file_writer=writer
+    )
+    cli_output.save_diff_output(
+        _query_args(output=str(tmp_path / "diff.jsonl"), jsonl=True), diff, file_writer=writer
+    )
     cli_output.save_rendered_output(
         rendered_output="payload",
         output_label="text",
@@ -280,45 +316,88 @@ def test_cli_queries_and_dispatch_paths(tmp_path: Path) -> None:
     service = SQLAlchemyPersistenceService(db_uri)
     run_ids = service.persist_multiple_runs(
         [
-            ("file", "alpha.txt", ExtractionResult.from_grouped_payload({"domains": ["alpha.example"]}, {})),
-            ("file", "beta.txt", ExtractionResult.from_grouped_payload({"domains": ["beta.example"]}, {})),
+            (
+                "file",
+                "alpha.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["alpha.example"]}, {}),
+            ),
+            (
+                "file",
+                "beta.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["beta.example"]}, {}),
+            ),
         ],
         tool_version="1.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
     writer = LocalFileWriter()
     config = SimpleNamespace(db_uri=db_uri)
 
-    assert cli_queries.handle_query_commands(_query_args(list_runs=True), config, file_writer=writer) is True
-    assert cli_queries.handle_query_commands(_query_args(search_ioc="beta"), config, file_writer=writer) is True
-    assert cli_queries.handle_query_commands(
-        _query_args(diff_runs=[str(run_ids[0]), str(run_ids[1])], output=str(tmp_path / "diff.json"), json=True),
-        config,
-        file_writer=writer,
-    ) is True
-    assert cli_queries.handle_query_commands(
-        _query_args(export_run=run_ids[0], output=str(tmp_path / "run.json"), json=True),
-        config,
-        file_writer=writer,
-    ) is True
-    assert cli_queries.handle_query_commands(
-        _query_args(delete_run=run_ids[0]),
-        config,
-        file_writer=writer,
-    ) is True
-    assert cli_queries.handle_query_commands(
-        _query_args(prune_before="2999-01-01T00:00:00", keep_latest=0, source_kind="file", source_value="beta"),
-        config,
-        file_writer=writer,
-    ) is True
+    assert (
+        cli_queries.handle_query_commands(_query_args(list_runs=True), config, file_writer=writer)
+        is True
+    )
+    assert (
+        cli_queries.handle_query_commands(
+            _query_args(search_ioc="beta"), config, file_writer=writer
+        )
+        is True
+    )
+    assert (
+        cli_queries.handle_query_commands(
+            _query_args(
+                diff_runs=[str(run_ids[0]), str(run_ids[1])],
+                output=str(tmp_path / "diff.json"),
+                json=True,
+            ),
+            config,
+            file_writer=writer,
+        )
+        is True
+    )
+    assert (
+        cli_queries.handle_query_commands(
+            _query_args(export_run=run_ids[0], output=str(tmp_path / "run.json"), json=True),
+            config,
+            file_writer=writer,
+        )
+        is True
+    )
+    assert (
+        cli_queries.handle_query_commands(
+            _query_args(delete_run=run_ids[0]),
+            config,
+            file_writer=writer,
+        )
+        is True
+    )
+    assert (
+        cli_queries.handle_query_commands(
+            _query_args(
+                prune_before="2999-01-01T00:00:00",
+                keep_latest=0,
+                source_kind="file",
+                source_value="beta",
+            ),
+            config,
+            file_writer=writer,
+        )
+        is True
+    )
     assert cli_queries.handle_query_commands(_query_args(), config, file_writer=writer) is False
     with pytest.raises(ValidationError):
-        cli_queries.handle_query_commands(_query_args(list_runs=True), SimpleNamespace(db_uri=None), file_writer=writer)
+        cli_queries.handle_query_commands(
+            _query_args(list_runs=True), SimpleNamespace(db_uri=None), file_writer=writer
+        )
 
     def _save_output(*args) -> None:
         del args
 
-    args = argparse.Namespace(init=True, force_update=False, multiple=None, directory=None, url_file=None)
+    args = argparse.Namespace(
+        init=True, force_update=False, multiple=None, directory=None, url_file=None
+    )
     called = {"init": 0}
     cli_dispatch.run_cli(
         args,
@@ -379,7 +458,9 @@ def test_cli_dispatch_directory_url_file_and_stdin_paths(tmp_path: Path) -> None
     cli_dispatch.run_cli(
         argparse.Namespace(**base_args),
         handle_misp_init=lambda: None,
-        process_multiple_files_input=lambda _args: (_ for _ in ()).throw(AssertionError("unexpected")),
+        process_multiple_files_input=lambda _args: (_ for _ in ()).throw(
+            AssertionError("unexpected")
+        ),
         process_single_input=lambda _args: (_ for _ in ()).throw(AssertionError("unexpected")),
         save_output=lambda *args: None,
     )
@@ -388,7 +469,9 @@ def test_cli_dispatch_directory_url_file_and_stdin_paths(tmp_path: Path) -> None
     cli_dispatch.run_cli(
         args_url,
         handle_misp_init=lambda: None,
-        process_multiple_files_input=lambda _args: (_ for _ in ()).throw(AssertionError("unexpected")),
+        process_multiple_files_input=lambda _args: (_ for _ in ()).throw(
+            AssertionError("unexpected")
+        ),
         process_single_input=lambda _args: (_ for _ in ()).throw(AssertionError("unexpected")),
         save_output=lambda *args: None,
     )
@@ -400,7 +483,9 @@ def test_cli_dispatch_directory_url_file_and_stdin_paths(tmp_path: Path) -> None
         cli_dispatch.run_cli(
             stdin_args,
             handle_misp_init=lambda: None,
-            process_multiple_files_input=lambda _args: (_ for _ in ()).throw(AssertionError("unexpected")),
+            process_multiple_files_input=lambda _args: (_ for _ in ()).throw(
+                AssertionError("unexpected")
+            ),
             process_single_input=lambda _args: ({}, {}, "stdin"),
             save_output=lambda *args: None,
         )
@@ -431,7 +516,15 @@ def test_cli_processing_edge_cases_and_streaming_paths(tmp_path: Path) -> None:
 
     with pytest.raises(FileExistenceError):
         cli_processing.process_url_file_input(
-            argparse.Namespace(url_file=str(tmp_path / "missing.txt"), no_defang=True, no_check_warnings=True, force_update=False, type="text", only=None, exclude=None),
+            argparse.Namespace(
+                url_file=str(tmp_path / "missing.txt"),
+                no_defang=True,
+                no_check_warnings=True,
+                force_update=False,
+                type="text",
+                only=None,
+                exclude=None,
+            ),
             reader=reader,
             warning_service=None,
             downloader=downloader,
@@ -440,7 +533,15 @@ def test_cli_processing_edge_cases_and_streaming_paths(tmp_path: Path) -> None:
     url_file = tmp_path / "urls.txt"
     url_file.write_text("# comment\n\n", encoding="utf-8")
     normal_iocs, warning_iocs, display, results = cli_processing.process_url_file_input(
-        argparse.Namespace(url_file=str(url_file), no_defang=True, no_check_warnings=True, force_update=False, type="text", only=None, exclude=None),
+        argparse.Namespace(
+            url_file=str(url_file),
+            no_defang=True,
+            no_check_warnings=True,
+            force_update=False,
+            type="text",
+            only=None,
+            exclude=None,
+        ),
         reader=reader,
         warning_service=None,
         downloader=downloader,
@@ -476,7 +577,13 @@ def test_cli_processing_edge_cases_and_streaming_paths(tmp_path: Path) -> None:
 
     streaming_result = cli_processing._streaming_result(
         a,
-        options=cli_processing.ProcessingOptions(defang=False, check_warnings=True, force_update=False, include_types=(IOCType.URL,), exclude_types=()),
+        options=cli_processing.ProcessingOptions(
+            defang=False,
+            check_warnings=True,
+            force_update=False,
+            include_types=(IOCType.URL,),
+            exclude_types=(),
+        ),
         warning_service=WarningService(),
         chunk_size=64,
         overlap=16,
@@ -487,7 +594,21 @@ def test_cli_processing_edge_cases_and_streaming_paths(tmp_path: Path) -> None:
 def test_dispatch_execute_and_use_case_edge_branches() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--value")
-    parser.parse_args = lambda argv=None: argparse.Namespace(init=False, force_update=False, file=None, url=None, url_direct=None, multiple=None, directory=None, url_file=None, stdin=False, list_runs=False, search_ioc=None, diff_runs=None, export_run=None)
+    parser.parse_args = lambda argv=None: argparse.Namespace(
+        init=False,
+        force_update=False,
+        file=None,
+        url=None,
+        url_direct=None,
+        multiple=None,
+        directory=None,
+        url_file=None,
+        stdin=False,
+        list_runs=False,
+        search_ioc=None,
+        diff_runs=None,
+        export_run=None,
+    )
     with pytest.raises(ValidationError):
         cli_dispatch.execute(create_argument_parser=lambda: parser, run_cli=lambda _args: None)
 

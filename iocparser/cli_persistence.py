@@ -48,7 +48,9 @@ def build_persist_options(args: argparse.Namespace) -> PersistOptions:
 
 
 def _normalized_run_metadata_map(
-    run_metadata_map: dict[str, dict[str, int | str]] | dict[str, dict[str, int | str | None]] | None,
+    run_metadata_map: dict[str, dict[str, int | str]]
+    | dict[str, dict[str, int | str | None]]
+    | None,
 ) -> dict[str, dict[str, int | str | None]] | None:
     if run_metadata_map is None:
         return None
@@ -61,7 +63,9 @@ def _normalized_run_metadata_map(
     }
 
 
-def _persist_results_request(request: PersistResultsRequestData) -> _cli_output.PersistResultsRequest:
+def _persist_results_request(
+    request: PersistResultsRequestData,
+) -> _cli_output.PersistResultsRequest:
     return _cli_output.PersistResultsRequest(
         config=request.config,
         source_kind=request.source_kind,
@@ -82,7 +86,9 @@ def persist_many_results(
     options: PersistOptions,
     source_kind: str = "file",
     source_metadata_map: dict[str, dict[str, object]] | None = None,
-    run_metadata_map: dict[str, dict[str, int | str]] | dict[str, dict[str, int | str | None]] | None = None,
+    run_metadata_map: dict[str, dict[str, int | str]]
+    | dict[str, dict[str, int | str | None]]
+    | None = None,
 ) -> tuple[int, ...]:
     normalized = _normalized_run_metadata_map(run_metadata_map)
     run_ids: list[int] = []
@@ -148,7 +154,10 @@ def _batch_result_entries(
     results: BatchResults | dict[str, tuple[GroupedIocs, GroupedWarnings]],
 ) -> list[tuple[str, str, GroupedIocs, GroupedWarnings]]:
     if isinstance(results, dict):
-        return [(item_key, item_key, normal_iocs, warning_iocs) for item_key, (normal_iocs, warning_iocs) in results.items()]
+        return [
+            (item_key, item_key, normal_iocs, warning_iocs)
+            for item_key, (normal_iocs, warning_iocs) in results.items()
+        ]
     return [
         (entry.item_key, entry.source_value, entry.normal_iocs, entry.warning_iocs)
         for entry in results.entries
@@ -186,7 +195,9 @@ def _failed_item_run_metadata(
         if fallback is None:
             fallback = run_metadata_map.get(source_value)
     return {
-        "duration_ms": _int_value(item.get("duration_ms"), default=fallback_int(fallback, "duration_ms", 0)),
+        "duration_ms": _int_value(
+            item.get("duration_ms"), default=fallback_int(fallback, "duration_ms", 0)
+        ),
         "processed_items": 1,
         "successful_items": 0,
         "failed_items": 1,
@@ -238,6 +249,7 @@ def persist_batch_job(
         report=dict(report),
         config=dict(effective_config),
     )
+
 
 __all__ = [
     "VERSION",

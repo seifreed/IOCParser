@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import argparse
 import json
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import cast
 
 from sqlalchemy import create_engine
+from sqlalchemy.engine import Engine
 
 from iocparser import cli_args as _cli_args
 from iocparser import cli_output as _cli_output
@@ -75,11 +76,19 @@ def _namespace_value(args: argparse.Namespace, field_name: str) -> object | None
     return namespace.get(field_name)
 
 
+def _run_with_engine[T](db_uri: str, operation: Callable[[Engine], T]) -> T:
+    engine = create_engine(db_uri, future=True)
+    try:
+        return operation(engine)
+    finally:
+        engine.dispose()
+
+
 def _handle_schema_inspection(args: argparse.Namespace, db_uri: str | None) -> bool:
     if _cli_args.get_bool_arg(args, "schema_version"):
         if not db_uri:
             raise ValidationError(SCHEMA_VERSION_REQUIRED)
-        value = schema_version(create_engine(db_uri, future=True))
+        value = _run_with_engine(db_uri, schema_version)
         _cli_output.print_status_line("schema_version", value)
         return True
     if _cli_args.get_bool_arg(args, "migrate"):
@@ -92,7 +101,7 @@ def _handle_schema_inspection(args: argparse.Namespace, db_uri: str | None) -> b
         return False
     if not db_uri:
         raise ValidationError(VALIDATE_REQUIRED)
-    problems = validate_schema(create_engine(db_uri, future=True))
+    problems = _run_with_engine(db_uri, validate_schema)
     _cli_output.print_status_line("schema_valid", "true" if not problems else "false")
     if problems:
         _cli_output.print_text_lines([f"  {problem}" for problem in problems])

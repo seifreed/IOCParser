@@ -55,7 +55,7 @@ from iocparser.cli_persistence import persist_failed_batch_items, persist_many_r
 from iocparser.cli_processing import process_url_file_input_with_report
 from iocparser.cli_processing_files import merge_batch_results
 from iocparser.cli_processing_support import BatchResultsCollection, batch_item_keys
-from iocparser.cli_processing_urls import build_batch_report, public_batch_report
+from iocparser.cli_processing_urls import _report_item, build_batch_report, public_batch_report
 from iocparser.cli_runtime import (
     _parse_http_mapping,
     apply_config_defaults,
@@ -153,6 +153,14 @@ def test_persisted_option_overrides_parse_bool_strings() -> None:
     assert export_filters.only_normal is False
     assert diff_filters.only_warnings is False
     assert diff_filters.only_normal is False
+
+
+def test_batch_report_item_parses_retryable_bool_strings() -> None:
+    disabled = _report_item({"url": "https://a.example", "retryable": "false"})
+    enabled = _report_item({"url": "https://b.example", "retryable": "yes"})
+
+    assert disabled["retryable"] is False
+    assert enabled["retryable"] is True
 
 
 class _Writer:

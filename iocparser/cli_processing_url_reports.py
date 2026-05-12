@@ -72,6 +72,18 @@ def int_value(value: object, *, default: int = 0) -> int:
     return default
 
 
+def bool_value(value: object, *, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"0", "false", "no", "off", ""}:
+            return False
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+    return bool(value)
+
+
 def _json_dict(path: Path) -> dict[str, object]:
     payload: object = loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
@@ -95,7 +107,7 @@ def _report_item(entry: dict[object, object]) -> BatchItemReport:
         if _set_batch_item_int(item, key_str, value):
             continue
         if key_str == "retryable":
-            item["retryable"] = bool(value)
+            item["retryable"] = bool_value(value)
             continue
         if key_str == "metadata" and isinstance(value, dict):
             item["metadata"] = {str(name): data for name, data in value.items()}

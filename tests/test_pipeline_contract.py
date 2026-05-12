@@ -181,6 +181,45 @@ def test_pipeline_worker_checks_file_size_before_reading(
     assert result.error.code == "VALIDATION_FAILED"
 
 
+def test_pipeline_worker_cleans_downloaded_url_when_runtime_size_limit_fails(
+    tmp_path: Path,
+) -> None:
+    temp_file = tmp_path / "downloaded.txt"
+    temp_file.write_text("too large", encoding="utf-8")
+
+    class FakeDownloader:
+        last_download_metadata = {"input_size": 9}
+
+        def download(self, url: str) -> str:
+            assert url == "https://example.test/report"
+            return str(temp_file)
+
+    class FakeClient:
+        downloader = FakeDownloader()
+
+        def extract_result_from_text(self, text_content: str, **kwargs: object) -> ExtractionResult:
+            raise AssertionError("text extraction should not run")
+
+        def extract_result_from_file(self, file_path: str, **kwargs: object) -> ExtractionResult:
+            raise AssertionError("file extraction should not run")
+
+    result = PipelineWorker(
+        client=FakeClient(),
+        limits=ResourceLimits(max_input_size_bytes=1),
+    ).process(
+        PipelineJobRequest(
+            input_kind="url",
+            source_value="https://example.test/report",
+            check_warnings=False,
+        )
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "VALIDATION_FAILED"
+    assert not temp_file.exists()
+
+
 def test_pipeline_worker_enforces_time_limit_and_invalid_kind() -> None:
     timed = PipelineWorker(limits=ResourceLimits(max_input_seconds=0.0))
     timed_result = timed.process(

@@ -258,17 +258,22 @@ def _prepare_url_input(
     *, client: ExtractionClient, limits: ResourceLimits, url: str
 ) -> PreparedInput:
     temp_file = client.downloader.download(url)
-    metadata = dict(client.downloader.last_download_metadata or {})
-    input_size = metadata_int(metadata, "input_size") or 0
-    enforce_size_limit(limits=limits, input_size_bytes=input_size)
-    url_metadata = dict(metadata)
-    url_metadata["temp_file"] = temp_file
-    url_metadata["source_kind"] = "url"
-    return PreparedInput(
-        fingerprint=cast("str | None", metadata.get("fingerprint")),
-        content_hash=cast("str | None", metadata.get("content_hash")),
-        metadata=url_metadata,
-    )
+    try:
+        metadata = dict(client.downloader.last_download_metadata or {})
+        input_size = metadata_int(metadata, "input_size") or 0
+        enforce_size_limit(limits=limits, input_size_bytes=input_size)
+        url_metadata = dict(metadata)
+        url_metadata["temp_file"] = temp_file
+        url_metadata["source_kind"] = "url"
+        return PreparedInput(
+            fingerprint=cast("str | None", metadata.get("fingerprint")),
+            content_hash=cast("str | None", metadata.get("content_hash")),
+            metadata=url_metadata,
+        )
+    except Exception:
+        with suppress(OSError):
+            Path(temp_file).unlink()
+        raise
 
 
 def prepare_input(

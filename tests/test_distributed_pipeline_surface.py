@@ -124,6 +124,29 @@ def test_domain_distributed_records_and_telemetry_sinks() -> None:
     LoggingTelemetrySink().emit(event)
 
 
+def test_queue_envelope_from_record_parses_bool_compatible_values() -> None:
+    payload = _envelope("job-bool").to_record()
+    request_payload = payload["request"]
+    assert isinstance(request_payload, dict)
+    request_payload.update(
+        {
+            "persist": "false",
+            "check_warnings": "0",
+            "force_update": "yes",
+            "defang": 0,
+            "emit_only": 1,
+        }
+    )
+
+    restored = QueueEnvelope.from_record(payload)
+
+    assert restored.request.persist is False
+    assert restored.request.check_warnings is False
+    assert restored.request.force_update is True
+    assert restored.request.defang is False
+    assert restored.request.emit_only is True
+
+
 def test_filesystem_queue_empty_and_race_branch(tmp_path: Path) -> None:
     adapter = FilesystemQueueAdapter(tmp_path / "queue")
     assert adapter.dequeue(queue_name="empty") is None

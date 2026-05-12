@@ -23,6 +23,10 @@ def _invalid_int_payload_value(*, key: str, raw_value: object) -> TypeError:
     return TypeError(f"Expected {key} to be int-compatible, got {type(raw_value).__name__}")
 
 
+def _invalid_bool_payload_value(*, key: str, raw_value: object) -> TypeError:
+    return TypeError(f"Expected {key} to be bool-compatible, got {type(raw_value).__name__}")
+
+
 def _int_from_payload(payload: dict[str, object], key: str, default: int) -> int:
     raw_value = payload.get(key)
     if raw_value is None:
@@ -32,6 +36,23 @@ def _int_from_payload(payload: dict[str, object], key: str, default: int) -> int
     if isinstance(raw_value, str):
         return int(raw_value)
     raise _invalid_int_payload_value(key=key, raw_value=raw_value)
+
+
+def _bool_from_payload(payload: dict[str, object], key: str, default: bool) -> bool:
+    raw_value = payload.get(key)
+    if raw_value is None:
+        return default
+    if isinstance(raw_value, bool):
+        return raw_value
+    if isinstance(raw_value, int) and raw_value in {0, 1}:
+        return bool(raw_value)
+    if isinstance(raw_value, str):
+        normalized = raw_value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off", ""}:
+            return False
+    raise _invalid_bool_payload_value(key=key, raw_value=raw_value)
 
 
 @dataclass(frozen=True)
@@ -85,13 +106,13 @@ class QueueEnvelope:
                 file_type=str(request_payload["file_type"])
                 if request_payload.get("file_type") is not None
                 else None,
-                persist=bool(request_payload.get("persist", False)),
+                persist=_bool_from_payload(request_payload, "persist", False),
                 db_uri=str(request_payload["db_uri"])
                 if request_payload.get("db_uri") is not None
                 else None,
-                check_warnings=bool(request_payload.get("check_warnings", True)),
-                force_update=bool(request_payload.get("force_update", False)),
-                defang=bool(request_payload.get("defang", True)),
+                check_warnings=_bool_from_payload(request_payload, "check_warnings", True),
+                force_update=_bool_from_payload(request_payload, "force_update", False),
+                defang=_bool_from_payload(request_payload, "defang", True),
                 only=str(request_payload["only"])
                 if request_payload.get("only") is not None
                 else None,
@@ -104,7 +125,7 @@ class QueueEnvelope:
                 job_id=str(request_payload["job_id"])
                 if request_payload.get("job_id") is not None
                 else None,
-                emit_only=bool(request_payload.get("emit_only", False)),
+                emit_only=_bool_from_payload(request_payload, "emit_only", False),
             ),
             queue_backend=str(payload.get("queue_backend", "filesystem")),
             queue_name=str(payload.get("queue_name", "default")),

@@ -81,7 +81,11 @@ iocparser-worker = "iocparser.worker_main:main"
 include = ["iocparser*"]
 
 [tool.setuptools.package-data]
-iocparser = ["modules/data/*.json", "schemas/*.json"]
+iocparser = [
+    "infrastructure/data/legitimate_domains.json",
+    "infrastructure/data/misp_warninglists_metadata.json",
+    "schemas/*.json",
+]
 
 # Ruff configuration
 [tool.ruff]

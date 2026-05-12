@@ -1275,7 +1275,7 @@ class TestStreamingExceptionHandling:
         # Should have gotten at least the first chunk before error
         assert len(chunks) >= 1
 
-    def test_extract_from_file_exception_handling(self):
+    def test_extract_from_file_exception_handling(self, monkeypatch):
         """
         Test exception handling during file extraction.
 
@@ -1289,22 +1289,24 @@ class TestStreamingExceptionHandling:
             temp_path = Path(f.name)
 
         try:
-            # Make the file unreadable by changing permissions (Unix-like systems)
-            import stat
+            original_open = Path.open
 
-            temp_path.chmod(0o000)
+            def deny_open(path_self, *args, **kwargs):
+                if path_self == temp_path:
+                    raise PermissionError(str(temp_path))
+                return original_open(path_self, *args, **kwargs)
+
+            monkeypatch.setattr(Path, "open", deny_open)
 
             # Attempt extraction - should raise exception
             with pytest.raises(PermissionError):
                 _get_file_extraction_result(extractor, temp_path, yield_chunks=False)
 
         finally:
-            # Restore permissions and clean up
             with contextlib.suppress(Exception):
-                temp_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
                 temp_path.unlink()
 
-    def test_parallel_extractor_exception_handling(self):
+    def test_parallel_extractor_exception_handling(self, monkeypatch):
         """
         Test parallel extraction handles exceptions gracefully.
 
@@ -1324,8 +1326,14 @@ class TestStreamingExceptionHandling:
             problem_file = Path(f.name)
 
         try:
-            # Make problem file unreadable
-            problem_file.chmod(0o000)
+            original_open = Path.open
+
+            def deny_open(path_self, *args, **kwargs):
+                if path_self == problem_file:
+                    raise PermissionError(str(problem_file))
+                return original_open(path_self, *args, **kwargs)
+
+            monkeypatch.setattr(Path, "open", deny_open)
 
             results = extractor.extract_from_files([valid_file, problem_file])
 
@@ -1342,9 +1350,6 @@ class TestStreamingExceptionHandling:
         finally:
             valid_file.unlink()
             with contextlib.suppress(Exception):
-                import stat
-
-                problem_file.chmod(stat.S_IRUSR | stat.S_IWUSR)
                 problem_file.unlink()
 
 

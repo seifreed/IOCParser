@@ -56,6 +56,8 @@ def setup_logger(
     logger.setLevel(level)
 
     # Remove existing handlers
+    for handler in logger.handlers:
+        handler.close()
     logger.handlers.clear()
 
     # Console handler

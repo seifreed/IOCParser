@@ -5,8 +5,6 @@ Comprehensive unit tests for IOC extractors
 Author: Marc Rivero | @seifreed
 """
 
-import tempfile
-
 import pytest
 
 from iocparser.infrastructure.extraction import IOCExtractor
@@ -625,17 +623,15 @@ class TestCoverageMissing:
 
     def test_extract_filepaths_unix_paths(self):
         """Test extract_filepaths extracts Unix paths."""
-        temp_dir = tempfile.gettempdir()
         text = """
         Unix paths:
         /usr/bin/malware
-        {temp_dir}/payload.sh
+        /tmp/iocparser/payload.sh
         /var/log/suspicious/activity.log
         """
-        text = text.format(temp_dir=temp_dir)
         result = self.extractor.extract_filepaths(text)
         assert any("/usr/bin/malware" in path for path in result)
-        assert any(f"{temp_dir}/payload.sh" in path for path in result)
+        assert any("/tmp/iocparser/payload.sh" in path for path in result)
 
     def test_extract_filepaths_filter_phrases(self):
         """Test extract_filepaths filters out descriptive phrases."""

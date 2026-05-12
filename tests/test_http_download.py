@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import socket
+import contextlib
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -8,6 +8,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import pytest
+import requests
 
 from iocparser.errors import (
     DownloadError,
@@ -72,7 +73,8 @@ class LocalHTTPServer:
                 self.send_header("Content-Length", header_value)
                 self.end_headers()
                 if body:
-                    self.wfile.write(body)
+                    with contextlib.suppress(BrokenPipeError, ConnectionResetError):
+                        self.wfile.write(body)
 
             def log_message(self, format: str, *args) -> None:
                 del format, args
@@ -92,12 +94,6 @@ class LocalHTTPServer:
         self.server.shutdown()
         self.server.server_close()
         self.thread.join(timeout=5)
-
-
-def unused_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        return int(sock.getsockname()[1])
 
 
 def test_validate_url_accepts_valid_url() -> None:
@@ -171,13 +167,20 @@ def test_requests_url_downloader_downloads_pdf_and_html_files() -> None:
             html_path.unlink(missing_ok=True)
 
 
-def test_download_url_to_temp_reports_timeout_and_network_errors() -> None:
+def test_download_url_to_temp_reports_timeout_and_network_errors(monkeypatch) -> None:
     with LocalHTTPServer(body=b"slow", delay=0.02) as slow_url, pytest.raises(IOCTimeoutError):
         download_url_to_temp(slow_url, timeout=0.001)
 
-    port = unused_port()
+    def raise_connection_error(*args, **kwargs):
+        del args, kwargs
+        raise requests.ConnectionError("offline")
+
+    monkeypatch.setattr(
+        "iocparser.infrastructure.http_download.requests.get",
+        raise_connection_error,
+    )
     with pytest.raises(DownloadError):
-        download_url_to_temp(f"http://127.0.0.1:{port}/missing", timeout=1)
+        download_url_to_temp("http://127.0.0.1/missing", timeout=1)
 
 
 def test_download_url_to_temp_reports_file_size_and_unexpected_errors() -> None:

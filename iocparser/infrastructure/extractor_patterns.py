@@ -66,7 +66,7 @@ PATTERNS: dict[str, Pattern[str]] = {
     "urls": re.compile(
         r"\b(?:https?|hxxps?|h\[\.\]ttps?|s?ftp)://"
         r"(?!DOMAIN_NAME|IP:|\*\.|localhost|example\.)"
-        r"[a-zA-Z0-9][-a-zA-Z0-9.]*[a-zA-Z0-9]"
+        r"[a-zA-Z0-9](?:[-a-zA-Z0-9]|(?:\.|\[\.\]|\(\.\)|\{\.\}))*[a-zA-Z0-9]"
         r"(?:\.[a-zA-Z]{2,63})?(?::[0-9]{1,5})?"
         r"(?:/[-a-zA-Z0-9()@:%_\+.~#?&/=]{0,2048})?",
         re.IGNORECASE,

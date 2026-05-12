@@ -306,7 +306,9 @@ _DEFANG_SCHEME_PATTERNS: tuple[tuple[_re.Pattern[str], str], ...] = (
 
 
 def defang_url(url: str) -> str:
-    result = url
+    from iocparser.shared_utils import refang_ioc
+
+    result = refang_ioc(url)
     for pattern, replacement in _DEFANG_SCHEME_PATTERNS:
         result = pattern.sub(replacement, result)
     return defang_dotted(result)

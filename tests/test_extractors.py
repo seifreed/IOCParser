@@ -136,6 +136,16 @@ class TestNetworkExtractors:
         result = self.extractor.extract_urls(text)
         assert len(result) >= 2
 
+    def test_extract_urls_with_defanged_host_separators(self):
+        """Test URL extraction handles defanged host separators."""
+        text = "Callback: hxxps://malware[.]example/payload"
+
+        result = self.extractor.extract_urls(text)
+        defanged_result = self.extractor_defang.extract_urls(text)
+
+        assert result == ["hxxps://malware[.]example/payload"]
+        assert defanged_result == ["hxxps://malware[.]example/payload"]
+
     def test_extract_mac_addresses(self):
         """Test MAC address extraction."""
         text = """

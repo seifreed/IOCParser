@@ -1227,9 +1227,7 @@ def test_merge_extraction_results_deduplicates_canonical_values() -> None:
     merged = merge_extraction_results(base, extra)
 
     assert [ioc.canonical_value() for ioc in merged.iocs] == ["example.com"]
-    assert [warning.ioc.canonical_value() for warning in merged.warnings] == [
-        "warning.example"
-    ]
+    assert [warning.ioc.canonical_value() for warning in merged.warnings] == ["warning.example"]
 
 
 def test_parser_client_apply_plugins_uses_registered_extractors() -> None:

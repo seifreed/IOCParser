@@ -33,6 +33,15 @@ def test_project_metadata_uses_current_license_fields() -> None:
 
     assert project["license"] == "MIT"
     assert project["license-files"] == ["LICENSE"]
-    assert all(
-        not classifier.startswith("License ::") for classifier in project["classifiers"]
-    )
+    assert all(not classifier.startswith("License ::") for classifier in project["classifiers"])
+
+
+def test_requirements_file_matches_project_runtime_dependencies() -> None:
+    config = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    requirements = [
+        line
+        for raw_line in (REPO_ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
+        if (line := raw_line.strip()) and not line.startswith("#")
+    ]
+
+    assert requirements == config["project"]["dependencies"]

@@ -94,9 +94,7 @@ class WorkerServiceConfig:
                 "IOCPARSER_WORKER_MAX_CYCLES", int_or_none(file_values["max_cycles"])
             ),
             concurrency=_positive_int_or_default(
-                int_env(
-                    "IOCPARSER_WORKER_CONCURRENCY", int_or(file_values["concurrency"], 1)
-                ),
+                int_env("IOCPARSER_WORKER_CONCURRENCY", int_or(file_values["concurrency"], 1)),
                 1,
             ),
             telemetry_mode=os.environ.get(

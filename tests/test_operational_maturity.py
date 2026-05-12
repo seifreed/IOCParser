@@ -46,6 +46,7 @@ from iocparser.client_extraction import (
     ClientExtractionAdapters,
     ClientExtractionRequest,
     ClientPluginSettings,
+    merge_extraction_results,
 )
 from iocparser.client_extraction import extract_url_result as extract_result_from_url
 from iocparser.config import load_config
@@ -1062,6 +1063,36 @@ def test_clients_wrap_reusable_services_and_plugin_pipeline(tmp_path: Path) -> N
     assert persistence.list_failed_batches(limit=5) == []
     assert persistence.retain_history(days=3650) >= 0
     assert SQLAlchemyPersistenceService(db_uri).list_failed_batch_items(batch_job_id=999) == []
+
+
+def test_merge_extraction_results_deduplicates_canonical_values() -> None:
+    base = ExtractionResult(
+        iocs=(IOC.from_raw("domains", "Example[.]COM"),),
+        warnings=(
+            WarningMatch(
+                ioc=IOC.from_raw("domains", "Warning[.]Example"),
+                warning_list="Known Good",
+                description="duplicate",
+            ),
+        ),
+    )
+    extra = ExtractionResult(
+        iocs=(IOC.from_raw("domains", "example.com"),),
+        warnings=(
+            WarningMatch(
+                ioc=IOC.from_raw("domains", "warning.example"),
+                warning_list="Known Good",
+                description="duplicate",
+            ),
+        ),
+    )
+
+    merged = merge_extraction_results(base, extra)
+
+    assert [ioc.canonical_value() for ioc in merged.iocs] == ["example.com"]
+    assert [warning.ioc.canonical_value() for warning in merged.warnings] == [
+        "warning.example"
+    ]
 
 
 def test_parser_client_apply_plugins_uses_registered_extractors() -> None:

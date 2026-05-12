@@ -71,23 +71,23 @@ def build_extraction_options(
 def merge_extraction_results(base: ExtractionResult, extra: ExtractionResult) -> ExtractionResult:
     from iocparser.domain.models import ioc_type_name
 
-    ioc_map = {(ioc_type_name(ioc.ioc_type), ioc.value.raw): ioc for ioc in base.iocs}
+    ioc_map = {(ioc_type_name(ioc.ioc_type), ioc.canonical_value()): ioc for ioc in base.iocs}
     warning_map = {
         (
             ioc_type_name(warning.ioc.ioc_type),
-            warning.ioc.value.raw,
+            warning.ioc.canonical_value(),
             warning.warning_list,
             warning.description,
         ): warning
         for warning in base.warnings
     }
     for ioc in extra.iocs:
-        ioc_map.setdefault((ioc_type_name(ioc.ioc_type), ioc.value.raw), ioc)
+        ioc_map.setdefault((ioc_type_name(ioc.ioc_type), ioc.canonical_value()), ioc)
     for warning in extra.warnings:
         warning_map.setdefault(
             (
                 ioc_type_name(warning.ioc.ioc_type),
-                warning.ioc.value.raw,
+                warning.ioc.canonical_value(),
                 warning.warning_list,
                 warning.description,
             ),

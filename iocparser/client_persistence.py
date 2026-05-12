@@ -35,7 +35,7 @@ class QueryRunsOptions(TypedDict, total=False):
     date_to: str | None
     source_kind: str | None
     source_value: str | None
-    sort_by: str
+    sort_by: str | None
 
 
 class SearchIOCsOptions(TypedDict, total=False):
@@ -50,9 +50,9 @@ class SearchIOCsOptions(TypedDict, total=False):
     tags: tuple[str, ...]
     exclude_tags: tuple[str, ...]
     min_severity: str | None
-    tag_mode: str
-    sort_by: str
-    search_backend: str
+    tag_mode: str | None
+    sort_by: str | None
+    search_backend: str | None
 
 
 def parse_string_filters(value: str | None) -> tuple[str, ...]:
@@ -92,7 +92,7 @@ class PersistenceClient:
             date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
             source_kind=options.get("source_kind"),
             source_value=options.get("source_value"),
-            sort_by=validated_run_sort(options.get("sort_by", "newest")),
+            sort_by=validated_run_sort(optional_str(options.get("sort_by")) or "newest"),
         )
         return self._typed_service.query_runs_page(
             limit=query.limit,
@@ -120,9 +120,11 @@ class PersistenceClient:
             tags=tuple(options.get("tags", ())),
             exclude_tags=tuple(options.get("exclude_tags", ())),
             min_severity=validated_min_severity(optional_str(options.get("min_severity"))),
-            tag_mode=validated_tag_mode(str(options.get("tag_mode", "all"))),
-            sort_by=validated_search_sort(str(options.get("sort_by", "newest"))),
-            search_backend=validated_search_backend(str(options.get("search_backend", "auto"))),
+            tag_mode=validated_tag_mode(optional_str(options.get("tag_mode")) or "all"),
+            sort_by=validated_search_sort(optional_str(options.get("sort_by")) or "newest"),
+            search_backend=validated_search_backend(
+                optional_str(options.get("search_backend")) or "auto"
+            ),
         )
         return self._typed_service.search_iocs_page(
             value=query.value,

@@ -346,6 +346,15 @@ def test_public_query_api_validates_dates_and_min_severity(tmp_path: Path) -> No
     with pytest.raises(ValidationError, match="Invalid sort_by"):
         client.query_runs(sort_by="bogus")
 
+    assert client.query_runs(sort_by=None).total >= 2
+    client_search_page = client.search_iocs(
+        value="alpha",
+        tag_mode=None,
+        sort_by=None,
+        search_backend=None,
+    )
+    assert client_search_page.items[0].value == "alpha.example"
+
     normalized_page = query_persisted_iocs(db_uri=db_uri, value="alpha", severity="HIGH")
     assert normalized_page.total == 1
 

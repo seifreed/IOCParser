@@ -4,7 +4,7 @@ import argparse
 import time
 from json import loads
 from pathlib import Path
-from typing import Protocol, TypedDict
+from typing import Protocol, TypedDict, cast
 
 from iocparser import cli_processing_urls_execution as _execution
 from iocparser.cli_args import get_optional_str_arg
@@ -179,7 +179,7 @@ def _retry_attempt_from_report(url: str, retry_report: str | None, *, occurrence
         return int_value(matches[occurrence - 1].get("retry_attempt", 0)) + 1
     if matches:
         return 1
-    return 1
+    return None
 
 
 def _retry_attempt_from_batch(
@@ -197,7 +197,7 @@ def _retry_attempt_from_batch(
         return matches[occurrence - 1].retry_attempt + 1
     if matches:
         return 1
-    return 1
+    return None
 
 
 def retry_attempt_for_url(
@@ -220,11 +220,6 @@ def retry_attempt_for_url(
     if retry_attempt is not None:
         return retry_attempt
     return 0
-
-
-def _retry_attempt_for_url(url: str, retry_report: str | None) -> int:
-    return retry_attempt_for_url(url, retry_report)
-
 
 def _load_batch_urls(
     args: argparse.Namespace,
@@ -330,7 +325,7 @@ def _public_batch_item(item: BatchItemReport) -> BatchItemReport:
     public_item = dict(item)
     public_item.pop("item_key", None)
     public_item.pop("input_index", None)
-    return public_item  # type: ignore[return-value]
+    return cast("BatchItemReport", public_item)
 
 
 def public_batch_report(report: BatchReport) -> BatchReport:
@@ -363,7 +358,7 @@ def public_batch_report(report: BatchReport) -> BatchReport:
     public_report["failures"] = public_failures
     public_report.pop("source_metadata_map", None)
     public_report.pop("run_metadata_map", None)
-    return public_report  # type: ignore[return-value]
+    return cast("BatchReport", public_report)
 
 
 def _build_batch_report(context: BatchReportContext) -> BatchReport:
@@ -529,7 +524,7 @@ def process_url_file_input_with_report(
         downloader=downloader,
         db_uri=db_uri,
     )
-    return payload.normal_iocs, payload.warning_iocs, payload.input_display, payload.results, payload.batch_report  # type: ignore[return-value]
+    return payload.normal_iocs, payload.warning_iocs, payload.input_display, payload.results, cast("BatchReport", payload.batch_report)
 
 
 def process_url_file_payload(

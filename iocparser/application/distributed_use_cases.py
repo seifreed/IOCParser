@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from uuid import uuid4
 
 from iocparser.domain.distributed import (
@@ -94,81 +95,96 @@ class DistributedPipelineCoordinator:
         if item is None:
             return None
         receipt, envelope = item
-        if self.job_service is not None:
-            self.job_service.mark_running(
-                job_id=str(envelope.request.job_id),
-                attempts=envelope.attempts + 1,
-                receipt_id=receipt.receipt_id,
-            )
-        self._emit("job_started", envelope, {"attempt": envelope.attempts + 1})
-        result = self.processor.process(envelope.request)
-        if result.status in {"success", "skipped"}:
-            self.queue_adapter.ack(receipt)
-            stored = (
-                self.job_service.mark_completed(
+        try:
+            if self.job_service is not None:
+                self.job_service.mark_running(
                     job_id=str(envelope.request.job_id),
                     attempts=envelope.attempts + 1,
-                    run_id=result.run_id,
-                    result_json=result.to_record(),
-                    metrics=_phase_metrics(result),
+                    receipt_id=receipt.receipt_id,
                 )
-                if self.job_service
-                else None
-            )
-            self._emit("job_completed", envelope, {"status": result.status, "run_id": result.run_id})
-            return stored or result
+            self._emit("job_started", envelope, {"attempt": envelope.attempts + 1})
+            result = self.processor.process(envelope.request)
+            if result.status in {"success", "skipped"}:
+                stored = (
+                    self.job_service.mark_completed(
+                        job_id=str(envelope.request.job_id),
+                        attempts=envelope.attempts + 1,
+                        run_id=result.run_id,
+                        result_json=result.to_record(),
+                        metrics=_phase_metrics(result),
+                    )
+                    if self.job_service
+                    else None
+                )
+                self.queue_adapter.ack(receipt)
+                self._emit("job_completed", envelope, {"status": result.status, "run_id": result.run_id})
+                return stored or result
 
-        should_retry = bool(result.error and result.error.retryable and (envelope.attempts + 1) < envelope.max_attempts)
-        if should_retry:
-            next_envelope = QueueEnvelope(
+            should_retry = bool(result.error and result.error.retryable and (envelope.attempts + 1) < envelope.max_attempts)
+            if should_retry:
+                stored = (
+                    self.job_service.mark_failed(
+                        job_id=str(envelope.request.job_id),
+                        attempts=envelope.attempts + 1,
+                        error=result.error,
+                        will_retry=True,
+                        metrics=_phase_metrics(result),
+                    )
+                    if self.job_service and result.error is not None
+                    else None
+                )
+                next_envelope = QueueEnvelope(
+                    request=envelope.request,
+                    queue_backend=envelope.queue_backend,
+                    queue_name=envelope.queue_name,
+                    attempts=envelope.attempts + 1,
+                    max_attempts=envelope.max_attempts,
+                    idempotency_key=envelope.idempotency_key,
+                    schema_version=envelope.schema_version,
+                    submitted_at=envelope.submitted_at,
+                )
+                next_receipt = self.queue_adapter.requeue(receipt, envelope=next_envelope)
+                self._emit("job_requeued", envelope, {"receipt_id": next_receipt.receipt_id})
+                return stored or result
+
+            dead_envelope = QueueEnvelope(
                 request=envelope.request,
                 queue_backend=envelope.queue_backend,
                 queue_name=envelope.queue_name,
                 attempts=envelope.attempts + 1,
                 max_attempts=envelope.max_attempts,
                 idempotency_key=envelope.idempotency_key,
-                schema_version=envelope.schema_version,
-                submitted_at=envelope.submitted_at,
             )
-            next_receipt = self.queue_adapter.requeue(receipt, envelope=next_envelope)
             stored = (
-                self.job_service.mark_failed(
+                self.job_service.mark_dead_lettered(
                     job_id=str(envelope.request.job_id),
                     attempts=envelope.attempts + 1,
                     error=result.error,
-                    will_retry=True,
-                    metrics=_phase_metrics(result),
                 )
                 if self.job_service and result.error is not None
                 else None
             )
-            self._emit("job_requeued", envelope, {"receipt_id": next_receipt.receipt_id})
-            return stored or result
-
-        dead_envelope = QueueEnvelope(
-            request=envelope.request,
-            queue_backend=envelope.queue_backend,
-            queue_name=envelope.queue_name,
-            attempts=envelope.attempts + 1,
-            max_attempts=envelope.max_attempts,
-            idempotency_key=envelope.idempotency_key,
-        )
-        dead_receipt = self.queue_adapter.dead_letter(receipt, envelope=dead_envelope)
-        stored = (
-            self.job_service.mark_dead_lettered(
-                job_id=str(envelope.request.job_id),
-                attempts=envelope.attempts + 1,
-                error=result.error,
+            dead_receipt = self.queue_adapter.dead_letter(receipt, envelope=dead_envelope)
+            self._emit(
+                "job_dead_lettered",
+                envelope,
+                {"receipt_id": dead_receipt.receipt_id, "error_code": result.error.code if result.error else ""},
             )
-            if self.job_service and result.error is not None
-            else None
-        )
-        self._emit(
-            "job_dead_lettered",
-            envelope,
-            {"receipt_id": dead_receipt.receipt_id, "error_code": result.error.code if result.error else ""},
-        )
-        return stored or result
+            return stored or result
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception as exc:
+            if self.job_service is not None:
+                from iocparser.pipeline_errors import classify_pipeline_exception
+                self.job_service.mark_dead_lettered(
+                    job_id=str(envelope.request.job_id),
+                    attempts=envelope.attempts + 1,
+                    error=classify_pipeline_exception(exc),
+                )
+            with suppress(Exception):
+                self.queue_adapter.dead_letter(receipt, envelope=envelope)
+            self._emit("job_dead_lettered", envelope, {"receipt_id": receipt.receipt_id, "error_code": "unhandled"})
+            raise
 
     def drain(
         self,
@@ -215,7 +231,15 @@ class DistributedPipelineCoordinator:
 def idempotency_key_for(request: PipelineJobRequest, *, digester: ContentDigester | None) -> str:
     """Build a stable idempotency key for a pipeline request."""
     if digester is None:
-        return request.source_value
+        return (
+            f"{request.input_kind}:{request.source_value}"
+            f":cw={request.check_warnings}"
+            f":fu={request.force_update}"
+            f":df={request.defang}"
+            f":o={request.only or ''}"
+            f":e={request.exclude or ''}"
+            f":eo={request.emit_only}"
+        )
     if request.input_kind == "text":
         return digester.digest_text(request.source_value)
     if request.input_kind == "file":

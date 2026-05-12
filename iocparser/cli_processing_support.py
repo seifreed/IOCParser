@@ -77,7 +77,6 @@ class BatchResultsCollection:
         return bool(self.entries)
 
     def __getitem__(self, key: str) -> tuple[GroupedIocs, GroupedWarnings]:
-        item_key_matches = [entry for entry in self.entries if entry.item_key == key]
         for entry in self.entries:
             if entry.item_key == key:
                 source_matches = [candidate for candidate in self.entries if candidate.source_value == key]
@@ -86,8 +85,6 @@ class BatchResultsCollection:
                 return entry.normal_iocs, entry.warning_iocs
         source_matches = [entry for entry in self.entries if entry.source_value == key]
         if len(source_matches) == 1:
-            if item_key_matches and item_key_matches[0] is not source_matches[0]:
-                raise KeyError(key)
             entry = source_matches[0]
             return entry.normal_iocs, entry.warning_iocs
         raise KeyError(key)

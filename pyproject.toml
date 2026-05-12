@@ -88,6 +88,7 @@ iocparser = ["modules/data/*.json", "schemas/*.json"]
 target-version = "py313"
 line-length = 100
 fix = true
+exclude = ["stubs/"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -162,7 +163,7 @@ ignore = [
 "iocparser/api_extraction.py" = ["PLR0913"]
 "iocparser/api_persistence_query.py" = ["TRY301", "UP047"]
 "iocparser/domain/sources.py" = ["PLR0913"]
-"iocparser/infrastructure/http_download.py" = ["PERF203", "RET503"]
+"iocparser/infrastructure/http_download.py" = ["PERF203", "RET503", "TRY003"]
 "iocparser/infrastructure/extractor_base.py" = ["SLF001"]
 "iocparser/infrastructure/persistence_queries.py" = ["C901", "PLR0913"]
 "iocparser/infrastructure/persistence_page_queries.py" = ["PLR0913"]
@@ -290,7 +291,6 @@ omit = [
 
 [tool.coverage.report]
 exclude_lines = [
-    "pragma: no cover",
     "def __repr__",
     "if self.debug:",
     "if __name__ == .__main__.:",

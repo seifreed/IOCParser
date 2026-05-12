@@ -219,12 +219,15 @@ def test_network_and_base_edge_paths_cover_remaining_branches() -> None:
         def _extract_pattern(self, text: str, pattern_name: str) -> list[str]:  # type: ignore[override]
             if pattern_name == "ips":
                 return ["1.2.3", "a.2.3.4", "01.2.3.4"]
+            if pattern_name == "ipv6":
+                return ["not::ip", "2001:db8::1"]
             if pattern_name == "domains":
                 return ["document.cookie", "evil-example.com"]
             return super()._extract_pattern(text, pattern_name)
 
     extractor = NetworkEdgeExtractor(defang=False)
     assert extractor.extract_ips("ignored") == []
+    assert extractor.extract_ipv6("ignored") == ["2001:db8::1"]
     assert extractor.extract_hosts("ignored") == ["evil-example.com"]
 
     dynamic_extractor_cls = type("DynamicExtractor", (IOCExtractor,), {"__module__": "missing.module"})

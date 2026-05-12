@@ -6,6 +6,7 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
+from typing import TypeVar, cast
 from urllib.parse import ParseResult, urlparse
 
 import requests
@@ -91,27 +92,32 @@ class RequestsURLDownloader(URLDownloader):
         self.proxies = dict(proxies if proxies is not None else cfg.proxies)
         self.allow_redirects = allow_redirects if allow_redirects is not None else cfg.allow_redirects
         self.verify: bool | str = verify if verify is not None else cfg.verify
-        self.cert: str | None = cert if cert is not self._UNSET else cfg.cert  # type: ignore[assignment]
+        self.cert: str | None = cast("str | None", cert) if cert is not self._UNSET else cfg.cert
         self._rate_limit_lock = Lock()
         self._last_request_started = 0.0
         self.last_download_metadata: dict[str, object] | None = None
 
     def with_policy(self, **overrides: object) -> RequestsURLDownloader:
         """Return a downloader with the same policy plus overrides."""
-        def _pick(key: str, default: object) -> object:
-            return overrides[key] if key in overrides and overrides[key] is not None else default
+        _T = TypeVar("_T")
+
+        def _pick(key: str, default: _T) -> _T:
+            result = overrides.get(key, default)
+            if result is None:
+                return default
+            return cast("_T", result)
 
         return RequestsURLDownloader(
-            timeout=_pick("timeout", self.timeout),  # type: ignore[arg-type]
-            retries=_pick("retries", self.retries),  # type: ignore[arg-type]
-            backoff=_pick("backoff", self.backoff),  # type: ignore[arg-type]
-            rate_limit_delay=_pick("rate_limit_delay", self.rate_limit_delay),  # type: ignore[arg-type]
-            headers=_pick("headers", self.headers),  # type: ignore[arg-type]
-            cookies=_pick("cookies", self.cookies),  # type: ignore[arg-type]
-            user_agent=_pick("user_agent", self.user_agent),  # type: ignore[arg-type]
-            proxies=_pick("proxies", self.proxies),  # type: ignore[arg-type]
-            allow_redirects=_pick("allow_redirects", self.allow_redirects),  # type: ignore[arg-type]
-            verify=_pick("verify", self.verify),  # type: ignore[arg-type]
+            timeout=_pick("timeout", self.timeout),
+            retries=_pick("retries", self.retries),
+            backoff=_pick("backoff", self.backoff),
+            rate_limit_delay=_pick("rate_limit_delay", self.rate_limit_delay),
+            headers=_pick("headers", self.headers),
+            cookies=_pick("cookies", self.cookies),
+            user_agent=_pick("user_agent", self.user_agent),
+            proxies=_pick("proxies", self.proxies),
+            allow_redirects=_pick("allow_redirects", self.allow_redirects),
+            verify=_pick("verify", self.verify),
             cert=_pick("cert", self.cert),
         )
 
@@ -154,9 +160,15 @@ class RequestsURLDownloader(URLDownloader):
 
     def check_content_size(self, content_length: str | None) -> None:
         """Check if content size exceeds limit."""
-        if content_length and int(content_length) > MAX_URL_SIZE:
+        if not content_length:
+            return
+        try:
+            length = int(content_length)
+        except ValueError as exc:
+            raise ValueError(f"Invalid Content-Length header: {content_length!r}") from exc
+        if length > MAX_URL_SIZE:
             raise FileSizeError(
-                int(content_length) / 1024 / 1024,
+                length / 1024 / 1024,
                 MAX_URL_SIZE / 1024 / 1024,
                 "URL content",
             )
@@ -186,7 +198,6 @@ class RequestsURLDownloader(URLDownloader):
                     continue
                 downloaded_size += len(chunk)
                 if downloaded_size > max_size:
-                    handle.close()
                     temp_file.unlink()
                     raise DownloadSizeError(max_size / 1024 / 1024)
                 handle.write(chunk)
@@ -194,8 +205,10 @@ class RequestsURLDownloader(URLDownloader):
 
     def download(self, url: str) -> str:
         """Download URL content into a temp file and return the path."""
+        import tempfile
+
         parsed_url = self.validate_url(url)
-        temp_dir = Path(__file__).parent.parent / "temp"
+        temp_dir = Path(tempfile.gettempdir()) / "iocparser"
         temp_dir.mkdir(exist_ok=True)
 
         for attempt in range(self.retries + 1):
@@ -227,7 +240,8 @@ class RequestsURLDownloader(URLDownloader):
         started_at = time.perf_counter()
         request_headers = dict(self.headers)
         request_headers.setdefault("User-Agent", self.user_agent)
-        response = requests.get(
+        response_url = ""
+        with requests.get(
             url,
             timeout=self.timeout,
             stream=True,
@@ -237,13 +251,14 @@ class RequestsURLDownloader(URLDownloader):
             allow_redirects=self.allow_redirects,
             verify=self.verify,
             cert=self.cert,
-        )
-        response.raise_for_status()
-        self.check_content_size(response.headers.get("Content-Length"))
+        ) as response:
+            response.raise_for_status()
+            self.check_content_size(response.headers.get("Content-Length"))
 
-        content_type = str(response.headers.get("Content-Type", "")).lower()
-        temp_file = temp_dir / self.generate_temp_filename(parsed_url, content_type)
-        downloaded_size = self.download_with_size_check(response, temp_file, MAX_URL_SIZE)
+            content_type = str(response.headers.get("Content-Type", "")).lower()
+            response_url = str(response.url)
+            temp_file = temp_dir / self.generate_temp_filename(parsed_url, content_type)
+            downloaded_size = self.download_with_size_check(response, temp_file, MAX_URL_SIZE)
         content_hash = hashlib.sha256(temp_file.read_bytes()).hexdigest()
         self.last_download_metadata = {
             "original_url": url,
@@ -254,7 +269,7 @@ class RequestsURLDownloader(URLDownloader):
             "elapsed_ms": int((time.perf_counter() - started_at) * 1000),
             "content_hash": content_hash,
             "fingerprint": content_hash[:16],
-            "response_url": str(response.url),
+            "response_url": response_url,
             "cookies": dict(self.cookies),
         }
         logger.info("Downloaded %.2fKB to %s", downloaded_size / 1024, temp_file)
@@ -287,19 +302,19 @@ def download_with_size_check(
 
 def download_url_to_temp(url: str, timeout: int = REQUEST_TIMEOUT) -> str:
     """Module-level convenience wrapper for downloading URLs."""
-    if timeout == REQUEST_TIMEOUT:
-        return _default_downloader().download(url)
     try:
         parsed_url = validate_url(url)
-        response = requests.get(url, timeout=timeout, stream=True)
-        response.raise_for_status()
-        check_content_size(response.headers.get("Content-Length"))
-        temp_dir = Path(__file__).parent.parent / "temp"
-        temp_dir.mkdir(exist_ok=True)
-        content_type = str(response.headers.get("Content-Type", "")).lower()
-        temp_file = temp_dir / generate_temp_filename(parsed_url, content_type)
-        download_with_size_check(response, temp_file, MAX_URL_SIZE)
-        return str(temp_file)
+        with requests.get(url, timeout=timeout, stream=True) as response:
+            response.raise_for_status()
+            check_content_size(response.headers.get("Content-Length"))
+            import tempfile
+
+            temp_dir = Path(tempfile.gettempdir()) / "iocparser"
+            temp_dir.mkdir(exist_ok=True)
+            content_type = str(response.headers.get("Content-Type", "")).lower()
+            temp_file = temp_dir / generate_temp_filename(parsed_url, content_type)
+            download_with_size_check(response, temp_file, MAX_URL_SIZE)
+            return str(temp_file)
     except requests.Timeout as exc:
         from iocparser.errors import IOCTimeoutError
 

@@ -8,6 +8,7 @@ Author: Marc Rivero | @seifreed
 
 from __future__ import annotations
 
+import ipaddress as _ipaddress_module
 import re
 import urllib.parse
 from collections.abc import Callable, Iterable
@@ -68,7 +69,7 @@ class NetworkHeuristicPolicy:
         return parsed.netloc.lower(), parsed.path.lower()
 
     def is_file_sharing_url(self, domain: str) -> bool:
-        return any(site in domain for site in self.file_sharing_sites)
+        return any(domain == site or domain.endswith(f".{site}") for site in self.file_sharing_sites)
 
     def is_suspicious_code_hosting_url(self, domain: str, path: str) -> bool:
         if not ("github.com" in domain or "gitlab.com" in domain or "bitbucket.org" in domain):
@@ -96,7 +97,17 @@ class NetworkHeuristicPolicy:
         if "." not in domain:
             return False
         domain_lower = domain.lower()
-        return not any(fragment in domain_lower for fragment in self.host_false_positives)
+        parts = domain_lower.split(".")
+        for fragment in self.host_false_positives:
+            if fragment.startswith("."):
+                if domain_lower.endswith(fragment):
+                    return False
+            elif fragment.endswith("."):
+                if domain_lower.startswith(fragment):
+                    return False
+            elif fragment in parts:
+                return False
+        return True
 
     def unc_hosts(self, text: str) -> list[str]:
         return [
@@ -240,16 +251,6 @@ DEFAULT_NETWORK_POLICY = NetworkHeuristicPolicy(
 )
 
 
-@dataclass(frozen=True)
-class NetworkPatternRule:
-    method_name: str
-    docstring: str
-    extractor: Callable[[ExtractorBase, str], list[str]]
-
-    def apply(self, extractor_instance: ExtractorBase, text: str) -> list[str]:
-        return self.extractor(extractor_instance, text)
-
-
 def _extract_domains(self: ExtractorBase, text: str) -> list[str]:
     return DEFAULT_NETWORK_POLICY.extracted_domains(
         direct_domains=self._extract_pattern(text, "domains"),
@@ -273,13 +274,11 @@ def _extract_ips(self: ExtractorBase, text: str) -> list[str]:
 
 
 def _extract_ipv6(self: ExtractorBase, text: str) -> list[str]:
-    import ipaddress as _ipaddress
-
     candidates = self._extract_pattern(text, "ipv6")
     validated: list[str] = []
     for candidate in candidates:
         try:
-            _ipaddress.ip_address(candidate)
+            _ipaddress_module.ip_address(candidate)
             validated.append(candidate)
         except ValueError:
             pass
@@ -299,27 +298,38 @@ def _extract_emails(self: ExtractorBase, text: str) -> list[str]:
     return DEFAULT_NETWORK_POLICY.extracted_emails(raw_emails=self._extract_pattern(text, "emails"), defang=self.defang)
 
 
-NETWORK_PATTERN_RULES: tuple[NetworkPatternRule, ...] = (
-    NetworkPatternRule("extract_domains", "Extract domain names from text.", _extract_domains),
-    NetworkPatternRule("extract_ips", "Extract IPv4 addresses from text.", _extract_ips),
-    NetworkPatternRule("extract_ipv6", "Extract IPv6 addresses from text.", _extract_ipv6),
-    NetworkPatternRule("extract_urls", "Extract URLs from text, intelligently filtering based on context.", _extract_urls),
-    NetworkPatternRule("extract_emails", "Extract email addresses from text.", _extract_emails),
+NETWORK_EXTRACTION_METHODS: tuple[str, ...] = (
+    "extract_domains",
+    "extract_ips",
+    "extract_ipv6",
+    "extract_urls",
+    "extract_emails",
+    "extract_hosts",
 )
-NETWORK_EXTRACTION_METHODS: tuple[str, ...] = (*[rule.method_name for rule in NETWORK_PATTERN_RULES], "extract_hosts")
-
-
-def _network_rule_method(rule: NetworkPatternRule) -> Callable[[ExtractorBase, str], list[str]]:
-    def extractor(self: ExtractorBase, text: str) -> list[str]:
-        return rule.apply(self, text)
-
-    extractor.__name__ = rule.method_name
-    extractor.__doc__ = rule.docstring
-    return extractor
 
 
 class NetworkExtractionMixin(ExtractorBase):
     """Network IOC extraction methods."""
+
+    def extract_domains(self, text: str) -> list[str]:
+        """Extract domain names from text."""
+        return _extract_domains(self, text)
+
+    def extract_ips(self, text: str) -> list[str]:
+        """Extract IPv4 addresses from text."""
+        return _extract_ips(self, text)
+
+    def extract_ipv6(self, text: str) -> list[str]:
+        """Extract IPv6 addresses from text."""
+        return _extract_ipv6(self, text)
+
+    def extract_urls(self, text: str) -> list[str]:
+        """Extract URLs from text, intelligently filtering based on context."""
+        return _extract_urls(self, text)
+
+    def extract_emails(self, text: str) -> list[str]:
+        """Extract email addresses from text."""
+        return _extract_emails(self, text)
 
     def _is_file_sharing_url(self, domain: str) -> bool:
         """Check if domain belongs to a file sharing service."""
@@ -342,8 +352,4 @@ class NetworkExtractionMixin(ExtractorBase):
         Extract actual network hostnames and domains from text.
         Returns only valid domains and explicitly mentioned machine names.
         """
-        return DEFAULT_NETWORK_POLICY.extracted_hosts(domains=self.extract_domains(text), text=text)  # type: ignore[attr-defined]
-
-
-for _rule in NETWORK_PATTERN_RULES:
-    setattr(NetworkExtractionMixin, _rule.method_name, _network_rule_method(_rule))
+        return DEFAULT_NETWORK_POLICY.extracted_hosts(domains=self.extract_domains(text), text=text)

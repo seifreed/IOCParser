@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import create_engine, or_, select, text
+from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 
 from iocparser.domain.jobs import BatchJobDetail, BatchJobSummary, FailedBatchItem
@@ -28,6 +30,31 @@ from iocparser.infrastructure.persistence_schema import (
     SourceModel,
 )
 from iocparser.infrastructure.persistence_support import build_summary, prune_runs
+
+
+@contextmanager
+def _managed_session(db_uri: str) -> Iterator[Session]:
+    """Create, migrate, and safely dispose a SQLAlchemy engine, yielding a Session."""
+    engine = create_engine(db_uri, future=True)
+    try:
+        migrate_engine(engine)
+        with Session(engine) as session:
+            yield session
+    finally:
+        engine.dispose()
+
+
+@contextmanager
+def _managed_connection(db_uri: str) -> Iterator[Connection]:
+    """Create, migrate, and safely dispose a SQLAlchemy engine, yielding a Connection."""
+    engine = create_engine(db_uri, future=True)
+    try:
+        migrate_engine(engine)
+        with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as connection:
+            yield connection
+    finally:
+        engine.dispose()
+
 
 INVALID_HISTORY_ARCHIVE = "invalid history archive"
 AMBIGUOUS_LEGACY_HISTORY_ARCHIVE = "ambiguous legacy history archive"
@@ -136,7 +163,7 @@ def _history_origin_id(session: Session) -> str:
     if isinstance(row, str) and row.strip():
         return row.strip()
     origin_id = str(uuid4())
-    session.execute(  # type: ignore[call-overload]
+    session.execute(
         text("INSERT OR REPLACE INTO history_metadata(key, value) VALUES ('origin_id', :value)"),
         {"value": origin_id},
     )
@@ -178,7 +205,16 @@ def _source_identity(row: dict[str, object]) -> tuple[object, ...]:
 def _existing_source(session: Session, row: dict[str, object]) -> SourceModel | None:
     identity = _source_identity(row)
     if identity[0] == "url":
-        candidates = session.execute(select(SourceModel).where(SourceModel.kind == "url")).scalars().all()
+        value = str(row.get("value", ""))
+        normalized_url = str(row.get("normalized_url", "")) if row.get("normalized_url") is not None else None
+        stmt = select(SourceModel).where(SourceModel.kind == "url")
+        clauses = []
+        if value:
+            clauses.append(SourceModel.value == value)
+        if normalized_url:
+            clauses.append(SourceModel.normalized_url == normalized_url)
+        stmt = stmt.where(or_(*clauses)) if clauses else stmt.where(SourceModel.value == value)
+        candidates = session.execute(stmt).scalars().all()
         for candidate in candidates:
             candidate_identity = _source_identity(
                 {
@@ -955,9 +991,7 @@ def _row_dict(model: HistoryModel) -> dict[str, object]:
 
 
 def export_history(db_uri: str) -> dict[str, object]:
-    engine = create_engine(db_uri, future=True)
-    migrate_engine(engine)
-    with Session(engine) as session:
+    with _managed_session(db_uri) as session:
         origin_id = _history_origin_id(session)
         session.commit()
         payload = {
@@ -985,9 +1019,7 @@ def export_history(db_uri: str) -> dict[str, object]:
 
 
 def import_history(db_uri: str, payload: dict[str, object]) -> dict[str, int]:
-    engine = create_engine(db_uri, future=True)
-    migrate_engine(engine)
-    with Session(engine) as session:
+    with _managed_session(db_uri) as session:
         same_origin = _same_origin_archive(session, payload)
         archive_id = _archive_id(payload)
         if _is_legacy_archive(payload) and _has_legacy_archive_collision(session, archive_id=archive_id):
@@ -1059,26 +1091,20 @@ def restore_history(db_uri: str, archive_path: str) -> dict[str, int]:
 
 
 def compact_history(db_uri: str) -> None:
-    engine = create_engine(db_uri, future=True)
-    migrate_engine(engine)
-    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as connection:
+    with _managed_connection(db_uri) as connection:
         connection.exec_driver_sql("VACUUM")
 
 
 def retain_history(db_uri: str, *, days: int, statuses: tuple[str, ...] = ()) -> int:
     cutoff = (datetime.now(UTC) - timedelta(days=max(0, days))).isoformat()
-    engine = create_engine(db_uri, future=True)
-    migrate_engine(engine)
-    with Session(engine) as session:
+    with _managed_session(db_uri) as session:
         deleted = prune_runs(session, before=cutoff, statuses=statuses)
         session.commit()
         return deleted
 
 
 def list_failed_batches(db_uri: str, *, limit: int = 20) -> list[BatchJobSummary]:
-    engine = create_engine(db_uri, future=True)
-    migrate_engine(engine)
-    with Session(engine) as session:
+    with _managed_session(db_uri) as session:
         jobs = session.execute(
             select(BatchJobModel).where(BatchJobModel.failed_inputs > 0).order_by(BatchJobModel.started_at.desc()).limit(limit)
         ).scalars().all()
@@ -1086,9 +1112,7 @@ def list_failed_batches(db_uri: str, *, limit: int = 20) -> list[BatchJobSummary
 
 
 def list_failed_batch_items(db_uri: str, *, batch_job_id: int) -> list[FailedBatchItem]:
-    engine = create_engine(db_uri, future=True)
-    migrate_engine(engine)
-    with Session(engine) as session:
+    with _managed_session(db_uri) as session:
         return [
             FailedBatchItem(
                 batch_job_id=item.batch_job_id,
@@ -1103,9 +1127,7 @@ def list_failed_batch_items(db_uri: str, *, batch_job_id: int) -> list[FailedBat
 
 
 def list_batch_jobs(db_uri: str, *, limit: int = 20, statuses: tuple[str, ...] = ()) -> list[BatchJobSummary]:
-    engine = create_engine(db_uri, future=True)
-    migrate_engine(engine)
-    with Session(engine) as session:
+    with _managed_session(db_uri) as session:
         stmt = select(BatchJobModel).order_by(BatchJobModel.started_at.desc()).limit(limit)
         if statuses:
             stmt = stmt.where(BatchJobModel.status.in_(statuses))
@@ -1114,9 +1136,7 @@ def list_batch_jobs(db_uri: str, *, limit: int = 20, statuses: tuple[str, ...] =
 
 
 def get_batch_job(db_uri: str, *, batch_job_id: int) -> BatchJobDetail | None:
-    engine = create_engine(db_uri, future=True)
-    migrate_engine(engine)
-    with Session(engine) as session:
+    with _managed_session(db_uri) as session:
         job = session.get(BatchJobModel, batch_job_id)
         if job is None:
             return None
@@ -1138,9 +1158,7 @@ def get_batch_job(db_uri: str, *, batch_job_id: int) -> BatchJobDetail | None:
 
 
 def list_batch_runs(db_uri: str, *, batch_job_id: int) -> list[PersistedRunSummary]:
-    engine = create_engine(db_uri, future=True)
-    migrate_engine(engine)
-    with Session(engine) as session:
+    with _managed_session(db_uri) as session:
         stmt = select(RunModel).where(RunModel.batch_job_id == batch_job_id).order_by(RunModel.started_at.asc())
         return [build_summary(session, run) for run in session.execute(stmt).scalars().all()]
 

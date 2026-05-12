@@ -1,0 +1,994 @@
+from __future__ import annotations
+
+import json
+import threading
+from datetime import UTC, datetime
+from types import SimpleNamespace
+
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
+from iocparser.domain.models import ExtractionOptions, ExtractionResult, PersistOptions, Source
+from iocparser.domain.pipeline import PipelineJobRequest
+
+
+class _ScalarResult:
+    def __init__(self, rows: list[object]) -> None:
+        self._rows = rows
+
+    def scalars(self) -> _ScalarResult:
+        return self
+
+    def all(self) -> list[object]:
+        return self._rows
+
+    def first(self) -> object | None:
+        return self._rows[0] if self._rows else None
+
+    def scalar_one_or_none(self) -> object | None:
+        return self._rows[0] if self._rows else None
+
+
+class _Savepoint:
+    def __init__(self, rollback_error: Exception | None = None) -> None:
+        self.rollback_error = rollback_error
+        self.committed = False
+        self.rolled_back = False
+
+    def commit(self) -> None:
+        self.committed = True
+
+    def rollback(self) -> None:
+        self.rolled_back = True
+        if self.rollback_error is not None:
+            raise self.rollback_error
+
+
+class _IntegritySession:
+    def __init__(
+        self,
+        retry_rows: list[object],
+        *,
+        rollback_error: Exception | None = None,
+    ) -> None:
+        self.retry_rows = retry_rows
+        self.rollback_error = rollback_error
+        self.execute_calls = 0
+        self.rollback_called = False
+
+    def execute(self, _stmt: object) -> _ScalarResult:
+        self.execute_calls += 1
+        return _ScalarResult([] if self.execute_calls == 1 else self.retry_rows)
+
+    def add(self, _model: object) -> None:
+        return None
+
+    def begin_nested(self) -> _Savepoint:
+        return _Savepoint(self.rollback_error)
+
+    def flush(self) -> None:
+        raise IntegrityError("duplicate", {}, Exception("duplicate"))
+
+    def rollback(self) -> None:
+        self.rollback_called = True
+
+
+def _raise(exc: BaseException) -> None:
+    raise exc
+
+
+def _fresh_db(tmp_path, name: str = "test.db") -> str:
+    db_uri = f"sqlite:///{tmp_path / name}"
+    engine = create_engine(db_uri, future=True)
+    try:
+        from iocparser.infrastructure.persistence_migration_runtime import migrate_engine
+
+        migrate_engine(engine)
+    finally:
+        engine.dispose()
+    return db_uri
+
+
+def _job_model_kwargs(**overrides: object) -> dict[str, object]:
+    now = datetime.now(UTC)
+    values: dict[str, object] = {
+        "job_id": "job",
+        "correlation_id": "corr",
+        "queue_backend": "filesystem",
+        "queue_name": "default",
+        "input_kind": "text",
+        "source_value": "payload",
+        "idempotency_key": None,
+        "status": "queued",
+        "attempts": 0,
+        "max_attempts": 3,
+        "retryable": None,
+        "receipt_id": "receipt",
+        "payload_json": "{}",
+        "result_json": "{}",
+        "metrics_json": "{}",
+        "last_error_code": None,
+        "last_error_category": None,
+        "last_error_message": None,
+        "run_id": None,
+        "submitted_at": now,
+        "started_at": None,
+        "completed_at": None,
+        "dead_lettered_at": None,
+    }
+    values.update(overrides)
+    return values
+
+
+def _dead_letter_model_kwargs(**overrides: object) -> dict[str, object]:
+    values: dict[str, object] = {
+        "job_id": "job",
+        "correlation_id": "corr",
+        "queue_backend": "filesystem",
+        "queue_name": "default",
+        "source_value": "payload",
+        "attempts": 1,
+        "max_attempts": 3,
+        "error_code": "ERR",
+        "error_category": "test",
+        "error_message": "boom",
+        "retryable": False,
+        "payload_json": "{}",
+        "dead_lettered_at": datetime.now(UTC),
+    }
+    values.update(overrides)
+    return values
+
+
+def test_json_object_returns_dict_with_string_keys() -> None:
+    from iocparser.adapters.renderers_json import json_object
+
+    assert json_object('{"1": "one", "two": 2}') == {"1": "one", "two": 2}
+
+
+def test_validated_search_call_reraises_unknown_value_error() -> None:
+    from iocparser.api_persistence_query import _validated_search_call
+
+    original = ValueError("unexpected backend failure")
+
+    def call() -> str:
+        raise original
+
+    with pytest.raises(ValueError, match="unexpected backend failure") as raised:
+        _validated_search_call("needle", call)
+    assert raised.value is original
+
+
+def test_application_use_cases_propagate_process_interruptions() -> None:
+    from iocparser.application.contracts import ExtractFileInput, PersistRunInput
+    from iocparser.application.use_cases import extract_from_file, persist_run
+
+    class InterruptingReader:
+        def read(self, _file_path: str, _options: ExtractionOptions) -> str:
+            raise KeyboardInterrupt
+
+    class Extractor:
+        def extract_all(self, _text: str, *, defang: bool = True) -> dict[str, list[str]]:
+            return {}
+
+    with pytest.raises(KeyboardInterrupt):
+        extract_from_file(
+            ExtractFileInput("sample.txt", ExtractionOptions()),
+            reader=InterruptingReader(),
+            extractor_engine=Extractor(),
+        )
+
+    class SourceRepository:
+        def get_or_create(self, **_kwargs: object) -> int:
+            raise KeyboardInterrupt
+
+    unit = SimpleNamespace(
+        source_repository=SourceRepository(),
+        ioc_repository=SimpleNamespace(get_or_create_normal=lambda _r: [], get_or_create_warnings=lambda _r: []),
+        run_repository=SimpleNamespace(create_run=lambda **_k: 1, attach_iocs=lambda **_k: None),
+        commit=lambda: None,
+        rollback=lambda: None,
+    )
+    with pytest.raises(KeyboardInterrupt):
+        persist_run(
+            PersistRunInput(
+                source=Source.from_raw("file", "sample.txt"),
+                result=ExtractionResult(),
+                tool_version="test",
+                options=PersistOptions(
+                    defang=True,
+                    check_warnings=False,
+                    force_update=False,
+                    output_format="json",
+                ),
+            ),
+            unit_of_work=unit,
+        )
+
+
+def test_distributed_process_next_propagates_interruptions() -> None:
+    from iocparser.application.distributed_use_cases import DistributedPipelineCoordinator
+
+    request = PipelineJobRequest(input_kind="text", source_value="payload", job_id="job")
+    envelope = QueueEnvelope(request=request, queue_backend="memory", queue_name="default")
+    receipt = QueueReceipt("memory", "default", "receipt", "message")
+
+    class Queue:
+        def dequeue(self, *, queue_name: str) -> tuple[QueueReceipt, QueueEnvelope]:
+            assert queue_name == "default"
+            return receipt, envelope
+
+    class Processor:
+        def process(self, _request: PipelineJobRequest) -> ExtractionResult:
+            raise KeyboardInterrupt
+
+    sink = SimpleNamespace(emit=lambda _event: None)
+    coordinator = DistributedPipelineCoordinator(
+        queue_adapter=Queue(),
+        processor=Processor(),
+        telemetry_sink=sink,
+    )
+
+    with pytest.raises(KeyboardInterrupt):
+        coordinator.process_next(queue_name="default")
+
+
+def test_cli_helpers_cover_url_source_and_retry_wrapper() -> None:
+    from iocparser.cli_dispatch_workflow import _source_kind_for_args
+    from iocparser.cli_processing_urls import _retry_attempt_for_url
+
+    args = SimpleNamespace(stdin=False, url=None, url_direct="https://example.com")
+
+    assert _source_kind_for_args(args) == "url"
+    assert _retry_attempt_for_url("https://example.com", None) == 0
+
+
+def test_future_based_executors_propagate_keyboard_interrupts(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    from iocparser.cli_processing_support import BatchResultsCollection
+    from iocparser.cli_url_batch_workflow import (
+        URLBatchWorkflowRequest,
+        URLBatchWorkflowState,
+        _collect_url_results,
+    )
+    from iocparser.domain.options import ExtractionOptions as DomainExtractionOptions
+    from iocparser.infrastructure.file_batch_executor import ThreadPoolFileBatchExecutor
+    from iocparser.infrastructure.streaming_parallel import ParallelStreamingExtractor
+
+    executor = ThreadPoolFileBatchExecutor(max_workers=1)
+    with pytest.raises(KeyboardInterrupt):
+        executor.execute(
+            ["sample"],
+            handler=lambda _request: _raise(KeyboardInterrupt()),
+            key_for=str,
+        )
+
+    text_file = tmp_path / "sample.txt"
+    text_file.write_text("hello", encoding="utf-8")
+    parallel = ParallelStreamingExtractor(max_workers=1, chunk_size=4, defang=False)
+    monkeypatch.setattr(
+        "iocparser.infrastructure.streaming.StreamingIOCExtractor.extract_from_file",
+        lambda *_args, **_kwargs: _raise(KeyboardInterrupt()),
+    )
+    with pytest.raises(KeyboardInterrupt):
+        parallel.extract_from_files([text_file])
+
+    class Future:
+        def result(self) -> object:
+            raise KeyboardInterrupt
+
+    future = Future()
+
+    class FakeExecutor:
+        def __init__(self, *, max_workers: int) -> None:
+            assert max_workers == 1
+
+        def __enter__(self) -> FakeExecutor:
+            return self
+
+        def __exit__(self, *_args: object) -> bool:
+            return False
+
+        def submit(self, *_args: object, **_kwargs: object) -> Future:
+            return future
+
+    monkeypatch.setattr("iocparser.cli_url_batch_workflow.ThreadPoolExecutor", FakeExecutor)
+    monkeypatch.setattr("iocparser.cli_url_batch_workflow.as_completed", list)
+
+    state = URLBatchWorkflowState(
+        results=BatchResultsCollection(),
+        source_metadata_map={},
+        run_metadata_map={},
+        failures={},
+        item_reports=[],
+    )
+    request = URLBatchWorkflowRequest(
+        args=SimpleNamespace(url_workers=1),
+        reader=SimpleNamespace(),
+        warning_service=None,
+        downloader=SimpleNamespace(),
+    )
+    with pytest.raises(KeyboardInterrupt):
+        _collect_url_results(
+            request,
+            url_items=[("u#1", "https://example.com")],
+            options=DomainExtractionOptions(),
+            retry_report=None,
+            retry_batch_job=None,
+            configured_plugin_client=None,
+            state=state,
+        )
+
+
+def test_network_policy_rejects_exact_prefix_and_suffix_fragments() -> None:
+    from iocparser.infrastructure.extractor_network import DEFAULT_NETWORK_POLICY
+
+    assert not DEFAULT_NETWORK_POLICY.is_valid_host_candidate("malware.addeventlistener")
+    assert not DEFAULT_NETWORK_POLICY.is_valid_host_candidate("document.cookie")
+    assert not DEFAULT_NETWORK_POLICY.is_valid_host_candidate("evil.view")
+
+
+def test_persistence_query_count_none_is_zero() -> None:
+    from iocparser.infrastructure.persistence.query.ops import _coerce_count
+
+    assert _coerce_count(None) == 0
+
+
+def test_ioc_repository_integrity_retry_and_reraise_paths() -> None:
+    from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
+
+    existing = SimpleNamespace(id=7)
+    retry_session = _IntegritySession([existing])
+
+    assert (
+        SQLAlchemyIOCRepository(retry_session)._get_or_create(
+            ioc_type="md5",
+            value="abc",
+            is_warning=False,
+            warning_list="",
+            warning_description="",
+        )
+        == 7
+    )
+
+    rollback_error = RuntimeError("savepoint rollback failed")
+    rollback_session = _IntegritySession([], rollback_error=rollback_error)
+    with pytest.raises(RuntimeError) as raised:
+        SQLAlchemyIOCRepository(rollback_session)._get_or_create(
+            ioc_type="sha1",
+            value="abc",
+            is_warning=False,
+            warning_list="",
+            warning_description="",
+        )
+    assert raised.value is rollback_error
+    assert rollback_session.rollback_called is True
+
+    missing_session = _IntegritySession([])
+    with pytest.raises(IntegrityError):
+        SQLAlchemyIOCRepository(missing_session)._get_or_create(
+            ioc_type="sha256",
+            value="abc",
+            is_warning=False,
+            warning_list="",
+            warning_description="",
+        )
+
+
+def test_source_repository_integrity_retry_and_reraise_paths() -> None:
+    from iocparser.infrastructure.persistence_source_repository import SQLAlchemySourceRepository
+
+    existing = SimpleNamespace(
+        id=41,
+        value="sample.txt",
+        last_seen=datetime(2020, 1, 1, tzinfo=UTC),
+        original_url=None,
+        normalized_url=None,
+        mime_type=None,
+        input_size=None,
+        content_hash=None,
+        fingerprint=None,
+        value_search="",
+    )
+    retry_session = _IntegritySession([existing])
+
+    assert (
+        SQLAlchemySourceRepository(retry_session).get_or_create(
+            kind="file",
+            value="sample.txt",
+            original_url="https://origin.example",
+            normalized_url="https://origin.example/",
+            mime_type="text/plain",
+            input_size=123,
+            content_hash="hash",
+            fingerprint="fp",
+        )
+        == 41
+    )
+    assert existing.mime_type == "text/plain"
+    assert existing.input_size == 123
+    assert existing.content_hash == "hash"
+
+    rollback_error = RuntimeError("savepoint rollback failed")
+    rollback_session = _IntegritySession([], rollback_error=rollback_error)
+    with pytest.raises(RuntimeError):
+        SQLAlchemySourceRepository(rollback_session).get_or_create(kind="file", value="rollback")
+    assert rollback_session.rollback_called is True
+
+    missing_session = _IntegritySession([])
+    with pytest.raises(IntegrityError):
+        SQLAlchemySourceRepository(missing_session).get_or_create(kind="file", value="missing")
+
+
+def test_unit_of_work_race_branches_and_context_manager(tmp_path) -> None:
+    from sqlalchemy import create_engine as sqlalchemy_create_engine
+
+    from iocparser.infrastructure import persistence_uow
+    from iocparser.infrastructure.persistence_uow import SQLAlchemyUnitOfWork
+
+    engine_uri = "sqlite:///:memory:?engine-race"
+    sentinel_engine = sqlalchemy_create_engine("sqlite:///:memory:", future=True)
+    persistence_uow._ENGINE_CACHE.pop(engine_uri, None)
+    persistence_uow._ENGINE_LOCK.acquire()
+    engine_results: list[object] = []
+
+    def load_engine() -> None:
+        engine_results.append(persistence_uow._get_or_create_engine(engine_uri))
+
+    engine_thread = threading.Thread(target=load_engine)
+    engine_thread.start()
+    persistence_uow._ENGINE_CACHE[engine_uri] = sentinel_engine
+    persistence_uow._ENGINE_LOCK.release()
+    engine_thread.join(timeout=5)
+    assert engine_results == [sentinel_engine]
+    persistence_uow._ENGINE_CACHE.pop(engine_uri, None)
+    sentinel_engine.dispose()
+
+    migrate_uri = "sqlite:///:memory:?migrate-race"
+    SQLAlchemyUnitOfWork._MIGRATED_URIS.discard(migrate_uri)
+    SQLAlchemyUnitOfWork._MIGRATE_LOCK.acquire()
+
+    migrate_thread = threading.Thread(target=lambda: SQLAlchemyUnitOfWork.migrate(migrate_uri))
+    migrate_thread.start()
+    SQLAlchemyUnitOfWork._MIGRATED_URIS.add(migrate_uri)
+    SQLAlchemyUnitOfWork._MIGRATE_LOCK.release()
+    migrate_thread.join(timeout=5)
+
+    db_uri = _fresh_db(tmp_path, "context.db")
+    with SQLAlchemyUnitOfWork(db_uri) as unit:
+        assert unit.session is not None
+
+
+def test_queue_adapters_close_and_preserve_interruptions(monkeypatch: pytest.MonkeyPatch) -> None:
+    import iocparser.infrastructure.queue_rabbitmq as rabbitmq
+    import iocparser.infrastructure.queue_sqs as sqs
+
+    class Boto3:
+        def client(self, service_name: str) -> object:
+            assert service_name == "sqs"
+            return SimpleNamespace()
+
+    def boto3_module() -> Boto3:
+        return Boto3()
+
+    monkeypatch.setattr(sqs, "_boto3_module", boto3_module)
+    sqs_adapter = sqs.SQSQueueAdapter("https://sqs.example/main")
+    sqs_adapter.close()
+    assert sqs_adapter.client is None
+
+    monkeypatch.setattr(
+        rabbitmq,
+        "_pika_module",
+        lambda: SimpleNamespace(
+            URLParameters=lambda url: url,
+            BlockingConnection=lambda _params: _raise(KeyboardInterrupt()),
+        ),
+    )
+    with pytest.raises(KeyboardInterrupt):
+        rabbitmq.RabbitMQQueueAdapter("amqp://localhost")._channel_for()
+
+    monkeypatch.setattr(
+        rabbitmq,
+        "_pika_module",
+        lambda: SimpleNamespace(
+            URLParameters=lambda url: url,
+            BlockingConnection=lambda _params: SimpleNamespace(
+                channel=lambda: _raise(KeyboardInterrupt()),
+            ),
+        ),
+    )
+    with pytest.raises(KeyboardInterrupt):
+        rabbitmq.RabbitMQQueueAdapter("amqp://localhost")._channel_for()
+
+    closed: list[bool] = []
+    monkeypatch.setattr(
+        rabbitmq,
+        "_pika_module",
+        lambda: SimpleNamespace(
+            URLParameters=lambda url: url,
+            BlockingConnection=lambda _params: SimpleNamespace(
+                channel=lambda: _raise(RuntimeError("channel failed")),
+                close=lambda: closed.append(True),
+            ),
+        ),
+    )
+    with pytest.raises(RuntimeError):
+        rabbitmq.RabbitMQQueueAdapter("amqp://localhost")._channel_for()
+    assert closed == [True]
+
+
+def test_streaming_mmap_boundary_and_interruptions(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from iocparser.infrastructure.streaming import StreamingIOCExtractor
+
+    boundary_file = tmp_path / "utf8.txt"
+    boundary_file.write_bytes("aé".encode())
+    progress: list[int] = []
+    extractor = StreamingIOCExtractor(chunk_size=2, overlap=0, defang=False, progress_callback=progress.append)
+    assert extractor.extract_from_mmap(boundary_file) == {}
+    assert progress
+
+    text_file = tmp_path / "interrupt.txt"
+    text_file.write_text("https://example.com", encoding="utf-8")
+    interrupting = StreamingIOCExtractor(chunk_size=8, overlap=0, defang=False)
+    monkeypatch.setattr(
+        interrupting.extractor,
+        "extract_all",
+        lambda *_args, **_kwargs: _raise(KeyboardInterrupt()),
+    )
+    with pytest.raises(KeyboardInterrupt):
+        interrupting.extract_from_file(text_file)
+    with pytest.raises(KeyboardInterrupt):
+        interrupting.extract_from_mmap(text_file)
+
+
+def test_pipeline_worker_and_service_preserve_operational_interruptions() -> None:
+    from iocparser.domain.pipeline import ResourceLimits
+    from iocparser.pipeline_worker import PipelineWorker
+    from iocparser.worker_service import DistributedWorkerService
+
+    class InterruptingClient:
+        downloader = SimpleNamespace()
+
+        def extract_result_from_text(self, *_args: object, **_kwargs: object) -> ExtractionResult:
+            raise KeyboardInterrupt
+
+        def extract_result_from_file(self, *_args: object, **_kwargs: object) -> ExtractionResult:
+            return ExtractionResult()
+
+    class MemoryFailingClient:
+        downloader = SimpleNamespace()
+
+        def extract_result_from_text(self, *_args: object, **_kwargs: object) -> ExtractionResult:
+            raise MemoryError
+
+        def extract_result_from_file(self, *_args: object, **_kwargs: object) -> ExtractionResult:
+            return ExtractionResult()
+
+    request = PipelineJobRequest(input_kind="text", source_value="payload")
+    with pytest.raises(KeyboardInterrupt):
+        PipelineWorker(client=InterruptingClient()).process(request)
+    with pytest.raises(MemoryError):
+        PipelineWorker(client=MemoryFailingClient()).process(request)
+
+    service = SimpleNamespace(limits=SimpleNamespace(max_workers="many"), process_next=lambda **_k: None)
+    worker_service = DistributedWorkerService(
+        service=service,
+        queue_name="default",
+        poll_interval_seconds=0.0,
+        max_messages_per_cycle=1,
+    )
+    assert worker_service.concurrency == 1
+
+    zero_limits = ResourceLimits(max_workers=0)
+    zero_service = SimpleNamespace(limits=zero_limits, process_next=lambda **_k: None)
+    zero_worker = DistributedWorkerService(
+        service=zero_service,
+        queue_name="default",
+        poll_interval_seconds=0.0,
+        max_messages_per_cycle=1,
+    )
+    assert zero_worker.concurrency == 1
+
+
+def test_distributed_persistence_rolls_back_and_single_import_lookup(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import iocparser.infrastructure.persistence_distributed as distributed
+    from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
+    from iocparser.infrastructure.persistence_schema import DistributedJobModel
+
+    class Unit:
+        def __init__(self, exc: BaseException) -> None:
+            self.exc = exc
+            self.session = SimpleNamespace(execute=lambda _stmt: _raise(exc))
+            self.rollback_called = False
+            self.close_called = False
+
+        def rollback(self) -> None:
+            self.rollback_called = True
+
+        def close(self) -> None:
+            self.close_called = True
+
+    request = PipelineJobRequest(input_kind="text", source_value="payload", job_id="job")
+    envelope = QueueEnvelope(request=request, queue_backend="memory", queue_name="default")
+
+    create_unit = Unit(RuntimeError("create failed"))
+    monkeypatch.setattr(distributed, "SQLAlchemyUnitOfWork", lambda _uri: create_unit)
+    service = SQLAlchemyDistributedJobService("sqlite:///unused.db")
+    monkeypatch.setattr(
+        service,
+        "_create_or_get_job_inner",
+        lambda **_kwargs: _raise(RuntimeError("create failed")),
+    )
+    with pytest.raises(RuntimeError):
+        service.create_or_get_job(envelope=envelope, receipt_id="receipt")
+    assert create_unit.rollback_called is True
+    assert create_unit.close_called is True
+
+    create_interrupt_unit = Unit(KeyboardInterrupt())
+    monkeypatch.setattr(distributed, "SQLAlchemyUnitOfWork", lambda _uri: create_interrupt_unit)
+    monkeypatch.setattr(
+        service,
+        "_create_or_get_job_inner",
+        lambda **_kwargs: _raise(KeyboardInterrupt()),
+    )
+    with pytest.raises(KeyboardInterrupt):
+        service.create_or_get_job(envelope=envelope, receipt_id="receipt")
+    assert create_interrupt_unit.rollback_called is False
+    assert create_interrupt_unit.close_called is True
+
+    interrupt_unit = Unit(KeyboardInterrupt())
+    monkeypatch.setattr(distributed, "SQLAlchemyUnitOfWork", lambda _uri: interrupt_unit)
+    with pytest.raises(KeyboardInterrupt):
+        service._transition(job_id="job", status="running", attempts=1)
+    assert interrupt_unit.rollback_called is False
+    assert interrupt_unit.close_called is True
+
+    transition_unit = Unit(RuntimeError("transition failed"))
+    monkeypatch.setattr(distributed, "SQLAlchemyUnitOfWork", lambda _uri: transition_unit)
+    with pytest.raises(RuntimeError):
+        service._transition(job_id="job", status="running", attempts=1)
+    assert transition_unit.rollback_called is True
+    assert transition_unit.close_called is True
+
+    from iocparser.infrastructure.persistence_schema import SQLAlchemyUnitOfWork as RealUnitOfWork
+
+    monkeypatch.setattr(distributed, "SQLAlchemyUnitOfWork", RealUnitOfWork)
+    db_uri = _fresh_db(tmp_path, "distributed-import.db")
+    engine = create_engine(db_uri, future=True)
+    try:
+        with Session(engine) as session:
+            session.add(
+                DistributedJobModel(
+                    **_job_model_kwargs(
+                        job_id="public#history:archive",
+                        payload_json=json.dumps({"request": {"job_id": "public"}}),
+                    ),
+                ),
+            )
+            session.commit()
+        found = SQLAlchemyDistributedJobService(db_uri).get_job(job_id="public")
+        assert found is not None
+        assert found.job_id == "public"
+    finally:
+        engine.dispose()
+
+
+def test_history_private_edges_with_real_models(tmp_path) -> None:
+    from iocparser.infrastructure.persistence.history import ops
+    from iocparser.infrastructure.persistence_batch import BatchJobModel, FailedBatchItemModel
+    from iocparser.infrastructure.persistence_schema import (
+        DeadLetterJobModel,
+        DistributedJobModel,
+        RunModel,
+        SourceModel,
+    )
+
+    db_uri = _fresh_db(tmp_path, "history-real.db")
+    engine = create_engine(db_uri, future=True)
+    now = datetime.now(UTC)
+    try:
+        with Session(engine) as session:
+            session.add(
+                DeadLetterJobModel(
+                    **_dead_letter_model_kwargs(
+                        job_id="dead-marker",
+                        payload_json=json.dumps(
+                            {ops.HISTORY_IMPORT_MARKER_KEY: {"archive_id": "legacy-archive"}},
+                        ),
+                    ),
+                ),
+            )
+            session.commit()
+            assert ops._has_legacy_archive_collision(session, archive_id="legacy-archive")
+
+            batch = BatchJobModel(
+                source_kind="url",
+                started_at=now,
+                finished_at=now,
+                total_inputs=1,
+                successful_inputs=0,
+                failed_inputs=1,
+                retry_attempt=2,
+                status="partial",
+                config_json="{}",
+                error_summary_json='{"RuntimeError": 1}',
+                metrics_json='{"duration_ms": 5}',
+            )
+            session.add(batch)
+            session.flush()
+            batch_row = {
+                "source_kind": "url",
+                "started_at": now,
+                "finished_at": now,
+                "total_inputs": 1,
+                "successful_inputs": 0,
+                "failed_inputs": 1,
+                "retry_attempt": 2,
+                "status": "partial",
+                "config_json": "{}",
+                "error_summary_json": '{"RuntimeError": 1}',
+                "metrics_json": '{"duration_ms": 5}',
+            }
+            assert ops._existing_batch_job(session, batch_row) == batch
+            assert ops._batch_job_signature(batch_row)[0] == "url"
+
+            failed = FailedBatchItemModel(
+                batch_job_id=batch.id,
+                source_value="https://failed.example",
+                error_type="RuntimeError",
+                error_message="failed",
+                retry_attempt=2,
+                created_at=now,
+            )
+            session.add(failed)
+            session.flush()
+            assert ops._existing_failed_batch_item(
+                session,
+                {
+                    "source_value": "https://failed.example",
+                    "error_type": "RuntimeError",
+                    "error_message": "failed",
+                    "retry_attempt": 2,
+                    "created_at": now,
+                },
+                batch_job_id=batch.id,
+            ) == failed
+
+            source = SourceModel(
+                kind="file",
+                value="sample.txt",
+                value_search="sample.txt",
+                first_seen=now,
+                last_seen=now,
+            )
+            session.add(source)
+            session.flush()
+            run = RunModel(
+                source_id=source.id,
+                batch_job_id=None,
+                started_at=now,
+                finished_at=now,
+                tool_version="test",
+                options_json='{"mode": "existing"}',
+                normal_ioc_count=0,
+                warning_ioc_count=0,
+                processed_items=1,
+                successful_items=1,
+                failed_items=0,
+                partial_error_count=0,
+                duration_ms=0,
+                status="success",
+                error_message="",
+            )
+            session.add(run)
+            session.flush()
+            assert (
+                ops._existing_run(
+                    session,
+                    {
+                        "started_at": now,
+                        "finished_at": now,
+                        "tool_version": "test",
+                        "options_json": '{"mode": "incoming"}',
+                        "normal_ioc_count": 0,
+                        "warning_ioc_count": 0,
+                        "processed_items": 1,
+                        "successful_items": 1,
+                        "failed_items": 0,
+                        "partial_error_count": 0,
+                        "duration_ms": 0,
+                        "status": "success",
+                        "error_message": "",
+                    },
+                    source_id=source.id,
+                    batch_job_id=None,
+                    ioc_signature=(),
+                    archive_id="archive",
+                    original_id=99,
+                    same_origin=False,
+                )
+                is None
+            )
+
+            marker_payload = json.dumps(
+                {
+                    "request": {"job_id": "public-job"},
+                    ops.HISTORY_IMPORT_MARKER_KEY: {"archive_id": "archive", "original_id": 1},
+                },
+            )
+            distributed_model = DistributedJobModel(
+                **_job_model_kwargs(job_id="internal-job", payload_json=marker_payload),
+            )
+            dead_model = DeadLetterJobModel(
+                **_dead_letter_model_kwargs(job_id="internal-dead", payload_json=marker_payload),
+            )
+            session.add_all([distributed_model, dead_model])
+            session.flush()
+            assert ops._distributed_public_job_id(distributed_model) == "public-job"
+            assert ops._dead_letter_public_job_id(dead_model) == "public-job"
+
+            same_origin_distributed = DistributedJobModel(
+                **_job_model_kwargs(job_id="same-origin-job", payload_json="{}"),
+            )
+            session.add(same_origin_distributed)
+            session.flush()
+            assert (
+                ops._existing_distributed_job(
+                    session,
+                    {"id": 10, "job_id": "same-origin-job"},
+                    archive_id="archive",
+                    same_origin=True,
+                )
+                == same_origin_distributed
+            )
+
+            mismatched_dead = DeadLetterJobModel(
+                **_dead_letter_model_kwargs(
+                    job_id="payload-mismatch",
+                    payload_json='{"payload": "stored"}',
+                    dead_lettered_at=now,
+                ),
+            )
+            session.add(mismatched_dead)
+            session.flush()
+            assert (
+                ops._existing_dead_letter_job(
+                    session,
+                    {
+                        "id": 11,
+                        "job_id": "payload-mismatch",
+                        "dead_lettered_at": now,
+                        "correlation_id": "corr",
+                        "queue_backend": "filesystem",
+                        "queue_name": "default",
+                        "source_value": "payload",
+                        "attempts": 1,
+                        "max_attempts": 3,
+                        "error_code": "ERR",
+                        "error_category": "test",
+                        "error_message": "boom",
+                        "retryable": False,
+                        "payload_json": '{"payload": "incoming"}',
+                    },
+                    archive_id="archive",
+                    same_origin=True,
+                )
+                is None
+            )
+            matching_dead = DeadLetterJobModel(
+                **_dead_letter_model_kwargs(
+                    job_id="payload-mismatch",
+                    payload_json='{"payload": "incoming"}',
+                    dead_lettered_at=now,
+                ),
+            )
+            session.add(matching_dead)
+            session.flush()
+            assert (
+                ops._existing_dead_letter_job(
+                    session,
+                    {
+                        "id": 12,
+                        "job_id": "payload-mismatch",
+                        "dead_lettered_at": now,
+                        "correlation_id": "corr",
+                        "queue_backend": "filesystem",
+                        "queue_name": "default",
+                        "source_value": "payload",
+                        "attempts": 1,
+                        "max_attempts": 3,
+                        "error_code": "ERR",
+                        "error_category": "test",
+                        "error_message": "boom",
+                        "retryable": False,
+                        "payload_json": '{"payload": "incoming"}',
+                    },
+                    archive_id="archive",
+                    same_origin=True,
+                )
+                == matching_dead
+            )
+    finally:
+        engine.dispose()
+
+
+def test_history_import_skip_and_same_origin_batch_paths() -> None:
+    from iocparser.infrastructure.persistence.history import ops
+
+    now = datetime.now(UTC)
+    row = {
+        "id": 5,
+        "source_kind": "url",
+        "started_at": now,
+        "finished_at": now,
+        "total_inputs": 1,
+        "successful_inputs": 1,
+        "failed_inputs": 0,
+        "retry_attempt": 0,
+        "status": "success",
+        "config_json": '{"url_workers": 2}',
+        "error_summary_json": "{}",
+        "metrics_json": "{}",
+    }
+    matching_candidate = SimpleNamespace(id=103, config_json='{"url_workers": 2}')
+
+    class BatchSession:
+        def execute(self, _stmt: object) -> _ScalarResult:
+            return _ScalarResult([101, 102, 103])
+
+        def get(self, _model: object, model_id: int) -> object | None:
+            if model_id == 101:
+                return None
+            if model_id == 102:
+                return SimpleNamespace(id=102, config_json='{"url_workers": 4}')
+            return matching_candidate
+
+        def add(self, _model: object) -> None:
+            raise AssertionError("existing same-origin batch should be reused")
+
+        def flush(self) -> None:
+            raise AssertionError("existing same-origin batch should be reused")
+
+    inserted, batch_map = ops._import_batch_jobs(
+        BatchSession(),
+        [row],
+        archive_id="archive",
+        same_origin=True,
+    )
+    assert inserted == 0
+    assert batch_map == {5: 103}
+
+    inserted_runs, run_map = ops._import_runs(
+        SimpleNamespace(),
+        [{"id": 1, "source_id": 55}],
+        archive_id="archive",
+        same_origin=False,
+        source_map={},
+        batch_map={},
+        run_ioc_rows=[
+            {"run_id": "bad", "ioc_id": 1},
+            {"run_id": 1, "ioc_id": 99},
+        ],
+        ioc_map={},
+    )
+    assert inserted_runs == 0
+    assert run_map == {}
+
+    assert (
+        ops._import_run_iocs(
+            SimpleNamespace(),
+            [{"run_id": 1, "ioc_id": 2}],
+            run_map={},
+            ioc_map={},
+        )
+        == 0
+    )
+    assert ops._import_failed_batch_items(SimpleNamespace(), [{"batch_job_id": 3}], batch_map={}) == 0

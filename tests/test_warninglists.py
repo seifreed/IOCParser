@@ -571,6 +571,30 @@ class TestWarningListsPreprocessing:
         assert len(warning_lists.cidr_networks) == 0
         assert len(warning_lists.lists_by_ioc_type) == 0
 
+    def test_preprocess_clears_warning_lookup_cache(self):
+        warning_lists = make_warning_lists()
+        warning_lists.warning_lists = {}
+        warning_lists._preprocess_lists()
+
+        is_warning, _ = warning_lists.check_value("example.com", "domains")
+        assert not is_warning
+
+        warning_lists.warning_lists = {
+            "new-domains": {
+                "name": "New Domains",
+                "description": "Updated cache content",
+                "type": "string",
+                "matching_attributes": ["domain"],
+                "list": ["example.com"],
+            }
+        }
+        warning_lists._preprocess_lists()
+
+        is_warning, info = warning_lists.check_value("example.com", "domains")
+        assert is_warning
+        assert info is not None
+        assert info["name"] == "New Domains"
+
 
 class TestWarningListsGetWarnings:
     """Test get_warnings_for_iocs functionality."""

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ipaddress
 import re
+from contextlib import suppress
 from logging import Logger
 from typing import ClassVar
 
@@ -25,6 +26,7 @@ class WarningListPreprocessMixin:
     IOC_TYPE_MAPPING: ClassVar[dict[str, str]]
     DEFANG_CLEANERS: ClassVar[list[tuple[str, str]]]
     _clean_value_cache: dict[str, str]
+    _warning_lookup_cache: dict[tuple[str, str], tuple[bool, dict[str, str] | None]]
 
     def _get_logger(self) -> Logger:
         return get_mixin_logger(self, logger)
@@ -43,6 +45,8 @@ class WarningListPreprocessMixin:
         self.lookup_data.cidr_networks.clear()
         self.lookup_data.lists_by_ioc_type.clear()
         self._ensure_clean_value_cache().clear()
+        with suppress(AttributeError):
+            self._warning_lookup_cache.clear()
 
     def _add_string_values(self, list_id: str, values_val: list[WarningListEntry]) -> None:
         for value in values_val:

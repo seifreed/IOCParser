@@ -18,6 +18,7 @@ from iocparser.cli_args import (
 )
 from iocparser.config import AppConfig
 from iocparser.domain.models import ExtractionResult, PersistOptions, Source
+from iocparser.errors import ValidationError
 from iocparser.infrastructure.file_readers import detect_file_type
 from iocparser.infrastructure.logger import get_logger
 from iocparser.infrastructure.persistence import SQLAlchemyUnitOfWork
@@ -29,6 +30,8 @@ color_red: str = str(Fore.RED)
 color_yellow: str = str(Fore.YELLOW)
 style_reset: str = str(Style.RESET_ALL)
 logger = get_logger(__name__)
+INVALID_SEVERITY_ERROR = "Invalid severity: {value}"
+VALID_SEVERITIES = {"high", "informational", "low", "medium"}
 
 __all__ = [
     "PersistResultsRequest",
@@ -195,7 +198,7 @@ def filter_result_for_output(
 ) -> ExtractionResult:
     namespace: Mapping[str, object] = vars(args)
     raw_max_evidence = namespace.get("max_evidence")
-    severities = parse_string_filters(get_optional_str_arg(args, "severity"))
+    severities = _validated_severity_filters(get_optional_str_arg(args, "severity"))
     tags = parse_string_filters(get_optional_str_arg(args, "tag"))
     include_normal = not get_bool_arg(args, "only_warnings")
     include_warnings = not get_bool_arg(args, "only_normal")
@@ -207,6 +210,17 @@ def filter_result_for_output(
         max_evidence=raw_max_evidence if isinstance(raw_max_evidence, int) else None,
         sort_by=get_optional_str_arg(args, "sort_by") or "type",
     )
+
+
+def _validated_severity_filters(value: str | None) -> tuple[str, ...]:
+    severities = parse_string_filters(value)
+    normalized: list[str] = []
+    for severity in severities:
+        candidate = severity.strip().lower()
+        if candidate not in VALID_SEVERITIES:
+            raise ValidationError(INVALID_SEVERITY_ERROR.format(value=severity))
+        normalized.append(candidate)
+    return tuple(normalized)
 
 
 def render_summary(result: ExtractionResult) -> str:

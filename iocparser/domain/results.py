@@ -7,6 +7,9 @@ from iocparser.domain.enums import IOCType, IOCTypeName, get_custom_ioc_type, io
 from iocparser.domain.values import IndicatorValue, indicator_value_for
 from iocparser.shared_utils import deduplicate_iocs
 
+INVALID_ANALYST_SORT_BY_ERROR = "Invalid sort_by: {value}"
+VALID_ANALYST_SORT_VALUES = {"severity", "type", "value"}
+
 
 def classify_ioc(
     ioc_type: IOCType | IOCTypeName | str, *, is_warning: bool = False
@@ -256,6 +259,9 @@ class ExtractionResult:
     ) -> ExtractionResult:
         """Filter and sort the result for analyst-facing outputs."""
 
+        normalized_sort_by = sort_by.strip().lower()
+        if normalized_sort_by not in VALID_ANALYST_SORT_VALUES:
+            raise ValueError(INVALID_ANALYST_SORT_BY_ERROR.format(value=sort_by))
         normalized_severities = {
             severity.strip().lower() for severity in severities if severity.strip()
         }
@@ -276,13 +282,13 @@ class ExtractionResult:
 
         def order_key(item: IOC | WarningMatch) -> tuple[str, str, str]:
             ioc = item if isinstance(item, IOC) else item.ioc
-            if sort_by == "severity":
+            if normalized_sort_by == "severity":
                 rank = {"high": "0", "medium": "1", "low": "2", "informational": "3"}.get(
                     ioc.severity.lower(),
                     "9",
                 )
                 return (rank, ioc_type_name(ioc.ioc_type), ioc.canonical_value())
-            if sort_by == "value":
+            if normalized_sort_by == "value":
                 return (ioc.canonical_value(), ioc_type_name(ioc.ioc_type), ioc.severity)
             return (ioc_type_name(ioc.ioc_type), ioc.canonical_value(), ioc.severity)
 

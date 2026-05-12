@@ -1167,6 +1167,12 @@ def test_render_result_supports_summary_and_analyst_filters() -> None:
     high_first = result.filter_analyst_view(sort_by="severity")
     assert high_first.iocs[0].ioc_type.value == "cves"
 
+    with pytest.raises(ValueError, match="Invalid sort_by"):
+        result.filter_analyst_view(sort_by="bogus")
+
+    with pytest.raises(ValidationError, match="Invalid severity"):
+        render_result(_args(json=True, severity="critical"), result)
+
     trimmed = result.filter_analyst_view(max_evidence=0, sort_by="value", severities=("high",))
     assert len(trimmed.iocs) == 1
     assert trimmed.iocs[0].evidence == ()

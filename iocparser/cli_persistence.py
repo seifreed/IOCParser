@@ -209,11 +209,14 @@ def _failed_item_run_metadata(
 
 def _int_value(value: object, *, default: int) -> int:
     if isinstance(value, bool):
-        return int(value)
+        return default
     if isinstance(value, int):
         return value
     if isinstance(value, str) and value.strip():
-        return int(value.strip())
+        try:
+            return int(value.strip())
+        except ValueError:
+            return default
     return default
 
 

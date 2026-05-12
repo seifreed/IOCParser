@@ -2288,6 +2288,36 @@ def test_persist_failed_batch_items_creates_failed_runs(tmp_path: Path) -> None:
     )
 
 
+def test_persist_failed_batch_items_defaults_invalid_duration_metadata(tmp_path: Path) -> None:
+    db_uri = f"sqlite:///{tmp_path / 'failed-batch-invalid-duration.sqlite'}"
+    config = load_config(cli_persist=True, cli_db_uri=db_uri, cli_config_path=None)
+    persist_failed_batch_items(
+        {
+            "items": [
+                {
+                    "url": "https://bad-duration.example",
+                    "status": "failed",
+                    "error": "timeout",
+                    "duration_ms": True,
+                }
+            ],
+            "run_metadata_map": {
+                "https://bad-duration.example": {
+                    "duration_ms": "bad",
+                    "error_message": "timeout",
+                }
+            },
+        },
+        config=config,
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
+    )
+
+    runs = query_persisted_runs(db_uri=db_uri, limit=10)
+    assert runs.items[0].duration_ms == 0
+
+
 def test_cli_dispatch_workflow_persists_failed_batch_items(tmp_path: Path) -> None:
     from iocparser import cli_dispatch_workflow as workflow
     from iocparser.infrastructure.persistence.history import (

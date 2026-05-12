@@ -18,10 +18,18 @@ def _int_report_value(payload: dict[str, object], key: str, default: int = 0) ->
     raw_value = payload.get(key)
     if raw_value is None:
         return default
+    if isinstance(raw_value, bool):
+        return default
     if isinstance(raw_value, int):
         return raw_value
     if isinstance(raw_value, str):
-        return int(raw_value)
+        stripped = raw_value.strip()
+        if stripped:
+            try:
+                return int(stripped)
+            except ValueError:
+                return default
+        return default
     raise _invalid_report_int_error(key=key, raw_value=raw_value)
 
 

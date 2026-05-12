@@ -77,7 +77,8 @@ def test_cli_dispatch_schema_version(tmp_path):
 def test_cli_int_value_bool():
     from iocparser.cli_persistence import _int_value
 
-    assert _int_value(True, default=0) == 1
+    assert _int_value(True, default=7) == 7
+    assert _int_value("bad", default=7) == 7
 
 
 # cli_processing_support.py:90 — KeyError when source match conflicts

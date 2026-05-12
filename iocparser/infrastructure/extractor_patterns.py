@@ -81,7 +81,7 @@ PATTERNS: dict[str, Pattern[str]] = {
     "monero": re.compile(r"\b4[0-9AB][a-zA-Z0-9]{93}\b"),
     # Email and communication
     "emails": re.compile(
-        r"\b[a-zA-Z0-9][a-zA-Z0-9._-]*@"
+        r"\b[a-zA-Z0-9][a-zA-Z0-9._+-]*@"
         r"[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,63}\b",
     ),
     # Vulnerabilities and threats

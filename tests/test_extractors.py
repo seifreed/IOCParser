@@ -163,6 +163,8 @@ class TestEmailAndCommunication:
         result = self.extractor.extract_emails(text)
         assert "user@example.com" in result
         assert "admin@test.co.uk" in result
+        assert "firstname.lastname+tag@subdomain.example.org" in result
+        assert "tag@subdomain.example.org" not in result
 
     def test_extract_emails_defanged(self):
         """Test email extraction with defanging."""

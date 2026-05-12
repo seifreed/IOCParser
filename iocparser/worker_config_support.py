@@ -25,6 +25,9 @@ WORKER_DEFAULTS: dict[str, object] = {
     "max_queue_size": 64,
     "skip_processed": False,
 }
+TRUE_BOOL_VALUES = {"1", "true", "yes", "on"}
+FALSE_BOOL_VALUES = {"0", "false", "no", "off"}
+INVALID_BOOL_ENV_ERROR = "Invalid boolean environment value for {name}: {value!r}"
 
 
 def _int_type_error(value: object) -> TypeError:
@@ -53,7 +56,12 @@ def bool_env(name: str, default: bool = False) -> bool:
     raw = os.environ.get(name)
     if raw is None or raw == "":
         return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
+    normalized = raw.strip().lower()
+    if normalized in TRUE_BOOL_VALUES:
+        return True
+    if normalized in FALSE_BOOL_VALUES:
+        return False
+    raise ValueError(INVALID_BOOL_ENV_ERROR.format(name=name, value=raw))
 
 
 def resolve_config_path(config_path: str | None) -> Path | None:

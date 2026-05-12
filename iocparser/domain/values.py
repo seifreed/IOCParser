@@ -41,7 +41,10 @@ class UrlValue(IndicatorValue):
 
     def canonical(self) -> str:
         normalized = super().canonical().strip()
-        parsed = urlparse(normalized)
+        try:
+            parsed = urlparse(normalized)
+        except ValueError:
+            return normalized
         if parsed.scheme and parsed.netloc:
             return parsed.geturl()
         return normalized

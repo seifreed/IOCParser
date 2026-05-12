@@ -31,6 +31,7 @@ def test_value_objects_canonicalize_expected_values() -> None:
     assert DomainValue(" Example[.]COM ").canonical() == "example.com"
     assert UrlValue("hxxps://Example[.]COM/path").canonical() == "https://Example.COM/path"
     assert UrlValue("not really a url").canonical() == "not really a url"
+    assert UrlValue("http://[::1").canonical() == "http://[::1"
     assert IpValue("2001:0db8::1").canonical() == "2001:db8::1"
     assert IpValue("not-an-ip").canonical() == "not-an-ip"
     assert EmailValue(" USER@Example[.]COM ").canonical() == "user@example.com"

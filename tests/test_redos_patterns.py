@@ -12,6 +12,7 @@ import pytest
 from iocparser.infrastructure.extractor_patterns import PATTERNS
 
 MAX_SECONDS = 1.0
+SUBPROCESS_TIMEOUT_SECONDS = 10.0
 
 
 def _alarm_handler(_signum: int, _frame: object) -> None:
@@ -33,7 +34,7 @@ def _findall_with_subprocess_timeout(pattern_name: str, payload: str) -> float:
     results = ctx.Queue()
     process = ctx.Process(target=_findall_in_child, args=(pattern_name, payload, results))
     process.start()
-    process.join(MAX_SECONDS + 1.0)
+    process.join(SUBPROCESS_TIMEOUT_SECONDS)
     if process.is_alive():
         process.terminate()
         process.join(timeout=5)

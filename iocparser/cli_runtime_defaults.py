@@ -134,5 +134,8 @@ def parse_http_mapping(value: object, *, separator: str) -> dict[str, str]:
         if separator not in item:
             continue
         name, raw_value = item.split(separator, maxsplit=1)
-        mapping[name.strip()] = raw_value.strip()
+        normalized_name = name.strip()
+        if not normalized_name:
+            continue
+        mapping[normalized_name] = raw_value.strip()
     return mapping

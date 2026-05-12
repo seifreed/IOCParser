@@ -554,6 +554,14 @@ class TestGetParser:
         # Assert: Should return HTMLParser
         assert isinstance(parser, HTMLParser)
 
+    def test_get_parser_treats_uppercase_url_scheme_as_remote(self) -> None:
+        url = "HTTPS://example.com/data"
+
+        parser = get_parser(url)
+
+        assert isinstance(parser, HTMLParser)
+        assert parser.file_path == url
+
     def test_get_parser_raises_unsupported_file_type_for_unknown_extension(
         self,
         tmp_path: Path,

@@ -39,7 +39,7 @@ logger = get_logger(__name__)
 
 
 def _is_remote_source(file_path: str) -> bool:
-    return file_path.startswith(("http://", "https://"))
+    return file_path.lower().startswith(("http://", "https://"))
 
 
 def _download_remote_source(file_path: str) -> Path:

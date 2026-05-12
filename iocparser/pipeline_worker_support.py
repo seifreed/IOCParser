@@ -15,7 +15,7 @@ from iocparser.application.use_cases import persist_run
 from iocparser.domain.models import ExtractionResult, PersistOptions, Source
 from iocparser.domain.persisted import PersistedRunExport, PersistedRunSummary
 from iocparser.domain.pipeline import PipelineJobRequest, PipelineJobResult, ResourceLimits
-from iocparser.errors import IOCTimeoutError, ValidationError
+from iocparser.errors import IOCTimeoutError, SourceNotFoundError, ValidationError
 from iocparser.infrastructure.persistence import (
     SQLAlchemyIOCRepository,
     SQLAlchemyPersistenceService,
@@ -219,13 +219,16 @@ def _prepare_text_input(*, limits: ResourceLimits, text: str) -> PreparedInput:
 
 
 def _prepare_file_input(*, limits: ResourceLimits, path: Path) -> PreparedInput:
+    if not path.is_file():
+        raise SourceNotFoundError(str(path))
+    input_size = path.stat().st_size
+    enforce_size_limit(limits=limits, input_size_bytes=input_size)
     content = path.read_bytes()
-    enforce_size_limit(limits=limits, input_size_bytes=len(content))
     content_hash = hashlib.sha256(content).hexdigest()
     return PreparedInput(
         fingerprint=content_hash[:16],
         content_hash=content_hash,
-        metadata={"input_size": len(content), "source_kind": "file"},
+        metadata={"input_size": input_size, "source_kind": "file"},
     )
 
 

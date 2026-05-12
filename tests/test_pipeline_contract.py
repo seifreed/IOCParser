@@ -148,6 +148,39 @@ def test_pipeline_worker_enforces_size_limit() -> None:
     assert result.error.retryable is False
 
 
+def test_pipeline_worker_classifies_missing_file_as_input_not_found() -> None:
+    result = PipelineWorker().process(
+        PipelineJobRequest(
+            input_kind="file",
+            source_value="/tmp/iocparser-missing-file-nope.txt",
+            check_warnings=False,
+        ),
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "INPUT_NOT_FOUND"
+
+
+def test_pipeline_worker_checks_file_size_before_reading(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    file_path = tmp_path / "oversized.txt"
+    file_path.write_text("too large", encoding="utf-8")
+
+    def fail_read_bytes(self: Path) -> bytes:
+        raise AssertionError(f"read_bytes should not be called for {self}")
+
+    monkeypatch.setattr(Path, "read_bytes", fail_read_bytes)
+    result = PipelineWorker(limits=ResourceLimits(max_input_size_bytes=1)).process(
+        PipelineJobRequest(input_kind="file", source_value=str(file_path), check_warnings=False),
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "VALIDATION_FAILED"
+
+
 def test_pipeline_worker_enforces_time_limit_and_invalid_kind() -> None:
     timed = PipelineWorker(limits=ResourceLimits(max_input_seconds=0.0))
     timed_result = timed.process(

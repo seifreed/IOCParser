@@ -8,6 +8,7 @@ from iocparser.config import AppConfig
 from iocparser.errors import ValidationError
 
 INVALID_DIFF_ONLY_ERROR = "Invalid diff_only: {value}"
+INVALID_HTTP_MAPPING_ERROR = "Invalid HTTP mapping JSON: {value}"
 VALID_DIFF_ONLY_VALUES = {"all", "added", "removed"}
 
 
@@ -118,7 +119,10 @@ def parse_http_mapping(value: object, *, separator: str) -> dict[str, str]:
         if not stripped:
             return {}
         if stripped.startswith("{"):
-            parsed: object = json.loads(stripped)
+            try:
+                parsed: object = json.loads(stripped)
+            except json.JSONDecodeError as exc:
+                raise ValidationError(INVALID_HTTP_MAPPING_ERROR.format(value=stripped)) from exc
             return (
                 {str(key): str(item) for key, item in parsed.items()}
                 if isinstance(parsed, dict)

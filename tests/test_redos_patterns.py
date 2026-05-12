@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import multiprocessing
-import queue
+import json
 import signal
+import subprocess
+import sys
 import time
 
 import pytest
@@ -19,35 +20,37 @@ def _alarm_handler(_signum: int, _frame: object) -> None:
     raise TimeoutError("Pattern took too long - probable ReDoS")
 
 
-def _findall_in_child(pattern_name: str, payload: str, results: multiprocessing.Queue) -> None:
-    try:
-        pattern = PATTERNS[pattern_name]
-        start = time.perf_counter()
-        pattern.findall(payload)
-        results.put(("ok", time.perf_counter() - start))
-    except BaseException as exc:
-        results.put(("error", repr(exc)))
-
-
 def _findall_with_subprocess_timeout(pattern_name: str, payload: str) -> float:
-    ctx = multiprocessing.get_context("spawn")
-    results = ctx.Queue()
-    process = ctx.Process(target=_findall_in_child, args=(pattern_name, payload, results))
-    process.start()
-    process.join(SUBPROCESS_TIMEOUT_SECONDS)
-    if process.is_alive():
-        process.terminate()
-        process.join(timeout=5)
-        raise TimeoutError("Pattern took too long - probable ReDoS")
+    script = (
+        "import json\n"
+        "import sys\n"
+        "import time\n"
+        "from iocparser.infrastructure.extractor_patterns import PATTERNS\n"
+        "pattern = PATTERNS[sys.argv[1]]\n"
+        "start = time.perf_counter()\n"
+        "pattern.findall(sys.argv[2])\n"
+        "print(json.dumps({'elapsed': time.perf_counter() - start}))"
+    )
     try:
-        status, value = results.get(timeout=1)
-    except queue.Empty as exc:
+        completed = subprocess.run(  # noqa: S603
+            [sys.executable, "-c", script, pattern_name, payload],
+            capture_output=True,
+            check=True,
+            text=True,
+            timeout=SUBPROCESS_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise TimeoutError("Pattern took too long - probable ReDoS") from exc
+    except subprocess.CalledProcessError as exc:
+        detail = exc.stderr.strip() or exc.stdout.strip() or repr(exc)
+        raise RuntimeError(detail) from exc
+    try:
+        payload_obj = json.loads(completed.stdout)
+        return float(payload_obj["elapsed"])
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
         raise RuntimeError(
-            f"Pattern subprocess exited without a result: {process.exitcode}"
+            f"Pattern subprocess returned invalid output: {completed.stdout!r}"
         ) from exc
-    if status == "error":
-        raise RuntimeError(str(value))
-    return float(value)
 
 
 @pytest.mark.parametrize(

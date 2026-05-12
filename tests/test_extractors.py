@@ -87,6 +87,16 @@ class TestNetworkExtractors:
         assert {"example.com", "test.co.uk", "subdomain.example.org"}.issubset(set(result))
         assert "localhost.localdomain" not in result
 
+    def test_extract_domains_single_character_labels(self):
+        """Test domain extraction keeps valid one-character labels."""
+        text = "Observed domains: x.com, c2.a.evil-example.com, a.b.example.org"
+
+        result = self.extractor.extract_domains(text)
+
+        assert "x.com" in result
+        assert "c2.a.evil-example.com" in result
+        assert "a.b.example.org" in result
+
     def test_extract_domains_defanged(self):
         """Test domain extraction with defanging."""
         text = "Visit malware.com for more info"

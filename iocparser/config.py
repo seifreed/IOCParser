@@ -15,6 +15,10 @@ from typing import TypedDict
 
 from dotenv import load_dotenv
 
+TRUE_BOOL_VALUES = {"1", "true", "yes", "on"}
+FALSE_BOOL_VALUES = {"0", "false", "no", "off"}
+INVALID_BOOLEAN_ERROR = "Invalid boolean for {option_name}: {value!r}"
+
 
 @dataclass(frozen=True)
 class AppConfig:
@@ -144,6 +148,15 @@ def _load_ini_sections(config_path: Path) -> ConfigParser:
     return parser
 
 
+def _parse_bool_value(value: str, *, option_name: str) -> bool:
+    normalized = value.strip().lower()
+    if normalized in TRUE_BOOL_VALUES:
+        return True
+    if normalized in FALSE_BOOL_VALUES:
+        return False
+    raise ValueError(INVALID_BOOLEAN_ERROR.format(option_name=option_name, value=value))
+
+
 def _load_ini_config(config_path: Path) -> ConfigValues:
     """Load config values from an INI file."""
     parser = _load_ini_sections(config_path)
@@ -153,7 +166,7 @@ def _load_ini_config(config_path: Path) -> ConfigValues:
     if parser.has_section("database"):
         if parser.has_option("database", "persist"):
             raw_persist = parser.get("database", "persist")
-            values["persist"] = raw_persist.strip().lower() in {"1", "true", "yes", "on"}
+            values["persist"] = _parse_bool_value(raw_persist, option_name="database.persist")
         values["db_uri"] = parser.get("database", "uri", fallback=None)
 
     if parser.has_section("defaults"):
@@ -218,12 +231,9 @@ def load_config(
 
     env_persist: bool | None = None
     if "IOCPARSER_PERSIST" in os.environ:
-        env_persist = os.environ["IOCPARSER_PERSIST"].strip().lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }
+        env_persist = _parse_bool_value(
+            os.environ["IOCPARSER_PERSIST"], option_name="IOCPARSER_PERSIST"
+        )
 
     env_db_uri = os.environ.get("IOCPARSER_DB_URI")
 

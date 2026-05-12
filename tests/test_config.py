@@ -9,6 +9,8 @@ from __future__ import annotations
 import os
 from contextlib import contextmanager
 
+import pytest
+
 from iocparser.config import load_config
 
 
@@ -63,3 +65,15 @@ def test_config_env_fallback(tmp_path) -> None:
 
     assert config.persist is True
     assert config.db_uri == "sqlite:///from_env.db"
+
+
+def test_config_rejects_invalid_boolean_values(tmp_path) -> None:
+    config_path = tmp_path / "iocparser.ini"
+    config_path.write_text("[database]\npersist=definitely\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"database\.persist"):
+        load_config(None, None, str(config_path))
+
+    with _env(IOCPARSER_PERSIST="definitely"):
+        with pytest.raises(ValueError, match="IOCPARSER_PERSIST"):
+            load_config(None, None, None)

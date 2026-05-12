@@ -182,9 +182,10 @@ class RequestsURLDownloader(URLDownloader):
     def generate_temp_filename(self, parsed_url: ParseResult, content_type: str) -> str:
         """Generate filename with appropriate extension, unique per download."""
         base_name = Path(parsed_url.path).name or parsed_url.netloc.replace(".", "_")
-        if "application/pdf" in content_type and not base_name.endswith(".pdf"):
+        lowercase_base_name = base_name.lower()
+        if "application/pdf" in content_type and not lowercase_base_name.endswith(".pdf"):
             base_name += ".pdf"
-        elif "text/html" in content_type and not base_name.endswith((".html", ".htm")):
+        elif "text/html" in content_type and not lowercase_base_name.endswith((".html", ".htm")):
             base_name += ".html"
         stem = Path(base_name).stem
         suffix = Path(base_name).suffix

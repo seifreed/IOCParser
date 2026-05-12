@@ -135,6 +135,10 @@ def test_generate_temp_filename_appends_pdf_and_html_extensions() -> None:
     named_name = generate_temp_filename(parsed_named, "text/html")
     assert named_name.startswith("page_")
     assert named_name.endswith(".html")
+    uppercase_pdf_name = generate_temp_filename(
+        urlparse("https://example.test/REPORT.PDF"), "application/pdf"
+    )
+    assert Path(uppercase_pdf_name).suffix == ".PDF"
 
 
 def test_download_with_size_check_writes_content_and_rejects_oversize(tmp_path: Path) -> None:

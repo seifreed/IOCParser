@@ -3,6 +3,16 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TypedDict, Unpack
 
+from iocparser.api_persistence_query import (
+    optional_str,
+    validated_iso_datetime,
+    validated_min_severity,
+    validated_non_negative_int,
+    validated_run_sort,
+    validated_search_backend,
+    validated_search_sort,
+    validated_tag_mode,
+)
 from iocparser.application.contracts import QueryRunsInput, SearchPersistedIOCsInput
 from iocparser.domain.models import (
     BatchJobDetail,
@@ -51,6 +61,15 @@ def parse_string_filters(value: str | None) -> tuple[str, ...]:
     return tuple(item.strip() for item in value.split(",") if item.strip())
 
 
+def validated_severity_values(values: tuple[str, ...]) -> tuple[str, ...]:
+    normalized: list[str] = []
+    for value in values:
+        severity = validated_min_severity(str(value))
+        if severity is not None:
+            normalized.append(severity)
+    return tuple(normalized)
+
+
 @dataclass(frozen=True)
 class PersistenceClient:
     """Reusable persistence/query client with a shared query service."""
@@ -67,13 +86,13 @@ class PersistenceClient:
 
     def query_runs(self, **options: Unpack[QueryRunsOptions]) -> PersistedRunsPage:
         query = QueryRunsInput(
-            limit=options.get("limit", 50),
-            offset=options.get("offset", 0),
-            date_from=options.get("date_from"),
-            date_to=options.get("date_to"),
+            limit=validated_non_negative_int(options.get("limit", 50), field="limit"),
+            offset=validated_non_negative_int(options.get("offset", 0), field="offset"),
+            date_from=validated_iso_datetime(optional_str(options.get("date_from"))),
+            date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
             source_kind=options.get("source_kind"),
             source_value=options.get("source_value"),
-            sort_by=options.get("sort_by", "newest"),
+            sort_by=validated_run_sort(options.get("sort_by", "newest")),
         )
         return self._typed_service.query_runs_page(
             limit=query.limit,
@@ -90,20 +109,20 @@ class PersistenceClient:
     ) -> PersistedIOCSearchPage:
         query = SearchPersistedIOCsInput(
             value=value,
-            limit=int(options.get("limit", 50)),
-            offset=int(options.get("offset", 0)),
-            date_from=options.get("date_from"),
-            date_to=options.get("date_to"),
+            limit=validated_non_negative_int(options.get("limit", 50), field="limit"),
+            offset=validated_non_negative_int(options.get("offset", 0), field="offset"),
+            date_from=validated_iso_datetime(optional_str(options.get("date_from"))),
+            date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
             source_kind=options.get("source_kind"),
             source_value=options.get("source_value"),
             ioc_type=options.get("ioc_type"),
-            severity=tuple(options.get("severity", ())),
+            severity=validated_severity_values(tuple(options.get("severity", ()))),
             tags=tuple(options.get("tags", ())),
             exclude_tags=tuple(options.get("exclude_tags", ())),
-            min_severity=options.get("min_severity"),
-            tag_mode=str(options.get("tag_mode", "all")),
-            sort_by=str(options.get("sort_by", "newest")),
-            search_backend=str(options.get("search_backend", "auto")),
+            min_severity=validated_min_severity(optional_str(options.get("min_severity"))),
+            tag_mode=validated_tag_mode(str(options.get("tag_mode", "all"))),
+            sort_by=validated_search_sort(str(options.get("sort_by", "newest"))),
+            search_backend=validated_search_backend(str(options.get("search_backend", "auto"))),
         )
         return self._typed_service.search_iocs_page(
             value=query.value,

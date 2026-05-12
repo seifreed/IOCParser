@@ -336,6 +336,16 @@ def test_public_query_api_validates_dates_and_min_severity(tmp_path: Path) -> No
     with pytest.raises(ValidationError, match="Invalid limit"):
         query_persisted_iocs(db_uri=db_uri, value="alpha", limit=True)
 
+    client = PersistenceClient(db_uri)
+    with pytest.raises(ValidationError, match="Invalid search_backend"):
+        client.search_iocs(value="alpha", search_backend="bogus")
+
+    with pytest.raises(ValidationError, match="Invalid limit"):
+        client.search_iocs(value="alpha", limit=True)
+
+    with pytest.raises(ValidationError, match="Invalid sort_by"):
+        client.query_runs(sort_by="bogus")
+
     normalized_page = query_persisted_iocs(db_uri=db_uri, value="alpha", severity="HIGH")
     assert normalized_page.total == 1
 

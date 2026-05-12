@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -23,6 +24,7 @@ from iocparser.cli_processing import process_url_file_input_with_report
 from iocparser.cli_runtime import apply_config_defaults
 from iocparser.config import load_config
 from iocparser.domain.models import IOC, ExtractionResult
+from iocparser.domain.persisted import PersistedRunExport, PersistedRunSummary
 from iocparser.domain.pipeline import RESULT_SCHEMA_VERSION, PipelineErrorInfo, PipelineJobResult
 from iocparser.errors import (
     DownloadError,
@@ -217,6 +219,80 @@ def test_pipeline_worker_cleans_downloaded_url_when_runtime_size_limit_fails(
     assert result.status == "failed"
     assert result.error is not None
     assert result.error.code == "VALIDATION_FAILED"
+    assert not temp_file.exists()
+
+
+def test_pipeline_worker_cleans_downloaded_url_when_processed_run_is_skipped(
+    tmp_path: Path,
+) -> None:
+    temp_file = tmp_path / "downloaded.txt"
+    temp_file.write_text("cached input", encoding="utf-8")
+    content_hash = "a" * 64
+    fingerprint = "a" * 16
+    now = datetime.now(UTC)
+    summary = PersistedRunSummary(
+        run_id=17,
+        source_kind="url",
+        source_value="https://example.test/report",
+        tool_version="5.0.0",
+        started_at=now,
+        finished_at=now,
+        content_hash=content_hash,
+        fingerprint=fingerprint,
+    )
+
+    class FakeDownloader:
+        last_download_metadata = {
+            "input_size": temp_file.stat().st_size,
+            "content_hash": content_hash,
+            "fingerprint": fingerprint,
+        }
+
+        def download(self, url: str) -> str:
+            assert url == "https://example.test/report"
+            return str(temp_file)
+
+    class FakeClient:
+        downloader = FakeDownloader()
+
+        def extract_result_from_text(self, text_content: str, **kwargs: object) -> ExtractionResult:
+            raise AssertionError("text extraction should not run")
+
+        def extract_result_from_file(self, file_path: str, **kwargs: object) -> ExtractionResult:
+            raise AssertionError("file extraction should not run for skipped inputs")
+
+    class FakeProcessedRunLookup:
+        def find_existing_run(
+            self,
+            *,
+            fingerprint: str | None = None,
+            content_hash: str | None = None,
+            status: str = "success",
+        ) -> PersistedRunSummary | None:
+            assert fingerprint == "a" * 16
+            assert content_hash == "a" * 64
+            assert status == "success"
+            return summary
+
+        def export_run(self, *, run_id: int) -> PersistedRunExport:
+            assert run_id == 17
+            return PersistedRunExport(summary=summary, result=_result())
+
+    result = PipelineWorker(
+        client=FakeClient(),
+        limits=ResourceLimits(skip_processed=True),
+        processed_run_lookup=FakeProcessedRunLookup(),
+    ).process(
+        PipelineJobRequest(
+            input_kind="url",
+            source_value="https://example.test/report",
+            check_warnings=False,
+        )
+    )
+
+    assert result.status == "skipped"
+    assert result.skipped is True
+    assert result.run_id == 17
     assert not temp_file.exists()
 
 

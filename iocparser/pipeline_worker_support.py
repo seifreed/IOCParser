@@ -183,6 +183,15 @@ def prepared_temp_file(prepared: PreparedInput) -> str:
     return raw_value
 
 
+def cleanup_prepared_input(*, request: PipelineJobRequest, prepared: PreparedInput) -> None:
+    if request.input_kind != "url":
+        return
+    raw_value = prepared.metadata.get("temp_file")
+    if isinstance(raw_value, str) and raw_value:
+        with suppress(OSError):
+            Path(raw_value).unlink()
+
+
 def enforce_size_limit(*, limits: ResourceLimits, input_size_bytes: int) -> None:
     if limits.max_input_size_bytes is not None and input_size_bytes > limits.max_input_size_bytes:
         raise size_limit_error(

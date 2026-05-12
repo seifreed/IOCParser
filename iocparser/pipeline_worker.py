@@ -18,6 +18,7 @@ from iocparser.pipeline_worker_support import (
     PreparedInput,
     ProcessContext,
     RunRepositoryAdapter,
+    cleanup_prepared_input,
     ensure_input_deadline,
     extract_result,
     failed_result,
@@ -81,6 +82,7 @@ class PipelineWorker:
             started_at=started_at,
             phase_timings_ms=phase_timings_ms,
         )
+        prepared: PreparedInput | None = None
         try:
             prepare_started = time.perf_counter()
             prepared = prepare_input(client=self.client, limits=self.limits, request=request)
@@ -100,6 +102,7 @@ class PipelineWorker:
                 skip_processed=self.limits.skip_processed,
             )
             if skipped is not None:
+                cleanup_prepared_input(request=request, prepared=prepared)
                 return skipped
 
             extract_started = time.perf_counter()
@@ -126,6 +129,8 @@ class PipelineWorker:
         except (MemoryError, RecursionError, SystemError):
             raise
         except Exception as exc:
+            if prepared is not None:
+                cleanup_prepared_input(request=request, prepared=prepared)
             return failed_result(
                 request=request,
                 exc=exc,

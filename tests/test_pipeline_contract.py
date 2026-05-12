@@ -268,6 +268,16 @@ def test_apply_config_defaults_sets_pipeline_limit_values(tmp_path: Path) -> Non
     assert args.max_queue_size == 9
 
 
+def test_apply_config_defaults_rejects_invalid_diff_only_config(tmp_path: Path) -> None:
+    config_path = tmp_path / "iocparser.ini"
+    config_path.write_text("[defaults]\ndiff_only = bogus\n", encoding="utf-8")
+    config = load_config(None, None, str(config_path))
+    args = SimpleNamespace(diff_only="all")
+
+    with pytest.raises(ValidationError, match="Invalid diff_only"):
+        apply_config_defaults(args, config)
+
+
 def test_pipeline_error_classification_covers_stable_codes() -> None:
     cases = [
         (FileExistenceError("missing.txt"), "INPUT_NOT_FOUND"),

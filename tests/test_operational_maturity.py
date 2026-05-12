@@ -12,12 +12,15 @@ import pytest
 
 from iocparser.api_persistence import (
     compact_persisted_history,
+    diff_persisted_runs,
     export_persisted_history,
+    export_structured_persisted_diff,
     import_persisted_history,
     list_distributed_jobs,
     list_failed_batch_jobs,
     query_persisted_iocs,
     query_persisted_runs,
+    render_persisted_diff,
     retain_persisted_history,
 )
 from iocparser.application.contracts import PersistRunInput
@@ -248,7 +251,12 @@ def test_search_page_applies_multiple_exclude_tags(tmp_path: Path) -> None:
 
 def test_public_query_api_validates_dates_and_min_severity(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'query-validation.sqlite'}"
-    _persist_result(db_uri, source_value="sample.txt", ioc_value="alpha.example", severity="high")
+    first_run_id = _persist_result(
+        db_uri, source_value="sample.txt", ioc_value="alpha.example", severity="high"
+    )
+    second_run_id = _persist_result(
+        db_uri, source_value="sample.txt", ioc_value="beta.example", severity="high"
+    )
 
     with pytest.raises(ValidationError, match="Invalid ISO date"):
         query_persisted_runs(db_uri=db_uri, limit=10, offset=0, date_from="not-a-date")
@@ -270,6 +278,29 @@ def test_public_query_api_validates_dates_and_min_severity(tmp_path: Path) -> No
 
     with pytest.raises(ValidationError, match="Invalid search_backend"):
         query_persisted_iocs(db_uri=db_uri, value="alpha", search_backend="bogus")
+
+    with pytest.raises(ValidationError, match="Invalid diff_only"):
+        diff_persisted_runs(
+            db_uri=db_uri,
+            left_run_id=first_run_id,
+            right_run_id=second_run_id,
+            diff_only="bogus",
+        )
+
+    with pytest.raises(ValidationError, match="Invalid diff_only"):
+        render_persisted_diff(
+            db_uri=db_uri,
+            left_run_id=first_run_id,
+            right_run_id=second_run_id,
+            diff_only="bogus",
+        )
+
+    with pytest.raises(ValidationError, match="Invalid diff_only"):
+        export_structured_persisted_diff(
+            db_uri=db_uri,
+            run_id=second_run_id,
+            diff_only="bogus",
+        )
 
     with pytest.raises(ValidationError, match="Invalid FTS query"):
         query_persisted_iocs(db_uri=db_uri, value="!!!", search_backend="fts")

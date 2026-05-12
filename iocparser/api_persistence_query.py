@@ -99,6 +99,7 @@ INVALID_MIN_SEVERITY_ERROR = "Invalid min_severity: {value}"
 INVALID_TAG_MODE_ERROR = "Invalid tag_mode: {value}"
 INVALID_SORT_BY_ERROR = "Invalid sort_by: {value}"
 INVALID_SEARCH_BACKEND_ERROR = "Invalid search_backend: {value}"
+INVALID_DIFF_ONLY_ERROR = "Invalid diff_only: {value}"
 INVALID_LIMIT_ERROR = "Invalid limit: {value}"
 INVALID_OFFSET_ERROR = "Invalid offset: {value}"
 VALID_MIN_SEVERITIES = {"informational", "low", "medium", "high"}
@@ -106,6 +107,7 @@ VALID_TAG_MODES = {"all", "any"}
 VALID_RUN_SORT_VALUES = {"newest", "oldest", "source"}
 VALID_SEARCH_SORT_VALUES = {"newest", "oldest", "source"}
 VALID_SEARCH_BACKENDS = {"auto", "fts", "like"}
+VALID_DIFF_ONLY_VALUES = {"all", "added", "removed"}
 INVALID_FTS_QUERY_ERROR = "Invalid FTS query: {value}"
 INVALID_EMPTY_SEARCH_QUERY_ERROR = "Invalid search value: {value}"
 T = TypeVar("T")
@@ -220,6 +222,15 @@ def validated_search_backend(value: str) -> str:
     return normalized
 
 
+def validated_diff_only(value: str | None) -> str:
+    if value is None:
+        return "all"
+    normalized = value.strip().lower()
+    if normalized not in VALID_DIFF_ONLY_VALUES:
+        raise ValidationError(INVALID_DIFF_ONLY_ERROR.format(value=value))
+    return normalized
+
+
 def validated_non_negative_int(value: object, *, field: str) -> int:
     try:
         if isinstance(value, bool):
@@ -260,7 +271,7 @@ def persisted_diff_input(
     right_run_id: int,
     options: PersistedDiffOptions,
 ) -> DiffPersistedRunsInput:
-    diff_only = options.get("diff_only", "all")
+    diff_only = validated_diff_only(optional_str(options.get("diff_only")))
     return DiffPersistedRunsInput(
         left_run_id=left_run_id,
         right_run_id=right_run_id,
@@ -278,7 +289,7 @@ def latest_source_diff_input(
     run_id: int,
     options: PersistedDiffOptions,
 ) -> DiffLatestSourceRunInput:
-    diff_only = options.get("diff_only", "all")
+    diff_only = validated_diff_only(optional_str(options.get("diff_only")))
     return DiffLatestSourceRunInput(
         run_id=run_id,
         only_added=diff_only == "added",
@@ -337,12 +348,13 @@ def coerce_diff_filters(
         tag=optional_str(option_overrides.pop("tag", None)),
         only_warnings=bool(option_overrides.pop("only_warnings", False)),
         only_normal=bool(option_overrides.pop("only_normal", False)),
-        diff_only=str(option_overrides.pop("diff_only", "all")),
+        diff_only=validated_diff_only(optional_str(option_overrides.pop("diff_only", None))),
         ioc_type=optional_str(option_overrides.pop("ioc_type", None)),
     )
 
 
 def diff_render_result(diff: PersistedRunDiff, diff_only: str) -> ExtractionResult:
+    diff_only = validated_diff_only(diff_only)
     if diff_only == "added":
         return diff.added
     if diff_only == "removed":

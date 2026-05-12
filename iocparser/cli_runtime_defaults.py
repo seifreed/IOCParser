@@ -5,6 +5,10 @@ import json
 
 from iocparser.cli_args import get_bool_arg
 from iocparser.config import AppConfig
+from iocparser.errors import ValidationError
+
+INVALID_DIFF_ONLY_ERROR = "Invalid diff_only: {value}"
+VALID_DIFF_ONLY_VALUES = {"all", "added", "removed"}
 
 
 def apply_config_defaults(args: argparse.Namespace, config: AppConfig) -> None:
@@ -78,7 +82,7 @@ def _apply_numeric_defaults(args: argparse.Namespace, config: AppConfig) -> None
 def _apply_network_defaults(args: argparse.Namespace, config: AppConfig) -> None:
     current_diff_only: object = getattr(args, "diff_only", "all")
     if current_diff_only == "all" and config.diff_only != "all":
-        args.diff_only = config.diff_only
+        args.diff_only = _validated_diff_only(config.diff_only)
     network_defaults: dict[str, str | float | None] = {
         "user_agent": config.user_agent,
         "proxy": config.proxy,
@@ -97,6 +101,13 @@ def _apply_network_defaults(args: argparse.Namespace, config: AppConfig) -> None
     tls_verify_value: object = getattr(args, "tls_verify", True)
     if tls_verify_value is True and config.tls_verify is False:
         args.tls_verify = False
+
+
+def _validated_diff_only(value: str) -> str:
+    normalized = value.strip().lower()
+    if normalized not in VALID_DIFF_ONLY_VALUES:
+        raise ValidationError(INVALID_DIFF_ONLY_ERROR.format(value=value))
+    return normalized
 
 
 def parse_http_mapping(value: object, *, separator: str) -> dict[str, str]:

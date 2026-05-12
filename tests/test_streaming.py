@@ -638,14 +638,8 @@ class TestStreamingIOCExtractor:
             temp_path = Path(f.name)
 
         try:
-            # Empty file may cause mmap to fail or return empty results.
-            # Both are acceptable portability outcomes; skip is not useful here.
-            try:
-                result = extractor.extract_from_mmap(temp_path)
-                assert isinstance(result, dict)
-            except Exception:
-                assert True
-
+            with pytest.raises(ValueError, match="cannot mmap an empty file"):
+                extractor.extract_from_mmap(temp_path)
         finally:
             temp_path.unlink()
 

@@ -447,9 +447,11 @@ class TestCoverageMissing:
 
     def test_is_valid_domain_programming_keywords(self):
         """Test _is_valid_domain rejects programming keywords."""
-        assert not self.extractor._is_valid_domain("document.com")
-        assert not self.extractor._is_valid_domain("window.org")
-        assert not self.extractor._is_valid_domain("console.net")
+        # These are legitimate domains that should NOT be filtered
+        assert self.extractor._is_valid_domain("document.com")
+        assert self.extractor._is_valid_domain("window.org")
+        assert self.extractor._is_valid_domain("console.net")
+        # gform is still filtered as a programming keyword
         assert not self.extractor._is_valid_domain("gform.io")
 
     def test_is_valid_domain_suspicious_subdomain(self):

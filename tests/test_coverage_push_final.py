@@ -14,39 +14,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from iocparser.domain.models import IOC, ExtractionResult
-
-
-def _db(tmp_path: Path, n: str = "t.db") -> str:
-    uri = f"sqlite:///{tmp_path / n}"
-    e = create_engine(uri, future=True)
-    from iocparser.infrastructure.persistence_migration_runtime import migrate_engine
-    migrate_engine(e)
-    return uri
-
-
-def _persist(uri: str, sk: str = "file", sv: str = "f.txt", iv: str = "x.com") -> int:
-    from iocparser.application.contracts import PersistRunInput
-    from iocparser.application.use_cases import persist_run
-    from iocparser.domain.models import PersistOptions, Source
-    from iocparser.infrastructure.persistence import SQLAlchemyUnitOfWork
-    u = SQLAlchemyUnitOfWork(uri)
-    try:
-        return persist_run(PersistRunInput(
-            source=Source.from_raw(sk, sv),
-            result=ExtractionResult(iocs=(IOC.from_raw("domains", iv),), warnings=()),
-            tool_version="5.0.0",
-            options=PersistOptions(defang=True, check_warnings=False, force_update=False, output_format="text"),
-        ), unit_of_work=u).run_id
-    except Exception:
-        u.rollback()
-        raise
+from tests.coverage_helpers import fresh_db, persist_run_into
 
 
 # ── 1. IntegrityError paths (mock: session.flush) ─────────────────────────
 class TestIOCRepoIntegrity:
     def test_retry_on_integrity_error(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
-        s = Session(create_engine(_db(tmp_path), future=True))
+        s = Session(create_engine(fresh_db(tmp_path), future=True))
         r = SQLAlchemyIOCRepository(s)
         id1 = r._get_or_create(ioc_type="md5", value="v1", is_warning=False, warning_list="", warning_description="")
         s.commit()
@@ -63,7 +38,7 @@ class TestIOCRepoIntegrity:
 
     def test_reraise_when_not_found(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
-        s = Session(create_engine(_db(tmp_path), future=True))
+        s = Session(create_engine(fresh_db(tmp_path), future=True))
         r = SQLAlchemyIOCRepository(s)
         with patch.object(s, "flush", side_effect=IntegrityError("x", {}, Exception())):
             with pytest.raises(IntegrityError):
@@ -76,7 +51,7 @@ class TestSourceRepoIntegrity:
         from iocparser.infrastructure.persistence_source_repository import (
             SQLAlchemySourceRepository,
         )
-        s = Session(create_engine(_db(tmp_path), future=True))
+        s = Session(create_engine(fresh_db(tmp_path), future=True))
         r = SQLAlchemySourceRepository(s)
         id1 = r.get_or_create(kind="file", value="a.txt")
         s.commit()
@@ -96,7 +71,7 @@ class TestSourceRepoIntegrity:
         from iocparser.infrastructure.persistence_source_repository import (
             SQLAlchemySourceRepository,
         )
-        s = Session(create_engine(_db(tmp_path), future=True))
+        s = Session(create_engine(fresh_db(tmp_path), future=True))
         r = SQLAlchemySourceRepository(s)
         with patch.object(s, "flush", side_effect=IntegrityError("x", {}, Exception())):
             with pytest.raises(IntegrityError):
@@ -108,8 +83,8 @@ class TestSourceRepoIntegrity:
 class TestHistoryImportFull:
     def _build_rich_db(self, tmp_path: Path) -> str:
         """Create a DB with sources, runs, batch jobs, distributed jobs, dead letters."""
-        uri = _db(tmp_path, "rich.db")
-        rid = _persist(uri, sk="url", sv="https://example.com/report", iv="evil.com")
+        uri = fresh_db(tmp_path, "rich.db")
+        rid = persist_run_into(uri, source_kind="url", source_value="https://example.com/report", ioc_value="evil.com")
 
         from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
         svc = SQLAlchemyPersistenceService(uri)
@@ -135,7 +110,7 @@ class TestHistoryImportFull:
         assert len(payload.get("sources", [])) >= 1
         assert len(payload.get("distributed_jobs", [])) >= 1
 
-        uri2 = _db(tmp_path, "target_full.db")
+        uri2 = fresh_db(tmp_path, "target_full.db")
         counts = import_history(uri2, payload)
         assert counts.get("sources", 0) >= 1
         assert counts.get("runs", 0) >= 1
@@ -146,7 +121,7 @@ class TestHistoryImportFull:
         payload = export_history(uri1)
         payload["__history_origin_id__"] = "origin-dedup"
 
-        uri2 = _db(tmp_path, "dedup.db")
+        uri2 = fresh_db(tmp_path, "dedup.db")
         import_history(uri2, payload)
         counts2 = import_history(uri2, payload)
         assert counts2.get("sources", 0) == 0
@@ -158,7 +133,7 @@ class TestHistoryImportFull:
         payload = export_history(uri1)
         payload["__history_archive_id__"] = "explicit-id-123"
 
-        uri2 = _db(tmp_path, "explicit.db")
+        uri2 = fresh_db(tmp_path, "explicit.db")
         counts = import_history(uri2, payload)
         assert isinstance(counts, dict)
 
@@ -167,7 +142,7 @@ class TestHistoryImportFull:
 class TestBatchTimestampEdges:
     def test_no_phase_timestamps_at_all(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_batch import create_batch_job
-        s = Session(create_engine(_db(tmp_path), future=True))
+        s = Session(create_engine(fresh_db(tmp_path), future=True))
         bid = create_batch_job(s, source_kind="file", run_ids=(), report={"total": 0, "successful": 0, "failed": 0, "items": []}, config={})
         s.commit()
         assert isinstance(bid, int)
@@ -175,7 +150,7 @@ class TestBatchTimestampEdges:
 
     def test_invalid_timestamp_string(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_batch import create_batch_job
-        s = Session(create_engine(_db(tmp_path), future=True))
+        s = Session(create_engine(fresh_db(tmp_path), future=True))
         report = {"total": 1, "successful": 1, "failed": 0, "items": [],
                   "phase_timestamps": {"started_at": "not-a-date", "finished_at": "also-bad"}, "duration_ms": 10}
         bid = create_batch_job(s, source_kind="url", run_ids=(), report=report, config={})
@@ -188,7 +163,7 @@ class TestBatchTimestampEdges:
 class TestDistributedImportedJob:
     def test_get_job_with_history_prefix(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
-        uri = _db(tmp_path)
+        uri = fresh_db(tmp_path)
         svc = SQLAlchemyDistributedJobService(uri)
         result = svc.get_job(job_id="j1#history:abc")
         assert result is None
@@ -239,16 +214,16 @@ class TestRendererEdges:
 class TestApiQueryValidation:
     def test_list_runs_with_valid_date_from(self, tmp_path: Path) -> None:
         from iocparser.api_persistence_query import list_persisted_runs
-        uri = _db(tmp_path)
-        _persist(uri)
+        uri = fresh_db(tmp_path)
+        persist_run_into(uri)
         runs = list_persisted_runs(db_uri=uri, date_from="2020-01-01T00:00:00")
         assert isinstance(runs, list)
 
     def test_render_diff_structured(self, tmp_path: Path) -> None:
         from iocparser.api_persistence_query import render_persisted_diff
-        uri = _db(tmp_path)
-        r1 = _persist(uri, iv="a.com")
-        r2 = _persist(uri, iv="b.com")
+        uri = fresh_db(tmp_path)
+        r1 = persist_run_into(uri, ioc_value="a.com")
+        r2 = persist_run_into(uri, ioc_value="b.com")
         out = render_persisted_diff(db_uri=uri, left_run_id=r1, right_run_id=r2, output_format="json")
         assert isinstance(out, str)
 
@@ -313,7 +288,7 @@ class TestUrlProcessingEdges:
 
     def test_retry_from_batch_no_match(self, tmp_path: Path) -> None:
         from iocparser.cli_processing_urls import retry_attempt_for_url
-        uri = _db(tmp_path)
+        uri = fresh_db(tmp_path)
         r = retry_attempt_for_url("https://nope.com", None, retry_batch_job=999, db_uri=uri, occurrence=1)
         assert isinstance(r, int)
 

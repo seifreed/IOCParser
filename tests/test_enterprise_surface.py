@@ -273,8 +273,8 @@ def test_custom_ioc_types_fts_and_public_batch_api(tmp_path: Path) -> None:
 
 
 def test_cli_plugin_paths_and_batch_queries(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    register_extractor("extra-cli", lambda: ExtraExtractor())
-    register_postprocessor("extra-post", lambda: ExtraPostProcessor())
+    register_extractor("extra-cli", ExtraExtractor)
+    register_postprocessor("extra-post", ExtraPostProcessor)
     file_path = tmp_path / "sample.txt"
     file_path.write_text("Visit hxxps://evil.example and 198.51.100.10", encoding="utf-8")
     common = {

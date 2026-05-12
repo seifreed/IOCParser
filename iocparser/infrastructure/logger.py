@@ -10,7 +10,7 @@ import logging
 import sys
 from collections.abc import Callable
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, TextIO
 
 
 class ColoredFormatter(logging.Formatter):
@@ -38,7 +38,7 @@ def setup_logger(
     level: int = logging.INFO,
     log_file: Path | None = None,
     console: bool = True,
-    stream: object | None = None,
+    stream: TextIO | None = None,
 ) -> logging.Logger:
     """
     Set up and configure logger for IOCParser.
@@ -61,7 +61,7 @@ def setup_logger(
     # Console handler
     if console:
         output_stream = sys.stdout if stream is None else stream
-        console_handler = logging.StreamHandler(output_stream)  # type: ignore[arg-type]
+        console_handler = logging.StreamHandler(output_stream)
         console_handler.setLevel(level)
 
         # Use colored formatter for console if TTY is available

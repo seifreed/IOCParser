@@ -1,6 +1,6 @@
 from typing import Generic, TypeVar, overload
 
-from sqlalchemy import ColumnExpression, Engine, MetaData, Result, Select
+from sqlalchemy import ClauseElement, ColumnExpression, Engine, MetaData, Result, Select
 
 T = TypeVar("T")
 
@@ -44,6 +44,8 @@ class Session:
     def __exit__(self, exc_type: object, exc: object, tb: object) -> None: ...
     @overload
     def execute(self, stmt: Select[T]) -> Result[T]: ...
+    @overload
+    def execute(self, stmt: ClauseElement, params: object = ...) -> Result[object]: ...
     @overload
     def execute(self, stmt: object) -> Result[object]: ...
     def add(self, obj: object) -> None: ...

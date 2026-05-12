@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 
-from sqlalchemy import ClauseElement, delete, func, or_, select
+from sqlalchemy import ClauseElement, Select, delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from iocparser.domain.models import (
@@ -212,7 +212,7 @@ def matches_advanced_filters(
         return False
     if min_severity is None:
         return True
-    return SEVERITY_ORDER.get(hit.severity.lower(), -1) >= SEVERITY_ORDER.get(min_severity.lower(), 0)
+    return SEVERITY_ORDER.get((hit.severity or "").lower(), -1) >= SEVERITY_ORDER.get(min_severity.lower(), 0)
 
 
 def delete_run(session: Session, run_id: int) -> bool:
@@ -257,7 +257,7 @@ def _build_prune_query(
     source_kind: str | None,
     source_value: str | None,
     statuses: tuple[str, ...],
-) -> object:
+) -> Select[RunModel]:
     stmt = select(RunModel).join(SourceModel, RunModel.source_id == SourceModel.id)
     if before:
         stmt = stmt.where(RunModel.started_at < parse_datetime(before))
@@ -270,13 +270,13 @@ def _build_prune_query(
     return stmt.order_by(RunModel.started_at.desc())
 
 
-def _select_deletable(runs: list[object], keep_latest: int) -> list[object]:
+def _select_deletable(runs: list[RunModel], keep_latest: int) -> list[RunModel]:
     if keep_latest <= 0:
         return list(runs)
-    runs_by_source: dict[int, list[object]] = {}
+    runs_by_source: dict[int, list[RunModel]] = {}
     for run in runs:
-        runs_by_source.setdefault(run.source_id, []).append(run)  # type: ignore[attr-defined]
-    deletable: list[object] = []
+        runs_by_source.setdefault(run.source_id, []).append(run)
+    deletable: list[RunModel] = []
     for source_runs in runs_by_source.values():
         deletable.extend(source_runs[keep_latest:])
     return deletable
@@ -295,7 +295,7 @@ def prune_runs(
     stmt = _build_prune_query(before=before, source_kind=source_kind, source_value=source_value, statuses=statuses)
     runs = session.execute(stmt).scalars().all()
     deletable = _select_deletable(runs, keep_latest)
-    deleted = sum(1 for run in deletable if delete_run(session, run.id))  # type: ignore[misc, attr-defined]
+    deleted = sum(1 for run in deletable if delete_run(session, run.id))
     if deleted > 0:
         session.flush()
         cleanup_orphaned_records(session)

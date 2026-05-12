@@ -54,6 +54,8 @@ class ParallelStreamingExtractor:
                     if progress_callback:
                         progress_callback(int((completed_files / total_files) * 100))
                     logger.info("Completed extraction from %s", path_str)
+                except (KeyboardInterrupt, SystemExit):
+                    raise
                 except Exception:
                     logger.exception("Error processing %s", file_path)
                     results[str(file_path)] = {"_errors": [str(file_path)]}

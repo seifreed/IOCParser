@@ -48,7 +48,6 @@ INVALID_PATH_FRAGMENTS = (
     "folder on the",
     "uploaded to",
     "artifacts were",
-    "initially",
 )
 
 
@@ -62,7 +61,7 @@ class ArtifactHeuristicPolicy:
         for addr in candidates:
             if len(addr) == 32 and all(char in "0123456789abcdefABCDEF" for char in addr):
                 continue
-            if len(addr) >= 26 and not all(char in "0123456789abcdefABCDEF" for char in addr):
+            if len(addr) >= 25 and not all(char in "0123456789abcdefABCDEF" for char in addr):
                 validated.append(addr)
         return validated
 
@@ -133,8 +132,11 @@ class ArtifactHeuristicPolicy:
             octets = addr.split(".")
             if len(octets) != 4:
                 continue
-            if all(0 <= int(octet) <= 255 for octet in octets):
-                valid.append(candidate)
+            try:
+                if all(0 <= int(octet) <= 255 for octet in octets):
+                    valid.append(candidate)
+            except ValueError:
+                continue
         return _dedup_case_insensitive(valid)
 
     def valid_snort_rules(self, candidates: list[str]) -> list[str]:
@@ -160,7 +162,10 @@ class ArtifactHeuristicPolicy:
                 normalized = candidate
             if ":" in normalized:
                 parts = normalized.split(":")
-                if 8 <= len(parts) <= 32 and all(len(part) == 2 and part.isalnum() for part in parts):
+                if 8 <= len(parts) <= 32 and all(
+                    len(part) == 2 and all(char in "0123456789abcdefABCDEF" for char in part)
+                    for part in parts
+                ):
                     if len(parts) != 6 and all(char in "0123456789abcdefABCDEF" for char in normalized.replace(":", "")):
                         valid_serials.append(normalized.lower())
         return _dedup_case_insensitive(valid_serials)

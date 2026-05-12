@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import contextlib
 import json
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -16,31 +15,7 @@ from sqlalchemy.orm import Session
 
 from iocparser.domain.models import IOC, ExtractionResult, WarningMatch
 from iocparser.errors import ValidationError
-
-
-def _db(p: Path, n: str = "z.db") -> str:
-    uri = f"sqlite:///{p / n}"
-    from iocparser.infrastructure.persistence_migration_runtime import migrate_engine
-    migrate_engine(create_engine(uri, future=True))
-    return uri
-
-
-def _persist(uri, iv="x.com"):
-    from iocparser.application.contracts import PersistRunInput
-    from iocparser.application.use_cases import persist_run
-    from iocparser.domain.models import PersistOptions, Source
-    from iocparser.infrastructure.persistence import SQLAlchemyUnitOfWork
-    u = SQLAlchemyUnitOfWork(uri)
-    try:
-        return persist_run(PersistRunInput(
-            source=Source.from_raw("file", "f.txt"),
-            result=ExtractionResult(iocs=(IOC.from_raw("domains", iv),), warnings=()),
-            tool_version="5.0.0",
-            options=PersistOptions(defang=True, check_warnings=False, force_update=False, output_format="text"),
-        ), unit_of_work=u).run_id
-    except Exception:
-        u.rollback()
-        raise
+from tests.coverage_helpers import fresh_db
 
 
 # renderers_json.py:120 — dict decode from JSON parse
@@ -73,7 +48,7 @@ def test_api_validated_non_negative_int_string():
 
 def test_api_search_iocs_reraises_generic_error(tmp_path):
     from iocparser.api_persistence_query import search_persisted_iocs
-    uri = _db(tmp_path)
+    uri = fresh_db(tmp_path)
     with contextlib.suppress(Exception):
         search_persisted_iocs(db_uri=uri, value="x", date_from="bad-date")
 
@@ -82,7 +57,7 @@ def test_api_search_iocs_reraises_generic_error(tmp_path):
 @pytest.mark.usefixtures("capsys")
 def test_cli_dispatch_schema_version(tmp_path):
     from iocparser.cli import execute
-    uri = _db(tmp_path)
+    uri = fresh_db(tmp_path)
     with contextlib.suppress(SystemExit):
         execute(["--schema-version", "--db-uri", uri])
 
@@ -115,7 +90,7 @@ def test_retry_attempt_occurrence_out_of_range(tmp_path):
 # cli_processing_urls.py:199 — retry from batch with occurrence out of range
 def test_retry_from_batch_occurrence_out_of_range(tmp_path):
     from iocparser.cli_processing_urls import retry_attempt_for_url
-    uri = _db(tmp_path)
+    uri = fresh_db(tmp_path)
     # No failed items exist → matches empty → falls through both ifs
     r = retry_attempt_for_url("https://nope.com", None, retry_batch_job=999, db_uri=uri, occurrence=5)
     assert isinstance(r, int)
@@ -151,7 +126,7 @@ def test_history_archive_id_from_origin():
 # persistence/history/ops.py:126-128 — legacy collision in dead_letter_jobs
 def test_history_legacy_collision_empty_db(tmp_path):
     from iocparser.infrastructure.persistence.history.ops import _has_legacy_archive_collision
-    engine = create_engine(_db(tmp_path), future=True)
+    engine = create_engine(fresh_db(tmp_path), future=True)
     with Session(engine) as session:
         assert _has_legacy_archive_collision(session, archive_id="nonexistent") is False
 
@@ -167,7 +142,7 @@ def test_report_datetime_invalid():
 # persistence_distributed.py:90,93 — get_job with history prefix, empty result
 def test_distributed_get_job_history_prefix_not_found(tmp_path):
     from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
-    svc = SQLAlchemyDistributedJobService(_db(tmp_path))
+    svc = SQLAlchemyDistributedJobService(fresh_db(tmp_path))
     assert svc.get_job(job_id="abc#history:xyz") is None
 
 
@@ -189,7 +164,7 @@ def test_worker_concurrent_empty_sleeps():
 # IntegrityError handlers (mock: session.flush — simulates concurrent DB writer)
 def test_ioc_repo_integrity_retry(tmp_path):
     from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
-    s = Session(create_engine(_db(tmp_path), future=True))
+    s = Session(create_engine(fresh_db(tmp_path), future=True))
     r = SQLAlchemyIOCRepository(s)
     id1 = r._get_or_create(ioc_type="md5", value="v1", is_warning=False, warning_list="", warning_description="")
     s.commit()
@@ -206,7 +181,7 @@ def test_ioc_repo_integrity_retry(tmp_path):
 
 def test_ioc_repo_integrity_reraise(tmp_path):
     from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
-    s = Session(create_engine(_db(tmp_path), future=True))
+    s = Session(create_engine(fresh_db(tmp_path), future=True))
     r = SQLAlchemyIOCRepository(s)
     with patch.object(s, "flush", side_effect=IntegrityError("x", {}, Exception())):
         with pytest.raises(IntegrityError):
@@ -216,7 +191,7 @@ def test_ioc_repo_integrity_reraise(tmp_path):
 
 def test_source_repo_integrity_retry(tmp_path):
     from iocparser.infrastructure.persistence_source_repository import SQLAlchemySourceRepository
-    s = Session(create_engine(_db(tmp_path), future=True))
+    s = Session(create_engine(fresh_db(tmp_path), future=True))
     r = SQLAlchemySourceRepository(s)
     id1 = r.get_or_create(kind="file", value="a.txt")
     s.commit()
@@ -233,9 +208,51 @@ def test_source_repo_integrity_retry(tmp_path):
 
 def test_source_repo_integrity_reraise(tmp_path):
     from iocparser.infrastructure.persistence_source_repository import SQLAlchemySourceRepository
-    s = Session(create_engine(_db(tmp_path), future=True))
+    s = Session(create_engine(fresh_db(tmp_path), future=True))
     r = SQLAlchemySourceRepository(s)
     with patch.object(s, "flush", side_effect=IntegrityError("x", {}, Exception())):
         with pytest.raises(IntegrityError):
             r.get_or_create(kind="file", value="ghost.pdf")
     s.close()
+
+
+# cli_processing_urls.py:199 — _retry_attempt_from_batch with matches but occurrence out of range
+def test_retry_attempt_from_batch_matches_occurrence_out_of_range(tmp_path):
+    from unittest.mock import patch
+
+    from iocparser.cli_processing_urls import _retry_attempt_from_batch
+    uri = fresh_db(tmp_path)
+    fake_item = SimpleNamespace(source_value="https://a.com", retry_attempt=2)
+    with patch("iocparser.cli_processing_urls.failed_batch_lookup_service") as mock_svc:
+        mock_svc.return_value.list_failed_batch_items.return_value = [fake_item]
+        r = _retry_attempt_from_batch(uri, batch_job_id=1, url="https://a.com", occurrence=5)
+    assert r == 1
+
+
+# cli_processing_urls.py:226 — _retry_attempt_for_url wrapper
+def test_retry_attempt_for_url_wrapper():
+    from iocparser.cli_processing_urls import _retry_attempt_for_url
+    assert _retry_attempt_for_url("https://example.com", None) == 0
+
+
+# queue_rabbitmq.py:92-95 — _channel_for reconnect on exception
+def test_rabbitmq_channel_for_reconnect_on_exception():
+    from unittest.mock import MagicMock, patch
+
+    from iocparser.infrastructure.queue_rabbitmq import RabbitMQQueueAdapter
+    adapter = RabbitMQQueueAdapter("amqp://localhost")
+    adapter._connection = MagicMock()
+    adapter._channel = MagicMock()
+    with patch.object(adapter, "_channel_for", side_effect=adapter._channel_for):
+        # Force a reconnect by simulating an error on first call
+        pass
+    # Test the exception path by mocking pika to raise
+    with patch("iocparser.infrastructure.queue_rabbitmq._pika_module") as mock_pika:
+        mock_pika.return_value.BlockingConnection.side_effect = RuntimeError("boom")
+        adapter2 = RabbitMQQueueAdapter("amqp://localhost")
+        adapter2._channel = None
+        adapter2._connection = MagicMock()
+        with pytest.raises(RuntimeError):
+            adapter2._channel_for()
+        assert adapter2._connection is None
+        assert adapter2._channel is None

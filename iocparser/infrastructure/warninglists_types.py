@@ -15,10 +15,10 @@ JSONData = dict[str, JSONValue] | list[JSONValue]
 
 def get_mixin_logger(instance: object, fallback: Logger) -> Logger:
     """Shared logger accessor for warning-list mixins."""
-    try:
-        return instance.logger  # type: ignore[attr-defined, no-any-return]
-    except AttributeError:
-        return fallback
+    logger = getattr(instance, "logger", None)
+    if isinstance(logger, Logger):
+        return logger
+    return fallback
 
 
 @dataclass

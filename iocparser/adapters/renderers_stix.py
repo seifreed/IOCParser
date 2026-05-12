@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import ClassVar
+from typing import Any, ClassVar, cast
 
 from stix2 import Indicator
 
 from iocparser.domain.enums import IOCTypeName, get_custom_ioc_type
-from iocparser.domain.models import ExtractionResult, IOCType, WarningMatch, ioc_type_name
+from iocparser.domain.models import IOC, ExtractionResult, IOCType, WarningMatch, ioc_type_name
 from iocparser.domain.pipeline import RESULT_SCHEMA_VERSION
 from iocparser.interfaces.ports import OutputRenderer
 from iocparser.rendering_support import build_stix_bundle
@@ -76,7 +76,7 @@ class STIXOutputRenderer(OutputRenderer):
             builder = custom_builder
         if not builder:
             return None
-        custom_props: dict[str, str] = {}
+        custom_props: dict[str, Any] = {}
         if warning:
             custom_props["x_warning_list"] = warning.warning_list
             if warning.description:
@@ -90,7 +90,7 @@ class STIXOutputRenderer(OutputRenderer):
             description=None,
             indicator_types=["malicious-activity"],
             allow_custom=True,
-            **custom_props,  # type: ignore[arg-type]
+            **custom_props,
         )
 
     def render(self, result: ExtractionResult) -> str:
@@ -105,9 +105,10 @@ class STIXOutputRenderer(OutputRenderer):
 def build_entry_indicator(renderer: STIXOutputRenderer, entry: tuple[str, object]) -> Indicator | None:
     entry_kind, payload = entry
     if entry_kind == "ioc" and hasattr(payload, "ioc_type") and hasattr(payload, "canonical_value"):
-        return renderer._build_indicator(payload.ioc_type, payload.canonical_value(), None)
+        return renderer._build_indicator(cast("IOC", payload).ioc_type, cast("IOC", payload).canonical_value(), None)
     if entry_kind == "warning" and hasattr(payload, "ioc"):
-        return renderer._build_indicator(payload.ioc.ioc_type, payload.ioc.canonical_value(), payload)  # type: ignore[arg-type]
+        warning = cast("WarningMatch", payload)
+        return renderer._build_indicator(warning.ioc.ioc_type, warning.ioc.canonical_value(), warning)
     return None
 
 

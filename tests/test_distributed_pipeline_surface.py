@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from iocparser.api_persistence import get_distributed_job, list_dead_letters, list_distributed_jobs
 from iocparser.client import PersistenceClient
@@ -23,6 +24,7 @@ from iocparser.domain.models import (
 from iocparser.domain.pipeline import PipelineErrorInfo, PipelineJobRequest
 from iocparser.errors import IOCTimeoutError
 from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
+from iocparser.infrastructure.persistence_schema import SQLAlchemyUnitOfWork
 from iocparser.infrastructure.queue_celery import CeleryQueueAdapter, build_celery_task_payload
 from iocparser.infrastructure.queue_factory import create_queue_adapter
 from iocparser.infrastructure.queue_filesystem import FilesystemQueueAdapter
@@ -244,6 +246,61 @@ def test_persistence_service_and_public_distributed_wrappers(tmp_path: Path) -> 
     assert len(list_dead_letters(db_uri=db_uri, limit=10, queue_backend="filesystem")) == 1
 
 
+def test_commit_new_job_or_fetch_handles_integrity_error(tmp_path: Path) -> None:
+    from iocparser.infrastructure.persistence_distributed_support import (
+        build_new_job,
+        commit_new_job_or_fetch,
+    )
+
+    db_uri = f"sqlite:///{tmp_path / 'race.sqlite'}"
+    unit = SQLAlchemyUnitOfWork(db_uri)
+    envelope = _envelope("job-race")
+    model = build_new_job(envelope=envelope, receipt_id="r1")
+
+    # First, create the job normally so it exists in the DB
+    unit.session.add(model)
+    unit.commit()
+    unit.close()
+
+    # Now start a new unit of work and simulate a race:
+    # the initial query returns None (stale read), but commit fails
+    # because another transaction inserted the row.
+    unit2 = SQLAlchemyUnitOfWork(db_uri)
+    model2 = build_new_job(envelope=envelope, receipt_id="r2")
+
+    call_count = [0]
+    original_commit = SQLAlchemyUnitOfWork.commit
+
+    def racing_commit(self):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            raise IntegrityError("duplicate", "", "")
+        original_commit(self)
+
+    with pytest.MonkeyPatch().context() as mp:
+        mp.setattr(SQLAlchemyUnitOfWork, "commit", racing_commit)
+        result = commit_new_job_or_fetch(unit2, model2, "job-race")
+        assert result.job_id == "job-race"
+        assert result.receipt_id == "r1"
+    unit2.close()
+
+    # Cover the defensive re-raise when IntegrityError happens but no row is found
+    unit3 = SQLAlchemyUnitOfWork(db_uri)
+    model3 = build_new_job(envelope=_envelope("job-race-3"), receipt_id="r3")
+    def fake_execute(_self, _stmt):
+        class _Result:
+            def scalar_one_or_none(self):
+                return None
+        return _Result()
+
+    with pytest.MonkeyPatch().context() as mp:
+        mp.setattr(SQLAlchemyUnitOfWork, "commit", lambda self: (_ for _ in ()).throw(IntegrityError("dup", "", "")))
+        mp.setattr(type(unit3.session), "execute", fake_execute)
+        with pytest.raises(IntegrityError):
+            commit_new_job_or_fetch(unit3, model3, "job-race-3")
+    unit3.close()
+
+
 def test_get_distributed_job_rejects_ambiguous_public_job_id(tmp_path: Path) -> None:
     first_source_db_uri = f"sqlite:///{tmp_path / 'distributed-history-first.sqlite'}"
     second_source_db_uri = f"sqlite:///{tmp_path / 'distributed-history-second.sqlite'}"
@@ -449,8 +506,7 @@ def test_queue_factory_and_optional_queue_adapters() -> None:
         assert isinstance(celery, CeleryQueueAdapter)
         receipt = celery.enqueue(queue_name="jobs", envelope=envelope)
         assert receipt.queue_backend == "celery"
-        with pytest.raises(NotImplementedError):
-            celery.dequeue(queue_name="jobs")
+        assert celery.dequeue(queue_name="jobs") is None
         celery.ack(receipt)
         celery.requeue(receipt, envelope=envelope)
         celery.dead_letter(receipt, envelope=envelope)

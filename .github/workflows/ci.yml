@@ -45,7 +45,7 @@ jobs:
 
     - name: Type check with mypy
       run: |
-        mypy iocparser --ignore-missing-imports
+        mypy iocparser
 
     - name: Enforce architecture guardrails
       run: |
@@ -193,12 +193,10 @@ jobs:
     - name: Security check with bandit
       run: |
         bandit -r iocparser -f json -o bandit-report.json
-      continue-on-error: true
 
     - name: Security check with pip-audit
       run: |
         pip-audit --ignore-vuln CVE-2026-3219
-      continue-on-error: true
 
   benchmark:
     runs-on: ubuntu-24.04

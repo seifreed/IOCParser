@@ -4,6 +4,7 @@ import argparse
 import io
 import json
 import sys
+import time
 from contextlib import redirect_stdout
 from datetime import UTC, datetime
 from pathlib import Path
@@ -51,6 +52,7 @@ from iocparser.client_persistence import _parse_string_filters
 from iocparser.domain.distributed import _int_from_payload
 from iocparser.domain.enums import IOCType, register_custom_ioc_type
 from iocparser.domain.models import IOC, ExtractionOptions, ExtractionResult
+from iocparser.domain.pipeline import PipelineJobRequest
 from iocparser.errors import DownloadError, ValidationError
 from iocparser.infrastructure.file_readers import MagicTextSourceReader
 from iocparser.infrastructure.http_download import RequestsURLDownloader
@@ -92,6 +94,7 @@ from iocparser.pipeline_worker import (
     _PreparedInput,
     _RunRepositoryAdapter,
 )
+from iocparser.pipeline_worker_support import PreparedInput, persist_result
 from iocparser.worker_config_support import (
     bool_env,
     float_env,
@@ -513,6 +516,27 @@ def test_pipeline_worker_private_helpers_cover_remaining_branches() -> None:
         _metadata_int({"input_size": []}, "input_size")
     with pytest.raises(ValueError, match="missing temp_file"):
         _prepared_temp_file(_PreparedInput(fingerprint=None, content_hash=None, metadata={}))
+
+
+def test_persist_result_rolls_back_and_closes_on_exception(monkeypatch) -> None:
+    """persist_result must rollback and close the UoW when persist_run raises."""
+    from unittest.mock import MagicMock
+
+    mock_persist_run = MagicMock(side_effect=RuntimeError("db down"))
+    monkeypatch.setattr("iocparser.pipeline_worker_support.persist_run", mock_persist_run)
+
+    request = PipelineJobRequest(
+        input_kind="text",
+        source_value="test",
+        persist=True,
+        db_uri="sqlite:///:memory:",
+        emit_only=False,
+    )
+    prepared = PreparedInput(fingerprint="fp", content_hash="hash", metadata={"input_size": 4})
+    result = ExtractionResult(iocs=())
+
+    with pytest.raises(RuntimeError, match="db down"):
+        persist_result(request=request, prepared=prepared, result=result, started=time.time())
 
 
 def test_renderers_cover_custom_stix_and_record_helpers() -> None:

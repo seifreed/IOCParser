@@ -55,7 +55,7 @@ def options(
     )
 
 
-def current_warning_service(enabled: bool) -> object | None:
+def current_warning_service(enabled: bool) -> WarningListService | None:
     return _lazy_warning_service() if enabled else None
 
 
@@ -173,7 +173,7 @@ def extract_result_from_file(
         defang=defang,
         only=only,
         exclude=exclude,
-        current_warning_service=current_warning_service,  # type: ignore[arg-type]
+        current_warning_service=current_warning_service,
     )
 
 
@@ -214,7 +214,7 @@ def extract_result_from_text(
         defang=defang,
         only=only,
         exclude=exclude,
-        current_warning_service=current_warning_service,  # type: ignore[arg-type]
+        current_warning_service=current_warning_service,
     )
 
 
@@ -253,7 +253,7 @@ def extract_result_from_url(
         defang=defang,
         only=only,
         exclude=exclude,
-        current_warning_service=current_warning_service,  # type: ignore[arg-type]
+        current_warning_service=current_warning_service,
     )
 
 

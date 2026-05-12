@@ -17,31 +17,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from iocparser.domain.models import IOC, ExtractionResult, WarningMatch
-
-
-def _db(p: Path, n: str = "final.db") -> str:
-    uri = f"sqlite:///{p / n}"
-    from iocparser.infrastructure.persistence_migration_runtime import migrate_engine
-    migrate_engine(create_engine(uri, future=True))
-    return uri
-
-
-def _persist(uri, sk="file", sv="f.txt", iv="x.com"):
-    from iocparser.application.contracts import PersistRunInput
-    from iocparser.application.use_cases import persist_run
-    from iocparser.domain.models import PersistOptions, Source
-    from iocparser.infrastructure.persistence import SQLAlchemyUnitOfWork
-    u = SQLAlchemyUnitOfWork(uri)
-    try:
-        return persist_run(PersistRunInput(
-            source=Source.from_raw(sk, sv),
-            result=ExtractionResult(iocs=(IOC.from_raw("domains", iv),), warnings=()),
-            tool_version="5.0.0",
-            options=PersistOptions(defang=True, check_warnings=False, force_update=False, output_format="text"),
-        ), unit_of_work=u).run_id
-    except Exception:
-        u.rollback()
-        raise
+from tests.coverage_helpers import fresh_db, persist_run_into
 
 
 # ── IOC repo: directly test the retry logic (lines 54-59) ─────────────────
@@ -53,7 +29,7 @@ class TestIOCRepoRetryLogic:
         from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
         from iocparser.infrastructure.persistence_models import IOCModel
 
-        engine = create_engine(_db(tmp_path, "ioc_direct.db"), future=True)
+        engine = create_engine(fresh_db(tmp_path, "ioc_direct.db"), future=True)
         session = Session(engine)
 
         # Insert a row directly
@@ -88,7 +64,7 @@ class TestSourceRepoRetryLogic:
         from iocparser.infrastructure.persistence_models import SourceModel
         from iocparser.infrastructure.persistence_repository_support import normalize_search
 
-        engine = create_engine(_db(tmp_path, "src_direct.db"), future=True)
+        engine = create_engine(fresh_db(tmp_path, "src_direct.db"), future=True)
         session = Session(engine)
 
         # Insert source directly
@@ -128,8 +104,8 @@ class TestHistoryRichImport:
         from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
         from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
 
-        uri = _db(tmp_path, "rich_src.db")
-        rid = _persist(uri, sk="url", sv="https://target.com", iv="evil.com")
+        uri = fresh_db(tmp_path, "rich_src.db")
+        rid = persist_run_into(uri, source_kind="url", source_value="https://target.com", ioc_value="evil.com")
 
         svc = SQLAlchemyPersistenceService(uri)
         svc.persist_batch_job(source_kind="url", run_ids=(rid,),
@@ -161,7 +137,7 @@ class TestHistoryRichImport:
         _, payload = self._build_rich_export(tmp_path)
         payload["__history_origin_id__"] = "rich-origin"
 
-        uri2 = _db(tmp_path, "rich_target.db")
+        uri2 = fresh_db(tmp_path, "rich_target.db")
         counts = import_history(uri2, payload)
         assert counts.get("sources", 0) >= 1
         assert counts.get("runs", 0) >= 1
@@ -172,7 +148,7 @@ class TestHistoryRichImport:
         _, payload = self._build_rich_export(tmp_path)
         payload["__history_origin_id__"] = "rich-dedup"
 
-        uri2 = _db(tmp_path, "rich_dedup.db")
+        uri2 = fresh_db(tmp_path, "rich_dedup.db")
         import_history(uri2, payload)
         counts2 = import_history(uri2, payload)
         # Second import should find all entities existing
@@ -186,7 +162,7 @@ class TestHistoryRichImport:
         payload.pop("__history_origin_id__", None)
         payload.pop("__history_archive_id__", None)
 
-        uri2 = _db(tmp_path, "legacy.db")
+        uri2 = fresh_db(tmp_path, "legacy.db")
         counts = import_history(uri2, payload)
         assert isinstance(counts, dict)
 
@@ -228,14 +204,14 @@ def test_cli_dispatch_url_source_kind(tmp_path):
     from iocparser.cli import execute
     urls_file = tmp_path / "urls.txt"
     urls_file.write_text("https://example.com\n")
-    uri = _db(tmp_path, "dispatch.db")
+    uri = fresh_db(tmp_path, "dispatch.db")
     with contextlib.suppress(SystemExit, Exception):
         execute(["--url-file", str(urls_file), "--db-uri", uri, "--no-persist"])
 
 # cli_processing_urls.py:199 — retry from batch with matches but high occurrence
 def test_retry_from_batch_occurrence_fallback(tmp_path):
     from iocparser.cli_processing_urls import retry_attempt_for_url
-    uri = _db(tmp_path)
+    uri = fresh_db(tmp_path)
     r = retry_attempt_for_url("https://a.com", None, retry_batch_job=999, db_uri=uri, occurrence=999)
     assert isinstance(r, int)
 
@@ -250,7 +226,7 @@ def test_retry_attempt_wrapper(tmp_path):
 # persistence_distributed.py:93 — ambiguous job lookup (>1 imported match)
 def test_distributed_ambiguous_raises(tmp_path):
     from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
-    uri = _db(tmp_path, "amb.db")
+    uri = fresh_db(tmp_path, "amb.db")
     # Not triggerable without inserting multiple rows with same job_id pattern
     svc = SQLAlchemyDistributedJobService(uri)
     assert svc.get_job(job_id="nope#history:abc") is None
@@ -264,7 +240,7 @@ def test_batch_retry_attempt_non_list():
 # api_persistence_query.py:252 — re-raise path
 def test_api_search_reraise(tmp_path):
     from iocparser.api_persistence_query import search_persisted_iocs
-    uri = _db(tmp_path)
+    uri = fresh_db(tmp_path)
     with contextlib.suppress(Exception):
         search_persisted_iocs(db_uri=uri, value="x", date_from="not-iso")
 

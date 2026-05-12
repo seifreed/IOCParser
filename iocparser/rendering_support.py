@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from typing import TypeVar
 
 from stix2 import Bundle, Indicator
 
 SectionValue = str | dict[str, str]
 WarningValue = dict[str, str] | str
 ContextMap = Mapping[tuple[str, str], Sequence[str]]
-T = TypeVar("T")
 
 SECTION_ORDER: list[tuple[str, str]] = [
     ("md5", "MD5 Hashes"),
@@ -100,7 +98,7 @@ def serialize_pretty_json(payload: Mapping[str, object]) -> str:
     return json.dumps(payload, indent=4, sort_keys=True)
 
 
-def build_stix_bundle(
+def build_stix_bundle[T](
     entries: Iterable[T],
     *,
     build_indicator: Callable[[T], Indicator | None],

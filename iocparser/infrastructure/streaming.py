@@ -221,6 +221,8 @@ class StreamingIOCExtractor:
                                 yield unique_iocs
                             else:
                                 self._accumulate_iocs(all_iocs, unique_iocs)
+            except (KeyboardInterrupt, SystemExit):
+                raise
             except Exception:
                 logger.exception("Error processing file %s", file_path)
                 raise
@@ -307,6 +309,12 @@ class StreamingIOCExtractor:
                     # Calculate chunk boundaries
                     chunk_end = min(offset + self.chunk_size, file_size)
 
+                    # Align chunk_end to a valid UTF-8 boundary to avoid
+                    # splitting multi-byte characters across chunks.
+                    if chunk_end < file_size:
+                        while chunk_end > offset and mmapped_file[chunk_end] & 0xC0 == 0x80:
+                            chunk_end -= 1
+
                     # Read chunk
                     chunk = decode_chunk(mmapped_file[offset:chunk_end])
 
@@ -333,6 +341,8 @@ class StreamingIOCExtractor:
                     # Move to next chunk
                     offset = chunk_end
 
+        except (KeyboardInterrupt, SystemExit):
+            raise
         except Exception:
             logger.exception("Error in memory-mapped extraction")
             raise

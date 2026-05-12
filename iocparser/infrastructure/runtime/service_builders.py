@@ -25,7 +25,7 @@ class DistributedServiceDependencies:
 def distributed_service_dependencies(*, worker: PipelineWorker | None, db_uri: str | None, telemetry_sink: TelemetrySink | None, limits: ResourceLimits | None) -> DistributedServiceDependencies:
     from iocparser.pipeline_worker_support import PipelineProcessedRunLookup
     lookup = PipelineProcessedRunLookup(db_uri) if db_uri else None
-    effective_worker = pipeline_worker_for(worker, limits=limits, processed_run_lookup=lookup)  # type: ignore[arg-type]
+    effective_worker = pipeline_worker_for(worker, limits=limits, processed_run_lookup=lookup)
     return DistributedServiceDependencies(
         worker=effective_worker,
         telemetry_sink=default_pipeline_telemetry_sink(telemetry_sink),

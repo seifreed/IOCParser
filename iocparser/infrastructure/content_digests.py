@@ -13,4 +13,11 @@ class SHA256ContentDigester(ContentDigester):
         return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
     def digest_file(self, file_path: str) -> str:
-        return hashlib.sha256(Path(file_path).read_bytes()).hexdigest()
+        hasher = hashlib.sha256()
+        with Path(file_path).open("rb") as f:
+            while True:
+                chunk = f.read(8192)
+                if not chunk:
+                    break
+                hasher.update(chunk)
+        return hasher.hexdigest()

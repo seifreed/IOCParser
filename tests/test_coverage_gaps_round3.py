@@ -19,16 +19,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from iocparser.domain.models import ExtractionResult
-
-
-def _fresh_db(tmp_path: Path, name: str = "test.db") -> str:
-    db_path = tmp_path / name
-    db_uri = f"sqlite:///{db_path}"
-    engine = create_engine(db_uri, future=True)
-    from iocparser.infrastructure.persistence_migration_runtime import migrate_engine
-    migrate_engine(engine)
-    return db_uri
-
+from tests.coverage_helpers import fresh_db
 
 # ---------------------------------------------------------------------------
 # 1. persistence_ioc_repository.py:54-59 — IntegrityError savepoint retry
@@ -37,7 +28,7 @@ def _fresh_db(tmp_path: Path, name: str = "test.db") -> str:
 class TestIOCRepositoryIntegrityRetry:
     def test_integrity_error_triggers_retry_and_finds_existing(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
-        db_uri = _fresh_db(tmp_path, "ioc_retry.db")
+        db_uri = fresh_db(tmp_path, "ioc_retry.db")
         engine = create_engine(db_uri, future=True)
         session = Session(engine)
         repo = SQLAlchemyIOCRepository(session)
@@ -69,7 +60,7 @@ class TestIOCRepositoryIntegrityRetry:
 
     def test_integrity_error_reraises_when_row_not_found(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
-        db_uri = _fresh_db(tmp_path, "ioc_reraise.db")
+        db_uri = fresh_db(tmp_path, "ioc_reraise.db")
         engine = create_engine(db_uri, future=True)
         session = Session(engine)
         repo = SQLAlchemyIOCRepository(session)
@@ -95,7 +86,7 @@ class TestSourceRepositoryIntegrityRetry:
         from iocparser.infrastructure.persistence_source_repository import (
             SQLAlchemySourceRepository,
         )
-        db_uri = _fresh_db(tmp_path, "src_retry.db")
+        db_uri = fresh_db(tmp_path, "src_retry.db")
         engine = create_engine(db_uri, future=True)
         session = Session(engine)
         repo = SQLAlchemySourceRepository(session)
@@ -136,7 +127,7 @@ class TestSourceRepositoryIntegrityRetry:
         from iocparser.infrastructure.persistence_source_repository import (
             SQLAlchemySourceRepository,
         )
-        db_uri = _fresh_db(tmp_path, "src_reraise.db")
+        db_uri = fresh_db(tmp_path, "src_reraise.db")
         engine = create_engine(db_uri, future=True)
         session = Session(engine)
         repo = SQLAlchemySourceRepository(session)
@@ -308,7 +299,7 @@ class TestPersistenceSupportHelpers:
 class TestBatchJobReportParsing:
     def test_create_batch_job_from_report(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_batch import create_batch_job
-        db_uri = _fresh_db(tmp_path, "batch.db")
+        db_uri = fresh_db(tmp_path, "batch.db")
         engine = create_engine(db_uri, future=True)
         session = Session(engine)
 
@@ -348,7 +339,7 @@ class TestBatchJobReportParsing:
 class TestDistributedJobTransitions:
     def test_mark_completed_nonexistent_job(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
-        db_uri = _fresh_db(tmp_path, "dist.db")
+        db_uri = fresh_db(tmp_path, "dist.db")
         service = SQLAlchemyDistributedJobService(db_uri)
         result = service.mark_completed(
             job_id="nonexistent",
@@ -362,7 +353,7 @@ class TestDistributedJobTransitions:
     def test_mark_failed_nonexistent_job(self, tmp_path: Path) -> None:
         from iocparser.domain.pipeline import PipelineErrorInfo
         from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
-        db_uri = _fresh_db(tmp_path, "dist2.db")
+        db_uri = fresh_db(tmp_path, "dist2.db")
         service = SQLAlchemyDistributedJobService(db_uri)
         result = service.mark_failed(
             job_id="nonexistent",
@@ -403,12 +394,28 @@ class TestScatteredGaps:
         result = build_stix_bundle([], build_indicator=lambda e: None)
         assert isinstance(result, str)
 
+    def test_rendering_support_build_stix_bundle_non_dict_payload(self, monkeypatch) -> None:
+        import json as _json
+        from unittest.mock import patch
+
+        from iocparser.rendering_support import build_stix_bundle
+
+        def fake_loads(s, *args, **kwargs):
+            if isinstance(s, str) and "\"type\": \"bundle\"" in s:
+                return []
+            return _json.loads(s, *args, **kwargs)
+
+        with patch("iocparser.rendering_support.json.loads", fake_loads):
+            result = build_stix_bundle([], build_indicator=lambda e: None)
+        parsed = _json.loads(result)
+        assert parsed == {}
+
     def test_distributed_use_cases_idempotency_key_url(self) -> None:
         from iocparser.application.distributed_use_cases import idempotency_key_for
         from iocparser.domain.pipeline import PipelineJobRequest
         request = PipelineJobRequest(input_kind="url", source_value="https://x.com")
         key = idempotency_key_for(request, digester=None)
-        assert key == "https://x.com"
+        assert key == "url:https://x.com:cw=True:fu=False:df=True:o=:e=:eo=False"
 
     def test_domain_sources_normalize_url(self) -> None:
         from iocparser.domain.sources import normalize_url_value

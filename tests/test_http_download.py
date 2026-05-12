@@ -191,6 +191,35 @@ def test_download_url_to_temp_reports_file_size_and_unexpected_errors() -> None:
     assert exc_info.value.error_type == "unexpected"
 
 
+def test_download_url_to_temp_uses_manual_path_for_default_timeout(monkeypatch) -> None:
+    """Regression: timeout == REQUEST_TIMEOUT must not bypass the manual path."""
+    get_calls = []
+
+    def fake_get(url, *, timeout=None, stream=False, **_kwargs):
+        get_calls.append((url, timeout, stream))
+        return type(
+            "FakeResponse",
+            (),
+            {
+                "raise_for_status": lambda _self=None: None,
+                "headers": {"Content-Length": "2", "Content-Type": "text/plain"},
+                "iter_content": lambda chunk_size: [b"ok"],
+                "__enter__": lambda s: s,
+                "__exit__": lambda *args: None,
+            },
+        )()
+
+    monkeypatch.setattr("iocparser.infrastructure.http_download.requests.get", fake_get)
+    monkeypatch.setattr(
+        "iocparser.infrastructure.http_download.download_with_size_check",
+        lambda response, temp_file, max_size: temp_file.write_text("ok"),
+    )
+    with LocalHTTPServer(body=b"ok") as url:
+        download_url_to_temp(url, timeout=30)
+    assert len(get_calls) == 1
+    assert get_calls[0][1] == 30
+
+
 def test_requests_url_downloader_reports_unexpected_errors() -> None:
     downloader = RequestsURLDownloader()
 

@@ -62,12 +62,15 @@ class MagicTextSourceReader(TextSourceReader):
         }
         return extension_map.get(file_path.suffix.lower(), "text")
 
-    _magic_instance: magic.Magic | None = None
+    # Thread-local storage for magic instances - libmagic is not thread-safe.
+    _magic_local = _threading.local()
 
     def _magic(self) -> magic.Magic:
-        if self._magic_instance is None:
-            self._magic_instance = magic.Magic(mime=True)
-        return self._magic_instance
+        instance = getattr(self._magic_local, "instance", None)
+        if instance is None:
+            instance = magic.Magic(mime=True)
+            self._magic_local.instance = instance
+        return instance
 
     def detect_file_type(self, file_path: Path) -> str:
         """Detect file type using magic with extension fallback."""

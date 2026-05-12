@@ -13,6 +13,7 @@ from uuid import uuid4
 from iocparser.application.contracts import PersistRunInput
 from iocparser.application.use_cases import persist_run
 from iocparser.domain.models import ExtractionResult, PersistOptions, Source
+from iocparser.domain.persisted import PersistedRunExport, PersistedRunSummary
 from iocparser.domain.pipeline import PipelineJobRequest, PipelineJobResult, ResourceLimits
 from iocparser.errors import IOCTimeoutError, ValidationError
 from iocparser.infrastructure.persistence import (
@@ -55,6 +56,9 @@ class PipelineUnitOfWork:
 
     def rollback(self) -> None:
         self._inner.rollback()
+
+    def close(self) -> None:
+        self._inner.close()
 
 
 class IOCRepositoryAdapter:
@@ -116,14 +120,14 @@ class PipelineProcessedRunLookup:
         fingerprint: str | None = None,
         content_hash: str | None = None,
         status: str = "success",
-    ) -> object:
+    ) -> PersistedRunSummary | None:
         return self._service.find_existing_run(
             fingerprint=fingerprint,
             content_hash=content_hash,
             status=status,
         )
 
-    def export_run(self, *, run_id: int) -> object:
+    def export_run(self, *, run_id: int) -> PersistedRunExport:
         return self._service.export_run(run_id=run_id)
 
 
@@ -320,31 +324,38 @@ def persist_result(
     original_url = prepared.metadata.get("original_url")
     normalized_url = prepared.metadata.get("normalized_url")
     mime_type = prepared.metadata.get("mime_type")
-    return persist_run(
-        PersistRunInput(
-            source=Source.from_raw(
-                request.input_kind,
-                request.source_value,
-                original_url=original_url if isinstance(original_url, str) and original_url else None,
-                normalized_url=normalized_url if isinstance(normalized_url, str) and normalized_url else None,
-                mime_type=mime_type if isinstance(mime_type, str) and mime_type else None,
-                input_size=input_size,
-                content_hash=prepared.content_hash,
-                fingerprint=prepared.fingerprint,
+    unit = PipelineUnitOfWork(request.db_uri)
+    try:
+        return persist_run(
+            PersistRunInput(
+                source=Source.from_raw(
+                    request.input_kind,
+                    request.source_value,
+                    original_url=original_url if isinstance(original_url, str) and original_url else None,
+                    normalized_url=normalized_url if isinstance(normalized_url, str) and normalized_url else None,
+                    mime_type=mime_type if isinstance(mime_type, str) and mime_type else None,
+                    input_size=input_size,
+                    content_hash=prepared.content_hash,
+                    fingerprint=prepared.fingerprint,
+                ),
+                result=result,
+                tool_version="5.0.0",
+                options=PersistOptions(
+                    defang=request.defang,
+                    check_warnings=request.check_warnings,
+                    force_update=request.force_update,
+                    output_format="json",
+                ),
+                duration_ms=int((time.perf_counter() - started) * 1000),
+                status="success",
             ),
-            result=result,
-            tool_version="5.0.0",
-            options=PersistOptions(
-                defang=request.defang,
-                check_warnings=request.check_warnings,
-                force_update=request.force_update,
-                output_format="json",
-            ),
-            duration_ms=int((time.perf_counter() - started) * 1000),
-            status="success",
-        ),
-        unit_of_work=PipelineUnitOfWork(request.db_uri),  # type: ignore[arg-type]
-    ).run_id
+            unit_of_work=unit,
+        ).run_id
+    except Exception:
+        unit.rollback()
+        raise
+    finally:
+        unit.close()
 
 
 def extract_result(*, client: ExtractionClient, request: PipelineJobRequest, prepared: PreparedInput) -> ExtractionResult:

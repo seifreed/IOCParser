@@ -485,6 +485,22 @@ class TestWarningListsPreprocessing:
         assert "invalid-regex-list" in warning_lists.compiled_regex
         assert len(warning_lists.compiled_regex["invalid-regex-list"]) == 1
 
+    def test_preprocess_lists_skips_unsafe_regex(self):
+        """Test preprocessing skips regex patterns with nested quantifiers."""
+        warning_lists = make_warning_lists()
+        warning_lists.warning_lists = {
+            "unsafe-regex-list": {
+                "name": "Unsafe Regex List",
+                "description": "Contains unsafe regex patterns",
+                "type": "regex",
+                "matching_attributes": ["domain"],
+                "list": [r"valid\.regex", r"(a+)+", r"(a*)*", None],
+            }
+        }
+        warning_lists._preprocess_lists()
+        assert "unsafe-regex-list" in warning_lists.compiled_regex
+        assert len(warning_lists.compiled_regex["unsafe-regex-list"]) == 1
+
     def test_preprocess_lists_with_invalid_cidr(self):
         """Test preprocessing handles invalid CIDR ranges."""
         warning_lists = make_warning_lists()

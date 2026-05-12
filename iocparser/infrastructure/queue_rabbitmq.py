@@ -87,8 +87,23 @@ class RabbitMQQueueAdapter:
             return channel
         pika = _pika_module()
         params = pika.URLParameters(self.url)
-        connection = pika.BlockingConnection(params)
-        channel = connection.channel()
+        try:
+            connection = pika.BlockingConnection(params)
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception:
+            self._connection = None
+            self._channel = None
+            raise
+        try:
+            channel = connection.channel()
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception:
+            connection.close()
+            self._connection = None
+            self._channel = None
+            raise
         self._connection = connection
         self._channel = channel
         return channel
@@ -119,12 +134,14 @@ class RabbitMQQueueAdapter:
         self._basic_ack(receipt, receipt.queue_name)
 
     def requeue(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
+        new_receipt = self.enqueue(queue_name=receipt.queue_name, envelope=envelope)
         self.ack(receipt)
-        return self.enqueue(queue_name=receipt.queue_name, envelope=envelope)
+        return new_receipt
 
     def dead_letter(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
+        new_receipt = self.enqueue(queue_name=f"{receipt.queue_name}{self.dead_letter_suffix}", envelope=envelope)
         self.ack(receipt)
-        return self.enqueue(queue_name=f"{receipt.queue_name}{self.dead_letter_suffix}", envelope=envelope)
+        return new_receipt
 
     def _basic_ack(self, receipt: QueueReceipt, queue_name: str) -> None:
         channel = self._channel_for()

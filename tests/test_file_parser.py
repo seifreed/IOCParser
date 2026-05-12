@@ -789,14 +789,8 @@ class TestHTMLParserErrorHandling:
 
         parser = HTMLParser(str(html_path))
 
-        # Should handle gracefully or raise HTMLProcessingError
-        try:
-            result = parser.extract_text()
-            # BeautifulSoup is permissive, so it might succeed
-            assert isinstance(result, str)
-        except HTMLProcessingError:
-            # This is also acceptable
-            pass
+        result = parser.extract_text()
+        assert isinstance(result, str)
 
     def test_html_parser_raises_url_access_error_for_local_404(self) -> None:
         import threading

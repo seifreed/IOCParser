@@ -86,8 +86,9 @@ class PipelineWorker:
             prepared = prepare_input(client=self.client, limits=self.limits, request=request)
             phase_timings_ms["prepare"] = int((time.perf_counter() - prepare_started) * 1000)
             processed_run_lookup = self.processed_run_lookup
-            if processed_run_lookup is None and self.processed_run_lookup_factory and request.db_uri:
-                processed_run_lookup = self.processed_run_lookup_factory(request.db_uri)  # type: ignore[assignment]
+            db_uri = request.db_uri
+            if processed_run_lookup is None and self.processed_run_lookup_factory is not None and db_uri:
+                processed_run_lookup = self.processed_run_lookup_factory(db_uri)
             skipped = maybe_skipped_result(
                 context=context,
                 processed_run_lookup=processed_run_lookup,
@@ -112,6 +113,10 @@ class PipelineWorker:
                 result=result,
                 run_id=run_id,
             )
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except (MemoryError, RecursionError, SystemError):
+            raise
         except Exception as exc:
             return failed_result(
                 request=request,

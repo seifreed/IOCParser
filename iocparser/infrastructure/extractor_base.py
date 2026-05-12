@@ -35,9 +35,9 @@ MIN_HOSTNAME_LENGTH = 3
 LARGE_TEXT_THRESHOLD = 10000
 
 PROGRAMMING_KEYWORDS = {
-    "document", "window", "console", "function", "addEventListener", "getElementById", "querySelector",
+    "addEventListener", "getElementById", "querySelector",
     "prototype", "constructor", "toString", "valueOf", "typeof", "instanceof", "undefined", "gform",
-    "jquery", "angular", "react", "vue",
+    "innerHTML", "outerHTML", "appendChild", "removeChild", "createElement",
 }
 SUSPICIOUS_SUBDOMAIN_KEYWORDS = [
     "malware", "c2", "payload", "evil", "bad", "attack", "exploit", "trojan", "virus", "worm", "botnet",
@@ -108,6 +108,7 @@ class DomainValidationPolicy:
             len(domain) <= self.max_domain_length
             and all(len(part) <= self.max_domain_part_length for part in parts)
             and len(parts) >= 2
+            and all(part for part in parts)
         )
 
 
@@ -203,16 +204,19 @@ class ExtractorBase:
         """
         if pattern_name not in self.patterns:
             return []
-        matches: list[str | tuple[str, ...]] = self.patterns[pattern_name].findall(text)
+        pattern = self.patterns[pattern_name]
         clean_matches: list[str] = []
-        for match in matches:
-            if isinstance(match, tuple):
-                for match_value in match:
-                    if match_value:
-                        clean_matches.append(match_value)
+        for match_obj in pattern.finditer(text):
+            match_value = match_obj.group(0)
+            # If the pattern has explicit capture groups, prefer the first non-empty group
+            groups = match_obj.groups()
+            if groups:
+                for group in groups:
+                    if group:
+                        match_value = group
                         break
-            elif match:
-                clean_matches.append(match)
+            if match_value:
+                clean_matches.append(match_value)
         seen: set[str] = set()
         deduplicated: list[str] = []
         for match in clean_matches:
@@ -329,8 +333,8 @@ class ExtractionAggregateMixin:
 
     def _extraction_methods(self) -> list[tuple[str, Callable[[str], list[str]]]]:
         cached = getattr(self, "_cached_extraction_methods", None)
-        if cached is not None:
-            return cached  # type: ignore[no-any-return]
+        if isinstance(cached, list):
+            return cached
         from iocparser.infrastructure.extractor_artifacts import ARTIFACT_EXTRACTION_METHODS
         from iocparser.infrastructure.extractor_network import NETWORK_EXTRACTION_METHODS
 

@@ -145,10 +145,10 @@ def persist_failed_batch_items(
 
 
 def _batch_result_entries(
-    results: BatchResults,
+    results: BatchResults | dict[str, tuple[GroupedIocs, GroupedWarnings]],
 ) -> list[tuple[str, str, GroupedIocs, GroupedWarnings]]:
-    if isinstance(results, dict):  # type: ignore[unreachable]
-        return [(item_key, item_key, normal_iocs, warning_iocs) for item_key, (normal_iocs, warning_iocs) in results.items()]  # type: ignore[unreachable]
+    if isinstance(results, dict):
+        return [(item_key, item_key, normal_iocs, warning_iocs) for item_key, (normal_iocs, warning_iocs) in results.items()]
     return [
         (entry.item_key, entry.source_value, entry.normal_iocs, entry.warning_iocs)
         for entry in results.entries

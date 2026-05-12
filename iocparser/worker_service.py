@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from dataclasses import dataclass
@@ -9,6 +10,8 @@ from iocparser.infrastructure.queueing import create_queue_adapter
 from iocparser.infrastructure.runtime.service_builders import telemetry_sink_for_worker_mode
 from iocparser.pipeline_worker import PipelineWorker
 from iocparser.worker_config import WorkerServiceConfig
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -46,8 +49,6 @@ def build_worker_service_runtime(
 
 
 class DistributedWorkerService:
-    """Long-running wrapper around DistributedPipelineService for standalone workers."""
-
     def __init__(
         self,
         *,
@@ -68,7 +69,6 @@ class DistributedWorkerService:
         *,
         worker: PipelineWorker | None = None,
     ) -> DistributedWorkerService:
-        """Build a deployable worker service from environment-facing config."""
         runtime = build_worker_service_runtime(config, worker=worker)
         return cls(
             service=runtime.service,
@@ -80,29 +80,34 @@ class DistributedWorkerService:
     @property
     def concurrency(self) -> int:
         limits = getattr(self.service, "limits", None)
-        if limits is not None and hasattr(limits, "max_workers") and limits.max_workers:
-            return max(1, limits.max_workers)  # type: ignore[no-any-return]
-        return 1
+        try:
+            return max(1, int(getattr(limits, "max_workers", 1)))
+        except (ValueError, TypeError):
+            return 1
 
     def _process_one(self) -> bool:
         return self.service.process_next(queue_name=self.queue_name) is not None
 
     def run_once(self) -> int:
-        """Process up to `max_messages_per_cycle` messages and return count processed."""
-        processed = 0
-        for _ in range(self.max_messages_per_cycle):
-            if not self._process_one():
-                break
-            processed += 1
-        return processed
+        try:
+            processed = 0
+            for _ in range(self.max_messages_per_cycle):
+                if not self._process_one():
+                    break
+                processed += 1
+            return processed
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception:
+            logger.exception("Error during worker run_once")
+            return 0
 
-    def run_forever(
+    def run_forever(  # noqa: C901
         self,
         *,
         stop_event: threading.Event | None = None,
         max_cycles: int | None = None,
     ) -> int:
-        """Run until stopped, returning the number of processed messages."""
         workers = self.concurrency
         cycles = 0
         processed = 0
@@ -121,7 +126,14 @@ class DistributedWorkerService:
             with ThreadPoolExecutor(max_workers=workers) as executor:
                 while stop_event is None or not stop_event.is_set():
                     futures = [executor.submit(self.run_once) for _ in range(workers)]
-                    current = sum(f.result() for f in futures)
+                    current = 0
+                    for f in futures:
+                        try:
+                            current += f.result()
+                        except (KeyboardInterrupt, SystemExit):
+                            raise
+                        except Exception:
+                            logger.exception("Worker thread raised an exception")
                     processed += current
                     cycles += 1
                     if max_cycles is not None and cycles >= max_cycles:

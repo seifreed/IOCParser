@@ -270,11 +270,13 @@ def _coerce_count(value: object) -> int:
         return value
     if isinstance(value, str):
         return int(value)
+    if value is None:
+        return 0
     raise _count_type_error(value)
 
 
 def _count_type_error(value: object) -> TypeError:
-    return TypeError(f"Expected integer count, got {type(value).__name__}")
+    return TypeError(f"Expected integer count, got {type(value).__name__}: {value!r}")
 
 
 class SQLAlchemyPersistenceService(PersistenceQueryService):

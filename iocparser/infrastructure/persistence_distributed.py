@@ -18,6 +18,7 @@ from iocparser.infrastructure.persistence_distributed_support import (
     active_idempotency_stmt,
     apply_transition,
     build_new_job,
+    commit_new_job_or_fetch,
     completed_transition,
     dead_letter_model,
     failed_transition,
@@ -45,23 +46,30 @@ class SQLAlchemyDistributedJobService:
     def create_or_get_job(self, *, envelope: QueueEnvelope, receipt_id: str) -> DistributedJobRecord:
         unit = SQLAlchemyUnitOfWork(self.db_uri)
         try:
-            stmt = job_by_id_stmt(str(envelope.request.job_id))
-            model = unit.session.execute(stmt).scalar_one_or_none()
-            if model is None:
-                if envelope.idempotency_key:
-                    idem_stmt = active_idempotency_stmt(envelope.idempotency_key)
-                    existing = unit.session.execute(idem_stmt).scalar_one_or_none()
-                    if existing is not None:
-                        return model_record(existing)
-                model = build_new_job(envelope=envelope, receipt_id=receipt_id)
-                unit.session.add(model)
-                unit.commit()
-                return model_record(model)
-            update_envelope(model, envelope=envelope, receipt_id=receipt_id)
-            unit.commit()
-            return model_record(model)
+            return self._create_or_get_job_inner(envelope=envelope, receipt_id=receipt_id, unit=unit)
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception:
+            unit.rollback()
+            raise
         finally:
             unit.close()
+
+    def _create_or_get_job_inner(self, *, envelope: QueueEnvelope, receipt_id: str, unit: SQLAlchemyUnitOfWork) -> DistributedJobRecord:
+        stmt = job_by_id_stmt(str(envelope.request.job_id))
+        model = unit.session.execute(stmt).scalar_one_or_none()
+        if model is None:
+            if envelope.idempotency_key:
+                idem_stmt = active_idempotency_stmt(envelope.idempotency_key)
+                existing = unit.session.execute(idem_stmt).scalar_one_or_none()
+                if existing is not None:
+                    return model_record(existing)
+            model = build_new_job(envelope=envelope, receipt_id=receipt_id)
+            committed = commit_new_job_or_fetch(unit, model, str(envelope.request.job_id))
+            return model_record(committed)
+        update_envelope(model, envelope=envelope, receipt_id=receipt_id)
+        unit.commit()
+        return model_record(model)
 
     def get_job(self, *, job_id: str) -> DistributedJobRecord | None:
         unit = SQLAlchemyUnitOfWork(self.db_uri)
@@ -241,5 +249,10 @@ class SQLAlchemyDistributedJobService:
             )
             unit.commit()
             return model_record(model)
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception:
+            unit.rollback()
+            raise
         finally:
             unit.close()

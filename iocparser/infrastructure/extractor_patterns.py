@@ -29,14 +29,17 @@ PATTERNS: dict[str, Pattern[str]] = {
         r"(?:SHA-512|SHA512|sha512)\s*:?\s*([a-fA-F0-9]{128})(?![a-fA-F0-9])"
         r"|\b([a-fA-F0-9]{128})\b(?![a-fA-F0-9])",
     ),
-    "ssdeep": re.compile(r"\b\d{2,}:[A-Za-z0-9/+]{3,}:[A-Za-z0-9/+]{3,}\b"),
-    "imphash": re.compile(r"\b[a-fA-F0-9]{32}\b"),  # Same as MD5 but context-dependent
+    "ssdeep": re.compile(r"\b\d+:[A-Za-z0-9/+]{3,}:[A-Za-z0-9/+]{3,}\b"),
+    "imphash": re.compile(
+        r"(?:imphash|import\s*hash)[\s:=]+([a-fA-F0-9]{32})\b",
+        re.IGNORECASE,
+    ),  # Context-dependent: requires 'imphash' or 'import hash' prefix
     # Network indicators
     "domains": re.compile(
-        r"\b((?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+"
+        r"\b((?:[a-zA-Z0-9][-a-zA-Z0-9]{0,61}[a-zA-Z0-9]\.){1,10}"
         r"[a-zA-Z]{2,63})\b|"
-        r"\b((?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?"
-        r"(?:\[\.\]|\(\.\)|\{\.\}|\.)){1,}[a-zA-Z]{2,63})\b",
+        r"\b((?:[a-zA-Z0-9][-a-zA-Z0-9]{0,61}[a-zA-Z0-9]"
+        r"(?:\[\.\]|\(\.\)|\{\.\}|\.)){1,10}[a-zA-Z]{2,63})\b",
     ),
     "ips": re.compile(
         # Match potential IPs - we'll validate octets later
@@ -45,27 +48,28 @@ PATTERNS: dict[str, Pattern[str]] = {
     ),
     "ipv6": re.compile(
         # Full format
-        r"(?:^|(?<=\s))(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}(?=\s|$)|"
+        r"(?<![0-9a-zA-Z])(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}(?![0-9a-zA-Z])|"
         # Compressed
-        r"(?:^|(?<=\s))(?:[0-9a-fA-F]{1,4}:){1,7}:(?:[0-9a-fA-F]{1,4}:){0,6}"
-        r"[0-9a-fA-F]{1,4}(?=\s|$)|"
+        r"(?<![0-9a-zA-Z])(?:[0-9a-fA-F]{1,4}:){1,7}:(?:[0-9a-fA-F]{1,4}:){0,6}"
+        r"[0-9a-fA-F]{1,4}(?![0-9a-zA-Z])|"
         # xxxx::xxxx
-        r"(?:^|(?<=\s))(?:[0-9a-fA-F]{1,4}:){1,6}::[0-9a-fA-F]{1,4}(?=\s|$)|"
+        r"(?<![0-9a-zA-Z])(?:[0-9a-fA-F]{1,4}:){1,6}::[0-9a-fA-F]{1,4}(?![0-9a-zA-Z])|"
         # xxxx:: (ending)
-        r"(?:^|(?<=\s))(?:[0-9a-fA-F]{1,4}:)+::(?=\s|$)|"
+        r"(?<![0-9a-zA-Z])(?:[0-9a-fA-F]{1,4}:)+::(?![0-9a-zA-Z])|"
         # ::xxxx
-        r"(?:^|(?<=\s))::(?:[0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4}(?=\s|$)|"
+        r"(?<![0-9a-zA-Z])::(?:[0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4}(?![0-9a-zA-Z])|"
         # Special cases ::1 and ::
-        r"(?:^|(?<=\s))::1(?=\s|$)|(?:^|(?<=\s))::(?=\s|$)|"
+        r"(?<![0-9a-zA-Z])::1(?![0-9a-zA-Z])|(?<![0-9a-zA-Z])::(?![0-9a-zA-Z])|"
         # IPv4-mapped
-        r"(?:^|(?<=\s))::ffff:[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(?=\s|$)",
+        r"(?<![0-9a-zA-Z])::ffff:[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(?![0-9a-zA-Z])",
     ),
     "urls": re.compile(
         r"\b(?:https?|hxxps?|h\[\.\]ttps?|s?ftp)://"
         r"(?!DOMAIN_NAME|IP:|\*\.|localhost|example\.)"
         r"[a-zA-Z0-9][-a-zA-Z0-9.]*[a-zA-Z0-9]"
         r"(?:\.[a-zA-Z]{2,63})?(?::[0-9]{1,5})?"
-        r"(?:/[-a-zA-Z0-9()@:%_\+.~#?&/=]*)?",
+        r"(?:/[-a-zA-Z0-9()@:%_\+.~#?&/=]{0,2048})?",
+        re.IGNORECASE,
     ),
     "mac_addresses": re.compile(
         r"\b(?:[0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}\b|"
@@ -81,8 +85,8 @@ PATTERNS: dict[str, Pattern[str]] = {
         r"[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,63}\b",
     ),
     # Vulnerabilities and threats
-    "cves": re.compile(r"\b(CVE-[0-9]{4}-[0-9]{4,7})\b", re.IGNORECASE),
-    "mitre_attack": re.compile(r"\b(T1[0-9]{3}(?:\.[0-9]{3})?)\b"),
+    "cves": re.compile(r"\b(CVE-[0-9]{4}-[0-9]{1,7})\b", re.IGNORECASE),
+    "mitre_attack": re.compile(r"\b(T1[0-9]{3}(?:\.[0-9]{1,3})?)\b"),
     # Windows artifacts
     "registry": re.compile(
         r"\b((?:HKEY_LOCAL_MACHINE|HKLM|HKEY_CURRENT_USER|HKCU|"
@@ -108,9 +112,9 @@ PATTERNS: dict[str, Pattern[str]] = {
     ),
     "filepaths": re.compile(
         r"(?:"
-        r'(?:%[A-Z_]+%\\|[A-Za-z]:\\)(?:[^\s<>:"/|?*\r\n\\]+\\)*'
-        r'[^\s<>:"/|?*\r\n\\]+(?:\.[A-Za-z0-9]{1,10})?(?=[\s"\u201c\u201d,;]|$)|'
-        r"/(?:usr|bin|etc|var|tmp|home|opt|proc|sys|lib|dev)/(?:[A-Za-z0-9-_\.]+/)*"
+        r'(?:%[A-Z_]+%\\|[A-Za-z]:\\)(?:[^\s<>:"/|?*\r\n\\]+\\){0,20}'
+        r'[^\s<>:"/|?*\r\n\\]+(?:\.[A-Za-z0-9]{1,10})?(?=[\s"\u201c\u201d,;)>]|$)|'
+        r"/(?:usr|bin|etc|var|tmp|home|opt|proc|sys|lib|dev)/(?:[A-Za-z0-9-_\\.]+/){0,20}"
         r'[A-Za-z0-9-_\.]+(?=[\s"\u201c\u201d,;]|$)'
         r")",
         re.IGNORECASE,
@@ -119,7 +123,11 @@ PATTERNS: dict[str, Pattern[str]] = {
     "user_agents": re.compile(
         r"User-Agent:\s*([^\r\n]+)|(Mozilla/[0-9\.]+\s+\([^)]+\)[^\r\n]*)",
     ),
-    "yara": re.compile(r"rule\s+\w+\s*\{(?:[^{}]|\{[^}]*\})*\}", re.DOTALL),
+    # YARA rules - bounded to avoid ReDoS on deeply nested/unmatched braces
+    "yara": re.compile(
+        r"rule\s+\w+\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*){0,50}\}",
+        re.DOTALL,
+    ),
     "asn": re.compile(r"\bAS[1-9][0-9]{0,9}\b"),
     "jwt": re.compile(r"eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"),
     "cert_serials": re.compile(
@@ -133,15 +141,15 @@ PATTERNS: dict[str, Pattern[str]] = {
     "mitre_groups": re.compile(r"\bG[0-9]{4}\b"),
     "mitre_mitigations": re.compile(r"\bM1[0-9]{3}\b"),
     "mitre_datasources": re.compile(r"\bDS[0-9]{4}\b"),
-    "onion_addresses": re.compile(r"\b[a-z2-7]{16,56}\.onion\b"),
+    "onion_addresses": re.compile(r"\b(?:[a-z2-7]{16}|[a-z2-7]{56})\.onion\b"),
     "aws_access_keys": re.compile(r"\b(?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}\b"),
     "pdb_paths": re.compile(
-        r"[A-Za-z]:\\(?:[^\s<>:\"/|?*\\]+\\)*[^\s<>:\"/|?*\\]+\.pdb",
+        r"[A-Za-z]:\\(?:[^\s<>:\"/|?*\\]+\\){0,20}[^\s<>:\"/|?*\\]+\.pdb",
         re.IGNORECASE,
     ),
     "ja3": re.compile(r"(?:ja3|JA3)[\s:=]+([a-fA-F0-9]{32})\b"),
     "ja3s": re.compile(r"(?:ja3s|JA3S|JA3-S)[\s:=]+([a-fA-F0-9]{32})\b"),
-    "ja4": re.compile(r"\b[qtd][1-9][0-9][dsi][0-9]{2,4}[a-z][0-9]{1,2}_[a-f0-9]{12}_[a-f0-9]{12}\b"),
+    "ja4": re.compile(r"\b[qtd][0-9]{2}[dsi][0-9]{2,4}[a-z][0-9]{1,2}_[a-f0-9]{12}_[a-f0-9]{12}\b"),
     "hassh": re.compile(r"(?:hassh|HASSH)[\s:=]+([a-fA-F0-9]{32})\b"),
     "hassh_server": re.compile(r"(?:hassh[_-]?server|HASSHServer)[\s:=]+([a-fA-F0-9]{32})\b"),
     "jarm": re.compile(r"(?:jarm|JARM)[\s:=]+([a-fA-F0-9]{62})\b"),
@@ -170,12 +178,14 @@ PATTERNS: dict[str, Pattern[str]] = {
         re.IGNORECASE,
     ),
     "suricata_sids": re.compile(r"\bsid\s*:\s*([0-9]{1,10})\s*;"),
+    # Snort/Suricata rules - bounded line length to avoid ReDoS
     "snort_rules": re.compile(
         r"\b((?:alert|drop|reject|pass)\s+(?:tcp|udp|icmp|ip|http|dns|tls|ssh|ftp|smtp)"
-        r"\s+[^\n;]+;\s*(?:[^\n]*?\bsid\s*:\s*[0-9]+\s*;[^\n]*))",
+        r"\s.{0,512};\s*(?:.{0,256}?\bsid\s*:\s*[0-9]+\s*;.{0,256}))",
     ),
+    # Sigma rules - bounded block length to avoid ReDoS
     "sigma_rules": re.compile(
-        r"(?:^|\n)(title:\s*[^\n]+\n(?:[^\n]*\n)*?detection:\s*\n(?:\s+[^\n]*\n)*)",
+        r"(?:^|\n)(title:\s*[^\n]{0,256}\n(?:[^\n]{0,256}\n){0,50}?detection:\s*\n(?:\s+[^\n]{0,256}\n){0,50})",
         re.MULTILINE,
     ),
 }

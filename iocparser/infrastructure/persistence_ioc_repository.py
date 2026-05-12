@@ -52,7 +52,11 @@ class SQLAlchemyIOCRepository(IOCRepository):
             self.session.flush()
             savepoint.commit()
         except IntegrityError:
-            savepoint.rollback()
+            try:
+                savepoint.rollback()
+            except Exception:
+                self.session.rollback()
+                raise
             ioc_rows = self.session.execute(stmt).scalars().all()
             if not ioc_rows:
                 raise

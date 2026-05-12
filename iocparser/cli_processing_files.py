@@ -30,7 +30,7 @@ from iocparser.cli_processing_support import joined_type_filters as shared_joine
 from iocparser.cli_processing_support import plugin_client as shared_plugin_client
 from iocparser.client import IOCParserClient
 from iocparser.domain.enums import IOCType, IOCTypeName
-from iocparser.domain.models import ExtractionResult
+from iocparser.domain.models import IOC, ExtractionResult, WarningMatch
 from iocparser.errors import (
     FileExistenceError,
     FileProcessingError,
@@ -199,13 +199,13 @@ def merge_results(results: dict[str, ExtractionResult]) -> ExtractionResult:
 
 
 def merge_batch_results(results: BatchResultsCollection) -> ExtractionResult:
-    all_iocs: list[object] = []
-    all_warnings: list[object] = []
+    all_iocs: list[IOC] = []
+    all_warnings: list[WarningMatch] = []
     for entry in results.entries:
         result = ExtractionResult.from_grouped_payload(entry.normal_iocs, entry.warning_iocs)
         all_iocs.extend(result.iocs)
         all_warnings.extend(result.warnings)
-    return ExtractionResult(iocs=tuple(all_iocs), warnings=tuple(all_warnings))  # type: ignore[arg-type]
+    return ExtractionResult(iocs=tuple(all_iocs), warnings=tuple(all_warnings))
 
 
 def _directory_files(directory: Path, pattern: str, recursive: bool) -> list[Path]:

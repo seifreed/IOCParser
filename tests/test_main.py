@@ -928,7 +928,9 @@ class TestDownloadURLAdvanced:
 
     def test_download_url_creates_temp_directory(self) -> None:
         """Test download creates temp directory if it doesn't exist."""
-        temp_dir = Path(__file__).parent.parent / "iocparser" / "temp"
+        import tempfile
+
+        temp_dir = Path(tempfile.gettempdir()) / "iocparser"
         removed = False
         if temp_dir.exists():
             for child in temp_dir.iterdir():

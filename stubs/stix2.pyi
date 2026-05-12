@@ -1,5 +1,3 @@
-from typing import Optional
-
 
 class Indicator:
     pattern: str
@@ -11,10 +9,10 @@ class Indicator:
         pattern: str,
         pattern_type: str,
         valid_from: object,
-        labels: list[str],
-        description: Optional[str] = ...,
-        indicator_types: Optional[list[str]] = ...,
-        pattern_version: Optional[str] = ...,
+        labels: list[str] | None = ...,
+        description: str | None = ...,
+        indicator_types: list[str] | None = ...,
+        pattern_version: str | None = ...,
         allow_custom: bool = ...,
         **kwargs: object,
     ) -> None: ...

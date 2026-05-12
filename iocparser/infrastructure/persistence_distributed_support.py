@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import TypedDict
 
 from sqlalchemy import Select, select
+from sqlalchemy.exc import IntegrityError
 
 from iocparser.domain.models import (
     JOB_STATUS_COMPLETED,
@@ -18,7 +19,11 @@ from iocparser.domain.models import (
     QueueEnvelope,
 )
 from iocparser.infrastructure.persistence_distributed_records import job_record
-from iocparser.infrastructure.persistence_schema import DeadLetterJobModel, DistributedJobModel
+from iocparser.infrastructure.persistence_schema import (
+    DeadLetterJobModel,
+    DistributedJobModel,
+    SQLAlchemyUnitOfWork,
+)
 
 ACTIVE_JOB_STATUSES = (JOB_STATUS_QUEUED, JOB_STATUS_RUNNING, JOB_STATUS_COMPLETED)
 HISTORY_IMPORT_MARKER_KEY = "__history_import__"
@@ -77,11 +82,12 @@ def active_idempotency_stmt(idempotency_key: str) -> Select[DistributedJobModel]
         )
         .order_by(DistributedJobModel.submitted_at.desc())
         .limit(1)
+        .with_for_update()
     )
 
 
 def job_by_id_stmt(job_id: str) -> Select[DistributedJobModel]:
-    return select(DistributedJobModel).where(DistributedJobModel.job_id == job_id)
+    return select(DistributedJobModel).where(DistributedJobModel.job_id == job_id).with_for_update()
 
 
 def list_jobs_stmt(*, limit: int, statuses: tuple[str, ...], queue_backend: str | None) -> Select[DistributedJobModel]:
@@ -143,6 +149,24 @@ def apply_transition(model: DistributedJobModel, update: TransitionUpdate) -> No
         model.started_at = update.started_at
     if update.completed_at is not None:
         model.completed_at = update.completed_at
+
+
+def commit_new_job_or_fetch(
+    unit: SQLAlchemyUnitOfWork,
+    model: DistributedJobModel,
+    job_id: str,
+) -> DistributedJobModel:
+    """Commit a new job, or return existing row on IntegrityError race."""
+    unit.session.add(model)
+    try:
+        unit.commit()
+        return model
+    except IntegrityError:
+        unit.rollback()
+        existing = unit.session.execute(job_by_id_stmt(job_id)).scalar_one_or_none()
+        if existing is not None:
+            return existing
+        raise
 
 
 def dead_letter_model(model: DistributedJobModel, *, attempts: int, error: PipelineErrorInfo) -> DeadLetterJobModel:

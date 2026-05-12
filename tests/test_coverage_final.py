@@ -20,40 +20,14 @@ from iocparser.domain.models import (
     ExtractionResult,
     WarningMatch,
 )
-
-
-def _fresh_db(tmp_path: Path, name: str = "t.db") -> str:
-    uri = f"sqlite:///{tmp_path / name}"
-    engine = create_engine(uri, future=True)
-    from iocparser.infrastructure.persistence_migration_runtime import migrate_engine
-    migrate_engine(engine)
-    return uri
-
-
-def _persist_one(db_uri: str, source_kind: str = "file", source_value: str = "f.txt", ioc_type: str = "domains", ioc_value: str = "x.com") -> int:
-    from iocparser.application.contracts import PersistRunInput
-    from iocparser.application.use_cases import persist_run
-    from iocparser.domain.models import PersistOptions, Source
-    from iocparser.infrastructure.persistence import SQLAlchemyUnitOfWork
-    unit = SQLAlchemyUnitOfWork(db_uri)
-    try:
-        r = persist_run(PersistRunInput(
-            source=Source.from_raw(source_kind, source_value),
-            result=ExtractionResult(iocs=(IOC.from_raw(ioc_type, ioc_value),), warnings=()),
-            tool_version="5.0.0",
-            options=PersistOptions(defang=True, check_warnings=False, force_update=False, output_format="text"),
-        ), unit_of_work=unit)
-        return r.run_id
-    except Exception:
-        unit.rollback()
-        raise
+from tests.coverage_helpers import fresh_db, persist_run_into
 
 
 # === persistence_ioc_repository IntegrityError (mock: simulates DB unique constraint) ===
 class TestIOCRepoIntegrity:
     def test_retry_finds_existing(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
-        engine = create_engine(_fresh_db(tmp_path), future=True)
+        engine = create_engine(fresh_db(tmp_path), future=True)
         session = Session(engine)
         repo = SQLAlchemyIOCRepository(session)
         id1 = repo._get_or_create(ioc_type="md5", value="a1", is_warning=False, warning_list="", warning_description="")
@@ -72,7 +46,7 @@ class TestIOCRepoIntegrity:
 
     def test_reraises_when_not_found(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
-        engine = create_engine(_fresh_db(tmp_path), future=True)
+        engine = create_engine(fresh_db(tmp_path), future=True)
         session = Session(engine)
         repo = SQLAlchemyIOCRepository(session)
         with patch.object(session, "flush", side_effect=IntegrityError("x", {}, Exception())):
@@ -87,7 +61,7 @@ class TestSourceRepoIntegrity:
         from iocparser.infrastructure.persistence_source_repository import (
             SQLAlchemySourceRepository,
         )
-        engine = create_engine(_fresh_db(tmp_path), future=True)
+        engine = create_engine(fresh_db(tmp_path), future=True)
         session = Session(engine)
         repo = SQLAlchemySourceRepository(session)
         id1 = repo.get_or_create(kind="file", value="t.pdf")
@@ -108,7 +82,7 @@ class TestSourceRepoIntegrity:
         from iocparser.infrastructure.persistence_source_repository import (
             SQLAlchemySourceRepository,
         )
-        engine = create_engine(_fresh_db(tmp_path), future=True)
+        engine = create_engine(fresh_db(tmp_path), future=True)
         session = Session(engine)
         repo = SQLAlchemySourceRepository(session)
         with patch.object(session, "flush", side_effect=IntegrityError("x", {}, Exception())):
@@ -256,7 +230,7 @@ class TestPersistenceSupportHelpers:
 class TestBatchTimestampFallbacks:
     def test_batch_job_missing_timestamps(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_batch import create_batch_job
-        engine = create_engine(_fresh_db(tmp_path), future=True)
+        engine = create_engine(fresh_db(tmp_path), future=True)
         session = Session(engine)
         report = {"total": 1, "successful": 1, "failed": 0, "items": []}
         bid = create_batch_job(session, source_kind="file", run_ids=(), report=report, config={})
@@ -266,7 +240,7 @@ class TestBatchTimestampFallbacks:
 
     def test_batch_job_inverted_timestamps(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_batch import create_batch_job
-        engine = create_engine(_fresh_db(tmp_path), future=True)
+        engine = create_engine(fresh_db(tmp_path), future=True)
         session = Session(engine)
         now = datetime.now(UTC)
         report = {
@@ -284,13 +258,13 @@ class TestBatchTimestampFallbacks:
 class TestDistributedJobEdges:
     def test_mark_running_nonexistent(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
-        svc = SQLAlchemyDistributedJobService(_fresh_db(tmp_path))
+        svc = SQLAlchemyDistributedJobService(fresh_db(tmp_path))
         assert svc.mark_running(job_id="nope", receipt_id="r", attempts=1) is None
 
     def test_mark_dead_lettered_nonexistent(self, tmp_path: Path) -> None:
         from iocparser.domain.pipeline import PipelineErrorInfo
         from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
-        svc = SQLAlchemyDistributedJobService(_fresh_db(tmp_path))
+        svc = SQLAlchemyDistributedJobService(fresh_db(tmp_path))
         assert svc.mark_dead_lettered(job_id="nope", attempts=1, error=PipelineErrorInfo("E", "c", False, "failed", "m")) is None
 
 
@@ -298,8 +272,8 @@ class TestDistributedJobEdges:
 class TestDiffPartialRun:
     def test_diff_partial_run_raises(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
-        db_uri = _fresh_db(tmp_path)
-        run_id = _persist_one(db_uri)
+        db_uri = fresh_db(tmp_path)
+        run_id = persist_run_into(db_uri)
         from iocparser.infrastructure.persistence_schema import SQLAlchemyUnitOfWork
         unit = SQLAlchemyUnitOfWork(db_uri)
         from iocparser.infrastructure.persistence_schema import RunModel
@@ -321,9 +295,9 @@ class TestApiPersistenceValidation:
 
     def test_render_diff_with_severity_filter(self, tmp_path: Path) -> None:
         from iocparser.api_persistence_query import render_persisted_diff
-        db_uri = _fresh_db(tmp_path)
-        r1 = _persist_one(db_uri, ioc_value="a.com")
-        r2 = _persist_one(db_uri, ioc_value="b.com")
+        db_uri = fresh_db(tmp_path)
+        r1 = persist_run_into(db_uri, ioc_value="a.com")
+        r2 = persist_run_into(db_uri, ioc_value="b.com")
         result = render_persisted_diff(db_uri=db_uri, left_run_id=r1, right_run_id=r2, output_format="json")
         assert isinstance(result, str)
 

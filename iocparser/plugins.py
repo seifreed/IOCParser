@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from importlib.metadata import entry_points
+from importlib.metadata import EntryPoints, entry_points
 from typing import Protocol, cast
 
 from iocparser.adapters.renderers import (
@@ -149,22 +149,22 @@ def _string_tuple(value: object) -> tuple[str, ...]:
     return tuple(str(item) for item in value)
 
 
-def _load_discovered_entry_points(discovered: object) -> None:
-    for entry_point in discovered.select(group="iocparser.renderers"):  # type: ignore[attr-defined]
+def _load_discovered_entry_points(discovered: EntryPoints) -> None:
+    for entry_point in discovered.select(group="iocparser.renderers"):
         name_lower = entry_point.name.lower()
         if name_lower in _BUILTIN_RENDERER_NAMES:
             _logger.warning("Plugin renderer '%s' overrides built-in renderer", name_lower)
         register_renderer(entry_point.name, cast("RendererFactory", entry_point.load()))
-    for entry_point in discovered.select(group="iocparser.enrichers"):  # type: ignore[attr-defined]
+    for entry_point in discovered.select(group="iocparser.enrichers"):
         name_lower = entry_point.name.lower()
         if name_lower in _BUILTIN_ENRICHER_NAMES:
             _logger.warning("Plugin enricher '%s' overrides built-in enricher", name_lower)
         register_enricher(entry_point.name, cast("EnricherFactory", entry_point.load()))
-    for entry_point in discovered.select(group="iocparser.extractors"):  # type: ignore[attr-defined]
+    for entry_point in discovered.select(group="iocparser.extractors"):
         register_extractor(entry_point.name, cast("ExtractorFactory", entry_point.load()))
-    for entry_point in discovered.select(group="iocparser.postprocessors"):  # type: ignore[attr-defined]
+    for entry_point in discovered.select(group="iocparser.postprocessors"):
         register_postprocessor(entry_point.name, cast("PostProcessorFactory", entry_point.load()))
-    for entry_point in discovered.select(group="iocparser.ioc_types"):  # type: ignore[attr-defined]
+    for entry_point in discovered.select(group="iocparser.ioc_types"):
         register_ioc_type_plugin(entry_point.name, cast("IOCTypePluginFactory", entry_point.load()))
 
 
@@ -207,7 +207,7 @@ def _register_builtin_plugins() -> None:
     register_renderer(
         "stix",
         lambda _with_context, stix_types: STIXOutputRenderer(
-            allowed_types=parse_ioc_types(stix_types) or None,  # type: ignore[arg-type]
+            allowed_types=set(parse_ioc_types(stix_types)) or None,
         ),
     )
     register_enricher("misp", MISPWarningListService)

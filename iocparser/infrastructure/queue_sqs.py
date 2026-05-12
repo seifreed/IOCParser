@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from importlib import import_module
 from typing import NotRequired, Protocol, TypedDict, cast
 from uuid import uuid4
@@ -68,70 +69,81 @@ class SQSQueueAdapter:
         self.dead_letter_queue_url = dead_letter_queue_url
         self._queue_urls: dict[str, str] = dict(queue_urls or {})
         self.client: _SQSClient = _boto3_module().client("sqs")
+        self._lock = threading.Lock()
 
     def _resolve_queue_url(self, queue_name: str) -> str:
         return self._queue_urls.get(queue_name, self.queue_url)
 
     def enqueue(self, *, queue_name: str, envelope: QueueEnvelope) -> QueueReceipt:
-        resolved_url = self._resolve_queue_url(queue_name)
-        response = self.client.send_message(
-            QueueUrl=resolved_url,
-            MessageBody=json.dumps(envelope.to_record(), sort_keys=True),
-            MessageAttributes={
-                "job_id": {"StringValue": str(envelope.request.job_id or uuid4()), "DataType": "String"},
-            },
-        )
-        message_id = str(response["MessageId"])
-        return QueueReceipt("sqs", queue_name, message_id, message_id)
+        with self._lock:
+            resolved_url = self._resolve_queue_url(queue_name)
+            response = self.client.send_message(
+                QueueUrl=resolved_url,
+                MessageBody=json.dumps(envelope.to_record(), sort_keys=True),
+                MessageAttributes={
+                    "job_id": {"StringValue": str(envelope.request.job_id or uuid4()), "DataType": "String"},
+                },
+            )
+            message_id = str(response["MessageId"])
+            return QueueReceipt("sqs", queue_name, message_id, message_id)
 
     def dequeue(self, *, queue_name: str) -> tuple[QueueReceipt, QueueEnvelope] | None:
-        resolved_url = self._resolve_queue_url(queue_name)
-        response = self.client.receive_message(
-            QueueUrl=resolved_url,
-            MaxNumberOfMessages=1,
-            WaitTimeSeconds=0,
-            MessageAttributeNames=["All"],
-        )
-        messages = response.get("Messages", [])
-        if not messages:
-            return None
-        message = messages[0]
-        receipt = QueueReceipt(
-            "sqs",
-            queue_name,
-            message["ReceiptHandle"],
-            str(message.get("MessageId", uuid4())),
-        )
-        return receipt, QueueEnvelope.from_record(_load_queue_record(message["Body"]))
+        with self._lock:
+            resolved_url = self._resolve_queue_url(queue_name)
+            response = self.client.receive_message(
+                QueueUrl=resolved_url,
+                MaxNumberOfMessages=1,
+                WaitTimeSeconds=20,
+                MessageAttributeNames=["All"],
+            )
+            messages = response.get("Messages", [])
+            if not messages:
+                return None
+            message = messages[0]
+            receipt = QueueReceipt(
+                "sqs",
+                queue_name,
+                message["ReceiptHandle"],
+                str(message.get("MessageId", uuid4())),
+            )
+            return receipt, QueueEnvelope.from_record(_load_queue_record(message["Body"]))
 
     def ack(self, receipt: QueueReceipt) -> None:
-        resolved_url = self._resolve_queue_url(receipt.queue_name)
-        self.client.delete_message(QueueUrl=resolved_url, ReceiptHandle=receipt.receipt_id)
+        with self._lock:
+            resolved_url = self._resolve_queue_url(receipt.queue_name)
+            self.client.delete_message(QueueUrl=resolved_url, ReceiptHandle=receipt.receipt_id)
 
     def requeue(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
-        self.ack(receipt)
-        resolved_url = self._resolve_queue_url(receipt.queue_name)
-        response = self.client.send_message(
-            QueueUrl=resolved_url,
-            MessageBody=json.dumps(envelope.to_record(), sort_keys=True),
-            MessageAttributes={
-                "job_id": {"StringValue": str(envelope.request.job_id or uuid4()), "DataType": "String"},
-            },
-        )
-        message_id = str(response["MessageId"])
-        return QueueReceipt("sqs", receipt.queue_name, message_id, message_id)
+        with self._lock:
+            resolved_url = self._resolve_queue_url(receipt.queue_name)
+            response = self.client.send_message(
+                QueueUrl=resolved_url,
+                MessageBody=json.dumps(envelope.to_record(), sort_keys=True),
+                MessageAttributes={
+                    "job_id": {"StringValue": str(envelope.request.job_id or uuid4()), "DataType": "String"},
+                },
+            )
+            message_id = str(response["MessageId"])
+            self.client.delete_message(QueueUrl=resolved_url, ReceiptHandle=receipt.receipt_id)
+            return QueueReceipt("sqs", receipt.queue_name, message_id, message_id)
+
+    def close(self) -> None:
+        with self._lock:
+            self.client = None  # type: ignore[assignment]
 
     def dead_letter(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
-        if not self.dead_letter_queue_url:
-            raise RuntimeError(
-                "SQS dead-letter queue URL not configured; refusing to re-enqueue to the main "
-                "queue which would cause an infinite processing loop. Set dead_letter_queue_url."
+        with self._lock:
+            if not self.dead_letter_queue_url:
+                raise RuntimeError(
+                    "SQS dead-letter queue URL not configured; refusing to re-enqueue to the main "
+                    "queue which would cause an infinite processing loop. Set dead_letter_queue_url."
+                )
+            target_queue = self.dead_letter_queue_url
+            response = self.client.send_message(
+                QueueUrl=target_queue,
+                MessageBody=json.dumps(envelope.to_record(), sort_keys=True),
             )
-        self.ack(receipt)
-        target_queue = self.dead_letter_queue_url
-        response = self.client.send_message(
-            QueueUrl=target_queue,
-            MessageBody=json.dumps(envelope.to_record(), sort_keys=True),
-        )
-        message_id = str(response["MessageId"])
-        return QueueReceipt("sqs", target_queue, message_id, message_id)
+            message_id = str(response["MessageId"])
+            resolved_url = self._resolve_queue_url(receipt.queue_name)
+            self.client.delete_message(QueueUrl=resolved_url, ReceiptHandle=receipt.receipt_id)
+            return QueueReceipt("sqs", target_queue, message_id, message_id)

@@ -53,13 +53,27 @@ class WarningListPreprocessMixin:
                 self.lookup_data.string_lookups[value_lower] = set()
             self.lookup_data.string_lookups[value_lower].add(list_id)
 
+    @staticmethod
+    def _is_safe_regex(pattern: str) -> bool:
+        """Reject patterns with nested quantifiers that can cause ReDoS."""
+        import re as _re
+
+        # Detect dangerous nested quantifiers like (a+)+, (a*)*, (a+)*, etc.
+        if _re.search(r"[+*?]\)[+*?]", pattern) or _re.search(r"\)[+*?]\)", pattern):
+            return False
+        return True
+
     def _add_regex_values(self, list_id: str, values_val: list[WarningListEntry]) -> None:
         compiled_patterns: list[re.Pattern[str]] = []
         for pattern in values_val:
             if pattern is None:
                 continue
+            pattern_str = str(pattern)
+            if not self._is_safe_regex(pattern_str):
+                self._get_logger().warning("Skipping potentially unsafe regex pattern: %s", pattern_str)
+                continue
             try:
-                compiled_patterns.append(re.compile(str(pattern), re.IGNORECASE))
+                compiled_patterns.append(re.compile(pattern_str, re.IGNORECASE))
             except (re.error, TypeError):
                 self._get_logger().debug("Invalid regex pattern: %s", pattern)
         if compiled_patterns:

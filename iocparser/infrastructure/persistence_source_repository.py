@@ -68,7 +68,11 @@ class SQLAlchemySourceRepository(SourceRepository):
             self.session.flush()
             savepoint.commit()
         except IntegrityError:
-            savepoint.rollback()
+            try:
+                savepoint.rollback()
+            except Exception:
+                self.session.rollback()
+                raise
             source_rows = self.session.execute(
                 select(SOURCE_MODEL).where(SourceModel.kind == kind, SourceModel.value == value)
             ).scalars().all()

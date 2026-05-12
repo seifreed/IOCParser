@@ -39,7 +39,7 @@ def read_chunks_with_prefix(
         if previous_chunk_tail:
             chunk = previous_chunk_tail + chunk
 
-        bytes_read += len(decode_chunk(raw_chunk).encode("utf-8", errors="ignore"))
+        bytes_read += len(raw_chunk) if isinstance(raw_chunk, bytes) else len(raw_chunk.encode("utf-8", errors="ignore"))
         if progress_callback and total_size:
             progress_callback(min(100, int((bytes_read / total_size) * 100)))
 

@@ -1854,7 +1854,7 @@ def test_plugin_registry_and_structured_records(tmp_path: Path) -> None:
     plugins_module._plugin_state["entry_points_loaded"] = False
     original_entry_points = plugins_module.entry_points
     try:
-        plugins_module.entry_points = lambda: _EntryPoints()
+        plugins_module.entry_points = _EntryPoints
         assert "entry-renderer" in plugins_module.renderer_names()
         assert "entry-enricher" in plugins_module.enricher_names()
     finally:

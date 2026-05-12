@@ -4,8 +4,8 @@ import argparse
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from iocparser import cli_processing_urls as _support
 from iocparser import cli_processing_urls_execution as _execution
 from iocparser.cli_args import ProcessingOptions, get_int_arg, get_optional_str_arg
 from iocparser.cli_processing_files import merge_batch_results
@@ -15,11 +15,16 @@ from iocparser.cli_processing_support import (
     GroupedWarnings,
     batch_item_keys,
 )
+from iocparser.domain.options import ExtractionOptions
 from iocparser.interfaces.ports import TextSourceReader, URLDownloader, WarningListService
 
+if TYPE_CHECKING:
+    from iocparser.cli_processing_urls import BatchItemReport, BatchReport
+else:
+    BatchItemReport = dict[str, object]
+    BatchReport = dict[str, object]
+
 BatchResults = BatchResultsCollection
-BatchItemReport = _support.BatchItemReport
-BatchReport = _support.BatchReport
 
 
 @dataclass(frozen=True)
@@ -43,6 +48,8 @@ class URLBatchWorkflowState:
 def run_url_batch_workflow(
     request: URLBatchWorkflowRequest,
 ) -> tuple[GroupedIocs, GroupedWarnings, str, BatchResults, BatchReport]:
+    from iocparser import cli_processing_urls as _support
+
     batch_started = time.perf_counter()
     batch_started_wall = time.time()
     retry_report = get_optional_str_arg(request.args, "retry_failed_from")
@@ -103,12 +110,14 @@ def _collect_url_results(
     request: URLBatchWorkflowRequest,
     *,
     url_items: list[tuple[str, str]],
-    options: object,
+    options: ExtractionOptions,
     retry_report: str | None,
     retry_batch_job: int | None,
     configured_plugin_client: _execution.PluginClient | None,
     state: URLBatchWorkflowState,
 ) -> None:
+    from iocparser import cli_processing_urls as _support
+
     max_workers = max(1, get_int_arg(request.args, "url_workers", 4))
     url_occurrences: dict[str, int] = {}
     item_occurrences: dict[str, int] = {}
@@ -122,7 +131,7 @@ def _collect_url_results(
             executor.submit(
                 _execution.process_url,
                 url,
-                options=options,  # type: ignore[arg-type]
+                options=options,
                 reader=request.reader,
                 warning_service=request.warning_service,
                 downloader=request.downloader,
@@ -135,6 +144,8 @@ def _collect_url_results(
             occurrence = item_occurrences[item_key]
             try:
                 _, result, metadata, duration_ms = future.result()
+            except (KeyboardInterrupt, SystemExit):
+                raise
             except Exception as exc:
                 _support.record_failed_url(
                     item_key,

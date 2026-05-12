@@ -16,10 +16,10 @@ from sqlalchemy.orm import Session
 from iocparser.cli_processing_support import BatchResultsCollection
 from iocparser.errors import SourceNotFoundError, SourceProcessingError
 from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
-from iocparser.infrastructure.persistence_schema import Base
 from iocparser.infrastructure.persistence_source_repository import SQLAlchemySourceRepository
 from iocparser.rendering_support import prepare_json_payload, serialize_pretty_json
 from iocparser.shared_utils import _dedup_key, deduplicate_iocs
+from tests.coverage_helpers import fresh_db
 
 # ---------------------------------------------------------------------------
 # 1. __main__.py — exercise the main() entry point error paths
@@ -33,7 +33,7 @@ class TestMainEntryPoint:
     def test_main_help_flag(self, tmp_path: Path) -> None:
         import subprocess
         import sys
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(
             [sys.executable, "-m", "iocparser", "--help"],
             capture_output=True, text=True, timeout=15, check=False,
         )
@@ -132,16 +132,9 @@ class TestApplicationErrorsShim:
 # 4+5. persistence repositories — savepoint retry paths
 # ---------------------------------------------------------------------------
 
-def _create_test_db(tmp_path: Path) -> Session:
-    db_path = tmp_path / "repo_test.db"
-    engine = create_engine(f"sqlite:///{db_path}", future=True)
-    Base.metadata.create_all(engine)
-    return Session(engine)
-
-
 class TestIOCRepositorySavepointRetry:
     def test_get_or_create_returns_existing_on_duplicate(self, tmp_path: Path) -> None:
-        session = _create_test_db(tmp_path)
+        session = Session(create_engine(fresh_db(tmp_path), future=True))
         repo = SQLAlchemyIOCRepository(session)
         id1 = repo._get_or_create(
             ioc_type="domains", value="evil.com",
@@ -156,7 +149,7 @@ class TestIOCRepositorySavepointRetry:
         session.close()
 
     def test_multiple_get_or_create_same_session(self, tmp_path: Path) -> None:
-        session = _create_test_db(tmp_path)
+        session = Session(create_engine(fresh_db(tmp_path), future=True))
         repo = SQLAlchemyIOCRepository(session)
         ids = [
             repo._get_or_create(ioc_type="sha256", value=f"hash{i}", is_warning=False, warning_list="", warning_description="")
@@ -169,7 +162,7 @@ class TestIOCRepositorySavepointRetry:
 
 class TestSourceRepositorySavepointRetry:
     def test_get_or_create_returns_existing_on_duplicate(self, tmp_path: Path) -> None:
-        session = _create_test_db(tmp_path)
+        session = Session(create_engine(fresh_db(tmp_path), future=True))
         repo = SQLAlchemySourceRepository(session)
         id1 = repo.get_or_create(kind="file", value="test.pdf")
         session.commit()
@@ -181,7 +174,7 @@ class TestSourceRepositorySavepointRetry:
         session.close()
 
     def test_get_or_create_updates_metadata_on_existing(self, tmp_path: Path) -> None:
-        session = _create_test_db(tmp_path)
+        session = Session(create_engine(fresh_db(tmp_path), future=True))
         repo = SQLAlchemySourceRepository(session)
         repo.get_or_create(kind="url", value="https://example.com")
         session.commit()
@@ -197,7 +190,7 @@ class TestSourceRepositorySavepointRetry:
         session.close()
 
     def test_get_or_create_url_with_normalized_url(self, tmp_path: Path) -> None:
-        session = _create_test_db(tmp_path)
+        session = Session(create_engine(fresh_db(tmp_path), future=True))
         repo = SQLAlchemySourceRepository(session)
         id1 = repo.get_or_create(
             kind="url", value="https://example.com/page",

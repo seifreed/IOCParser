@@ -119,6 +119,8 @@ def extract_from_file(
         )
     except SourceNotFoundError:
         raise
+    except (KeyboardInterrupt, SystemExit):
+        raise
     except Exception as exc:
         raise SourceProcessingError(request.file_path, str(exc)) from exc
 
@@ -217,6 +219,8 @@ def persist_run(
         )
         unit_of_work.commit()
         return PersistedRun(run_id=run_id)
+    except (KeyboardInterrupt, SystemExit):
+        raise
     except Exception:
         unit_of_work.rollback()
         raise

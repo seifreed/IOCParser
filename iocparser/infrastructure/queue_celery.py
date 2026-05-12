@@ -54,7 +54,7 @@ class CeleryQueueAdapter:
 
     def dequeue(self, *, queue_name: str) -> tuple[QueueReceipt, QueueEnvelope] | None:
         del queue_name
-        raise NotImplementedError("Celery dequeue is handled by Celery workers, not by polling this adapter")
+        return None
 
     def ack(self, receipt: QueueReceipt) -> None:
         del receipt

@@ -29,8 +29,11 @@ def migrate_db_uri(db_uri: str) -> int:
     from sqlalchemy import create_engine
 
     engine = create_engine(db_uri, future=True)
-    migrate_engine(engine)
-    return schema_version(engine)
+    try:
+        migrate_engine(engine)
+        return schema_version(engine)
+    finally:
+        engine.dispose()
 
 
 __all__ = [

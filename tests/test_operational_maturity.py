@@ -808,12 +808,12 @@ def test_retry_failed_report_can_filter_by_error_type_and_text(tmp_path: Path) -
     missing = tmp_path / "missing.json"
     with pytest.raises(FileExistenceError):
         _failed_urls_from_report(missing)
-    assert _retry_attempt_for_url("https://missing.example", str(report_path)) == 1
+    assert _retry_attempt_for_url("https://missing.example", str(report_path)) == 0
 
 
 def test_clients_wrap_reusable_services_and_plugin_pipeline(tmp_path: Path) -> None:
-    register_extractor("demo-extractor", lambda: DemoExtractor())
-    register_postprocessor("demo-post", lambda: DemoPostProcessor())
+    register_extractor("demo-extractor", DemoExtractor)
+    register_postprocessor("demo-post", DemoPostProcessor)
     parser_client = IOCParserClient(enrichers=(), extractors=("demo-extractor",), postprocessors=("demo-post",))
     result = parser_client.extract_result_from_text("plain text without IOCs", check_warnings=False)
     assert {ioc.value.raw for ioc in result.iocs} == {"plugin.example", "203.0.113.55"}
@@ -826,17 +826,15 @@ def test_clients_wrap_reusable_services_and_plugin_pipeline(tmp_path: Path) -> N
     assert "demo-post" in postprocessor_names()
     assert isinstance(get_extractor("demo-extractor"), DemoExtractor)
     assert isinstance(get_postprocessor("demo-post"), DemoPostProcessor)
+    class _WarningExtractor:
+        def extract(self, *_args, **_kwargs):
+            return ExtractionResult(
+                warnings=(WarningMatch(ioc=IOC.from_raw("domains", "warn.example"), warning_list="demo"),),
+            )
+
     register_extractor(
         "demo-warning",
-        lambda: type(
-            "WarningExtractor",
-            (),
-            {
-                "extract": lambda self, *_args, **_kwargs: ExtractionResult(
-                    warnings=(WarningMatch(ioc=IOC.from_raw("domains", "warn.example"), warning_list="demo"),),
-                ),
-            },
-        )(),
+        _WarningExtractor,
     )
     assert IOCParserClient(enrichers=(), extractors=("demo-warning",)).extract_result_from_text("x", check_warnings=False).warnings
 
@@ -847,8 +845,8 @@ def test_clients_wrap_reusable_services_and_plugin_pipeline(tmp_path: Path) -> N
 
     from iocparser.plugins import register_enricher
 
-    register_enricher("demo-enricher-a", lambda: PassThroughEnricher())
-    register_enricher("demo-enricher-b", lambda: PassThroughEnricher())
+    register_enricher("demo-enricher-a", PassThroughEnricher)
+    register_enricher("demo-enricher-b", PassThroughEnricher)
     assert IOCParserClient(enrichers=("demo-enricher-a", "demo-enricher-b"))._warning_service(True) is not None
 
     db_uri = f"sqlite:///{tmp_path / 'client.sqlite'}"
@@ -866,7 +864,7 @@ def test_clients_wrap_reusable_services_and_plugin_pipeline(tmp_path: Path) -> N
 
 
 def test_parser_client_apply_plugins_uses_registered_extractors() -> None:
-    register_extractor("demo-apply", lambda: DemoExtractor())
+    register_extractor("demo-apply", DemoExtractor)
     parser_client = IOCParserClient(enrichers=(), extractors=("demo-apply",))
     options = _options(check_warnings=False, force_update=False, defang=True)
     result = parser_client._apply_plugins(
@@ -988,8 +986,8 @@ def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_pa
     finally:
         unit.close()
 
-    register_extractor("ep-extractor", lambda: DemoExtractor())
-    register_postprocessor("ep-post", lambda: DemoPostProcessor())
+    register_extractor("ep-extractor", DemoExtractor)
+    register_postprocessor("ep-post", DemoPostProcessor)
     assert "ep-extractor" in extractor_names()
     assert "ep-post" in postprocessor_names()
 

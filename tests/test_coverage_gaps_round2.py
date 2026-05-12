@@ -9,24 +9,12 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlalchemy import create_engine
-
 from iocparser.domain.models import (
     IOC,
     ExtractionResult,
     PersistedRunDiff,
 )
-
-
-def _fresh_db(tmp_path: Path, name: str = "test.db") -> str:
-    db_path = tmp_path / name
-    db_uri = f"sqlite:///{db_path}"
-    engine = create_engine(db_uri, future=True)
-    from iocparser.infrastructure.persistence_migration_runtime import migrate_engine
-
-    migrate_engine(engine)
-    return db_uri
-
+from tests.coverage_helpers import fresh_db
 
 # ---------------------------------------------------------------------------
 # 1. persistence/history/ops.py — full export/import round-trip
@@ -36,7 +24,7 @@ class TestHistoryExportImportRoundTrip:
     def test_export_empty_database(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence.history import export_history
 
-        db_uri = _fresh_db(tmp_path)
+        db_uri = fresh_db(tmp_path)
         payload = export_history(db_uri)
         assert isinstance(payload, dict)
         assert "sources" in payload
@@ -46,7 +34,7 @@ class TestHistoryExportImportRoundTrip:
     def test_import_into_fresh_database(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence.history import export_history, import_history
 
-        db_uri_source = _fresh_db(tmp_path, "source.db")
+        db_uri_source = fresh_db(tmp_path, "source.db")
 
         from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
         SQLAlchemyPersistenceService(db_uri_source)
@@ -79,7 +67,7 @@ class TestHistoryExportImportRoundTrip:
         assert len(payload["runs"]) >= 1
         assert len(payload["iocs"]) >= 1
 
-        db_uri_target = _fresh_db(tmp_path, "target.db")
+        db_uri_target = fresh_db(tmp_path, "target.db")
         counts = import_history(db_uri_target, payload)
         assert isinstance(counts, dict)
         assert counts.get("sources", 0) >= 1
@@ -87,7 +75,7 @@ class TestHistoryExportImportRoundTrip:
     def test_import_same_data_twice_is_idempotent(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence.history import export_history, import_history
 
-        db_uri = _fresh_db(tmp_path, "idempotent.db")
+        db_uri = fresh_db(tmp_path, "idempotent.db")
         from iocparser.application.contracts import PersistRunInput
         from iocparser.application.use_cases import persist_run
         from iocparser.domain.models import PersistOptions, Source
@@ -109,7 +97,7 @@ class TestHistoryExportImportRoundTrip:
             raise
 
         payload = export_history(db_uri)
-        db_uri2 = _fresh_db(tmp_path, "target2.db")
+        db_uri2 = fresh_db(tmp_path, "target2.db")
         import_history(db_uri2, payload)
         counts2 = import_history(db_uri2, payload)
         assert counts2.get("sources", 0) == 0
@@ -242,7 +230,7 @@ class TestBuildDiffPayload:
 
 class TestPruneRunsBranches:
     def test_prune_with_source_kind_filter(self, tmp_path: Path) -> None:
-        db_uri = _fresh_db(tmp_path)
+        db_uri = fresh_db(tmp_path)
         from iocparser.application.contracts import PersistRunInput
         from iocparser.application.use_cases import persist_run
         from iocparser.domain.models import PersistOptions, Source
@@ -271,7 +259,7 @@ class TestPruneRunsBranches:
         assert deleted >= 1
 
     def test_prune_with_source_value_filter(self, tmp_path: Path) -> None:
-        db_uri = _fresh_db(tmp_path)
+        db_uri = fresh_db(tmp_path)
         from iocparser.application.contracts import PersistRunInput
         from iocparser.application.use_cases import persist_run
         from iocparser.domain.models import PersistOptions, Source
@@ -300,7 +288,7 @@ class TestPruneRunsBranches:
         assert deleted >= 1
 
     def test_prune_with_statuses_filter(self, tmp_path: Path) -> None:
-        db_uri = _fresh_db(tmp_path)
+        db_uri = fresh_db(tmp_path)
         from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
         service = SQLAlchemyPersistenceService(db_uri)
         deleted = service.prune_runs(statuses=("failed",))
@@ -381,7 +369,7 @@ class TestRetryAttemptHelpers:
     def test_retry_attempt_from_db(self, tmp_path: Path) -> None:
         from iocparser.cli_processing_urls import retry_attempt_for_url
 
-        db_uri = _fresh_db(tmp_path, "retry.db")
+        db_uri = fresh_db(tmp_path, "retry.db")
         result = retry_attempt_for_url(
             "https://nonexistent.com",
             None,

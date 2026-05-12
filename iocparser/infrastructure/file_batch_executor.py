@@ -6,7 +6,10 @@ from typing import TypeVar
 
 from iocparser.domain.models import ExtractionResult
 from iocparser.errors import SourceNotFoundError, SourceProcessingError
+from iocparser.infrastructure.logger import get_logger
 from iocparser.interfaces.ports import FileBatchExecutor
+
+logger = get_logger(__name__)
 
 TBatchRequest = TypeVar("TBatchRequest")
 
@@ -32,5 +35,10 @@ class ThreadPoolFileBatchExecutor(FileBatchExecutor):
                 try:
                     results[source_key] = future.result()
                 except (SourceNotFoundError, SourceProcessingError):
+                    results[source_key] = ExtractionResult()
+                except (KeyboardInterrupt, SystemExit):
+                    raise
+                except Exception:
+                    logger.exception("Batch processing failed for %s", source_key)
                     results[source_key] = ExtractionResult()
         return results

@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from iocparser.api_pipeline import (
     JOB_STATUS_COMPLETED,
     JOB_STATUS_DEAD_LETTERED,
@@ -15,6 +17,7 @@ from iocparser.api_pipeline import (
 from iocparser.application.distributed_use_cases import idempotency_key_for
 from iocparser.client import IOCParserClient
 from iocparser.distributed_pipeline import DistributedPipelineService
+from iocparser.domain.distributed import QueueEnvelope
 from iocparser.errors import IOCTimeoutError
 from iocparser.infrastructure.queue_factory import create_queue_adapter
 from iocparser.infrastructure.queue_filesystem import FilesystemQueueAdapter
@@ -25,6 +28,12 @@ class TimeoutClient(IOCParserClient):
     def extract_result_from_text(self, text_content: str, **kwargs: object):  # type: ignore[override]
         del text_content, kwargs
         raise IOCTimeoutError("Extract", "retryable-input")
+
+
+class RuntimeErrorClient(IOCParserClient):
+    def extract_result_from_text(self, text_content: str, **kwargs: object):  # type: ignore[override]
+        del text_content, kwargs
+        raise RuntimeError("unexpected failure")
 
 
 class RecordingDigester:
@@ -87,6 +96,32 @@ def test_distributed_pipeline_filesystem_queue_e2e(tmp_path: Path) -> None:
     assert [event["name"] for event in telemetry.events] == ["job_submitted", "job_started", "job_completed"]
 
 
+def test_filesystem_queue_dequeue_survives_race_condition(tmp_path: Path) -> None:
+    """Regression: FileNotFoundError during rename must not crash dequeue."""
+    queue = FilesystemQueueAdapter(tmp_path / "queue")
+    request = PipelineJobRequest(
+        input_kind="text",
+        source_value="race test",
+        persist=False,
+        check_warnings=False,
+    )
+    envelope = QueueEnvelope(
+        request=request,
+        queue_backend="filesystem",
+        queue_name="race",
+    )
+    queue.enqueue(queue_name="race", envelope=envelope)
+    queue.enqueue(queue_name="race", envelope=envelope)
+
+    # Simulate another worker winning the race by removing the first pending file
+    first = sorted((tmp_path / "queue" / "race" / "pending").glob("*.json"))[0]
+    first.unlink()
+
+    result = queue.dequeue(queue_name="race")
+    assert result is not None
+    assert queue.pending_count(queue_name="race") == 0
+
+
 def test_distributed_pipeline_deduplicates_submit_before_enqueue(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'dedupe.sqlite'}"
     service = DistributedPipelineService(
@@ -129,6 +164,34 @@ def test_distributed_pipeline_retries_and_dead_letters(tmp_path: Path) -> None:
     assert len(dead_letters) == 1
     assert dead_letters[0].error.code == "INPUT_TIMEOUT"
     assert queue.dead_count(queue_name="retry") == 1
+
+
+def test_distributed_pipeline_dead_letters_on_unexpected_exception(tmp_path: Path) -> None:
+    db_uri = f"sqlite:///{tmp_path / 'unexpected.sqlite'}"
+    queue = FilesystemQueueAdapter(tmp_path / "queue")
+    service = DistributedPipelineService(
+        queue_adapter=queue,
+        db_uri=db_uri,
+    )
+    request = PipelineJobRequest(
+        input_kind="text",
+        source_value="boom",
+        persist=False,
+        check_warnings=False,
+    )
+    service.submit(request, queue_name="unexpected", max_attempts=1)
+    original_mark_running = service.job_service.mark_running
+
+    def exploding_mark_running(**kwargs):
+        original_mark_running(**kwargs)
+        raise RuntimeError("db failure")
+
+    service.job_service.mark_running = exploding_mark_running
+    with pytest.raises(RuntimeError, match="db failure"):
+        service.process_next(queue_name="unexpected")
+    dead_letters = service.list_dead_letters(limit=10)
+    assert len(dead_letters) == 1
+    assert dead_letters[0].error.code == "UNEXPECTED_FAILURE"
 
 
 def test_queue_factory_and_client_wrapper(tmp_path: Path) -> None:

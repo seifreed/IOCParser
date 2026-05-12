@@ -123,9 +123,9 @@ class HTMLParser(FileParser):
         try:
             # Check if it's a URL or a local file
             if self.file_path.startswith(("http://", "https://")):
-                response = requests.get(self.file_path, timeout=30)
-                response.raise_for_status()  # Ensure request was successful
-                content = response.text
+                with requests.get(self.file_path, timeout=30, stream=True) as response:
+                    response.raise_for_status()  # Ensure request was successful
+                    content = response.text
             else:
                 with Path(self.file_path).open(encoding="utf-8", errors="ignore") as f:
                     content = f.read()

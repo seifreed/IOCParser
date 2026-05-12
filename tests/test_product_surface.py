@@ -156,6 +156,8 @@ def test_persisted_option_overrides_parse_bool_strings() -> None:
 
     with pytest.raises(ValidationError, match="Invalid boolean option"):
         coerce_render_options(None, {"with_context": "maybe"})
+    with pytest.raises(ValidationError, match="Invalid boolean option"):
+        coerce_export_filters(None, {"only_warnings": ["yes"]})
 
 
 def test_batch_report_item_parses_retryable_bool_strings() -> None:

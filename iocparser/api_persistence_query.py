@@ -129,6 +129,8 @@ def optional_str(value: object | None) -> str | None:
 def bool_option(value: object | None, default: bool = False) -> bool:
     if value is None:
         return default
+    if isinstance(value, bool):
+        return value
     if isinstance(value, str):
         normalized = value.strip().lower()
         if normalized in {"0", "false", "no", "off", ""}:
@@ -136,7 +138,7 @@ def bool_option(value: object | None, default: bool = False) -> bool:
         if normalized in {"1", "true", "yes", "on"}:
             return True
         raise ValidationError(INVALID_BOOLEAN_ERROR.format(value=value))
-    return bool(value)
+    raise ValidationError(INVALID_BOOLEAN_ERROR.format(value=value))
 
 
 def parse_string_filters(value: str | None) -> tuple[str, ...]:

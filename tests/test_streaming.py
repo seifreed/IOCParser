@@ -323,6 +323,7 @@ class TestStreamingIOCExtractor:
     def test_read_chunks_with_zero_chunk_size_normalizes_to_one(self):
         extractor = StreamingIOCExtractor(chunk_size=0, overlap=0)
 
+        assert extractor.chunk_size == 1
         chunks = list(extractor._read_chunks_with_prefix(io.StringIO("abc"), is_text=True))
 
         assert chunks == [("a", 0), ("b", 0), ("c", 0)]

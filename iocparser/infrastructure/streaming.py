@@ -50,7 +50,7 @@ class StreamingIOCExtractor:
             defang: Whether to defang extracted IOCs
             progress_callback: Optional callback for progress updates
         """
-        self.chunk_size = chunk_size
+        self.chunk_size = max(1, chunk_size)
         self.overlap = overlap
         from iocparser.infrastructure.extraction import IOCExtractor
 

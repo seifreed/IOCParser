@@ -25,7 +25,7 @@ from iocparser.domain.models import (
     Source,
     WarningMatch,
 )
-from iocparser.errors import SourceNotFoundError, SourceProcessingError
+from iocparser.errors import FileSizeError, SourceNotFoundError, SourceProcessingError
 from iocparser.infrastructure.extraction import DefaultIOCExtractionEngine
 from iocparser.infrastructure.file_batch_executor import ThreadPoolFileBatchExecutor
 from iocparser.infrastructure.temp_files import TemporaryFileCleaner
@@ -182,6 +182,17 @@ def test_extract_from_file_wraps_unexpected_errors() -> None:
     reader = MappingReader({"/tmp/broken.txt": ValueError("bad parser")})
 
     with pytest.raises(SourceProcessingError):
+        extract_from_file(request, reader=reader, extractor_engine=DefaultIOCExtractionEngine())
+
+
+def test_extract_from_file_preserves_validation_errors() -> None:
+    request = ExtractFileInput(
+        file_path="/tmp/too-large.txt",
+        options=ExtractionOptions(file_type="text", check_warnings=False),
+    )
+    reader = MappingReader({"/tmp/too-large.txt": FileSizeError(2.0, 1.0)})
+
+    with pytest.raises(FileSizeError):
         extract_from_file(request, reader=reader, extractor_engine=DefaultIOCExtractionEngine())
 
 

@@ -17,7 +17,7 @@ from iocparser.domain.models import (
     PersistedRun,
     classify_ioc,
 )
-from iocparser.errors import SourceNotFoundError, SourceProcessingError
+from iocparser.errors import SourceNotFoundError, SourceProcessingError, ValidationError
 from iocparser.interfaces.ports import (
     FileBatchExecutor,
     IOCExtractionEngine,
@@ -122,6 +122,8 @@ def extract_from_file(
             warning_service=warning_service,
         )
     except SourceNotFoundError:
+        raise
+    except ValidationError:
         raise
     except (KeyboardInterrupt, SystemExit):
         raise

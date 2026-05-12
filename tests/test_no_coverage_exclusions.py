@@ -17,6 +17,20 @@ def test_coverage_config_does_not_exclude_lines() -> None:
     assert "exclude_lines" not in report_config
 
 
+def test_python_sources_do_not_use_inline_coverage_exclusions() -> None:
+    forbidden = ("# " + "pragma: " + "no cover").encode("ascii")
+    ignored_dirs = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "__pycache__"}
+    offenders = []
+    for root in (REPO_ROOT / "iocparser", REPO_ROOT / "tests"):
+        for path in root.rglob("*.py"):
+            if any(part in ignored_dirs for part in path.parts):
+                continue
+            if forbidden in path.read_bytes():
+                offenders.append(path.relative_to(REPO_ROOT).as_posix())
+
+    assert offenders == []
+
+
 def test_package_main_module_executes_entrypoint_guard(monkeypatch: pytest.MonkeyPatch) -> None:
     import iocparser.cli
 

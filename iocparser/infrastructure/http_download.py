@@ -160,6 +160,8 @@ class RequestsURLDownloader(URLDownloader):
         parsed_url = urlparse(url)
         if not parsed_url.scheme or not parsed_url.netloc:
             raise InvalidURLError(url)
+        if parsed_url.scheme.lower() not in {"http", "https"}:
+            raise InvalidURLError(url)
         return parsed_url
 
     def check_content_size(self, content_length: str | None) -> None:

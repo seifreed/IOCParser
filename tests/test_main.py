@@ -500,8 +500,8 @@ class TestDownloadURLToTemp:
         with pytest.raises(InvalidURLError):
             download_url_to_temp("not-a-url")
 
-        # FTP URLs raise DownloadError (different exception than validation)
-        with pytest.raises(DownloadError):
+        # FTP URLs are not supported by the HTTP downloader.
+        with pytest.raises(InvalidURLError):
             download_url_to_temp("ftp://example.com/file.txt")
 
     def test_download_url_to_temp_timeout(self) -> None:

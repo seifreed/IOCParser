@@ -107,6 +107,8 @@ def test_validate_url_accepts_valid_url() -> None:
 def test_validate_url_rejects_invalid_url() -> None:
     with pytest.raises(InvalidURLError):
         validate_url("not-a-url")
+    with pytest.raises(InvalidURLError):
+        validate_url("ftp://example.test/file.txt")
 
 
 def test_check_content_size_accepts_empty_and_small_values() -> None:

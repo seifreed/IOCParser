@@ -552,6 +552,12 @@ class TestGetOutputFilename:
         assert "example" in result
         assert result.endswith("_iocs.txt")
 
+    def test_get_output_filename_url_scheme_is_case_insensitive(self) -> None:
+        """Test output filename generation detects uppercase URL schemes."""
+        result = get_output_filename("HTTPS://example.com/report.pdf")
+
+        assert result == "example.com_report.pdf_iocs.txt"
+
     def test_get_output_filename_url_with_path(self) -> None:
         """Test output filename generation from URL with path."""
         result = get_output_filename("https://blog.example.com/2024/malware-report.pdf")

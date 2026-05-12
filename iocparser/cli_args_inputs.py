@@ -20,7 +20,7 @@ def get_output_filename(
     output_format: str | None = None,
 ) -> str:
     """Generate an output filename based on the input name."""
-    if input_source.startswith(("http://", "https://")):
+    if input_source.lower().startswith(("http://", "https://")):
         url_parts = urlparse(input_source)
         base_name = url_parts.netloc
         if url_parts.path and url_parts.path != "/":

@@ -200,15 +200,19 @@ class RequestsURLDownloader(URLDownloader):
         """Download content with size checking."""
         downloaded_size = 0
         exceeded_size_limit = False
-        with temp_file.open("wb") as handle:
-            for chunk in response.iter_content(chunk_size=8192):
-                if not chunk:
-                    continue
-                downloaded_size += len(chunk)
-                if downloaded_size > max_size:
-                    exceeded_size_limit = True
-                    break
-                handle.write(chunk)
+        try:
+            with temp_file.open("wb") as handle:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if not chunk:
+                        continue
+                    downloaded_size += len(chunk)
+                    if downloaded_size > max_size:
+                        exceeded_size_limit = True
+                        break
+                    handle.write(chunk)
+        except Exception:
+            temp_file.unlink(missing_ok=True)
+            raise
         if exceeded_size_limit:
             temp_file.unlink(missing_ok=True)
             raise DownloadSizeError(max_size / 1024 / 1024)

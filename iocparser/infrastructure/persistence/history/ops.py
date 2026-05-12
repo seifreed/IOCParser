@@ -96,6 +96,8 @@ def _json_object(raw_value: str) -> dict[str, object]:
 
 
 def _is_int_like(value: object) -> bool:
+    if isinstance(value, bool):
+        return False
     if isinstance(value, int):
         return True
     if isinstance(value, str):

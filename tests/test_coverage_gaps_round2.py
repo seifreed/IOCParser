@@ -174,11 +174,14 @@ class TestHistoryHelpers:
     def test_json_int_map_with_negatives(self) -> None:
         from iocparser.infrastructure.persistence.history.ops import _json_int_map
 
-        result = _json_int_map('{"a": 5, "b": -1, "c": "3", "d": "not_a_number"}')
+        result = _json_int_map(
+            '{"a": 5, "b": -1, "c": "3", "d": "not_a_number", "e": true}'
+        )
         assert result["a"] == 5
         assert result["b"] == -1
         assert result["c"] == 3
         assert "d" not in result
+        assert "e" not in result
 
 
 # ---------------------------------------------------------------------------

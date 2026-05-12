@@ -378,6 +378,7 @@ def test_persistence_helper_functions_cover_conversion_edges() -> None:
 
     assert record_json_object("[]") == {}
     assert _json_int_map(json.dumps({"a": "2"})) == {"a": 2}
+    assert _json_int_map(json.dumps({"a": True, "b": "bad", "c": "-3"})) == {"c": -3}
     assert _json_list("{}") == []
     evidence = _evidence_from_json(
         json.dumps([1, {"excerpt": "x", "line_number": 4, "source": "s"}])

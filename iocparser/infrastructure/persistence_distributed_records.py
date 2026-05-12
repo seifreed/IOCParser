@@ -30,10 +30,15 @@ def _json_int_map(raw_value: str) -> dict[str, int]:
     decoded = _json_object(raw_value)
     metrics: dict[str, int] = {}
     for name, value in decoded.items():
+        if isinstance(value, bool):
+            continue
         if isinstance(value, int):
             metrics[name] = value
-        elif isinstance(value, str):
-            metrics[name] = int(value)
+            continue
+        if isinstance(value, str):
+            stripped = value.strip()
+            if stripped.lstrip("-").isdigit():
+                metrics[name] = int(stripped)
     return metrics
 
 

@@ -405,6 +405,21 @@ def test_get_distributed_job_prefers_exact_live_job_over_imported_history(tmp_pa
     assert loaded.submitted_at == live.submitted_at
 
 
+def test_get_distributed_job_escapes_imported_history_job_id_wildcards(
+    tmp_path: Path,
+) -> None:
+    source_db_uri = f"sqlite:///{tmp_path / 'distributed-wildcard-history-source.sqlite'}"
+    target_db_uri = f"sqlite:///{tmp_path / 'distributed-wildcard-history-target.sqlite'}"
+
+    source_service = SQLAlchemyDistributedJobService(source_db_uri)
+    source_service.create_or_get_job(envelope=_envelope("jobA"), receipt_id="r1")
+
+    target_client = PersistenceClient(target_db_uri)
+    target_client.import_history(PersistenceClient(source_db_uri).export_history())
+
+    assert get_distributed_job(db_uri=target_db_uri, job_id="job_") is None
+
+
 def test_imported_history_does_not_satisfy_live_idempotency_lookup(tmp_path: Path) -> None:
     source_db_uri = f"sqlite:///{tmp_path / 'distributed-idem-source.sqlite'}"
     target_db_uri = f"sqlite:///{tmp_path / 'distributed-idem-target.sqlite'}"

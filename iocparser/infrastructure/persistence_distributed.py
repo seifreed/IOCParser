@@ -37,6 +37,11 @@ from iocparser.infrastructure.persistence_schema import (
 AMBIGUOUS_DISTRIBUTED_JOB_ID = "ambiguous distributed job id"
 
 
+def _history_job_like_prefix(job_id: str) -> str:
+    escaped = job_id.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"{escaped}#history:%"
+
+
 class SQLAlchemyDistributedJobService:
     """Persistence helper for distributed queue lifecycle records."""
 
@@ -98,7 +103,10 @@ class SQLAlchemyDistributedJobService:
                 unit.session.execute(
                     select(DistributedJobModel)
                     .where(
-                        DistributedJobModel.job_id.like(f"{job_id}#history:%"),
+                        DistributedJobModel.job_id.like(
+                            _history_job_like_prefix(job_id),
+                            escape="\\",
+                        ),
                     )
                     .order_by(
                         DistributedJobModel.submitted_at.desc(),

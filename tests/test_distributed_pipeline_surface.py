@@ -19,6 +19,7 @@ from iocparser.domain.models import (
     DeadLetterRecord,
     DistributedJobRecord,
     QueueEnvelope,
+    QueueReceipt,
     TelemetryEvent,
 )
 from iocparser.domain.pipeline import PipelineErrorInfo, PipelineJobRequest
@@ -188,6 +189,18 @@ def test_filesystem_queue_rejects_path_traversal_components(tmp_path: Path) -> N
     assert receipt_path.parent == pending_dir
     assert ".." not in receipt_path.name
     assert adapter.pending_count(queue_name="safe") == 1
+
+
+def test_filesystem_queue_rejects_external_receipt_paths(tmp_path: Path) -> None:
+    adapter = FilesystemQueueAdapter(tmp_path / "queue")
+    victim = tmp_path / "victim.txt"
+    victim.write_text("do-not-delete", encoding="utf-8")
+    external = QueueReceipt("filesystem", "safe", str(victim), "victim")
+
+    with pytest.raises(ValueError, match="receipt"):
+        adapter.ack(external)
+
+    assert victim.read_text(encoding="utf-8") == "do-not-delete"
 
 
 def test_distributed_pipeline_without_database_covers_empty_and_retry_paths(tmp_path: Path) -> None:

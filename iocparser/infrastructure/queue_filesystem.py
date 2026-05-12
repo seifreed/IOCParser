@@ -10,6 +10,7 @@ from uuid import uuid4
 from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
 
 INVALID_QUEUE_NAME_ERROR = "Invalid queue name"
+INVALID_RECEIPT_PATH_ERROR = "Invalid filesystem queue receipt"
 
 
 def _load_queue_record(payload: str) -> dict[str, object]:
@@ -79,16 +80,16 @@ class FilesystemQueueAdapter:
             return None
 
     def ack(self, receipt: QueueReceipt) -> None:
-        Path(receipt.receipt_id).unlink(missing_ok=True)
+        self._receipt_path(receipt).unlink(missing_ok=True)
 
     def requeue(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
         queue_dir = self._queue_dir(receipt.queue_name, "pending")
+        processing_path = self._receipt_path(receipt)
         temp_path = queue_dir / f"tmp-{uuid4().hex}.json"
         message_name = _safe_filename_component(envelope.request.job_id or uuid4())
         new_path = queue_dir / f"{message_name}-{uuid4().hex}.json"
         temp_path.write_text(json.dumps(envelope.to_record(), sort_keys=True), encoding="utf-8")
         temp_path.rename(new_path)
-        processing_path = Path(receipt.receipt_id)
         processing_path.unlink(missing_ok=True)
         return QueueReceipt(
             queue_backend="filesystem",
@@ -98,7 +99,7 @@ class FilesystemQueueAdapter:
         )
 
     def dead_letter(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
-        processing_path = Path(receipt.receipt_id)
+        processing_path = self._receipt_path(receipt)
         dead_dir = self._queue_dir(receipt.queue_name, "dead")
         temp_path = dead_dir / f"tmp-{uuid4().hex}.json"
         target = dead_dir / processing_path.name
@@ -123,3 +124,11 @@ class FilesystemQueueAdapter:
         path = self.root_dir / queue_name / state
         path.mkdir(parents=True, exist_ok=True)
         return path
+
+    def _receipt_path(self, receipt: QueueReceipt) -> Path:
+        receipt_path = Path(receipt.receipt_id)
+        try:
+            receipt_path.resolve().relative_to(self.root_dir.resolve())
+        except ValueError as exc:
+            raise ValueError(INVALID_RECEIPT_PATH_ERROR) from exc
+        return receipt_path

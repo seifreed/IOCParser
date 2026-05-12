@@ -17,6 +17,7 @@ def read_chunks_with_prefix(
     progress_callback: Callable[[int], None] | None,
     is_text: bool = True,
 ) -> Iterator[tuple[str, int]]:
+    chunk_size = max(1, chunk_size)
     if not is_text and isinstance(file_obj, io.TextIOBase) and hasattr(file_obj, "buffer"):
         file_obj = file_obj.buffer
 

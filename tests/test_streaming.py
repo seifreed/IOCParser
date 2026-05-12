@@ -320,6 +320,13 @@ class TestStreamingIOCExtractor:
 
         assert chunks == [("abc", 0), ("def", 0)]
 
+    def test_read_chunks_with_zero_chunk_size_normalizes_to_one(self):
+        extractor = StreamingIOCExtractor(chunk_size=0, overlap=0)
+
+        chunks = list(extractor._read_chunks_with_prefix(io.StringIO("abc"), is_text=True))
+
+        assert chunks == [("a", 0), ("b", 0), ("c", 0)]
+
     def test_read_chunks_binary_stream(self):
         """
         Test chunk reading from binary stream.

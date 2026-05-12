@@ -196,7 +196,7 @@ def list_failed_batch_jobs(session: Session, *, limit: int = 20) -> list[tuple[B
         select(BatchJobModel)
         .where(BatchJobModel.failed_inputs > 0)
         .order_by(BatchJobModel.started_at.desc())
-        .limit(limit)
+        .limit(max(0, limit))
     )
     jobs: list[BatchJobModel] = list(session.execute(stmt).scalars().all())
     return [

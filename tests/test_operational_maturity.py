@@ -340,6 +340,90 @@ def test_public_query_api_validates_dates_and_min_severity(tmp_path: Path) -> No
     assert normalized_page.total == 1
 
 
+def test_direct_persistence_services_do_not_treat_negative_limits_as_unbounded(
+    tmp_path: Path,
+) -> None:
+    db_uri = f"sqlite:///{tmp_path / 'negative-limit.sqlite'}"
+    service = SQLAlchemyPersistenceService(db_uri)
+    service.persist_multiple_runs(
+        [
+            (
+                "file",
+                "first.txt",
+                ExtractionResult(iocs=(IOC.from_raw("domains", "first.example"),)),
+            ),
+            (
+                "file",
+                "second.txt",
+                ExtractionResult(iocs=(IOC.from_raw("domains", "second.example"),)),
+            ),
+        ],
+        tool_version="5.0.0",
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
+    )
+
+    run_page = service.query_runs_page(limit=-1, offset=-10)
+    search_page = service.search_iocs_page(value="example", limit=-1, offset=-10)
+
+    assert run_page.total == 2
+    assert run_page.items == ()
+    assert run_page.limit == 0
+    assert run_page.offset == 0
+    assert search_page.total == 2
+    assert search_page.items == ()
+    assert search_page.limit == 0
+    assert search_page.offset == 0
+
+    service.persist_batch_job(
+        source_kind="url",
+        run_ids=(),
+        report={
+            "total": 1,
+            "successful": 0,
+            "failed": 1,
+            "items": [
+                {
+                    "status": "failed",
+                    "url": "https://failed.example",
+                    "error_type": "DownloadError",
+                    "error": "failed",
+                }
+            ],
+        },
+        config={},
+    )
+    assert service.list_failed_batches(limit=-1) == []
+    assert service.list_batch_jobs(limit=-1) == []
+
+    distributed = SQLAlchemyDistributedJobService(db_uri)
+    envelope = QueueEnvelope(
+        request=PipelineJobRequest(
+            input_kind="text",
+            source_value="payload",
+            job_id="negative-limit-job",
+        ),
+        queue_backend="filesystem",
+        queue_name="jobs",
+    )
+    distributed.create_or_get_job(envelope=envelope, receipt_id="receipt-1")
+    distributed.mark_dead_lettered(
+        job_id="negative-limit-job",
+        attempts=1,
+        error=PipelineErrorInfo(
+            code="VALIDATION_FAILED",
+            category="validation",
+            retryable=False,
+            status="failed",
+            message="failed",
+        ),
+    )
+
+    assert distributed.list_jobs(limit=-1) == []
+    assert distributed.list_dead_letters(limit=-1) == []
+
+
 def test_like_search_treats_percent_and_underscore_as_literals(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'like-literals.sqlite'}"
     _persist_result(db_uri, source_value="first.txt", ioc_value="alpha%beta.example")

@@ -131,16 +131,14 @@ def query_runs_page(query: RunPageQuery) -> PersistedRunsPage:
             count_stmt = count_stmt.where(clause)
         stmt = _order_run_stmt(stmt, sort_by=query.sort_by)
         total = _coerce_count(unit_of_work.session.execute(count_stmt).scalar_one())
-        runs = (
-            unit_of_work.session.execute(stmt.offset(max(0, query.offset)).limit(query.limit))
-            .scalars()
-            .all()
-        )
+        limit = max(0, query.limit)
+        offset = max(0, query.offset)
+        runs = unit_of_work.session.execute(stmt.offset(offset).limit(limit)).scalars().all()
         return PersistedRunsPage(
             items=tuple(build_summary(unit_of_work.session, run) for run in runs),
             total=total,
-            limit=query.limit,
-            offset=max(0, query.offset),
+            limit=limit,
+            offset=offset,
         )
     finally:
         unit_of_work.close()
@@ -202,14 +200,14 @@ def search_iocs_page(query: IOCSearchPageQuery) -> PersistedIOCSearchPage:
         stmt = _order_search_stmt(stmt, sort_by=query.sort_by)
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = _coerce_count(unit_of_work.session.execute(count_stmt).scalar_one())
-        rows = unit_of_work.session.execute(
-            stmt.offset(max(0, query.offset)).limit(query.limit)
-        ).all()
+        limit = max(0, query.limit)
+        offset = max(0, query.offset)
+        rows = unit_of_work.session.execute(stmt.offset(offset).limit(limit)).all()
         return PersistedIOCSearchPage(
             items=tuple(build_query_hits(rows)),
             total=total,
-            limit=query.limit,
-            offset=max(0, query.offset),
+            limit=limit,
+            offset=offset,
         )
     finally:
         unit_of_work.close()

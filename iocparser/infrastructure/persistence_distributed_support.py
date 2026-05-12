@@ -94,7 +94,9 @@ def list_jobs_stmt(
     *, limit: int, statuses: tuple[str, ...], queue_backend: str | None
 ) -> Select[DistributedJobModel]:
     stmt = (
-        select(DistributedJobModel).order_by(DistributedJobModel.submitted_at.desc()).limit(limit)
+        select(DistributedJobModel)
+        .order_by(DistributedJobModel.submitted_at.desc())
+        .limit(max(0, limit))
     )
     if statuses:
         stmt = stmt.where(DistributedJobModel.status.in_(statuses))
@@ -105,7 +107,9 @@ def list_jobs_stmt(
 
 def list_dead_letters_stmt(*, limit: int, queue_backend: str | None) -> Select[DeadLetterJobModel]:
     stmt = (
-        select(DeadLetterJobModel).order_by(DeadLetterJobModel.dead_lettered_at.desc()).limit(limit)
+        select(DeadLetterJobModel)
+        .order_by(DeadLetterJobModel.dead_lettered_at.desc())
+        .limit(max(0, limit))
     )
     if queue_backend:
         stmt = stmt.where(DeadLetterJobModel.queue_backend == queue_backend)

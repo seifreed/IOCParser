@@ -85,6 +85,10 @@ def _namespace_value(args: argparse.Namespace, field_name: str) -> object | None
     return namespace.get(field_name)
 
 
+def _string_filters_attr(args: argparse.Namespace, field_name: str) -> tuple[str, ...]:
+    return _cli_args.parse_string_filters(_namespace_value(args, field_name))
+
+
 def _diff_run_ids(args: argparse.Namespace) -> tuple[int, int] | None:
     raw_value = _namespace_value(args, "diff_runs")
     if not isinstance(raw_value, (list, tuple)) or len(raw_value) != 2:
@@ -135,13 +139,9 @@ def _handle_search_ioc(args: argparse.Namespace, config: AppConfig) -> bool:
             source_kind=_cli_args.get_optional_str_arg(args, "source_kind"),
             source_value=_cli_args.get_optional_str_arg(args, "source_value"),
             ioc_type=_cli_args.get_optional_str_arg(args, "ioc_type"),
-            severity=_cli_args.parse_string_filters(
-                _cli_args.get_optional_str_arg(args, "severity")
-            ),
-            tags=_cli_args.parse_string_filters(_cli_args.get_optional_str_arg(args, "tag")),
-            exclude_tags=_cli_args.parse_string_filters(
-                _cli_args.get_optional_str_arg(args, "exclude_tag")
-            ),
+            severity=_string_filters_attr(args, "severity"),
+            tags=_string_filters_attr(args, "tag"),
+            exclude_tags=_string_filters_attr(args, "exclude_tag"),
             min_severity=_cli_args.get_optional_str_arg(args, "min_severity"),
             tag_mode=_cli_args.get_optional_str_arg(args, "tag_mode") or "all",
             sort_by=_cli_args.get_optional_str_arg(args, "query_sort") or "newest",
@@ -170,13 +170,9 @@ def _handle_diff_runs(
             only_removed=_cli_args.get_optional_str_arg(args, "diff_only") == "removed",
             only_warnings=_cli_args.get_bool_arg(args, "diff_warnings_only"),
             only_normal=_cli_args.get_bool_arg(args, "only_normal"),
-            ioc_types=_cli_args.parse_string_filters(
-                _cli_args.get_optional_str_arg(args, "ioc_type")
-            ),
-            severity=_cli_args.parse_string_filters(
-                _cli_args.get_optional_str_arg(args, "severity")
-            ),
-            tags=_cli_args.parse_string_filters(_cli_args.get_optional_str_arg(args, "tag")),
+            ioc_types=_string_filters_attr(args, "ioc_type"),
+            severity=_string_filters_attr(args, "severity"),
+            tags=_string_filters_attr(args, "tag"),
         ),
         persistence_query_service=_query_service_for(config),
     )
@@ -197,13 +193,9 @@ def _handle_diff_latest(
             only_removed=_cli_args.get_optional_str_arg(args, "diff_only") == "removed",
             only_warnings=_cli_args.get_bool_arg(args, "diff_warnings_only"),
             only_normal=_cli_args.get_bool_arg(args, "only_normal"),
-            ioc_types=_cli_args.parse_string_filters(
-                _cli_args.get_optional_str_arg(args, "ioc_type")
-            ),
-            severity=_cli_args.parse_string_filters(
-                _cli_args.get_optional_str_arg(args, "severity")
-            ),
-            tags=_cli_args.parse_string_filters(_cli_args.get_optional_str_arg(args, "tag")),
+            ioc_types=_string_filters_attr(args, "ioc_type"),
+            severity=_string_filters_attr(args, "severity"),
+            tags=_string_filters_attr(args, "tag"),
         ),
         persistence_query_service=_query_service_for(config),
     )
@@ -220,10 +212,8 @@ def _handle_export_run(
     export = uc_export_persisted_run(
         ExportPersistedRunInput(
             run_id=export_run_id,
-            severity=_cli_args.parse_string_filters(
-                _cli_args.get_optional_str_arg(args, "severity")
-            ),
-            tags=_cli_args.parse_string_filters(_cli_args.get_optional_str_arg(args, "tag")),
+            severity=_string_filters_attr(args, "severity"),
+            tags=_string_filters_attr(args, "tag"),
             include_normal=not _cli_args.get_bool_arg(args, "only_warnings"),
             include_warnings=not _cli_args.get_bool_arg(args, "only_normal"),
             max_evidence=_optional_int_attr(args, "max_evidence"),
@@ -241,9 +231,7 @@ def _handle_list_batches(args: argparse.Namespace, config: AppConfig) -> bool:
     jobs = uc_list_batch_jobs(
         ListBatchJobsInput(
             limit=_cli_args.get_int_arg(args, "batch_limit", 20),
-            statuses=_cli_args.parse_string_filters(
-                _cli_args.get_optional_str_arg(args, "prune_status")
-            ),
+            statuses=_string_filters_attr(args, "prune_status"),
         ),
         persistence_query_service=_query_service_for(config),
     )
@@ -308,9 +296,7 @@ def _handle_prune_runs(args: argparse.Namespace, config: AppConfig) -> bool:
             keep_latest=_cli_args.get_int_arg(args, "keep_latest", 0),
             source_kind=_cli_args.get_optional_str_arg(args, "source_kind"),
             source_value=_cli_args.get_optional_str_arg(args, "source_value"),
-            statuses=_cli_args.parse_string_filters(
-                _cli_args.get_optional_str_arg(args, "prune_status")
-            ),
+            statuses=_string_filters_attr(args, "prune_status"),
         ),
         persistence_query_service=_query_service_for(config),
     )

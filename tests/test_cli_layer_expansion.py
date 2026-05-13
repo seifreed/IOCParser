@@ -217,6 +217,75 @@ def test_query_use_cases_delegate_to_query_service() -> None:
     ).added.grouped_iocs() == {"domains": ["beta.example"]}
 
 
+def test_cli_search_repeated_exclude_tags_are_forwarded(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    class CaptureSearchService:
+        def search_iocs(self, **kwargs: object) -> list[PersistedRunQueryHit]:
+            captured.update(kwargs)
+            return []
+
+    monkeypatch.setattr(cli_queries, "_query_service_for", lambda _config: CaptureSearchService())
+
+    assert (
+        cli_queries.handle_query_commands(
+            _query_args(search_ioc="alpha", exclude_tag=["benign,noise", "internal"]),
+            SimpleNamespace(db_uri="sqlite:///unused"),
+            file_writer=MemoryWriter(),
+        )
+        is True
+    )
+
+    assert captured["exclude_tags"] == ("benign", "noise", "internal")
+
+
+def test_cli_repeated_prune_statuses_are_forwarded(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, tuple[str, ...]] = {}
+
+    class CaptureMaintenanceService:
+        def list_batch_jobs(self, *, limit: int, statuses: tuple[str, ...]):
+            del limit
+            captured["list"] = statuses
+            return []
+
+        def prune_runs(
+            self,
+            *,
+            before: str | None,
+            keep_latest: int,
+            source_kind: str | None,
+            source_value: str | None,
+            statuses: tuple[str, ...],
+        ) -> int:
+            del before, keep_latest, source_kind, source_value
+            captured["prune"] = statuses
+            return 0
+
+    service = CaptureMaintenanceService()
+    monkeypatch.setattr(cli_queries, "_query_service_for", lambda _config: service)
+
+    status_args = ["failed,partial", "success"]
+    assert (
+        cli_queries.handle_query_commands(
+            _query_args(list_batches=True, prune_status=status_args),
+            SimpleNamespace(db_uri="sqlite:///unused"),
+            file_writer=MemoryWriter(),
+        )
+        is True
+    )
+    assert (
+        cli_queries.handle_query_commands(
+            _query_args(prune_before="2999-01-01T00:00:00", prune_status=status_args),
+            SimpleNamespace(db_uri="sqlite:///unused"),
+            file_writer=MemoryWriter(),
+        )
+        is True
+    )
+
+    assert captured["list"] == ("failed", "partial", "success")
+    assert captured["prune"] == ("failed", "partial", "success")
+
+
 def test_cli_persistence_builds_all_output_formats_and_persists(tmp_path: Path) -> None:
     for flag, output_format in (
         ("stix", "stix"),

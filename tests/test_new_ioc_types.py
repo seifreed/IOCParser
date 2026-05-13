@@ -56,6 +56,18 @@ def test_extract_cidr_rejects_invalid_octet():
     assert "192.168.300.0/16" not in cidrs
 
 
+def test_extract_cidr_rejects_leading_zero_octets():
+    """CIDR IPv4 octets must follow the same leading-zero rule as IP extraction."""
+    engine = DefaultIOCExtractionEngine()
+    text = "Invalid: 192.168.001.0/24, 10.01.0.0/8. Valid: 192.168.1.0/24"
+    result = engine.extract_all(text)
+    cidrs = result.get("cidr", [])
+
+    assert "192.168.1.0/24" in cidrs
+    assert "192.168.001.0/24" not in cidrs
+    assert "10.01.0.0/8" not in cidrs
+
+
 def test_extract_cidr_no_match_returns_absent_key():
     """Text with no CIDR notation must not produce a 'cidr' key at all."""
     engine = DefaultIOCExtractionEngine()

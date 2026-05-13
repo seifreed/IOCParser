@@ -11,8 +11,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from iocparser.infrastructure.extractor_base import ExtractorBase
-from iocparser.infrastructure.extractor_network import _dedup_case_insensitive
+from iocparser.infrastructure.extractor_base import ExtractorBase, IPv4_MAX_OCTET, IPv4_PARTS_COUNT
+from iocparser.infrastructure.extractor_network import (
+    DEFAULT_NETWORK_POLICY,
+    _dedup_case_insensitive,
+)
 
 LEGITIMATE_PROCESS_NAMES = {
     "svchost.exe",
@@ -139,11 +142,10 @@ class ArtifactHeuristicPolicy:
             octets = addr.split(".")
             if len(octets) != 4:
                 continue
-            try:
-                if all(0 <= int(octet) <= 255 for octet in octets):
-                    valid.append(candidate)
-            except ValueError:
-                continue
+            if DEFAULT_NETWORK_POLICY.is_valid_ipv4(
+                octets, octet_count=IPv4_PARTS_COUNT, max_octet=IPv4_MAX_OCTET
+            ):
+                valid.append(candidate)
         return _dedup_case_insensitive(valid)
 
     def valid_snort_rules(self, candidates: list[str]) -> list[str]:

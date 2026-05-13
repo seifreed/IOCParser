@@ -67,7 +67,11 @@ class SQLAlchemyRunRepository(RunRepository):
         result: ExtractionResultLike | ExtractionResult | None = None,
     ) -> None:
         metadata_items = result_items(result)
+        attached_ioc_ids: set[int] = set()
         for index, ioc_id in enumerate(ioc_ids):
+            if ioc_id in attached_ioc_ids:
+                continue
+            attached_ioc_ids.add(ioc_id)
             item = metadata_items[index] if index < len(metadata_items) else None
             if item is None:
                 severity = ""

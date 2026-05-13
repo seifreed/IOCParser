@@ -314,3 +314,36 @@ def test_persistence_service_persists_multiple_runs(tmp_path) -> None:
     assert len(sources) == 2
     assert len(iocs) == 2
     checker.close()
+
+
+def test_persistence_service_handles_duplicate_iocs_in_run_result(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-duplicate-run-iocs.db"
+    service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
+    result = ExtractionResult.from_grouped_payload(
+        {"domains": ["example.com", "example.com"]},
+        {
+            "domains": [
+                {"value": "google.com", "warning_list": "top", "description": "popular"},
+                {"value": "google.com", "warning_list": "top", "description": "popular"},
+            ],
+        },
+    )
+    options = PersistOptions(
+        defang=False,
+        check_warnings=True,
+        force_update=False,
+        output_format="json",
+    )
+
+    (run_id,) = service.persist_multiple_runs(
+        [("file", "/tmp/duplicates.txt", result)],
+        tool_version="9.9.9",
+        options=options,
+    )
+
+    checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
+    with Session(checker.engine) as session:
+        run_iocs = session.execute(select(RunIOC).where(RunIOC.run_id == run_id)).scalars().all()
+    checker.close()
+
+    assert len(run_iocs) == 2

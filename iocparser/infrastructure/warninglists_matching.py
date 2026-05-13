@@ -44,6 +44,7 @@ class WarningListMatchingMixin:
     logger: Logger
     warning_lists: dict[str, WarningListDict]
     lookup_data: WarningListLookups
+    IOC_TYPE_MAPPING: ClassVar[dict[str, str]]
     MISP_TYPE_MAPPING: ClassVar[dict[str, list[str]]]
     _warning_lookup_cache: dict[tuple[str, str], tuple[bool, dict[str, str] | None]]
 
@@ -139,6 +140,59 @@ class WarningListMatchingMixin:
     def _get_all_list_ids(self) -> list[str]:
         return list(self.warning_lists.keys())
 
+    def _matching_attribute_names(self, warning_list: WarningListDict) -> list[str]:
+        matching_attrs = warning_list.get("matching_attributes")
+        if not isinstance(matching_attrs, list):
+            return []
+        attrs_list: list[str] = []
+        for attr in matching_attrs:
+            if isinstance(attr, str):
+                attr_name = attr
+            elif isinstance(attr, dict):
+                attr_name = str(attr.get("name", ""))
+            else:
+                attr_name = str(attr)
+            if attr_name.strip():
+                attrs_list.append(attr_name)
+        return attrs_list
+
+    def _get_unscoped_list_ids(self) -> list[str]:
+        return [
+            list_id
+            for list_id, warning_list in self.warning_lists.items()
+            if not self._matching_attribute_names(warning_list)
+        ]
+
+    def _is_known_ioc_type(self, ioc_type: str) -> bool:
+        known_types = set(self.IOC_TYPE_MAPPING.values()) | set(self.MISP_TYPE_MAPPING)
+        known_types.update(
+            {
+                "md5",
+                "sha1",
+                "sha256",
+                "sha512",
+                "ssdeep",
+                "imphash",
+                "bitcoin",
+                "ethereum",
+                "monero",
+            }
+        )
+        return ioc_type in known_types
+
+    def _get_candidate_list_ids(self, ioc_type: str) -> list[str]:
+        related_types = [ioc_type]
+        if ioc_type == "urls":
+            related_types.append("domains")
+        relevant_list_ids = [
+            list_id
+            for related_type in related_types
+            for list_id in self._get_relevant_list_ids(related_type)
+        ]
+        if not self._is_known_ioc_type(ioc_type):
+            return relevant_list_ids if relevant_list_ids else self._get_all_list_ids()
+        return list(dict.fromkeys([*relevant_list_ids, *self._get_unscoped_list_ids()]))
+
     def _check_string_lookups(
         self,
         clean_value_lower: str,
@@ -226,25 +280,28 @@ class WarningListMatchingMixin:
         extracted_domain: str | None = None
         if ioc_type == "urls":
             extracted_domain = self._extract_domain_from_url(clean_value)
-        relevant_list_ids = self._get_relevant_list_ids(ioc_type)
-        all_list_ids = relevant_list_ids if relevant_list_ids else self._get_all_list_ids()
-        warning = self._check_string_lookups(clean_value_lower, extracted_domain, all_list_ids)
+        candidate_list_ids = self._get_candidate_list_ids(ioc_type)
+        warning = self._check_string_lookups(
+            clean_value_lower, extracted_domain, candidate_list_ids
+        )
         if warning:
             string_result: tuple[bool, dict[str, str] | None] = (True, warning)
             self._cache_check_value(cache_key, string_result)
             return string_result
-        warning = self._check_regex_lookups(clean_value, extracted_domain, all_list_ids)
+        warning = self._check_regex_lookups(clean_value, extracted_domain, candidate_list_ids)
         if warning:
             regex_result: tuple[bool, dict[str, str] | None] = (True, warning)
             self._cache_check_value(cache_key, regex_result)
             return regex_result
         if ioc_type in ["ips", "ipv6"]:
-            warning = self._check_cidr_lookups(clean_value, all_list_ids)
+            warning = self._check_cidr_lookups(clean_value, candidate_list_ids)
             if warning:
                 cidr_result: tuple[bool, dict[str, str] | None] = (True, warning)
                 self._cache_check_value(cache_key, cidr_result)
                 return cidr_result
-        warning = self._check_substring_lists(clean_value, extracted_domain, all_list_ids, ioc_type)
+        warning = self._check_substring_lists(
+            clean_value, extracted_domain, candidate_list_ids, ioc_type
+        )
         result: tuple[bool, dict[str, str] | None] = (warning is not None, warning)
         self._cache_check_value(cache_key, result)
         return result
@@ -276,12 +333,7 @@ class WarningListMatchingMixin:
         matching_attrs = warning_list.get("matching_attributes")
         if not matching_attrs or not isinstance(matching_attrs, list):
             return False
-        attrs_list: list[str] = []
-        for attr in matching_attrs:
-            if isinstance(attr, str):
-                attrs_list.append(attr)
-            elif isinstance(attr, dict) and "name" in attr:
-                attrs_list.append(str(attr["name"]))
+        attrs_list = self._matching_attribute_names(warning_list)
         if not attrs_list:
             return False
         for misp_type in misp_types:

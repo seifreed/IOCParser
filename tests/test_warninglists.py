@@ -1555,6 +1555,48 @@ class TestWarningListsCheckValueEdgeCases:
         assert is_warning
         assert info["name"] == "Security Provider Domains"
 
+    def test_known_ioc_type_does_not_fallback_to_unrelated_warning_lists(self):
+        warning_lists = make_warning_lists()
+
+        warning_lists.warning_lists = {
+            "email-only": {
+                "name": "Email Only",
+                "description": "Values that only apply to email IOCs",
+                "type": "string",
+                "matching_attributes": ["email"],
+                "list": ["example.com"],
+            }
+        }
+        warning_lists._preprocess_lists()
+
+        is_warning, info = warning_lists.check_value("example.com", "domains")
+        assert not is_warning
+        assert info is None
+
+    def test_unscoped_warning_lists_still_apply_when_relevant_lists_exist(self):
+        warning_lists = make_warning_lists()
+
+        warning_lists.warning_lists = {
+            "domain-other": {
+                "name": "Other Domains",
+                "description": "A typed list that does not contain the IOC",
+                "type": "string",
+                "matching_attributes": ["domain"],
+                "list": ["other.example"],
+            },
+            "global-list": {
+                "name": "Global List",
+                "description": "A list without matching attributes applies globally",
+                "type": "string",
+                "list": ["example.com"],
+            },
+        }
+        warning_lists._preprocess_lists()
+
+        is_warning, info = warning_lists.check_value("example.com", "domains")
+        assert is_warning
+        assert info["name"] == "Global List"
+
     def test_check_value_with_extracted_domain_in_regex(self):
         """
         Test check_value when extracted domain matches regex.

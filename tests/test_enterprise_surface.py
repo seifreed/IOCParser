@@ -48,7 +48,7 @@ from iocparser.cli_persistence import (
     persist_failed_batch_items,
     persist_many_results,
 )
-from iocparser.client import PersistenceClient
+from iocparser.client import IOCParserClient, PersistenceClient
 from iocparser.config import load_config
 from iocparser.domain.jobs import BatchJobDetail
 from iocparser.domain.models import (
@@ -79,6 +79,7 @@ from iocparser.plugins import (
     ioc_type_plugin_names,
     postprocessor_names,
     register_custom_ioc_type,
+    register_enricher,
     register_extractor,
     register_ioc_type_plugin,
     register_postprocessor,
@@ -138,6 +139,36 @@ class ExtraPostProcessor:
         return ExtractionResult(
             iocs=(*result.iocs, IOC.from_raw("ips", "203.0.113.200")), warnings=result.warnings
         )
+
+
+class WarningExtractor:
+    def extract(self, text_content: str, *, defang: bool = True) -> ExtractionResult:
+        del text_content, defang
+        return ExtractionResult(iocs=(IOC.from_raw("domains", "plugin-warning.example"),))
+
+
+class PluginWarningService:
+    def separate(
+        self,
+        iocs: tuple[IOC, ...],
+        *,
+        force_update: bool = False,
+    ) -> ExtractionResult:
+        del force_update
+        normal_iocs: list[IOC] = []
+        warnings: list[WarningMatch] = []
+        for ioc in iocs:
+            if ioc.value.raw == "plugin-warning.example":
+                warnings.append(
+                    WarningMatch(
+                        ioc=ioc,
+                        warning_list="Plugin Warning",
+                        description="added by plugin extractor",
+                    )
+                )
+            else:
+                normal_iocs.append(ioc)
+        return ExtractionResult(iocs=tuple(normal_iocs), warnings=tuple(warnings))
 
 
 def _setup_batch_history(db_uri: str, *, failed_url: str = "https://fail.example") -> int:
@@ -304,6 +335,28 @@ def test_custom_ioc_types_fts_and_public_batch_api(tmp_path: Path) -> None:
     assert client.list_batch_runs(batch_job_id=batch_job_id)
     assert list_batch_jobs_history(db_uri, limit=5, statuses=("partial",))
     assert get_batch_job_history(db_uri, batch_job_id=999999) is None
+
+
+def test_extractor_plugin_iocs_are_checked_by_enrichers() -> None:
+    register_extractor("warning-plugin-extractor", WarningExtractor)
+    register_enricher("plugin-warning-enricher", PluginWarningService)
+
+    client = IOCParserClient(
+        enrichers=("plugin-warning-enricher",),
+        extractors=("warning-plugin-extractor",),
+    )
+    result = client.extract_result_from_text(
+        "plain text without built-in IOCs",
+        check_warnings=True,
+        defang=False,
+    )
+
+    assert not any(ioc.value.raw == "plugin-warning.example" for ioc in result.iocs)
+    assert any(
+        warning.ioc.value.raw == "plugin-warning.example"
+        and warning.warning_list == "Plugin Warning"
+        for warning in result.warnings
+    )
 
 
 def test_cli_plugin_paths_and_batch_queries(

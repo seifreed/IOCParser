@@ -160,16 +160,14 @@ def extract_text_result(
     base_result = extract_from_text(
         ExtractTextInput(text_content=text_content, options=options),
         extractor_engine=extractor_engine,
-        warning_service=warning_service_for(
-            enabled=request.check_warnings, enrichers=plugins.enrichers
-        ),
+        warning_service=None,
     )
-    return apply_plugins(
+    return finalize_extraction_result(
         text_content=text_content,
         options=options,
         result=base_result,
-        extractors=plugins.extractors,
-        postprocessors=plugins.postprocessors,
+        plugins=plugins,
+        request=request,
     )
 
 
@@ -192,16 +190,14 @@ def extract_file_result(
     result = extract_from_text(
         ExtractTextInput(text_content=text_content, options=options),
         extractor_engine=adapters.extractor_engine,
-        warning_service=warning_service_for(
-            enabled=options.check_warnings, enrichers=plugins.enrichers
-        ),
+        warning_service=None,
     )
-    return apply_plugins(
+    return finalize_extraction_result(
         text_content=text_content,
         options=options,
         result=result,
-        extractors=plugins.extractors,
-        postprocessors=plugins.postprocessors,
+        plugins=plugins,
+        request=request,
     )
 
 
@@ -237,6 +233,23 @@ def warning_service_for(*, enabled: bool, enrichers: tuple[str, ...]) -> Warning
     return services[0] if len(services) == 1 else CompositeWarningListService(services)
 
 
+def separate_warnings_for_result(
+    result: ExtractionResult,
+    *,
+    enabled: bool,
+    force_update: bool,
+    enrichers: tuple[str, ...],
+) -> ExtractionResult:
+    warning_service = warning_service_for(enabled=enabled, enrichers=enrichers)
+    if warning_service is None:
+        return result
+    separated = warning_service.separate(result.iocs, force_update=force_update)
+    return ExtractionResult(
+        iocs=separated.iocs,
+        warnings=(*result.warnings, *separated.warnings),
+    )
+
+
 def apply_plugins(
     *,
     text_content: str,
@@ -253,6 +266,36 @@ def apply_plugins(
     for name in postprocessors:
         merged = get_postprocessor(name).process(merged)
     return merged.filter_types(options.include_types, options.exclude_types)
+
+
+def finalize_extraction_result(
+    *,
+    text_content: str,
+    options: ExtractionOptions,
+    result: ExtractionResult,
+    plugins: ClientPluginSettings,
+    request: ClientExtractionRequest,
+) -> ExtractionResult:
+    with_extractors = apply_plugins(
+        text_content=text_content,
+        options=options,
+        result=result,
+        extractors=plugins.extractors,
+        postprocessors=(),
+    )
+    separated = separate_warnings_for_result(
+        with_extractors,
+        enabled=request.check_warnings,
+        force_update=request.force_update,
+        enrichers=plugins.enrichers,
+    )
+    return apply_plugins(
+        text_content=text_content,
+        options=options,
+        result=separated,
+        extractors=(),
+        postprocessors=plugins.postprocessors,
+    )
 
 
 @dataclass
@@ -401,7 +444,9 @@ __all__ = [
     "extract_url_result",
     "extraction_adapters",
     "extraction_request",
+    "finalize_extraction_result",
     "merge_extraction_results",
     "plugin_settings",
+    "separate_warnings_for_result",
     "warning_service_for",
 ]

@@ -1,41 +1,135 @@
-name: Publish to PyPI
+name: Publish Release
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v*.*.*"
+      - "[0-9]*.[0-9]*.[0-9]*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
+  build:
+    runs-on: ubuntu-24.04
+
+    outputs:
+      package-version: ${{ steps.version.outputs.package-version }}
+
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.14'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install build twine
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
 
-    - name: Build package
-      run: python -m build
+      - name: Validate tag matches package version
+        id: version
+        shell: bash
+        run: |
+          package_version="$(
+            python - <<'PY'
+          import tomllib
+          from pathlib import Path
 
-    - name: Upload schema artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: iocparser-schemas
-        path: iocparser/schemas/*.json
+          pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+          print(pyproject["project"]["version"])
+          PY
+          )"
+          tag_name="${GITHUB_REF_NAME}"
 
-    - name: Attach schemas to release
-      uses: softprops/action-gh-release@v2
-      with:
-        files: iocparser/schemas/*.json
+          if [[ "$tag_name" != "$package_version" && "$tag_name" != "v$package_version" ]]; then
+            echo "Tag '$tag_name' does not match pyproject version '$package_version'." >&2
+            echo "Use '$package_version' or 'v$package_version'." >&2
+            exit 1
+          fi
 
-    - name: Publish to PyPI
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-      run: twine upload dist/*
+          echo "package-version=$package_version" >> "$GITHUB_OUTPUT"
+
+      - name: Build package
+        run: |
+          rm -rf build dist ./*.egg-info
+          python -m build
+
+      - name: Check package
+        run: twine check dist/*
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          cp ./dist/* release-assets/
+          cp ./iocparser/schemas/*.json release-assets/
+
+      - name: Upload Python distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-release-assets
+          path: release-assets/*
+          if-no-files-found: error
+
+  github-release:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          name: github-release-assets
+          path: release-assets
+
+      - name: Create GitHub release and upload assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" release-assets/* \
+              --verify-tag \
+              --title "$GITHUB_REF_NAME" \
+              --generate-notes
+          fi
+
+  pypi:
+    needs: [build, github-release]
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi
+      url: https://pypi.org/p/iocparser-tool
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Download Python distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-distributions
+          path: dist
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

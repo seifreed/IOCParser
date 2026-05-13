@@ -39,6 +39,7 @@ from iocparser.errors import (
 from iocparser.infrastructure.file_readers import MagicTextSourceReader
 from iocparser.infrastructure.http_download import RequestsURLDownloader
 from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
+from iocparser.infrastructure.persistence_schema import RunModel, SQLAlchemyUnitOfWork
 from iocparser.pipeline_errors import classify_pipeline_exception
 
 
@@ -547,3 +548,35 @@ def test_find_existing_run_without_keys_returns_none(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'empty.db'}"
     service = SQLAlchemyPersistenceService(db_uri)
     assert service.find_existing_run() is None
+
+
+def test_find_existing_run_uses_newest_run_id_as_timestamp_tiebreaker(tmp_path: Path) -> None:
+    db_uri = f"sqlite:///{tmp_path / 'dedupe-tiebreak.db'}"
+    worker = PipelineWorker()
+    request = PipelineJobRequest(
+        input_kind="text",
+        source_value="IOC hxxp://evil.example",
+        persist=True,
+        db_uri=db_uri,
+        check_warnings=False,
+    )
+    first = worker.process(request)
+    second = worker.process(request)
+    same_started_at = datetime(2026, 1, 1, tzinfo=UTC)
+    unit = SQLAlchemyUnitOfWork(db_uri)
+    try:
+        for run_id in (first.run_id, second.run_id):
+            run = unit.session.get(RunModel, run_id)
+            assert run is not None
+            run.started_at = same_started_at
+        unit.commit()
+    finally:
+        unit.close()
+
+    found = SQLAlchemyPersistenceService(db_uri).find_existing_run(
+        fingerprint=second.fingerprint,
+        content_hash=second.content_hash,
+    )
+
+    assert found is not None
+    assert found.run_id == second.run_id

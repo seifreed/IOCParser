@@ -553,7 +553,7 @@ class SQLAlchemyPersistenceService(PersistenceQueryService):
                 stmt = stmt.where(SourceModel.fingerprint == fingerprint)
             if content_hash:
                 stmt = stmt.where(SourceModel.content_hash == content_hash)
-            stmt = stmt.order_by(RunModel.started_at.desc()).limit(1)
+            stmt = stmt.order_by(RunModel.started_at.desc(), RunModel.id.desc()).limit(1)
             run = unit_of_work.session.execute(stmt).scalar_one_or_none()
             if run is None:
                 return None

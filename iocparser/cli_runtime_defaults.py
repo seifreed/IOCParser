@@ -96,12 +96,10 @@ def _apply_network_defaults(args: argparse.Namespace, config: AppConfig) -> None
         current_network: object = getattr(args, name, None)
         if current_network is None and configured:
             setattr(args, name, configured)
-    allow_redirects_value: object = getattr(args, "allow_redirects", True)
-    if allow_redirects_value is True and config.allow_redirects is False:
-        args.allow_redirects = False
-    tls_verify_value: object = getattr(args, "tls_verify", True)
-    if tls_verify_value is True and config.tls_verify is False:
-        args.tls_verify = False
+    if getattr(args, "allow_redirects", None) is None:
+        args.allow_redirects = config.allow_redirects
+    if getattr(args, "tls_verify", None) is None:
+        args.tls_verify = config.tls_verify
 
 
 def _validated_diff_only(value: str) -> str:

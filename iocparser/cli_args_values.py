@@ -13,9 +13,11 @@ def get_str_arg(args: argparse.Namespace, name: str, default: str = "") -> str:
     return str(value) if value is not None else default
 
 
-def get_bool_arg(args: argparse.Namespace, name: str) -> bool:
+def get_bool_arg(args: argparse.Namespace, name: str, default: bool = False) -> bool:
     """Get boolean argument from argparse namespace."""
-    value: object = getattr(args, name, False)
+    value: object = getattr(args, name, None)
+    if value is None:
+        return default
     if isinstance(value, str):
         normalized = value.strip().lower()
         if normalized in {"0", "false", "no", "off", ""}:

@@ -41,7 +41,7 @@ from iocparser.api_persistence_query import (
     coerce_export_filters,
     coerce_render_options,
 )
-from iocparser.cli_args import parse_string_filters
+from iocparser.cli_args import create_argument_parser, parse_string_filters
 from iocparser.cli_output import (
     PersistResultsRequest,
     persist_results,
@@ -1424,8 +1424,8 @@ def test_load_config_supports_extended_defaults(tmp_path: Path) -> None:
     args.headers_json = None
     args.cookies_json = None
     args.proxy = None
-    args.allow_redirects = True
-    args.tls_verify = True
+    args.allow_redirects = None
+    args.tls_verify = None
     args.tls_cert = None
     args.ca_bundle = None
     args.connect_timeout = None
@@ -1471,6 +1471,22 @@ def test_load_config_supports_extended_defaults(tmp_path: Path) -> None:
     args.tls_verify = True
     configured_with_ca = downloader_for_args(args)
     assert configured_with_ca.verify == "/tmp/ca.pem"
+
+
+def test_cli_boolean_network_flags_override_false_config() -> None:
+    config = AppConfig(
+        persist=False,
+        db_uri=None,
+        config_path=None,
+        allow_redirects=False,
+        tls_verify=False,
+    )
+    args = create_argument_parser().parse_args(["--allow-redirects", "--tls-verify"])
+
+    apply_config_defaults(args, config)
+
+    assert args.allow_redirects is True
+    assert args.tls_verify is True
 
 
 def test_requests_url_downloader_supports_retries_and_metadata() -> None:

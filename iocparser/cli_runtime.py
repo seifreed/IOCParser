@@ -104,7 +104,7 @@ def downloader_for_args(args: argparse.Namespace) -> RequestsURLDownloader:
     headers = _parse_http_mapping(headers_source, separator=":")
     cookies = _parse_http_mapping(cookies_source, separator="=")
     ca_bundle = get_optional_str_arg(args, "ca_bundle")
-    verify: bool | str = get_bool_arg(args, "tls_verify")
+    verify: bool | str = get_bool_arg(args, "tls_verify", True)
     if verify and ca_bundle:
         verify = ca_bundle
     connect_timeout = _optional_float_arg(args, "connect_timeout")
@@ -136,7 +136,7 @@ def downloader_for_args(args: argparse.Namespace) -> RequestsURLDownloader:
         proxies={"http": proxy, "https": proxy}
         if (proxy := get_optional_str_arg(args, "proxy"))
         else None,
-        allow_redirects=get_bool_arg(args, "allow_redirects"),
+        allow_redirects=get_bool_arg(args, "allow_redirects", True),
         verify=verify,
         cert=get_optional_str_arg(args, "tls_cert"),
     )

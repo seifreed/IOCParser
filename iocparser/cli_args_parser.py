@@ -139,13 +139,13 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--allow-redirects",
         action=argparse.BooleanOptionalAction,
-        default=True,
+        default=None,
         help="Follow HTTP redirects",
     )
     parser.add_argument(
         "--tls-verify",
         action=argparse.BooleanOptionalAction,
-        default=True,
+        default=None,
         help="Enable TLS certificate verification",
     )
     parser.add_argument("--tls-cert", help="Client TLS certificate path for URL downloads")

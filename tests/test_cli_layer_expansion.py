@@ -37,7 +37,7 @@ from iocparser.domain.models import (
     PersistOptions,
     WarningMatch,
 )
-from iocparser.errors import FileExistenceError, ValidationError
+from iocparser.errors import FileExistenceError, SourceProcessingError, ValidationError
 from iocparser.infrastructure.extraction import DefaultIOCExtractionEngine
 from iocparser.infrastructure.file_readers import MagicTextSourceReader
 from iocparser.infrastructure.http_download import RequestsURLDownloader
@@ -660,6 +660,100 @@ def test_process_multiple_streaming_error_item_becomes_empty_result(
     assert good_warnings == {}
     assert bad_iocs == {}
     assert bad_warnings == {}
+
+
+def test_process_multiple_duplicate_streaming_files_isolates_errors(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from iocparser.infrastructure.streaming import StreamingIOCExtractor
+
+    good_file = tmp_path / "good.txt"
+    bad_file = tmp_path / "bad.txt"
+    good_file.write_text("IOC URL: https://good.example.com/path\n", encoding="utf-8")
+    bad_file.write_text("this file will fail during streaming\n", encoding="utf-8")
+    reader = MagicTextSourceReader()
+    original_extract = StreamingIOCExtractor.extract_from_file
+
+    def fail_bad_file(self, file_path, *args, **kwargs):
+        if Path(file_path) == bad_file:
+            raise PermissionError(str(bad_file))
+        return original_extract(self, file_path, *args, **kwargs)
+
+    monkeypatch.setattr(StreamingIOCExtractor, "extract_from_file", fail_bad_file)
+
+    results = cli_processing.process_multiple_files(
+        [good_file, bad_file, bad_file],
+        reader=reader,
+        warning_service=None,
+        request=cli_processing.MultiFileProcessingRequest(
+            file_type=None,
+            defang=False,
+            check_warnings=False,
+            force_update=False,
+            include_types=(),
+            exclude_types=(),
+            streaming=True,
+            chunk_size=1024 * 1024,
+            overlap=1024,
+            max_workers=1,
+        ),
+    )
+
+    good_iocs, good_warnings = results[str(good_file)]
+    bad_entries = [entry for entry in results.entries if entry.source_value == str(bad_file)]
+    assert good_iocs
+    assert good_warnings == {}
+    assert len(bad_entries) == 2
+    assert all(entry.normal_iocs == {} for entry in bad_entries)
+    assert all(entry.warning_iocs == {} for entry in bad_entries)
+
+
+def test_process_multiple_duplicate_files_isolates_extraction_errors(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from iocparser import cli_processing_files
+
+    good_file = tmp_path / "good.txt"
+    bad_file = tmp_path / "bad.txt"
+    good_file.write_text("IOC URL: https://good.example.com/path\n", encoding="utf-8")
+    bad_file.write_text("this file will fail during extraction\n", encoding="utf-8")
+    reader = MagicTextSourceReader()
+
+    def fake_extract_from_file(input_data, *, reader, extractor_engine, warning_service):
+        del reader, extractor_engine, warning_service
+        if input_data.file_path == str(bad_file):
+            raise SourceProcessingError(str(bad_file), "boom")
+        return ExtractionResult(iocs=(IOC.from_raw("urls", "https://good.example.com/path"),))
+
+    monkeypatch.setattr(cli_processing_files, "_extract_from_file", lambda: fake_extract_from_file)
+
+    results = cli_processing.process_multiple_files(
+        [good_file, bad_file, bad_file],
+        reader=reader,
+        warning_service=None,
+        request=cli_processing.MultiFileProcessingRequest(
+            file_type=None,
+            defang=False,
+            check_warnings=False,
+            force_update=False,
+            include_types=(),
+            exclude_types=(),
+            streaming=False,
+            chunk_size=1024 * 1024,
+            overlap=1024,
+            max_workers=1,
+        ),
+    )
+
+    good_iocs, good_warnings = results[str(good_file)]
+    bad_entries = [entry for entry in results.entries if entry.source_value == str(bad_file)]
+    assert good_iocs == {"urls": ["https://good.example.com/path"]}
+    assert good_warnings == {}
+    assert len(bad_entries) == 2
+    assert all(entry.normal_iocs == {} for entry in bad_entries)
+    assert all(entry.warning_iocs == {} for entry in bad_entries)
 
 
 def test_dispatch_execute_and_use_case_edge_branches() -> None:

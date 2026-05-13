@@ -40,11 +40,13 @@ from iocparser.errors import (
 )
 from iocparser.infrastructure.file_batch_executor import ThreadPoolFileBatchExecutor
 from iocparser.infrastructure.http_download import RequestsURLDownloader
+from iocparser.infrastructure.logger import get_logger
 from iocparser.interfaces.ports import TextSourceReader, WarningListService
 from iocparser.shared_utils import deduplicate_iocs
 
 BatchResults = BatchResultsCollection
 GroupedRawIocs = dict[str, list[str | dict[str, str]]]
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -284,6 +286,144 @@ def process_file(
     return result.grouped_iocs(), result.grouped_warnings()
 
 
+def _add_result(
+    results: BatchResultsCollection,
+    *,
+    item_key: str,
+    source_value: str,
+    result: ExtractionResult,
+) -> None:
+    results.add(
+        item_key=item_key,
+        source_value=source_value,
+        normal_iocs=result.grouped_iocs(),
+        warning_iocs=result.grouped_warnings(),
+    )
+
+
+def _non_streaming_file_request(request: MultiFileProcessingRequest) -> FileProcessingRequest:
+    return FileProcessingRequest(
+        file_type=request.file_type,
+        defang=request.defang,
+        check_warnings=request.check_warnings,
+        force_update=request.force_update,
+        include_types=request.include_types,
+        exclude_types=request.exclude_types,
+        streaming=False,
+        chunk_size=request.chunk_size,
+        overlap=request.overlap,
+    )
+
+
+def _process_duplicate_streaming_files(
+    file_paths: Sequence[Path],
+    *,
+    options: ProcessingOptions,
+    warning_service: WarningListService | None,
+    request: MultiFileProcessingRequest,
+) -> BatchResultsCollection:
+    results = BatchResultsCollection()
+    for item_key, source_value in batch_item_keys(str(path) for path in file_paths):
+        try:
+            result = _streaming_result(
+                Path(source_value),
+                options=options,
+                warning_service=warning_service if request.check_warnings else None,
+                chunk_size=request.chunk_size,
+                overlap=request.overlap,
+            )
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception:
+            logger.exception("Batch streaming failed for %s", source_value)
+            result = ExtractionResult()
+        _add_result(results, item_key=item_key, source_value=source_value, result=result)
+    return results
+
+
+def _process_parallel_streaming_files(
+    file_paths: Sequence[Path],
+    *,
+    options: ProcessingOptions,
+    warning_service: WarningListService | None,
+    request: MultiFileProcessingRequest,
+) -> BatchResultsCollection:
+    results = BatchResultsCollection()
+    extractor = _parallel_streaming_extractor(
+        max_workers=request.max_workers,
+        chunk_size=request.chunk_size,
+        overlap=request.overlap,
+        defang=request.defang,
+    )
+    raw_results = extractor.extract_from_files(file_paths)
+    for path, raw_iocs in raw_results.items():
+        result = _streaming_result_from_raw_iocs(raw_iocs).filter_types(
+            options.include_types,
+            options.exclude_types,
+        )
+        if request.check_warnings and warning_service is not None:
+            result = warning_service.separate(result.iocs, force_update=request.force_update)
+        _add_result(results, item_key=path, source_value=path, result=result)
+    return results
+
+
+def _process_duplicate_files(
+    file_paths: Sequence[Path],
+    *,
+    reader: TextSourceReader,
+    warning_service: WarningListService | None,
+    request: MultiFileProcessingRequest,
+) -> BatchResultsCollection:
+    results = BatchResultsCollection()
+    file_request = _non_streaming_file_request(request)
+    for item_key, source_value in batch_item_keys(str(path) for path in file_paths):
+        try:
+            normal_iocs, warning_iocs = process_file(
+                Path(source_value),
+                reader=reader,
+                warning_service=warning_service,
+                request=file_request,
+            )
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except (FileExistenceError, FileProcessingError):
+            normal_iocs, warning_iocs = {}, {}
+        except Exception:
+            logger.exception("Batch processing failed for %s", source_value)
+            normal_iocs, warning_iocs = {}, {}
+        results.add(
+            item_key=item_key,
+            source_value=source_value,
+            normal_iocs=normal_iocs,
+            warning_iocs=warning_iocs,
+        )
+    return results
+
+
+def _process_parallel_files(
+    file_paths: Sequence[Path],
+    *,
+    options: ProcessingOptions,
+    reader: TextSourceReader,
+    warning_service: WarningListService | None,
+    request: MultiFileProcessingRequest,
+) -> BatchResultsCollection:
+    results = BatchResultsCollection()
+    extracted_results = _extract_from_files()(
+        [
+            ExtractFileInput(file_path=str(file_path), options=options.to_domain())
+            for file_path in file_paths
+        ],
+        reader=reader,
+        extractor_engine=extractor_engine,
+        batch_executor=_thread_pool_batch_executor(max_workers=request.max_workers),
+        warning_service=warning_service if request.check_warnings else None,
+    )
+    for path, result in extracted_results.items():
+        _add_result(results, item_key=path, source_value=path, result=result)
+    return results
+
+
 def process_multiple_files(
     file_paths: list[Path],
     *,
@@ -294,90 +434,33 @@ def process_multiple_files(
     options = request.to_processing_options()
     duplicate_paths = len({str(path) for path in file_paths}) != len(file_paths)
     if request.streaming:
-        results = BatchResultsCollection()
         if duplicate_paths:
-            for item_key, source_value in batch_item_keys(str(path) for path in file_paths):
-                result = _streaming_result(
-                    Path(source_value),
-                    options=options,
-                    warning_service=warning_service if request.check_warnings else None,
-                    chunk_size=request.chunk_size,
-                    overlap=request.overlap,
-                )
-                results.add(
-                    item_key=item_key,
-                    source_value=source_value,
-                    normal_iocs=result.grouped_iocs(),
-                    warning_iocs=result.grouped_warnings(),
-                )
-        else:
-            extractor = _parallel_streaming_extractor(
-                max_workers=request.max_workers,
-                chunk_size=request.chunk_size,
-                overlap=request.overlap,
-                defang=request.defang,
+            return _process_duplicate_streaming_files(
+                file_paths,
+                options=options,
+                warning_service=warning_service,
+                request=request,
             )
-            raw_results = extractor.extract_from_files(file_paths)
-            for path, raw_iocs in raw_results.items():
-                result = _streaming_result_from_raw_iocs(raw_iocs).filter_types(
-                    options.include_types,
-                    options.exclude_types,
-                )
-                if request.check_warnings and warning_service is not None:
-                    result = warning_service.separate(
-                        result.iocs, force_update=request.force_update
-                    )
-                results.add(
-                    item_key=path,
-                    source_value=path,
-                    normal_iocs=result.grouped_iocs(),
-                    warning_iocs=result.grouped_warnings(),
-                )
-    else:
-        results = BatchResultsCollection()
-        if duplicate_paths:
-            for item_key, source_value in batch_item_keys(str(path) for path in file_paths):
-                normal_iocs, warning_iocs = process_file(
-                    Path(source_value),
-                    reader=reader,
-                    warning_service=warning_service,
-                    request=FileProcessingRequest(
-                        file_type=request.file_type,
-                        defang=request.defang,
-                        check_warnings=request.check_warnings,
-                        force_update=request.force_update,
-                        include_types=request.include_types,
-                        exclude_types=request.exclude_types,
-                        streaming=False,
-                        chunk_size=request.chunk_size,
-                        overlap=request.overlap,
-                    ),
-                )
-                results.add(
-                    item_key=item_key,
-                    source_value=source_value,
-                    normal_iocs=normal_iocs,
-                    warning_iocs=warning_iocs,
-                )
-        else:
-            extracted_results = _extract_from_files()(
-                [
-                    ExtractFileInput(file_path=str(file_path), options=options.to_domain())
-                    for file_path in file_paths
-                ],
-                reader=reader,
-                extractor_engine=extractor_engine,
-                batch_executor=_thread_pool_batch_executor(max_workers=request.max_workers),
-                warning_service=warning_service if request.check_warnings else None,
-            )
-            for path, result in extracted_results.items():
-                results.add(
-                    item_key=path,
-                    source_value=path,
-                    normal_iocs=result.grouped_iocs(),
-                    warning_iocs=result.grouped_warnings(),
-                )
-    return results
+        return _process_parallel_streaming_files(
+            file_paths,
+            options=options,
+            warning_service=warning_service,
+            request=request,
+        )
+    if duplicate_paths:
+        return _process_duplicate_files(
+            file_paths,
+            reader=reader,
+            warning_service=warning_service,
+            request=request,
+        )
+    return _process_parallel_files(
+        file_paths,
+        options=options,
+        reader=reader,
+        warning_service=warning_service,
+        request=request,
+    )
 
 
 def process_multiple_files_input(

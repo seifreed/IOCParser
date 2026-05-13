@@ -27,6 +27,10 @@ def _invalid_bool_payload_value(*, key: str, raw_value: object) -> TypeError:
     return TypeError(f"Expected {key} to be bool-compatible, got {type(raw_value).__name__}")
 
 
+def _invalid_retry_counter_value(*, key: str) -> ValueError:
+    return ValueError(f"{key} must be a valid retry counter")
+
+
 def _int_from_payload(payload: dict[str, object], key: str, default: int) -> int:
     raw_value = payload.get(key)
     if raw_value is None:
@@ -72,6 +76,12 @@ class QueueEnvelope:
     idempotency_key: str | None = None
     schema_version: str = PIPELINE_JOB_SCHEMA_VERSION
     submitted_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+
+    def __post_init__(self) -> None:
+        if self.attempts < 0:
+            raise _invalid_retry_counter_value(key="attempts")
+        if self.max_attempts <= 0:
+            raise _invalid_retry_counter_value(key="max_attempts")
 
     def to_record(self) -> dict[str, object]:
         return {

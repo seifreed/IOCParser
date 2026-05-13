@@ -156,6 +156,20 @@ def test_queue_envelope_from_record_rejects_bool_integer_fields() -> None:
         QueueEnvelope.from_record(payload)
 
 
+def test_queue_envelope_rejects_invalid_retry_counters() -> None:
+    negative_attempts = _envelope("job-negative-attempts").to_record()
+    negative_attempts["attempts"] = "-1"
+
+    with pytest.raises(ValueError, match="attempts"):
+        QueueEnvelope.from_record(negative_attempts)
+
+    zero_max_attempts = _envelope("job-zero-max-attempts").to_record()
+    zero_max_attempts["max_attempts"] = 0
+
+    with pytest.raises(ValueError, match="max_attempts"):
+        QueueEnvelope.from_record(zero_max_attempts)
+
+
 def test_filesystem_queue_empty_and_race_branch(tmp_path: Path) -> None:
     adapter = FilesystemQueueAdapter(tmp_path / "queue")
     assert adapter.dequeue(queue_name="empty") is None

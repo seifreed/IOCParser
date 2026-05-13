@@ -112,8 +112,10 @@ def load_worker_file_values(config_path: Path | None) -> dict[str, object]:
         values["hard_timeout_seconds"] = parser.getint(
             "runtime", "hard_timeout_seconds", fallback=None
         )
-        values["max_queue_size"] = parser.getint("runtime", "max_queue_size", fallback=64)
-        values["skip_processed"] = parser.getboolean("runtime", "skip_processed", fallback=False)
+        if parser.has_option("runtime", "max_queue_size"):
+            values["max_queue_size"] = parser.getint("runtime", "max_queue_size")
+        if parser.has_option("runtime", "skip_processed"):
+            values["skip_processed"] = parser.getboolean("runtime", "skip_processed")
     return values
 
 

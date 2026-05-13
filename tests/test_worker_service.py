@@ -106,6 +106,25 @@ max_input_seconds = 2.5
     assert config.skip_processed is True
 
 
+def test_worker_config_runtime_section_preserves_network_queue_limits(tmp_path: Path) -> None:
+    config_path = tmp_path / "iocparser.ini"
+    config_path.write_text(
+        """[network]
+max_queue_size = 17
+skip_processed = true
+[runtime]
+max_input_size_bytes = 4096
+""",
+        encoding="utf-8",
+    )
+
+    config = WorkerServiceConfig.from_sources(str(config_path))
+
+    assert config.max_input_size_bytes == 4096
+    assert config.max_queue_size == 17
+    assert config.skip_processed is True
+
+
 def test_worker_config_preserves_zero_poll_interval(tmp_path: Path) -> None:
     with _Env(IOCPARSER_WORKER_POLL_INTERVAL_SECONDS="0"):
         env_config = WorkerServiceConfig.from_sources()

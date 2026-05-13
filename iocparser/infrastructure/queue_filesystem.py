@@ -66,8 +66,12 @@ class FilesystemQueueAdapter:
                     path.rename(target)
                 except FileNotFoundError:
                     continue
-                payload = _load_queue_record(target.read_text(encoding="utf-8"))
-                envelope = QueueEnvelope.from_record(payload)
+                try:
+                    payload = _load_queue_record(target.read_text(encoding="utf-8"))
+                    envelope = QueueEnvelope.from_record(payload)
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    self._quarantine_invalid_payload(queue_name, target)
+                    continue
                 return (
                     QueueReceipt(
                         queue_backend="filesystem",
@@ -118,6 +122,13 @@ class FilesystemQueueAdapter:
 
     def dead_count(self, *, queue_name: str) -> int:
         return len(list(self._queue_dir(queue_name, "dead").glob("*.json")))
+
+    def _quarantine_invalid_payload(self, queue_name: str, path: Path) -> None:
+        dead_dir = self._queue_dir(queue_name, "dead")
+        target = dead_dir / path.name
+        if target.exists():
+            target = dead_dir / f"{path.stem}-{uuid4().hex}{path.suffix}"
+        path.rename(target)
 
     def _queue_dir(self, queue_name: str, state: str) -> Path:
         _validate_queue_name(queue_name)

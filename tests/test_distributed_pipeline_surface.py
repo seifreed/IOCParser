@@ -217,6 +217,23 @@ def test_filesystem_queue_rejects_external_receipt_paths(tmp_path: Path) -> None
     assert victim.read_text(encoding="utf-8") == "do-not-delete"
 
 
+def test_filesystem_queue_quarantines_invalid_payload_and_continues(tmp_path: Path) -> None:
+    adapter = FilesystemQueueAdapter(tmp_path / "queue")
+    pending_dir = tmp_path / "queue" / "bad-payload" / "pending"
+    pending_dir.mkdir(parents=True)
+    invalid_path = pending_dir / "000-invalid.json"
+    invalid_path.write_text('{"attempts": -1, "max_attempts": 3}', encoding="utf-8")
+    adapter.enqueue(queue_name="bad-payload", envelope=_envelope("valid-job"))
+
+    item = adapter.dequeue(queue_name="bad-payload")
+
+    assert item is not None
+    assert item[1].request.job_id == "valid-job"
+    assert adapter.dead_count(queue_name="bad-payload") == 1
+    adapter.ack(item[0])
+    assert not list((tmp_path / "queue" / "bad-payload" / "processing").glob("*.json"))
+
+
 def test_distributed_pipeline_without_database_covers_empty_and_retry_paths(tmp_path: Path) -> None:
     queue = FilesystemQueueAdapter(tmp_path / "queue")
     service = DistributedPipelineService(queue_adapter=queue)

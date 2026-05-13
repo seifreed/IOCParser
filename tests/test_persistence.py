@@ -339,6 +339,54 @@ def test_persisted_diff_compares_canonical_ioc_values(tmp_path) -> None:
     assert diff.removed.total_count() == 0
 
 
+def test_prune_keep_latest_uses_newest_run_id_as_timestamp_tiebreaker(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-prune-tiebreaker.db"
+    db_uri = f"sqlite:///{db_path}"
+    service = SQLAlchemyPersistenceService(db_uri)
+    options = PersistOptions(
+        defang=False,
+        check_warnings=False,
+        force_update=False,
+        output_format="json",
+    )
+    run_ids = service.persist_multiple_runs(
+        [
+            (
+                "file",
+                "same.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["old.example"]}, {}),
+            ),
+            (
+                "file",
+                "same.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["new.example"]}, {}),
+            ),
+        ],
+        tool_version="5.0.0",
+        options=options,
+    )
+    verifier = SQLAlchemyUnitOfWork(db_uri)
+    try:
+        with Session(verifier.engine) as session:
+            timestamp = session.get(Run, run_ids[0]).started_at
+            for run_id in run_ids:
+                session.get(Run, run_id).started_at = timestamp
+            session.commit()
+    finally:
+        verifier.close()
+
+    deleted = service.prune_runs(
+        before="2999-01-01T00:00:00",
+        keep_latest=1,
+        source_kind="file",
+        source_value="same.txt",
+    )
+    remaining = service.list_runs(limit=10, source_kind="file", source_value="same.txt")
+
+    assert deleted == 1
+    assert [run.run_id for run in remaining] == [run_ids[1]]
+
+
 def test_unit_of_work_rollback_discards_uncommitted_changes(tmp_path) -> None:
     db_path = tmp_path / "iocparser-rollback.db"
     unit_of_work = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")

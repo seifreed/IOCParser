@@ -280,7 +280,7 @@ def _build_prune_query(
         stmt = stmt.where(source_value_clause(source_kind=source_kind, source_value=source_value))
     if statuses:
         stmt = stmt.where(RunModel.status.in_(statuses))
-    return stmt.order_by(RunModel.started_at.desc())
+    return stmt.order_by(RunModel.started_at.desc(), RunModel.id.desc())
 
 
 def _select_deletable(runs: list[RunModel], keep_latest: int) -> list[RunModel]:

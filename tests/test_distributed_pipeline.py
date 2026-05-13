@@ -58,9 +58,14 @@ def test_idempotency_key_for_uses_injected_digester() -> None:
     request = PipelineJobRequest(input_kind="file", source_value="/tmp/sample.txt")
 
     key = idempotency_key_for(request, digester=digester)
+    changed_options_key = idempotency_key_for(
+        PipelineJobRequest(input_kind="file", source_value="/tmp/sample.txt", defang=False),
+        digester=digester,
+    )
 
-    assert key == "file:/tmp/sample.txt"
-    assert digester.calls == [("file", "/tmp/sample.txt")]
+    assert len(key) == 64
+    assert changed_options_key != key
+    assert digester.calls == [("file", "/tmp/sample.txt"), ("file", "/tmp/sample.txt")]
 
 
 def test_distributed_pipeline_filesystem_queue_e2e(tmp_path: Path) -> None:
@@ -143,6 +148,35 @@ def test_distributed_pipeline_deduplicates_submit_before_enqueue(tmp_path: Path)
     second = service.submit(request, queue_name="dedupe")
     assert first.job_id == second.job_id
     assert service.queue_adapter.pending_count(queue_name="dedupe") == 1
+
+
+def test_distributed_pipeline_idempotency_includes_processing_options(tmp_path: Path) -> None:
+    db_uri = f"sqlite:///{tmp_path / 'dedupe-options.sqlite'}"
+    service = DistributedPipelineService(
+        queue_adapter=FilesystemQueueAdapter(tmp_path / "queue"),
+        db_uri=db_uri,
+    )
+    first = service.submit(
+        PipelineJobRequest(
+            input_kind="text",
+            source_value="same source",
+            persist=False,
+            check_warnings=True,
+        ),
+        queue_name="dedupe-options",
+    )
+    second = service.submit(
+        PipelineJobRequest(
+            input_kind="text",
+            source_value="same source",
+            persist=False,
+            check_warnings=False,
+        ),
+        queue_name="dedupe-options",
+    )
+
+    assert first.job_id != second.job_id
+    assert service.queue_adapter.pending_count(queue_name="dedupe-options") == 2
 
 
 def test_distributed_pipeline_retries_and_dead_letters(tmp_path: Path) -> None:

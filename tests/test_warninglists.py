@@ -1508,6 +1508,29 @@ class TestWarningListsCheckValueEdgeCases:
         is_warning, info = warning_lists.check_value("10.5.5.5", "ips")
         assert is_warning
 
+    def test_check_value_with_exact_ip_in_cidr_list(self):
+        """Test CIDR warning lists can contain exact IP values."""
+        warning_lists = make_warning_lists()
+
+        warning_lists.warning_lists = {
+            "exact-ips": {
+                "name": "Exact IPs",
+                "description": "Exact IP entries in a CIDR warning list",
+                "type": "cidr",
+                "matching_attributes": ["ip-src", "ipv6"],
+                "list": ["8.8.8.8", "2001:db8::1"],
+            }
+        }
+        warning_lists._preprocess_lists()
+
+        is_warning, info = warning_lists.check_value("8.8.8.8", "ips")
+        assert is_warning
+        assert info["name"] == "Exact IPs"
+
+        is_warning, info = warning_lists.check_value("2001:db8::1", "ipv6")
+        assert is_warning
+        assert info["name"] == "Exact IPs"
+
     def test_check_value_with_substring_fallback(self):
         """
         Test check_value substring type fallback path.

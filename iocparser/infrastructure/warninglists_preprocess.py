@@ -91,8 +91,6 @@ class WarningListPreprocessMixin:
             if cidr_value is None:
                 continue
             cidr_text = str(cidr_value)
-            if "/" not in cidr_text:
-                continue
             try:
                 networks.append(ipaddress.ip_network(cidr_text, strict=False))
             except (ValueError, ipaddress.AddressValueError):

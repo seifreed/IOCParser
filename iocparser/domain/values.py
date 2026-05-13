@@ -83,13 +83,14 @@ def indicator_value_for(ioc_type: IOCType | IOCTypeName | str, raw: str) -> Indi
     custom_type = get_custom_ioc_type(ioc_type)
     if custom_type is not None:
         return indicator_value_for(custom_type.base_type, raw)
-    if ioc_type == IOCType.DOMAIN:
+    canonical_type = IOCType.from_name(ioc_type)
+    if canonical_type == IOCType.DOMAIN:
         return DomainValue(raw)
-    if ioc_type == IOCType.HOST:
+    if canonical_type == IOCType.HOST:
         return HostValue(raw)
-    if ioc_type == IOCType.URL:
+    if canonical_type == IOCType.URL:
         return UrlValue(raw)
-    if ioc_type in {
+    if canonical_type in {
         IOCType.MD5,
         IOCType.SHA1,
         IOCType.SHA256,
@@ -98,8 +99,8 @@ def indicator_value_for(ioc_type: IOCType | IOCTypeName | str, raw: str) -> Indi
         IOCType.IMPHASH,
     }:
         return HashValue(raw)
-    if ioc_type in {IOCType.IP, IOCType.IPV6}:
+    if canonical_type in {IOCType.IP, IOCType.IPV6}:
         return IpValue(raw)
-    if ioc_type == IOCType.EMAIL:
+    if canonical_type == IOCType.EMAIL:
         return EmailValue(raw)
     return IndicatorValue(raw)

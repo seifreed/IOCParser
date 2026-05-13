@@ -136,6 +136,72 @@ def test_ioc_repository_refreshes_legacy_defanged_search_value(tmp_path) -> None
         unit_of_work.close()
 
 
+def test_import_history_normalizes_imported_ioc_search_values(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-import-search.db"
+    service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
+    timestamp = "2026-05-13T00:00:00"
+    payload: dict[str, object] = {
+        "sources": [
+            {
+                "id": 1,
+                "kind": "file",
+                "value": "archive.txt",
+                "value_search": "archive.txt",
+                "first_seen": timestamp,
+                "last_seen": timestamp,
+            }
+        ],
+        "iocs": [
+            {
+                "id": 1,
+                "ioc_type": "urls",
+                "value": "hxxps://Example[.]COM/a",
+                "value_search": "hxxps://example[.]com/a",
+                "is_warning": False,
+                "warning_list": "",
+                "warning_description": "",
+            }
+        ],
+        "runs": [
+            {
+                "id": 1,
+                "source_id": 1,
+                "started_at": timestamp,
+                "finished_at": timestamp,
+                "tool_version": "5.0.0",
+                "options_json": "{}",
+                "normal_ioc_count": 1,
+                "warning_ioc_count": 0,
+                "processed_items": 1,
+                "successful_items": 1,
+                "failed_items": 0,
+                "partial_error_count": 0,
+                "duration_ms": 0,
+                "status": "success",
+                "error_message": "",
+            }
+        ],
+        "run_iocs": [
+            {
+                "id": 1,
+                "run_id": 1,
+                "ioc_id": 1,
+                "severity": "low",
+                "tags_json": "[]",
+                "tags_search": "",
+                "evidence_json": "[]",
+            }
+        ],
+    }
+
+    counts = service.import_history(payload)
+    page = service.search_iocs_page(value="https://example.com/a", search_backend="like")
+
+    assert counts["iocs"] == 1
+    assert page.total == 1
+    assert page.items[0].value == "hxxps://Example[.]COM/a"
+
+
 def test_persisted_diff_compares_canonical_ioc_values(tmp_path) -> None:
     db_path = tmp_path / "iocparser-diff-canonical.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")

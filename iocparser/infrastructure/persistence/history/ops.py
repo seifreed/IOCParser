@@ -26,6 +26,7 @@ from iocparser.infrastructure.persistence_batch import (
     load_failed_batch_items,
 )
 from iocparser.infrastructure.persistence_migrations import migrate_engine
+from iocparser.infrastructure.persistence_repository_support import normalize_ioc_search
 from iocparser.infrastructure.persistence_schema import (
     DeadLetterJobModel,
     DistributedJobModel,
@@ -35,6 +36,8 @@ from iocparser.infrastructure.persistence_schema import (
     SourceModel,
 )
 from iocparser.infrastructure.persistence_support import build_summary, prune_runs
+
+_typed_row = typed_row
 
 
 @contextmanager
@@ -192,10 +195,6 @@ def _payload_rows(payload: dict[str, object], key: str) -> list[dict[str, object
         if isinstance(row, Mapping):
             rows.append(_string_key_mapping(row))
     return rows
-
-
-def _typed_row(row: dict[str, object]) -> dict[str, object]:
-    return typed_row(row)
 
 
 def _source_identity(row: dict[str, object]) -> tuple[object, ...]:
@@ -555,7 +554,7 @@ def _import_sources(session: Session, rows: list[dict[str, object]]) -> tuple[in
     inserted = 0
     source_map: dict[int, int] = {}
     for row in rows:
-        typed = _typed_row(row)
+        typed = typed_row(row)
         existing = _existing_source(session, typed)
         if existing is None:
             source = SourceModel(**{key: value for key, value in typed.items() if key != "id"})
@@ -580,7 +579,9 @@ def _import_iocs(session: Session, rows: list[dict[str, object]]) -> tuple[int, 
     inserted = 0
     ioc_map: dict[int, int] = {}
     for row in rows:
-        typed = _typed_row(row)
+        typed = typed_row(row)
+        search_value = normalize_ioc_search(str(typed.get("value", "")))
+        typed["value_search"] = search_value
         existing = _existing_ioc(session, typed)
         if existing is None:
             ioc = IOCModel(**{key: value for key, value in typed.items() if key != "id"})
@@ -588,6 +589,8 @@ def _import_iocs(session: Session, rows: list[dict[str, object]]) -> tuple[int, 
             session.flush()
             existing = ioc
             inserted += 1
+        elif existing.value_search != search_value:
+            existing.value_search = search_value
         original_id = typed.get("id")
         if isinstance(original_id, int):
             ioc_map[original_id] = existing.id
@@ -604,7 +607,7 @@ def _import_batch_jobs(
     inserted = 0
     batch_map: dict[int, int] = {}
     for row in rows:
-        typed = _typed_row(row)
+        typed = typed_row(row)
         original_id = typed.get("id")
         import_marker = {
             "archive_id": archive_id,
@@ -679,7 +682,7 @@ def _import_runs(
     run_map: dict[int, int] = {}
     imported_signatures: dict[int, list[tuple[int, str, str, str]]] = {}
     for run_ioc_row in run_ioc_rows:
-        typed_run_ioc = _typed_row(run_ioc_row)
+        typed_run_ioc = typed_row(run_ioc_row)
         original_run_id = typed_run_ioc.get("run_id")
         original_ioc_id = typed_run_ioc.get("ioc_id")
         if not isinstance(original_run_id, int) or not isinstance(original_ioc_id, int):
@@ -697,7 +700,7 @@ def _import_runs(
             )
         )
     for row in rows:
-        typed = _typed_row(row)
+        typed = typed_row(row)
         source_id = source_map.get(int_from_row(typed.get("source_id"), default=0) or 0)
         if source_id is None:
             continue
@@ -759,7 +762,7 @@ def _import_run_iocs(
 ) -> int:
     inserted = 0
     for row in rows:
-        typed = _typed_row(row)
+        typed = typed_row(row)
         run_id = run_map.get(int_from_row(typed.get("run_id"), default=0) or 0)
         ioc_id = ioc_map.get(int_from_row(typed.get("ioc_id"), default=0) or 0)
         if run_id is None or ioc_id is None:
@@ -790,7 +793,7 @@ def _import_failed_batch_items(
     inserted = 0
     seen_signatures: dict[tuple[int, str, str, str, int, object], int] = {}
     for row in rows:
-        typed = _typed_row(row)
+        typed = typed_row(row)
         batch_job_id = batch_map.get(int_from_row(typed.get("batch_job_id"), default=0) or 0)
         if batch_job_id is None:
             continue
@@ -843,7 +846,7 @@ def _import_distributed_jobs(
 ) -> int:
     inserted = 0
     for row in rows:
-        typed = _typed_row(row)
+        typed = typed_row(row)
         existing = _existing_distributed_job(
             session, typed, archive_id=archive_id, same_origin=same_origin
         )
@@ -884,7 +887,7 @@ def _import_dead_letter_jobs(
 ) -> int:
     inserted = 0
     for row in rows:
-        typed = _typed_row(row)
+        typed = typed_row(row)
         if (
             _existing_dead_letter_job(
                 session, typed, archive_id=archive_id, same_origin=same_origin

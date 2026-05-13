@@ -26,8 +26,9 @@ def classify_ioc(
             if "warning-list-match" not in tags:
                 tags.append("warning-list-match")
         return severity, tuple(tags)
-    tags = [ioc_type_name(ioc_type)]
-    if ioc_type in {
+    canonical_type = IOCType.from_name(ioc_type)
+    tags = [ioc_type_name(canonical_type)]
+    if canonical_type in {
         IOCType.CVE,
         IOCType.MITRE_ATTACK,
         IOCType.YARA,
@@ -36,7 +37,7 @@ def classify_ioc(
     }:
         severity = "high"
         tags.append("behavioral")
-    elif ioc_type in {
+    elif canonical_type in {
         IOCType.URL,
         IOCType.DOMAIN,
         IOCType.HOST,
@@ -46,7 +47,7 @@ def classify_ioc(
     }:
         severity = "medium"
         tags.append("network")
-    elif ioc_type in {
+    elif canonical_type in {
         IOCType.MD5,
         IOCType.SHA1,
         IOCType.SHA256,

@@ -11,6 +11,7 @@ from iocparser.domain.models import (
     Source,
     SourceKind,
     UrlValue,
+    classify_ioc,
     indicator_value_for,
 )
 from iocparser.domain.sources import normalize_url_value
@@ -52,6 +53,13 @@ def test_ioc_and_source_build_from_raw_inputs() -> None:
     assert source == Source(kind=SourceKind.TEXT, value="sample")
     assert ioc.ioc_type is IOCType.DOMAIN
     assert ioc.canonical_value() == "example.com"
+
+
+def test_classify_ioc_normalizes_string_type_names() -> None:
+    severity, tags = classify_ioc("urls")
+
+    assert severity == "medium"
+    assert tags == ("urls", "network")
 
 
 def test_malformed_urls_do_not_break_source_normalization() -> None:

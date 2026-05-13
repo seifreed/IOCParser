@@ -616,6 +616,52 @@ def test_cli_processing_edge_cases_and_streaming_paths(tmp_path: Path) -> None:
     assert streaming_result.warnings
 
 
+def test_process_multiple_streaming_error_item_becomes_empty_result(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from iocparser.infrastructure.streaming import StreamingIOCExtractor
+
+    good_file = tmp_path / "good.txt"
+    bad_file = tmp_path / "bad.txt"
+    good_file.write_text("IOC URL: https://good.example.com/path\n", encoding="utf-8")
+    bad_file.write_text("this file will fail during streaming\n", encoding="utf-8")
+    reader = MagicTextSourceReader()
+    original_extract = StreamingIOCExtractor.extract_from_file
+
+    def fail_one_file(self, file_path, *args, **kwargs):
+        if Path(file_path) == bad_file:
+            raise PermissionError(str(bad_file))
+        return original_extract(self, file_path, *args, **kwargs)
+
+    monkeypatch.setattr(StreamingIOCExtractor, "extract_from_file", fail_one_file)
+
+    results = cli_processing.process_multiple_files(
+        [good_file, bad_file],
+        reader=reader,
+        warning_service=None,
+        request=cli_processing.MultiFileProcessingRequest(
+            file_type=None,
+            defang=False,
+            check_warnings=False,
+            force_update=False,
+            include_types=(),
+            exclude_types=(),
+            streaming=True,
+            chunk_size=1024 * 1024,
+            overlap=1024,
+            max_workers=1,
+        ),
+    )
+
+    good_iocs, good_warnings = results[str(good_file)]
+    bad_iocs, bad_warnings = results[str(bad_file)]
+    assert good_iocs
+    assert good_warnings == {}
+    assert bad_iocs == {}
+    assert bad_warnings == {}
+
+
 def test_dispatch_execute_and_use_case_edge_branches() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--value")

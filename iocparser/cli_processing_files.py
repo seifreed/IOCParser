@@ -214,6 +214,13 @@ def merge_batch_results(results: BatchResultsCollection) -> ExtractionResult:
     return ExtractionResult(iocs=tuple(all_iocs), warnings=tuple(all_warnings))
 
 
+def _streaming_result_from_raw_iocs(raw_iocs: GroupedRawIocs) -> ExtractionResult:
+    clean_iocs = {
+        ioc_type: values for ioc_type, values in raw_iocs.items() if ioc_type != "_errors"
+    }
+    return ExtractionResult.from_grouped_payload(clean_iocs, {})
+
+
 def _directory_files(directory: Path, pattern: str, recursive: bool) -> list[Path]:
     iterator = directory.rglob(pattern) if recursive else directory.glob(pattern)
     return sorted(path for path in iterator if path.is_file())
@@ -312,7 +319,7 @@ def process_multiple_files(
             )
             raw_results = extractor.extract_from_files(file_paths)
             for path, raw_iocs in raw_results.items():
-                result = ExtractionResult.from_grouped_payload(raw_iocs, {}).filter_types(
+                result = _streaming_result_from_raw_iocs(raw_iocs).filter_types(
                     options.include_types,
                     options.exclude_types,
                 )

@@ -218,7 +218,7 @@ def build_batch_report(context: BatchReportContext) -> BatchReport:
         "failures": failures,
         "error_groups": _group_failures(item_reports),
         "items": [
-            _public_batch_item(item)
+            cast("BatchItemReport", dict(item))
             for item in sorted(item_reports, key=lambda item: int_value(item.get("input_index", 0)))
         ],
         "source_metadata_map": context["source_metadata_map"],

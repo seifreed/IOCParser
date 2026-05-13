@@ -492,7 +492,8 @@ def test_url_batch_preserves_duplicate_inputs_through_report_and_persistence(
     assert report["successful"] == 2
     assert len(report["items"]) == 2
     assert report["failed"] == 0
-    assert all("item_key" not in item for item in report["items"])
+    assert all("item_key" in item for item in report["items"])
+    assert all("item_key" not in item for item in public_batch_report(report)["items"])
     assert [item["url"] for item in report["items"]] == [url, url]
     workflow.persist_batch_results(
         args,

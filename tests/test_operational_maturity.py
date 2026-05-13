@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
+import time
 from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -40,7 +41,11 @@ from iocparser.cli_persistence import (
     persist_many_results,
 )
 from iocparser.cli_processing import _failed_urls_from_report, _retry_attempt_for_url
-from iocparser.cli_processing_urls import retry_attempt_for_url
+from iocparser.cli_processing_urls import (
+    build_batch_report,
+    public_batch_report,
+    retry_attempt_for_url,
+)
 from iocparser.cli_schema import handle_schema_commands, print_schema_revisions
 from iocparser.client import IOCParserClient, PersistenceClient, _options
 from iocparser.client_extraction import (
@@ -2303,3 +2308,65 @@ def test_persist_failed_batch_items_uses_item_key_metadata_for_duplicate_urls(
     duplicate_runs = [run for run in runs.items if run.source_value == "https://dup.example"]
     assert len(duplicate_runs) == 2
     assert {run.duration_ms for run in duplicate_runs} == {11, 22}
+
+
+def test_built_batch_report_keeps_failed_duplicate_item_keys_for_persistence(
+    tmp_path: Path,
+) -> None:
+    db_uri = f"sqlite:///{tmp_path / 'built-duplicate-failed-metadata.sqlite'}"
+    config = load_config(True, db_uri, None)
+    report = build_batch_report(
+        {
+            "urls": ["https://dup.example", "https://dup.example"],
+            "results": {},
+            "failures": {"batch-item:1": "first boom", "batch-item:2": "second boom"},
+            "item_reports": [
+                {
+                    "item_key": "batch-item:1",
+                    "input_index": 1,
+                    "url": "https://dup.example",
+                    "status": "failed",
+                    "error": "first boom",
+                    "error_type": "TimeoutError",
+                },
+                {
+                    "item_key": "batch-item:2",
+                    "input_index": 2,
+                    "url": "https://dup.example",
+                    "status": "failed",
+                    "error": "second boom",
+                    "error_type": "TimeoutError",
+                },
+            ],
+            "source_metadata_map": {},
+            "run_metadata_map": {
+                "batch-item:1": {"duration_ms": 11, "error_message": "first boom"},
+                "batch-item:2": {"duration_ms": 22, "error_message": "second boom"},
+            },
+            "job_id": "job-1",
+            "correlation_id": "corr-1",
+            "input_load_ms": 0,
+            "batch_started": time.perf_counter(),
+            "batch_started_wall": time.time(),
+        }
+    )
+
+    assert [item.get("item_key") for item in report["items"]] == [
+        "batch-item:1",
+        "batch-item:2",
+    ]
+    assert all("item_key" not in item for item in public_batch_report(report)["items"])
+
+    persist_failed_batch_items(
+        report,
+        config=config,
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
+    )
+
+    runs = query_persisted_runs(db_uri=db_uri, limit=10)
+    duplicate_runs = [run for run in runs.items if run.source_value == "https://dup.example"]
+    assert len(duplicate_runs) == 2
+    assert {run.duration_ms for run in duplicate_runs} == {11, 22}
+    assert {run.error_message for run in duplicate_runs} == {"first boom", "second boom"}

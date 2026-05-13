@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://pypi.org/project/iocparser-tool/"><img src="https://img.shields.io/pypi/v/iocparser-tool?style=flat-square&logo=pypi&logoColor=white" alt="PyPI Version"></a>
-  <a href="https://pypi.org/project/iocparser-tool/"><img src="https://img.shields.io/pypi/pyversions/iocparser-tool?style=flat-square&logo=python&logoColor=white" alt="Python Versions"></a>
+  <a href="https://pypi.org/project/iocparser-tool/"><img src="https://img.shields.io/badge/python-3.13%20%7C%203.14-blue?style=flat-square&logo=python&logoColor=white" alt="Python 3.13 and 3.14"></a>
   <a href="https://github.com/seifreed/iocparser/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
   <a href="https://github.com/seifreed/iocparser/actions"><img src="https://img.shields.io/github/actions/workflow/status/seifreed/iocparser/ci.yml?style=flat-square&logo=github&label=CI" alt="CI Status"></a>
   <img src="https://img.shields.io/badge/coverage-100%25-brightgreen?style=flat-square" alt="Coverage">

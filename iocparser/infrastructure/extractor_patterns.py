@@ -47,6 +47,10 @@ PATTERNS: dict[str, Pattern[str]] = {
         r"\b\d{1,3}(?:[\[\(\{]?\.[\]\)\}]?\d{1,3}){3}\b",
     ),
     "ipv6": re.compile(
+        # IPv4-mapped must come before generic compressed forms;
+        # otherwise ::ffff:192.168.1.1 is truncated at ::ffff:192.
+        r"(?<![0-9a-zA-Z])::ffff:"
+        r"[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(?![0-9a-zA-Z])|"
         # Full format
         r"(?<![0-9a-zA-Z])(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}(?![0-9a-zA-Z])|"
         # Compressed
@@ -59,9 +63,7 @@ PATTERNS: dict[str, Pattern[str]] = {
         # ::xxxx
         r"(?<![0-9a-zA-Z])::(?:[0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4}(?![0-9a-zA-Z])|"
         # Special cases ::1 and ::
-        r"(?<![0-9a-zA-Z])::1(?![0-9a-zA-Z])|(?<![0-9a-zA-Z])::(?![0-9a-zA-Z])|"
-        # IPv4-mapped
-        r"(?<![0-9a-zA-Z])::ffff:[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(?![0-9a-zA-Z])",
+        r"(?<![0-9a-zA-Z])::1(?![0-9a-zA-Z])|(?<![0-9a-zA-Z])::(?![0-9a-zA-Z])",
     ),
     "urls": re.compile(
         r"\b(?:https?|hxxps?|h\[\.\]ttps?|s?ftp)://"

@@ -126,6 +126,16 @@ class TestNetworkExtractors:
         result = self.extractor.extract_ipv6(text)
         assert len(result) >= 2
 
+    def test_extract_ipv6_ipv4_mapped_address(self):
+        """Test IPv4-mapped IPv6 extraction preserves the full address."""
+        text = "Callback over IPv6: ::ffff:192.168.1.1 not ::ffff:999.999.999.999"
+
+        result = self.extractor.extract_ipv6(text)
+
+        assert "::ffff:192.168.1.1" in result
+        assert "::ffff:192" not in result
+        assert "::ffff:999" not in result
+
     def test_extract_urls(self):
         """Test URL extraction."""
         text = """

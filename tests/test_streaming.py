@@ -1168,6 +1168,15 @@ class TestEdgeCases:
         finally:
             temp_path.unlink()
 
+    def test_ioc_starting_at_overlap_boundary_is_kept(self, tmp_path: Path):
+        extractor = StreamingIOCExtractor(chunk_size=5, overlap=5, defang=False)
+        file_path = tmp_path / "split-domain.txt"
+        file_path.write_text("abcde.com trailing", encoding="utf-8")
+
+        result = _get_file_extraction_result(extractor, file_path, yield_chunks=False)
+
+        assert result["domains"] == ["abcde.com"]
+
     def test_very_small_chunk_size(self):
         """
         Test processing with very small chunk size.

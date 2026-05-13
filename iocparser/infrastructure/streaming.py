@@ -347,10 +347,14 @@ class StreamingIOCExtractor:
 
                     # Prepend overlap from previous chunk (mirrors extract_from_file)
                     previous_tail = b""
+                    overlap_start = 0
                     if offset > 0:
-                        overlap_start = max(0, offset - self.overlap)
+                        overlap_start = max(0, offset - self.overlap - 1)
                         previous_tail = mmapped_file[overlap_start:offset]
                     prefix_text = decode_chunk(previous_tail) if previous_tail else ""
+                    if prefix_text and overlap_start == 0:
+                        # Preserve a known left boundary when the overlap starts at file origin.
+                        prefix_text = f" {prefix_text}"
                     prefix_length = len(prefix_text)
                     chunk = prefix_text + chunk
 

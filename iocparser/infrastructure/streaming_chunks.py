@@ -22,6 +22,7 @@ def read_chunks_with_prefix(
         file_obj = file_obj.buffer
 
     previous_chunk_tail = ""
+    previous_tail_has_leading_context = True
     bytes_read = 0
     total_size = 0
     try:
@@ -36,9 +37,13 @@ def read_chunks_with_prefix(
         if not raw_chunk:
             break
         chunk = decode_chunk(raw_chunk)
-        prefix_length = len(previous_chunk_tail)
-        if previous_chunk_tail:
-            chunk = previous_chunk_tail + chunk
+        prefix = previous_chunk_tail
+        if prefix and not previous_tail_has_leading_context:
+            # Preserve a known left boundary when the overlap starts at the stream origin.
+            prefix = f" {prefix}"
+        prefix_length = len(prefix)
+        if prefix:
+            chunk = prefix + chunk
 
         bytes_read += (
             len(raw_chunk)
@@ -49,4 +54,11 @@ def read_chunks_with_prefix(
             progress_callback(min(100, int((bytes_read / total_size) * 100)))
 
         yield chunk, prefix_length
-        previous_chunk_tail = chunk[-overlap:] if overlap > 0 else ""
+        if overlap > 0:
+            # Keep one extra character so boundary validation can reject truncated suffixes.
+            tail_length = overlap + 1
+            previous_tail_has_leading_context = len(chunk) > tail_length
+            previous_chunk_tail = chunk[-tail_length:]
+        else:
+            previous_tail_has_leading_context = True
+            previous_chunk_tail = ""

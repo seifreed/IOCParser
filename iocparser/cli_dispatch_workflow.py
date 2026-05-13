@@ -163,7 +163,9 @@ def handle_preprocessing_commands(
     if _cli_args.get_bool_arg(args, "list_plugins"):
         _cli_output.print_json_payload(dict(plugin_listing_payload()))
         return True
-    if _cli_args.get_bool_arg(args, "init") or _cli_args.get_bool_arg(args, "force_update"):
+    if _cli_args.get_bool_arg(args, "init") or (
+        _cli_args.get_bool_arg(args, "force_update") and not _cli_args.has_input_args(args)
+    ):
         handle_misp_init()
         return True
     if _cli_schema.handle_schema_commands(args, config, file_writer=_cli_runtime.file_writer):

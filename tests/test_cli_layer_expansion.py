@@ -23,6 +23,7 @@ from iocparser.application.query_use_cases import (
     search_persisted_iocs,
 )
 from iocparser.application.use_cases import extract_from_text
+from iocparser.cli_args import create_argument_parser
 from iocparser.domain.models import (
     IOC,
     ExtractionOptions,
@@ -407,6 +408,30 @@ def test_cli_queries_and_dispatch_paths(tmp_path: Path) -> None:
         save_output=_save_output,
     )
     assert called["init"] == 1
+
+
+def test_cli_dispatch_force_update_with_input_still_processes_file(tmp_path: Path) -> None:
+    input_file = tmp_path / "report.txt"
+    input_file.write_text("IOC domain: force-update.example\n", encoding="utf-8")
+    args = create_argument_parser().parse_args(
+        ["-f", str(input_file), "--force-update", "--no-check-warnings"]
+    )
+    called = {"init": 0, "single": 0, "saved": 0}
+
+    cli_dispatch.run_cli(
+        args,
+        handle_misp_init=lambda: called.__setitem__("init", called["init"] + 1),
+        process_multiple_files_input=lambda _args: (_ for _ in ()).throw(
+            AssertionError("unexpected")
+        ),
+        process_single_input=lambda _args: (
+            called.__setitem__("single", called["single"] + 1)
+            or ({"domains": ["force-update.example"]}, {}, str(input_file))
+        ),
+        save_output=lambda *_args: called.__setitem__("saved", called["saved"] + 1),
+    )
+
+    assert called == {"init": 0, "single": 1, "saved": 1}
 
 
 def test_cli_dispatch_directory_url_file_and_stdin_paths(tmp_path: Path) -> None:

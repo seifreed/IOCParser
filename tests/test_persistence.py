@@ -347,3 +347,31 @@ def test_persistence_service_handles_duplicate_iocs_in_run_result(tmp_path) -> N
     checker.close()
 
     assert len(run_iocs) == 2
+
+
+def test_persistence_service_preserves_direct_url_source_metadata(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-direct-url-source.db"
+    service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
+    options = PersistOptions(
+        defang=False,
+        check_warnings=False,
+        force_update=False,
+        output_format="json",
+    )
+
+    service.persist_multiple_runs(
+        [
+            (
+                "url",
+                "HTTPS://Example.COM/report#section",
+                ExtractionResult.from_grouped_payload({"domains": ["example.com"]}, {}),
+            )
+        ],
+        tool_version="9.9.9",
+        options=options,
+    )
+
+    run = service.list_runs(limit=1)[0]
+
+    assert run.original_url == "HTTPS://Example.COM/report#section"
+    assert run.normalized_url == "https://example.com/report"

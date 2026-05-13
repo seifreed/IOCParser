@@ -54,13 +54,15 @@ class Source:
     ) -> Source:
         """Build a Source from wire values."""
         source_kind = SourceKind.from_name(kind)
+        original = original_url
         normalized = normalized_url
         if source_kind is SourceKind.URL:
+            original = original or value
             normalized = normalize_url_value(normalized) or normalize_url_value(value)
         return cls(
             kind=source_kind,
             value=value,
-            original_url=original_url,
+            original_url=original,
             normalized_url=normalized,
             mime_type=mime_type,
             input_size=input_size,

@@ -58,6 +58,7 @@ def test_malformed_urls_do_not_break_source_normalization() -> None:
     source = Source.from_raw("url", "http://[::1")
 
     assert normalize_url_value("http://[::1") is None
+    assert source.original_url == "http://[::1"
     assert source.normalized_url is None
 
 

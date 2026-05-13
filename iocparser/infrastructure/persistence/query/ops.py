@@ -175,11 +175,7 @@ def search_iocs_page(query: IOCSearchPageQuery) -> PersistedIOCSearchPage:
             stmt = stmt.where(RunIOCModel.severity.in_(query.severity))
         if query.tags:
             tag_filters = [
-                RunIOCModel.tags_search.like(
-                    _escaped_like_pattern(tag.strip().lower()), escape="\\"
-                )
-                for tag in query.tags
-                if tag.strip()
+                _tag_search_clause(tag.strip().lower()) for tag in query.tags if tag.strip()
             ]
             if tag_filters:
                 stmt = stmt.where(
@@ -188,11 +184,7 @@ def search_iocs_page(query: IOCSearchPageQuery) -> PersistedIOCSearchPage:
         for tag in query.exclude_tags:
             normalized_tag = tag.strip().lower()
             if normalized_tag:
-                stmt = stmt.where(
-                    RunIOCModel.tags_search.not_like(
-                        _escaped_like_pattern(normalized_tag), escape="\\"
-                    )
-                )
+                stmt = stmt.where(~_tag_search_clause(normalized_tag))
         if query.min_severity:
             threshold = SEVERITY_ORDER.get(query.min_severity.lower(), 0)
             allowed = tuple(name for name, rank in SEVERITY_ORDER.items() if rank >= threshold)
@@ -258,9 +250,18 @@ def _order_search_stmt(stmt: SearchSelect, *, sort_by: str) -> SearchSelect:
     return stmt.order_by(RunModel.started_at.desc(), RunModel.id.desc())
 
 
-def _escaped_like_pattern(normalized_value: str) -> str:
-    escaped = normalized_value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-    return f"%{escaped}%"
+def _escaped_like_value(normalized_value: str) -> str:
+    return normalized_value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _tag_search_clause(normalized_tag: str) -> ClauseElement:
+    escaped = _escaped_like_value(normalized_tag)
+    return or_(
+        RunIOCModel.tags_search == normalized_tag,
+        RunIOCModel.tags_search.like(f"{escaped} %", escape="\\"),
+        RunIOCModel.tags_search.like(f"% {escaped}", escape="\\"),
+        RunIOCModel.tags_search.like(f"% {escaped} %", escape="\\"),
+    )
 
 
 def _apply_search_backend(
@@ -280,7 +281,7 @@ def _apply_search_backend(
         )
         return stmt.where(filter_clause).params(fts_query=fts_query)
     return stmt.where(
-        IOCModel.value_search.like(_escaped_like_pattern(normalized_value), escape="\\")
+        IOCModel.value_search.like(f"%{_escaped_like_value(normalized_value)}%", escape="\\")
     )
 
 

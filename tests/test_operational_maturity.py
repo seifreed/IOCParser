@@ -510,6 +510,21 @@ def test_tag_filters_treat_percent_and_underscore_as_literals(tmp_path: Path) ->
     assert "fourth.example" in [hit.value for hit in excluded_hits.items]
 
 
+def test_tag_filters_match_whole_tags_not_substrings(tmp_path: Path) -> None:
+    db_uri = f"sqlite:///{tmp_path / 'tag-token-boundaries.sqlite'}"
+    _persist_result(db_uri, source_value="exact.txt", ioc_value="exact.example", tags=("network",))
+    _persist_result(
+        db_uri, source_value="prefix.txt", ioc_value="prefix.example", tags=("networking",)
+    )
+
+    tagged_hits = query_persisted_iocs(db_uri=db_uri, value=".example", tag="network")
+    excluded_hits = query_persisted_iocs(db_uri=db_uri, value=".example", exclude_tag="network")
+
+    assert [hit.value for hit in tagged_hits.items] == ["exact.example"]
+    assert "exact.example" not in [hit.value for hit in excluded_hits.items]
+    assert "prefix.example" in [hit.value for hit in excluded_hits.items]
+
+
 def test_query_pagination_is_stable_when_runs_share_started_at(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'stable-pagination.sqlite'}"
     first_run_id = _persist_result(db_uri, source_value="first.txt", ioc_value="first.example")

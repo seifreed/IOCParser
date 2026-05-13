@@ -23,6 +23,16 @@ class ResourceLimits:
     max_queue_size: int = 64
     skip_processed: bool = False
 
+    def __post_init__(self) -> None:
+        if self.max_input_size_bytes is not None and self.max_input_size_bytes < 0:
+            object.__setattr__(self, "max_input_size_bytes", None)
+        if self.max_input_seconds is not None and self.max_input_seconds < 0:
+            object.__setattr__(self, "max_input_seconds", None)
+        if self.max_workers <= 0:
+            object.__setattr__(self, "max_workers", 1)
+        if self.max_queue_size <= 0:
+            object.__setattr__(self, "max_queue_size", 64)
+
 
 @dataclass(frozen=True)
 class PipelineErrorInfo:

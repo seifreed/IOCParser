@@ -150,6 +150,28 @@ def test_pipeline_worker_enforces_size_limit() -> None:
     assert result.error.retryable is False
 
 
+def test_resource_limits_ignore_negative_operational_limits() -> None:
+    limits = ResourceLimits(
+        max_input_size_bytes=-1,
+        max_input_seconds=-1.0,
+        max_workers=0,
+        max_queue_size=0,
+    )
+
+    assert limits.max_input_size_bytes is None
+    assert limits.max_input_seconds is None
+    assert limits.max_workers == 1
+    assert limits.max_queue_size == 64
+    result = PipelineWorker(limits=limits).process(
+        PipelineJobRequest(
+            input_kind="text",
+            source_value="see hxxp://evil.example",
+            check_warnings=False,
+        ),
+    )
+    assert result.status == "success"
+
+
 def test_pipeline_worker_classifies_missing_file_as_input_not_found() -> None:
     result = PipelineWorker().process(
         PipelineJobRequest(

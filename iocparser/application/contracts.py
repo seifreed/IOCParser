@@ -102,6 +102,7 @@ class DiffPersistedRunsInput:
     only_added: bool = False
     only_removed: bool = False
     only_warnings: bool = False
+    only_normal: bool = False
     ioc_types: tuple[str, ...] = ()
     severity: tuple[str, ...] = ()
     tags: tuple[str, ...] = ()
@@ -115,6 +116,7 @@ class DiffLatestSourceRunInput:
     only_added: bool = False
     only_removed: bool = False
     only_warnings: bool = False
+    only_normal: bool = False
     ioc_types: tuple[str, ...] = ()
     severity: tuple[str, ...] = ()
     tags: tuple[str, ...] = ()

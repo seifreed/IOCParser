@@ -157,7 +157,7 @@ def _filter_diff(
     request: DiffPersistedRunsInput | DiffLatestSourceRunInput,
 ) -> PersistedRunDiff:
     include_normal = not request.only_warnings
-    include_warnings = True
+    include_warnings = not request.only_normal
     filtered_added = diff.added.filter_analyst_view(
         severities=request.severity,
         tags=request.tags,

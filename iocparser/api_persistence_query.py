@@ -69,6 +69,7 @@ class SearchPersistedIOCOptions(TypedDict, total=False):
 class PersistedDiffOptions(TypedDict, total=False):
     diff_only: str
     only_warnings: bool
+    only_normal: bool
     ioc_type: str | None
     severity: str | None
     tag: str | None
@@ -319,6 +320,7 @@ def persisted_diff_input(
         only_added=diff_only == "added",
         only_removed=diff_only == "removed",
         only_warnings=bool_option(options.get("only_warnings")),
+        only_normal=bool_option(options.get("only_normal")),
         ioc_types=validated_ioc_type_filters(options.get("ioc_type")),
         severity=validated_severity_filters(options.get("severity")),
         tags=parse_string_filters(options.get("tag")),
@@ -336,6 +338,7 @@ def latest_source_diff_input(
         only_added=diff_only == "added",
         only_removed=diff_only == "removed",
         only_warnings=bool_option(options.get("only_warnings")),
+        only_normal=bool_option(options.get("only_normal")),
         ioc_types=validated_ioc_type_filters(options.get("ioc_type")),
         severity=validated_severity_filters(options.get("severity")),
         tags=parse_string_filters(options.get("tag")),
@@ -543,6 +546,7 @@ def render_persisted_diff(
             run_id=run_id,
             diff_only=diff_filters.diff_only,
             only_warnings=diff_filters.only_warnings,
+            only_normal=diff_filters.only_normal,
             ioc_type=diff_filters.ioc_type,
             severity=diff_filters.severity,
             tag=diff_filters.tag,
@@ -556,6 +560,7 @@ def render_persisted_diff(
             right_run_id=right_run_id,
             diff_only=diff_filters.diff_only,
             only_warnings=diff_filters.only_warnings,
+            only_normal=diff_filters.only_normal,
             ioc_type=diff_filters.ioc_type,
             severity=diff_filters.severity,
             tag=diff_filters.tag,

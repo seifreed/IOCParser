@@ -1652,6 +1652,25 @@ def test_public_render_api_and_semantic_diff_filters(tmp_path: Path) -> None:
     )
     assert "alpha.example" in removed_diff
 
+    normal_only_removed_diff = render_persisted_diff(
+        db_uri=db_uri,
+        left_run_id=run_ids[0],
+        right_run_id=run_ids[1],
+        output_format="json",
+        diff_only="removed",
+        only_normal=True,
+    )
+    assert "alpha.example" in normal_only_removed_diff
+    assert "Known Benign" not in normal_only_removed_diff
+
+    normal_only_structured_diff = diff_persisted_runs(
+        db_uri=db_uri,
+        left_run_id=run_ids[0],
+        right_run_id=run_ids[1],
+        only_normal=True,
+    )
+    assert normal_only_structured_diff.removed_warning_counts == {}
+
     warning_only_diff = diff_persisted_runs(
         db_uri=db_uri, left_run_id=run_ids[1], right_run_id=run_ids[0]
     )

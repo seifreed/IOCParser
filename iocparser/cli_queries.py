@@ -169,6 +169,7 @@ def _handle_diff_runs(
             only_added=_cli_args.get_optional_str_arg(args, "diff_only") == "added",
             only_removed=_cli_args.get_optional_str_arg(args, "diff_only") == "removed",
             only_warnings=_cli_args.get_bool_arg(args, "diff_warnings_only"),
+            only_normal=_cli_args.get_bool_arg(args, "only_normal"),
             ioc_types=_cli_args.parse_string_filters(
                 _cli_args.get_optional_str_arg(args, "ioc_type")
             ),
@@ -195,6 +196,7 @@ def _handle_diff_latest(
             only_added=_cli_args.get_optional_str_arg(args, "diff_only") == "added",
             only_removed=_cli_args.get_optional_str_arg(args, "diff_only") == "removed",
             only_warnings=_cli_args.get_bool_arg(args, "diff_warnings_only"),
+            only_normal=_cli_args.get_bool_arg(args, "only_normal"),
             ioc_types=_cli_args.parse_string_filters(
                 _cli_args.get_optional_str_arg(args, "ioc_type")
             ),

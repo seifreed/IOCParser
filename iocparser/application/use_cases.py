@@ -43,7 +43,10 @@ def _build_evidence(text_content: str, value: str, *, source: str = "") -> tuple
 
     evidences: list[IOCEvidence] = []
     for index, line in enumerate(text_content.splitlines(), start=1):
-        if any(variant in line for variant in search_variants):
+        refanged_line = refang_ioc(line)
+        if any(
+            variant in line or refang_ioc(variant) in refanged_line for variant in search_variants
+        ):
             evidences.append(
                 IOCEvidence(excerpt=line.strip()[:240], line_number=index, source=source)
             )

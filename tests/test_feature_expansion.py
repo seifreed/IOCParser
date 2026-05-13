@@ -116,6 +116,22 @@ def test_extract_from_text_adds_context_and_classification() -> None:
     assert "evil.example" in url_ioc.evidence[0].excerpt
 
 
+def test_extract_from_text_preserves_evidence_for_refanged_outputs() -> None:
+    result = extract_from_text(
+        ExtractTextInput(
+            text_content="Line one\nIOC domain: evil[.]com\n",
+            options=ExtractionOptions(defang=False, check_warnings=False),
+        ),
+        extractor_engine=DefaultIOCExtractionEngine(),
+    )
+
+    domain_ioc = next(ioc for ioc in result.iocs if ioc.ioc_type is IOCType.DOMAIN)
+
+    assert domain_ioc.value.raw == "evil.com"
+    assert domain_ioc.evidence[0].line_number == 2
+    assert "evil[.]com" in domain_ioc.evidence[0].excerpt
+
+
 def test_new_renderers_support_context_and_type_filters() -> None:
     result = ExtractionResult(
         iocs=(

@@ -72,6 +72,27 @@ def _queue_payload_type_error() -> TypeError:
     return TypeError("Queue payload must be a JSON object")
 
 
+def _payload_text(payload: bytes) -> str:
+    try:
+        return payload.decode("utf-8")
+    except UnicodeDecodeError:
+        return repr(payload)
+
+
+def _invalid_payload_body(
+    *, payload: bytes, queue_name: str, message_id: str, error: Exception
+) -> bytes:
+    return json.dumps(
+        {
+            "invalid_payload": _payload_text(payload),
+            "queue_name": queue_name,
+            "message_id": message_id,
+            "error": str(error),
+        },
+        sort_keys=True,
+    ).encode("utf-8")
+
+
 class RabbitMQQueueAdapter:
     """RabbitMQ adapter using pika when installed."""
 
@@ -130,7 +151,12 @@ class RabbitMQQueueAdapter:
         receipt = QueueReceipt(
             "rabbitmq", queue_name, str(method.delivery_tag), str(properties.message_id or uuid4())
         )
-        return receipt, QueueEnvelope.from_record(_load_queue_record(body))
+        try:
+            envelope = QueueEnvelope.from_record(_load_queue_record(body))
+        except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError) as exc:
+            self._quarantine_invalid_payload(receipt, payload=body, error=exc)
+            return None
+        return receipt, envelope
 
     def ack(self, receipt: QueueReceipt) -> None:
         self._basic_ack(receipt, receipt.queue_name)
@@ -146,6 +172,26 @@ class RabbitMQQueueAdapter:
         )
         self.ack(receipt)
         return new_receipt
+
+    def _quarantine_invalid_payload(
+        self, receipt: QueueReceipt, *, payload: bytes, error: Exception
+    ) -> None:
+        pika = _pika_module()
+        channel = self._channel_for()
+        dead_queue_name = f"{receipt.queue_name}{self.dead_letter_suffix}"
+        channel.queue_declare(queue=dead_queue_name, durable=True)
+        channel.basic_publish(
+            exchange="",
+            routing_key=dead_queue_name,
+            body=_invalid_payload_body(
+                payload=payload,
+                queue_name=receipt.queue_name,
+                message_id=receipt.message_id,
+                error=error,
+            ),
+            properties=pika.BasicProperties(delivery_mode=2, message_id=receipt.message_id),
+        )
+        self._basic_ack(receipt, receipt.queue_name)
 
     def _basic_ack(self, receipt: QueueReceipt, queue_name: str) -> None:
         channel = self._channel_for()

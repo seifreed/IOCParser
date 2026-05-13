@@ -689,6 +689,134 @@ def test_queue_factory_and_optional_queue_adapters() -> None:
         create_queue_adapter("unsupported")
 
 
+def test_optional_queue_adapters_quarantine_invalid_payloads() -> None:
+    class FakeRabbitChannel:
+        def __init__(self) -> None:
+            self.queues: dict[str, list[tuple[object, bytes]]] = {
+                "jobs": [(SimpleNamespace(message_id="bad-rabbit"), b"[]")]
+            }
+            self.acked: list[int] = []
+
+        def queue_declare(self, *, queue: str, durable: bool) -> None:
+            del durable
+            self.queues.setdefault(queue, [])
+
+        def basic_publish(
+            self, *, exchange: str, routing_key: str, body: bytes, properties: object
+        ) -> None:
+            del exchange
+            self.queues.setdefault(routing_key, []).append((properties, body))
+
+        def basic_get(self, *, queue: str, auto_ack: bool):
+            del auto_ack
+            items = self.queues.get(queue, [])
+            if not items:
+                return None, None, None
+            props, body = items.pop(0)
+            return SimpleNamespace(delivery_tag=7), props, body
+
+        def basic_ack(self, *, delivery_tag: int) -> None:
+            self.acked.append(delivery_tag)
+
+        def close(self) -> None:
+            return None
+
+    class FakeRabbitConnection:
+        def __init__(self) -> None:
+            self.channel_obj = FakeRabbitChannel()
+
+        def channel(self) -> FakeRabbitChannel:
+            return self.channel_obj
+
+        def close(self) -> None:
+            return None
+
+    class FakePika:
+        connection = FakeRabbitConnection()
+
+        class URLParameters:
+            def __init__(self, url: str) -> None:
+                self.url = url
+
+        class BasicProperties:
+            def __init__(self, *, delivery_mode: int, message_id: str) -> None:
+                self.delivery_mode = delivery_mode
+                self.message_id = message_id
+
+        @staticmethod
+        def BlockingConnection(params: object) -> FakeRabbitConnection:
+            del params
+            return FakePika.connection
+
+    class FakeSQSClient:
+        def __init__(self) -> None:
+            self.queues: dict[str, list[dict[str, str]]] = {
+                "https://sqs.example/jobs": [
+                    {"Body": "[]", "ReceiptHandle": "rh-bad", "MessageId": "bad-sqs"}
+                ]
+            }
+
+        def send_message(
+            self,
+            *,
+            QueueUrl: str,
+            MessageBody: str,
+            MessageAttributes: dict[str, object] | None = None,
+        ):
+            del MessageAttributes
+            receipt = f"rh-{len(self.queues.setdefault(QueueUrl, [])) + 1}"
+            message = {"Body": MessageBody, "ReceiptHandle": receipt, "MessageId": f"msg-{receipt}"}
+            self.queues[QueueUrl].append(message)
+            return {"MessageId": message["MessageId"]}
+
+        def receive_message(
+            self,
+            *,
+            QueueUrl: str,
+            MaxNumberOfMessages: int,
+            WaitTimeSeconds: int,
+            MessageAttributeNames: list[str],
+        ):
+            del MaxNumberOfMessages, WaitTimeSeconds, MessageAttributeNames
+            items = self.queues.get(QueueUrl, [])
+            return {"Messages": items[:1]} if items else {}
+
+        def delete_message(self, *, QueueUrl: str, ReceiptHandle: str) -> None:
+            self.queues[QueueUrl] = [
+                item
+                for item in self.queues.get(QueueUrl, [])
+                if item["ReceiptHandle"] != ReceiptHandle
+            ]
+
+    class FakeBoto3:
+        def __init__(self) -> None:
+            self.client_obj = FakeSQSClient()
+
+        def client(self, service_name: str) -> FakeSQSClient:
+            assert service_name == "sqs"
+            return self.client_obj
+
+    with installed_module("pika", FakePika()):
+        rabbit = RabbitMQQueueAdapter("amqp://guest:guest@localhost")
+        assert rabbit.dequeue(queue_name="jobs") is None
+        channel = FakePika.connection.channel_obj
+        assert channel.acked == [7]
+        assert len(channel.queues["jobs.dead"]) == 1
+        dead_body = json.loads(channel.queues["jobs.dead"][0][1].decode("utf-8"))
+        assert dead_body["invalid_payload"] == "[]"
+
+    with installed_module("boto3", FakeBoto3()):
+        sqs = SQSQueueAdapter(
+            "https://sqs.example/jobs",
+            dead_letter_queue_url="https://sqs.example/jobs-dead",
+        )
+        assert sqs.dequeue(queue_name="ignored") is None
+        assert sqs.client.queues["https://sqs.example/jobs"] == []
+        assert len(sqs.client.queues["https://sqs.example/jobs-dead"]) == 1
+        dead_body = json.loads(sqs.client.queues["https://sqs.example/jobs-dead"][0]["Body"])
+        assert dead_body["invalid_payload"] == "[]"
+
+
 def test_celery_queue_falls_back_to_task_id_and_dead_letters_receipt_queue() -> None:
     class FakeAsyncResult:
         id = None

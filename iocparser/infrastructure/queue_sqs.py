@@ -55,6 +55,20 @@ def _queue_payload_type_error() -> TypeError:
     return TypeError("Queue payload must be a JSON object")
 
 
+def _invalid_payload_record(
+    *, payload: str, queue_name: str, message_id: str, error: Exception
+) -> str:
+    return json.dumps(
+        {
+            "invalid_payload": payload,
+            "queue_name": queue_name,
+            "message_id": message_id,
+            "error": str(error),
+        },
+        sort_keys=True,
+    )
+
+
 class SQSQueueAdapter:
     """AWS SQS adapter using boto3 when installed."""
 
@@ -109,7 +123,12 @@ class SQSQueueAdapter:
                 message["ReceiptHandle"],
                 str(message.get("MessageId", uuid4())),
             )
-            return receipt, QueueEnvelope.from_record(_load_queue_record(message["Body"]))
+            try:
+                envelope = QueueEnvelope.from_record(_load_queue_record(message["Body"]))
+            except (json.JSONDecodeError, TypeError, ValueError) as exc:
+                self._quarantine_invalid_payload(receipt, payload=message["Body"], error=exc)
+                return None
+            return receipt, envelope
 
     def ack(self, receipt: QueueReceipt) -> None:
         with self._lock:
@@ -136,6 +155,24 @@ class SQSQueueAdapter:
     def close(self) -> None:
         with self._lock:
             self.client = None  # type: ignore[assignment]
+
+    def _quarantine_invalid_payload(
+        self, receipt: QueueReceipt, *, payload: str, error: Exception
+    ) -> None:
+        if self.dead_letter_queue_url:
+            dead_queue_name = f"{receipt.queue_name}.dead"
+            self._queue_urls[dead_queue_name] = self.dead_letter_queue_url
+            self.client.send_message(
+                QueueUrl=self.dead_letter_queue_url,
+                MessageBody=_invalid_payload_record(
+                    payload=payload,
+                    queue_name=receipt.queue_name,
+                    message_id=receipt.message_id,
+                    error=error,
+                ),
+            )
+        resolved_url = self._resolve_queue_url(receipt.queue_name)
+        self.client.delete_message(QueueUrl=resolved_url, ReceiptHandle=receipt.receipt_id)
 
     def dead_letter(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
         with self._lock:

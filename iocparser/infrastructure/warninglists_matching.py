@@ -251,7 +251,9 @@ class WarningListMatchingMixin:
             if warning_list.get("type") != "substring":
                 continue
             misp_types = self._get_misp_types_for_ioc(ioc_type)
-            if not self._is_list_applicable(warning_list, misp_types, ioc_type):
+            if self._matching_attribute_names(warning_list) and not self._is_list_applicable(
+                warning_list, misp_types, ioc_type
+            ):
                 continue
             result = self._check_against_warning_list(
                 clean_value, extracted_domain, warning_list, list_id

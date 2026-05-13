@@ -1617,6 +1617,30 @@ class TestWarningListsCheckValueEdgeCases:
         assert is_warning
         assert info["name"] == "Global List"
 
+    def test_unscoped_substring_warning_lists_still_apply_globally(self):
+        warning_lists = make_warning_lists()
+
+        warning_lists.warning_lists = {
+            "domain-other": {
+                "name": "Other Domains",
+                "description": "A typed list that does not contain the IOC",
+                "type": "string",
+                "matching_attributes": ["domain"],
+                "list": ["other.example"],
+            },
+            "global-substring": {
+                "name": "Global Substring",
+                "description": "A substring list without matching attributes applies globally",
+                "type": "substring",
+                "list": ["trusted-cdn"],
+            },
+        }
+        warning_lists._preprocess_lists()
+
+        is_warning, info = warning_lists.check_value("https://trusted-cdn.example/path", "urls")
+        assert is_warning
+        assert info["name"] == "Global Substring"
+
     def test_check_value_with_extracted_domain_in_regex(self):
         """
         Test check_value when extracted domain matches regex.

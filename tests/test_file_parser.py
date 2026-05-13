@@ -187,6 +187,26 @@ class TestPDFParser:
         assert "example.com" in extracted_text
         assert "abc123" in extracted_text
 
+    def test_extract_pdf_text_separates_page_text(self) -> None:
+        """Page boundaries must not merge adjacent IOCs or words."""
+
+        class Page:
+            def __init__(self, text: str) -> None:
+                self.text = text
+
+            def extract_text(self) -> str:
+                return self.text
+
+            def extract_tables(self) -> list[list[list[str | None]]]:
+                return []
+
+        pdf = type("PDF", (), {"pages": [Page("Domain evil.com"), Page("IP 203.0.113.7")]})()
+
+        extracted_text = PDFParser._extract_pdf_text(pdf)
+
+        assert "evil.com\nIP" in extracted_text
+        assert "evil.comIP" not in extracted_text
+
     def test_extract_text_from_pdf_with_table(self, tmp_path: Path) -> None:
         """
         Test extracting text from PDF containing table-like structures.

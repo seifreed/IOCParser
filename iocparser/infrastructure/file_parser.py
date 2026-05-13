@@ -102,7 +102,10 @@ class PDFParser(FileParser):
         for page_num in tqdm(range(total_pages), desc="Processing pages"):
             page = pdf.pages[page_num]
             page_text: str = str(page.extract_text() or "")
-            text_content += page_text
+            if page_text:
+                text_content += page_text
+                if not text_content.endswith("\n"):
+                    text_content += "\n"
 
             tables = page.extract_tables() or []
             for table in tables:

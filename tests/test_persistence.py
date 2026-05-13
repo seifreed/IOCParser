@@ -375,3 +375,39 @@ def test_persistence_service_preserves_direct_url_source_metadata(tmp_path) -> N
 
     assert run.original_url == "HTTPS://Example.COM/report#section"
     assert run.normalized_url == "https://example.com/report"
+
+
+def test_url_source_filter_preserves_path_case_identity(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-url-path-case.db"
+    service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
+    options = PersistOptions(
+        defang=False,
+        check_warnings=False,
+        force_update=False,
+        output_format="json",
+    )
+    service.persist_multiple_runs(
+        [
+            (
+                "url",
+                "https://example.test/Report",
+                ExtractionResult.from_grouped_payload({"domains": ["upper.example"]}, {}),
+            ),
+            (
+                "url",
+                "https://example.test/report",
+                ExtractionResult.from_grouped_payload({"domains": ["lower.example"]}, {}),
+            ),
+        ],
+        tool_version="9.9.9",
+        options=options,
+    )
+
+    page = service.query_runs_page(
+        limit=10,
+        source_kind="url",
+        source_value="https://example.test/report",
+    )
+
+    assert page.total == 1
+    assert page.items[0].source_value == "https://example.test/report"

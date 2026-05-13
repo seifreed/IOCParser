@@ -75,7 +75,7 @@ def normalized_source_filter(value: str) -> str:
 
 def normalized_url_filter(value: str) -> str | None:
     normalized = normalize_url_value(value)
-    return normalized.lower() if normalized is not None else None
+    return normalized if normalized is not None else None
 
 
 def _url_filter_variants(value: str) -> tuple[str, ...]:
@@ -97,7 +97,7 @@ def source_value_clause(*, source_kind: str | None, source_value: str) -> Clause
     if source_kind == "url":
         clauses: list[ClauseElement] = [SourceModel.value == exact_value]
         clauses.extend(
-            func.lower(func.coalesce(SourceModel.normalized_url, "")) == candidate
+            func.coalesce(SourceModel.normalized_url, "") == candidate
             for candidate in (url_variants or ())
         )
         return or_(*clauses) if len(clauses) > 1 else clauses[0]

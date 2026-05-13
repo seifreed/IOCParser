@@ -332,57 +332,11 @@ iocparser-worker
 
 ---
 
-## CI and Release Publishing
-
-The project CI validates Python 3.13 and 3.14 across Linux, macOS, and Windows. The release workflow publishes from matching version tags, creates GitHub release assets, and uses PyPI trusted publishing through OIDC.
-
-```bash
-# Example release tag for pyproject version 5.0.2
-git tag v5.0.2
-git push origin v5.0.2
-```
-
-Release assets include:
-
-- Python wheel
-- Source distribution
-- JSON schema artifacts from `iocparser/schemas/`
-
----
-
 ## Requirements
 
 - Python 3.13 or 3.14
 - libmagic runtime support for file type detection
 - See [pyproject.toml](pyproject.toml) for dependencies and optional pipeline extras
-
----
-
-## Testing
-
-```bash
-make test-quick
-make test
-make test-benchmark
-```
-
-- `make test-quick`: fast feedback lane
-- `make test`: full functional suite with coverage enforcement
-- `make test-benchmark`: benchmark-only lane
-
-Coverage is enforced at `100%` in CI.
-
----
-
-## Contributing
-
-Contributions are welcome.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
 
 ---
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import time
+from json import JSONDecodeError
 from pathlib import Path
 from typing import Protocol, cast
 
@@ -108,6 +109,19 @@ def _failed_batch_item_matches_retry_filters(
     )
 
 
+def _load_valid_batch_report_payload(report_path: Path) -> dict[str, object]:
+    try:
+        payload = _json_dict(report_path)
+    except JSONDecodeError as exc:
+        raise _invalid_batch_report(report_path) from exc
+    if not payload:
+        raise _invalid_batch_report(report_path)
+    raw_items = payload.get("items")
+    if raw_items is not None and not isinstance(raw_items, list):
+        raise _invalid_batch_report_items(report_path)
+    return payload
+
+
 def _failed_urls_from_report(
     report_path: Path,
     *,
@@ -116,12 +130,7 @@ def _failed_urls_from_report(
 ) -> list[str]:
     if not report_path.is_file():
         raise FileExistenceError(str(report_path))
-    payload = _json_dict(report_path)
-    if not payload:
-        raise _invalid_batch_report(report_path)
-    raw_items = payload.get("items")
-    if raw_items is not None and not isinstance(raw_items, list):
-        raise _invalid_batch_report_items(report_path)
+    payload = _load_valid_batch_report_payload(report_path)
     urls = [
         str(item.get("url", "")).strip()
         for item in _report_items(payload)
@@ -169,9 +178,10 @@ def _retry_attempt_from_report(
 ) -> int | None:
     if not retry_report:
         return None
+    payload = _load_valid_batch_report_payload(Path(retry_report))
     matches = [
         item
-        for item in _report_items(_json_dict(Path(retry_report)))
+        for item in _report_items(payload)
         if str(item.get("url", "")).strip() == url
         and _report_item_matches_retry_filters(
             item,

@@ -2197,6 +2197,15 @@ def test_schema_migration_status_and_retry_failed_batch(tmp_path: Path) -> None:
             warning_service=None,
             downloader=RequestsURLDownloader(),
         )
+    malformed_report = tmp_path / "malformed-report.json"
+    malformed_report.write_text("{ invalid json }", encoding="utf-8")
+    with pytest.raises(ValidationError, match="Invalid batch report"):
+        process_url_file_input_with_report(
+            _args(retry_failed_from=str(malformed_report)),
+            reader=MagicTextSourceReader(),
+            warning_service=None,
+            downloader=RequestsURLDownloader(),
+        )
     invalid_items_report = tmp_path / "invalid-items-report.json"
     invalid_items_report.write_text('{"items": "bad"}', encoding="utf-8")
     with pytest.raises(ValidationError, match="Invalid batch report items"):

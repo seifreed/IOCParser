@@ -218,6 +218,9 @@ secrets.json
 # Development tools and quality assurance
 .ruff_cache/
 .bandit/
+
+# Local agent instructions
+AGENTS.md
 .black_cache/
 .isort_cache/
 .pylint.d/

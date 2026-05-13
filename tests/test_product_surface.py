@@ -1412,14 +1412,14 @@ def test_load_config_supports_extended_defaults(tmp_path: Path) -> None:
     args.severity = None
     args.tag = None
     args.streaming = False
-    args.url_workers = 4
-    args.url_retries = 0
-    args.url_backoff = 0.0
-    args.rate_limit = 0.0
-    args.parallel = 1
-    args.chunk_size = 1024 * 1024
-    args.overlap = 1024
-    args.diff_only = "all"
+    args.url_workers = None
+    args.url_retries = None
+    args.url_backoff = None
+    args.rate_limit = None
+    args.parallel = None
+    args.chunk_size = None
+    args.overlap = None
+    args.diff_only = None
     args.user_agent = None
     args.headers_json = None
     args.cookies_json = None
@@ -1453,6 +1453,7 @@ def test_load_config_supports_extended_defaults(tmp_path: Path) -> None:
         diff_only="added",
     )
     diff_args = _args()
+    diff_args.diff_only = None
     apply_config_defaults(diff_args, config_with_diff)
     assert diff_args.diff_only == "added"
 
@@ -1487,6 +1488,57 @@ def test_cli_boolean_network_flags_override_false_config() -> None:
 
     assert args.allow_redirects is True
     assert args.tls_verify is True
+
+
+def test_cli_numeric_defaults_override_config_when_explicit() -> None:
+    config = AppConfig(
+        persist=False,
+        db_uri=None,
+        config_path=None,
+        url_workers=8,
+        url_retries=2,
+        url_backoff=0.5,
+        rate_limit=0.25,
+        parallel=3,
+        chunk_size=4096,
+        overlap=128,
+        max_queue_size=9,
+        diff_only="added",
+    )
+    args = create_argument_parser().parse_args(
+        [
+            "--url-workers",
+            "4",
+            "--url-retries",
+            "0",
+            "--url-backoff",
+            "0",
+            "--rate-limit",
+            "0",
+            "--parallel",
+            "1",
+            "--chunk-size",
+            str(1024 * 1024),
+            "--overlap",
+            "1024",
+            "--max-queue-size",
+            "64",
+            "--diff-only",
+            "all",
+        ]
+    )
+
+    apply_config_defaults(args, config)
+
+    assert args.url_workers == 4
+    assert args.url_retries == 0
+    assert args.url_backoff == 0
+    assert args.rate_limit == 0
+    assert args.parallel == 1
+    assert args.chunk_size == 1024 * 1024
+    assert args.overlap == 1024
+    assert args.max_queue_size == 64
+    assert args.diff_only == "all"
 
 
 def test_requests_url_downloader_supports_retries_and_metadata() -> None:

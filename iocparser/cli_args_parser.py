@@ -70,10 +70,10 @@ def _add_processing_arguments(parser: argparse.ArgumentParser) -> None:
         "--streaming", action="store_true", help="Use streaming extraction for file inputs"
     )
     parser.add_argument(
-        "--chunk-size", type=int, default=1024 * 1024, help="Chunk size for streaming extraction"
+        "--chunk-size", type=int, default=None, help="Chunk size for streaming extraction"
     )
     parser.add_argument(
-        "--overlap", type=int, default=1024, help="Chunk overlap for streaming extraction"
+        "--overlap", type=int, default=None, help="Chunk overlap for streaming extraction"
     )
     parser.add_argument(
         "--recursive", action="store_true", help="Recurse into subdirectories in directory mode"
@@ -109,25 +109,28 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--parallel",
         type=int,
-        default=1,
+        default=None,
         help=f"Number of parallel workers for multiple files (max default flow {MAX_WORKERS})",
     )
     parser.add_argument(
         "--url-workers",
         type=int,
-        default=DEFAULT_URL_WORKERS,
+        default=None,
         help="Parallel workers for URL batch inputs",
     )
     parser.add_argument(
-        "--url-retries", type=int, default=0, help="Retries for URL batch downloads"
+        "--url-retries", type=int, default=None, help="Retries for URL batch downloads"
     )
     parser.add_argument(
-        "--url-backoff", type=float, default=0.0, help="Base backoff in seconds between URL retries"
+        "--url-backoff",
+        type=float,
+        default=None,
+        help="Base backoff in seconds between URL retries",
     )
     parser.add_argument(
         "--rate-limit",
         type=float,
-        default=0.0,
+        default=None,
         help="Minimum delay in seconds between URL requests",
     )
     parser.add_argument("--user-agent", help="HTTP User-Agent for URL downloads")
@@ -176,7 +179,7 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--max-queue-size",
         type=int,
-        default=64,
+        default=None,
         help="Maximum in-flight queue size for worker-style integration",
     )
 
@@ -210,7 +213,7 @@ def _add_persistence_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--diff-only",
         choices=["all", "added", "removed"],
-        default="all",
+        default=None,
         help="Limit diff output sections",
     )
     parser.add_argument(

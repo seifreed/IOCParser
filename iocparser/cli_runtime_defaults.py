@@ -56,19 +56,19 @@ def _apply_output_defaults(args: argparse.Namespace, config: AppConfig) -> None:
 
 
 def _apply_numeric_defaults(args: argparse.Namespace, config: AppConfig) -> None:
-    numeric_defaults: dict[str, tuple[int | float, int | float]] = {
-        "url_workers": (4, config.url_workers),
-        "url_retries": (0, config.url_retries),
-        "url_backoff": (0.0, config.url_backoff),
-        "rate_limit": (0.0, config.rate_limit),
-        "parallel": (1, config.parallel),
-        "chunk_size": (1024 * 1024, config.chunk_size),
-        "overlap": (1024, config.overlap),
-        "max_queue_size": (64, config.max_queue_size),
+    numeric_defaults: dict[str, int | float] = {
+        "url_workers": config.url_workers,
+        "url_retries": config.url_retries,
+        "url_backoff": config.url_backoff,
+        "rate_limit": config.rate_limit,
+        "parallel": config.parallel,
+        "chunk_size": config.chunk_size,
+        "overlap": config.overlap,
+        "max_queue_size": config.max_queue_size,
     }
-    for name, (default_value, configured) in numeric_defaults.items():
-        current: object = getattr(args, name, default_value)
-        if current == default_value and configured != default_value:
+    for name, configured in numeric_defaults.items():
+        current: object = getattr(args, name, None)
+        if current is None:
             setattr(args, name, configured)
     optional_numeric_defaults: dict[str, float | None] = {
         "max_input_size_mb": config.max_input_size_mb,
@@ -81,8 +81,8 @@ def _apply_numeric_defaults(args: argparse.Namespace, config: AppConfig) -> None
 
 
 def _apply_network_defaults(args: argparse.Namespace, config: AppConfig) -> None:
-    current_diff_only: object = getattr(args, "diff_only", "all")
-    if current_diff_only == "all" and config.diff_only != "all":
+    current_diff_only: object = getattr(args, "diff_only", None)
+    if current_diff_only is None:
         args.diff_only = _validated_diff_only(config.diff_only)
     network_defaults: dict[str, str | float | None] = {
         "user_agent": config.user_agent,

@@ -417,17 +417,17 @@ def test_apply_config_defaults_sets_pipeline_limit_values(tmp_path: Path) -> Non
         csv=False,
         stix=False,
         output_format=None,
-        url_workers=4,
-        url_retries=0,
-        url_backoff=0.0,
-        rate_limit=0.0,
-        parallel=1,
-        chunk_size=1024 * 1024,
-        overlap=1024,
-        max_queue_size=64,
+        url_workers=None,
+        url_retries=None,
+        url_backoff=None,
+        rate_limit=None,
+        parallel=None,
+        chunk_size=None,
+        overlap=None,
+        max_queue_size=None,
         max_input_size_mb=None,
         max_input_seconds=None,
-        diff_only="all",
+        diff_only=None,
         user_agent=None,
         proxy=None,
         tls_cert=None,
@@ -448,7 +448,7 @@ def test_apply_config_defaults_rejects_invalid_diff_only_config(tmp_path: Path) 
     config_path = tmp_path / "iocparser.ini"
     config_path.write_text("[defaults]\ndiff_only = bogus\n", encoding="utf-8")
     config = load_config(None, None, str(config_path))
-    args = SimpleNamespace(diff_only="all")
+    args = SimpleNamespace(diff_only=None)
 
     with pytest.raises(ValidationError, match="Invalid diff_only"):
         apply_config_defaults(args, config)

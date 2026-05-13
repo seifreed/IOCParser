@@ -69,7 +69,7 @@ class NetworkHeuristicPolicy:
             parsed = urllib.parse.urlparse(clean_for_parse)
         except (ValueError, AttributeError):
             return None
-        return parsed.netloc.lower(), parsed.path.lower()
+        return (parsed.hostname or "").lower(), parsed.path.lower()
 
     def is_file_sharing_url(self, domain: str) -> bool:
         return any(

@@ -588,6 +588,17 @@ class TestCoverageMissing:
         # Normal GitHub URLs should be filtered
         assert not any("normal-repo" in url for url in result)
 
+    def test_extract_urls_applies_code_hosting_filter_with_ports(self):
+        """Test code hosting heuristics use the hostname, not the netloc with port."""
+        text = """
+        Normal: https://github.com:443/user/normal-repo
+        Suspicious: https://github.com:443/user/malware/payload.exe
+        """
+        result = self.extractor.extract_urls(text)
+
+        assert "https://github.com:443/user/normal-repo" not in result
+        assert "https://github.com:443/user/malware/payload.exe" in result
+
     def test_extract_urls_does_not_treat_embedded_code_host_names_as_code_hosts(self):
         """Test domains containing code-host names are not filtered as real code hosts."""
         text = """

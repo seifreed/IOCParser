@@ -125,7 +125,10 @@ def postprocessor_names() -> tuple[str, ...]:
 
 def register_ioc_type_plugin(name: str, factory: IOCTypePluginFactory) -> None:
     """Register a plugin that contributes a custom IOC type."""
-    _ioc_type_registry[name.lower()] = factory
+    plugin_name = name.lower()
+    _ioc_type_registry[plugin_name] = factory
+    if _plugin_state["entry_points_loaded"]:
+        _register_ioc_type_plugin(plugin_name)
 
 
 def _ioc_type_plugin_definition(name: str) -> dict[str, object]:
@@ -175,28 +178,32 @@ def _load_discovered_entry_points(discovered: EntryPoints) -> None:
         register_ioc_type_plugin(entry_point.name, cast("IOCTypePluginFactory", entry_point.load()))
 
 
+def _register_ioc_type_plugin(plugin_name: str) -> None:
+    try:
+        definition = _ioc_type_plugin_definition(plugin_name)
+        base_type_raw = str(definition.get("base_type", "urls")).strip()
+        if not base_type_raw:
+            _logger.warning("Plugin '%s' has empty base_type, skipping", plugin_name)
+            return
+        register_custom_ioc_type(
+            str(definition.get("name", plugin_name)),
+            base_type=base_type_raw,
+            aliases=_string_tuple(definition.get("aliases")),
+            severity=str(definition["severity"])
+            if definition.get("severity") is not None
+            else None,
+            tags=_string_tuple(definition.get("tags")),
+            stix_pattern=str(definition["stix_pattern"])
+            if definition.get("stix_pattern") is not None
+            else None,
+        )
+    except (ValueError, TypeError, KeyError) as exc:
+        _logger.warning("Failed to register IOC type plugin '%s': %s", plugin_name, exc)
+
+
 def _register_discovered_ioc_types() -> None:
     for plugin_name in tuple(sorted(_ioc_type_registry)):
-        try:
-            definition = _ioc_type_plugin_definition(plugin_name)
-            base_type_raw = str(definition.get("base_type", "urls")).strip()
-            if not base_type_raw:
-                _logger.warning("Plugin '%s' has empty base_type, skipping", plugin_name)
-                continue
-            register_custom_ioc_type(
-                str(definition.get("name", plugin_name)),
-                base_type=base_type_raw,
-                aliases=_string_tuple(definition.get("aliases")),
-                severity=str(definition["severity"])
-                if definition.get("severity") is not None
-                else None,
-                tags=_string_tuple(definition.get("tags")),
-                stix_pattern=str(definition["stix_pattern"])
-                if definition.get("stix_pattern") is not None
-                else None,
-            )
-        except (ValueError, TypeError, KeyError) as exc:
-            _logger.warning("Failed to register IOC type plugin '%s': %s", plugin_name, exc)
+        _register_ioc_type_plugin(plugin_name)
 
 
 def _load_entry_point_plugins() -> None:

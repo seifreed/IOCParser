@@ -642,3 +642,24 @@ def test_plugin_entry_points_and_query_filter_edges() -> None:
     )
     assert added_only.removed.total_count() == 0
     assert removed_only.added.total_count() == 0
+
+
+def test_late_ioc_type_plugin_registration_becomes_available() -> None:
+    import iocparser.domain.enums as enums_module
+    import iocparser.plugins as plugins_module
+
+    previous_loaded = plugins_module._plugin_state["entry_points_loaded"]
+    plugins_module._plugin_state["entry_points_loaded"] = True
+    plugins_module._ioc_type_registry.pop("late-runtime-ioc", None)
+    enums_module._custom_ioc_types.pop("late_runtime_ioc", None)
+    try:
+        register_ioc_type_plugin(
+            "late-runtime-ioc",
+            lambda: {"name": "late_runtime_ioc", "base_type": "urls"},
+        )
+
+        assert "late_runtime_ioc" in custom_ioc_types()
+    finally:
+        plugins_module._ioc_type_registry.pop("late-runtime-ioc", None)
+        enums_module._custom_ioc_types.pop("late_runtime_ioc", None)
+        plugins_module._plugin_state["entry_points_loaded"] = previous_loaded

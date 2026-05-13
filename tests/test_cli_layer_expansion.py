@@ -300,6 +300,24 @@ def test_cli_output_helpers_cover_text_and_export_paths(tmp_path: Path) -> None:
     cli_output.save_diff_output(
         _query_args(output=str(tmp_path / "diff.jsonl"), jsonl=True), diff, file_writer=writer
     )
+    warning_diff = PersistedRunDiff(
+        left_run_id=1,
+        right_run_id=2,
+        added=ExtractionResult(
+            warnings=(
+                WarningMatch(
+                    ioc=IOC.from_raw("domains", "warning.example"),
+                    warning_list="Demo",
+                ),
+            )
+        ),
+        removed=ExtractionResult(iocs=(IOC.from_raw("domains", "normal.example"),)),
+    )
+    cli_output.save_diff_output(
+        _query_args(output=str(tmp_path / "diff.csv"), csv=True),
+        warning_diff,
+        file_writer=writer,
+    )
     cli_output.save_rendered_output(
         rendered_output="payload",
         output_label="text",
@@ -310,6 +328,9 @@ def test_cli_output_helpers_cover_text_and_export_paths(tmp_path: Path) -> None:
     )
     assert any(path.endswith("diff.txt") for path, _ in writer.writes)
     assert any(path.endswith("diff.jsonl") for path, _ in writer.writes)
+    assert "warning.example,True" in next(
+        content for path, content in writer.writes if path.endswith("diff.csv")
+    )
 
 
 def test_cli_queries_and_dispatch_paths(tmp_path: Path) -> None:

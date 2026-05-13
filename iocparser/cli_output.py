@@ -21,6 +21,7 @@ from iocparser.cli_processing_urls import int_value as _int_value
 from iocparser.domain.models import (
     BatchJobDetail,
     BatchJobSummary,
+    ExtractionResult,
     PersistedRunDiff,
     PersistedRunExport,
     PersistedRunQueryHit,
@@ -188,11 +189,17 @@ def _render_diff_csv(
     return output.getvalue()
 
 
+def _diff_records(result: ExtractionResult) -> list[dict[str, object]]:
+    records = [dict(ioc.to_record(), is_warning=False) for ioc in result.iocs]
+    records.extend(dict(warning.to_record(), is_warning=True) for warning in result.warnings)
+    return records
+
+
 def _build_diff_payload(
     diff: PersistedRunDiff, diff_only: str
 ) -> tuple[dict[str, object], list[dict[str, object]], list[dict[str, object]]]:
-    added_records = diff.added.to_records()
-    removed_records = diff.removed.to_records()
+    added_records = _diff_records(diff.added)
+    removed_records = _diff_records(diff.removed)
     payload: dict[str, object] = {
         "left_run_id": diff.left_run_id,
         "right_run_id": diff.right_run_id,

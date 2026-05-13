@@ -122,9 +122,11 @@ class RequestsURLDownloader(URLDownloader):
         """Return a downloader with the same policy plus overrides."""
         _T = TypeVar("_T")
 
-        def _pick(key: str, default: _T) -> _T:
-            result = overrides.get(key, default)
-            if result is None:
+        def _pick(key: str, default: _T, *, allow_none: bool = False) -> _T:
+            if key not in overrides:
+                return default
+            result = overrides[key]
+            if result is None and not allow_none:
                 return default
             return cast("_T", result)
 
@@ -139,7 +141,7 @@ class RequestsURLDownloader(URLDownloader):
             proxies=_pick("proxies", self.proxies),
             allow_redirects=_pick("allow_redirects", self.allow_redirects),
             verify=_pick("verify", self.verify),
-            cert=_pick("cert", self.cert),
+            cert=_pick("cert", self.cert, allow_none=True),
         )
 
     def download_metadata(self) -> dict[str, object]:

@@ -127,6 +127,14 @@ def test_requests_url_downloader_sanitizes_non_positive_timeouts() -> None:
     )
 
 
+def test_requests_url_downloader_with_policy_can_clear_client_cert() -> None:
+    downloader = RequestsURLDownloader(cert="/tmp/client.pem")
+
+    derived = downloader.with_policy(cert=None)
+
+    assert derived.cert is None
+
+
 def test_check_content_size_accepts_empty_and_small_values() -> None:
     check_content_size(None)
     check_content_size("1024")

@@ -1062,3 +1062,263 @@ def test_history_import_skip_and_same_origin_batch_paths() -> None:
     assert (
         ops._import_failed_batch_items(SimpleNamespace(), [{"batch_job_id": 3}], batch_map={}) == 0
     )
+
+
+def test_strict_coverage_option_and_metadata_edge_helpers() -> None:
+    from iocparser.api_persistence_query import bool_option, validated_ioc_type_filter
+    from iocparser.cli_output_rendering import (
+        _validated_severity_filters,
+        int_run_metadata_value,
+        optional_int_run_metadata_value,
+    )
+    from iocparser.cli_processing_url_reports import bool_value
+    from iocparser.cli_runtime_defaults import parse_http_mapping
+    from iocparser.client_persistence import validated_severity_values
+    from iocparser.domain.distributed import QueueEnvelope
+
+    assert bool_option("ON") is True
+    assert validated_ioc_type_filter("   ") is None
+    assert int_run_metadata_value({"items": "   "}, "items", 3) == 3
+    assert optional_int_run_metadata_value({"duration": True}, "duration") is None
+    assert optional_int_run_metadata_value({"duration": "   "}, "duration") is None
+    assert optional_int_run_metadata_value({"duration": "bad"}, "duration") is None
+    assert _validated_severity_filters("High,LOW") == ("high", "low")
+    assert bool_value(None, default=True) is True
+    assert bool_value(1) is True
+    assert parse_http_mapping("X-Test: value", separator=":") == {"X-Test": "value"}
+    assert validated_severity_values(("HIGH", "low")) == ("high", "low")
+
+    with pytest.raises(TypeError, match="bool-compatible"):
+        QueueEnvelope.from_record(
+            {
+                "request": {
+                    "input_kind": "text",
+                    "source_value": "payload",
+                    "persist": "maybe",
+                },
+            },
+        )
+
+
+def test_strict_coverage_infrastructure_edge_helpers(tmp_path) -> None:
+    from iocparser.infrastructure.http_download import RequestsURLDownloader
+    from iocparser.infrastructure.persistence_batch import _int_report_value
+    from iocparser.infrastructure.persistence_repository_support import (
+        int_metadata_value,
+        optional_int_metadata_value,
+    )
+    from iocparser.infrastructure.queue_filesystem import (
+        FilesystemQueueAdapter,
+        _validate_queue_name,
+    )
+    from iocparser.infrastructure.queue_rabbitmq import _payload_text
+
+    downloader = RequestsURLDownloader(timeout=12.0)
+    clone = downloader.with_policy(timeout=None)
+    assert clone.timeout == downloader.timeout
+
+    assert _int_report_value({"total": "   "}, "total", 9) == 9
+    metadata = {"count": "   "}
+    assert int_metadata_value(metadata, "count", 4) == 4
+    assert optional_int_metadata_value(metadata, "count") is None
+
+    with pytest.raises(ValueError, match="queue name"):
+        _validate_queue_name("..")
+
+    adapter = FilesystemQueueAdapter(tmp_path / "queues")
+    pending_dir = adapter._queue_dir("default", "pending")
+    dead_dir = adapter._queue_dir("default", "dead")
+    invalid_payload = pending_dir / "bad.json"
+    invalid_payload.write_text("{}", encoding="utf-8")
+    (dead_dir / "bad.json").write_text("existing", encoding="utf-8")
+
+    adapter._quarantine_invalid_payload("default", invalid_payload)
+
+    assert not invalid_payload.exists()
+    assert len(list(dead_dir.glob("bad*.json"))) == 2
+    assert _payload_text(b"\xff") == repr(b"\xff")
+
+
+def test_history_import_updates_stale_ioc_search_value(tmp_path) -> None:
+    from iocparser.infrastructure.persistence.history import ops
+    from iocparser.infrastructure.persistence_models import IOCModel
+    from iocparser.infrastructure.persistence_repository_support import normalize_ioc_search
+
+    db_uri = _fresh_db(tmp_path, "history-ioc-search.db")
+    engine = create_engine(db_uri, future=True)
+    try:
+        with Session(engine) as session:
+            ioc = IOCModel(
+                ioc_type="domains",
+                value="Example.COM",
+                value_search="stale",
+                is_warning=False,
+                warning_list="",
+                warning_description="",
+            )
+            session.add(ioc)
+            session.flush()
+
+            inserted, ioc_map = ops._import_iocs(
+                session,
+                [
+                    {
+                        "id": 42,
+                        "ioc_type": "domains",
+                        "value": "Example.COM",
+                        "is_warning": False,
+                        "warning_list": "",
+                        "warning_description": "",
+                    },
+                ],
+            )
+
+            assert inserted == 0
+            assert ioc_map == {42: ioc.id}
+            assert ioc.value_search == normalize_ioc_search("Example.COM")
+    finally:
+        engine.dispose()
+
+
+def test_streaming_mmap_general_exception_is_logged_and_reraised(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from iocparser.infrastructure.streaming import StreamingIOCExtractor
+
+    text_file = tmp_path / "mmap-error.txt"
+    text_file.write_text("https://example.com/path", encoding="utf-8")
+    extractor = StreamingIOCExtractor(chunk_size=8, overlap=0, defang=False)
+    monkeypatch.setattr(
+        extractor.extractor,
+        "extract_all",
+        lambda *_args, **_kwargs: _raise(RuntimeError("mmap failed")),
+    )
+
+    with pytest.raises(RuntimeError, match="mmap failed"):
+        extractor.extract_from_mmap(text_file)
+
+
+def test_warninglist_matching_empty_attribute_names_short_circuits() -> None:
+    from iocparser.infrastructure.warninglists_matching import WarningListMatchingMixin
+
+    class Matcher(WarningListMatchingMixin):
+        IOC_TYPE_MAPPING = {}
+        MISP_TYPE_MAPPING = {}
+
+        def _clean_defanged_value(self, value: str) -> str:
+            self.cleaned_value = value
+            return value
+
+    matcher = Matcher()
+
+    assert (
+        matcher._is_list_applicable(
+            {"matching_attributes": [" ", {"name": ""}]},
+            ["domain"],
+            "domains",
+        )
+        is False
+    )
+
+
+def test_duplicate_file_processing_interrupts_and_generic_errors(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import iocparser.cli_processing_files as files
+
+    sample = tmp_path / "sample.txt"
+    sample.write_text("payload", encoding="utf-8")
+    request = files.MultiFileProcessingRequest()
+    options = request.to_processing_options()
+
+    monkeypatch.setattr(
+        files,
+        "_streaming_result",
+        lambda *_args, **_kwargs: _raise(KeyboardInterrupt()),
+    )
+    with pytest.raises(KeyboardInterrupt):
+        files._process_duplicate_streaming_files(
+            [sample],
+            options=options,
+            warning_service=None,
+            request=request,
+        )
+
+    monkeypatch.setattr(
+        files,
+        "process_file",
+        lambda *_args, **_kwargs: _raise(RuntimeError("batch failed")),
+    )
+    results = files._process_duplicate_files(
+        [sample],
+        reader=SimpleNamespace(),
+        warning_service=None,
+        request=request,
+    )
+    assert results.entries[0].normal_iocs == {}
+    assert results.entries[0].warning_iocs == {}
+
+    monkeypatch.setattr(
+        files,
+        "process_file",
+        lambda *_args, **_kwargs: _raise(KeyboardInterrupt()),
+    )
+    with pytest.raises(KeyboardInterrupt):
+        files._process_duplicate_files(
+            [sample],
+            reader=SimpleNamespace(),
+            warning_service=None,
+            request=request,
+        )
+
+
+def test_pipeline_url_preparation_derives_missing_hash_metadata(tmp_path) -> None:
+    import hashlib
+
+    from iocparser.domain.pipeline import ResourceLimits
+    from iocparser.pipeline_worker_support import _prepare_url_input
+
+    payload_path = tmp_path / "download.txt"
+    payload_path.write_bytes(b"url payload")
+    expected_hash = hashlib.sha256(payload_path.read_bytes()).hexdigest()
+
+    class Downloader:
+        def __init__(self, metadata: dict[str, object]) -> None:
+            self.last_download_metadata = metadata
+
+        def download(self, _url: str) -> str:
+            return str(payload_path)
+
+    prepared_without_hash = _prepare_url_input(
+        client=SimpleNamespace(
+            downloader=Downloader({"input_size": payload_path.stat().st_size}),
+        ),
+        limits=ResourceLimits(max_input_size_bytes=100),
+        url="https://example.com/report",
+    )
+    assert prepared_without_hash.content_hash == expected_hash
+    assert prepared_without_hash.fingerprint == expected_hash[:16]
+
+    prepared_without_fingerprint = _prepare_url_input(
+        client=SimpleNamespace(
+            downloader=Downloader(
+                {
+                    "input_size": payload_path.stat().st_size,
+                    "content_hash": expected_hash,
+                },
+            ),
+        ),
+        limits=ResourceLimits(max_input_size_bytes=100),
+        url="https://example.com/report",
+    )
+    assert prepared_without_fingerprint.fingerprint == expected_hash[:16]
+
+
+def test_worker_config_bool_env_false_value(monkeypatch: pytest.MonkeyPatch) -> None:
+    from iocparser.worker_config_support import bool_env
+
+    monkeypatch.setenv("IOCPARSER_TEST_BOOL", "off")
+
+    assert bool_env("IOCPARSER_TEST_BOOL", default=True) is False

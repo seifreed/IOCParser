@@ -25,14 +25,15 @@ def int_metadata_value(metadata: dict[str, int | str | None], key: str, default:
     if isinstance(raw_value, bool):
         return default
     if isinstance(raw_value, int):
-        return raw_value
+        return raw_value if raw_value >= 0 else default
     stripped = raw_value.strip()
     if not stripped:
         return default
     try:
-        return int(stripped)
+        parsed = int(stripped)
     except ValueError:
         return default
+    return parsed if parsed >= 0 else default
 
 
 def optional_int_metadata_value(metadata: dict[str, int | str | None], key: str) -> int | None:
@@ -42,14 +43,15 @@ def optional_int_metadata_value(metadata: dict[str, int | str | None], key: str)
     if isinstance(raw_value, bool):
         return None
     if isinstance(raw_value, int):
-        return raw_value
+        return raw_value if raw_value >= 0 else None
     stripped = raw_value.strip()
     if not stripped:
         return None
     try:
-        return int(stripped)
+        parsed = int(stripped)
     except ValueError:
         return None
+    return parsed if parsed >= 0 else None
 
 
 def string_metadata_value(metadata: dict[str, int | str | None], key: str, default: str) -> str:

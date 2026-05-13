@@ -653,8 +653,9 @@ class TestStreamingIOCExtractor:
             temp_path = Path(f.name)
 
         try:
-            with pytest.raises(ValueError, match="cannot mmap an empty file"):
-                extractor.extract_from_mmap(temp_path)
+            result = extractor.extract_from_mmap(temp_path)
+
+            assert result == {}
         finally:
             temp_path.unlink()
 

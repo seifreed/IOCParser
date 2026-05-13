@@ -320,6 +320,9 @@ class StreamingIOCExtractor:
         self.seen_iocs.clear()
         all_iocs: dict[str, list[str]] = defaultdict(list)
 
+        if file_path.stat().st_size == 0:
+            return {}
+
         try:
             with (
                 file_path.open("rb") as f,

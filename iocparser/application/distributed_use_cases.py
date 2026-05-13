@@ -24,6 +24,19 @@ def _phase_metrics(result: PipelineJobResult) -> dict[str, object]:
     return dict(result.phase_timings_ms)
 
 
+def _advance_envelope(envelope: QueueEnvelope) -> QueueEnvelope:
+    return QueueEnvelope(
+        request=envelope.request,
+        queue_backend=envelope.queue_backend,
+        queue_name=envelope.queue_name,
+        attempts=envelope.attempts + 1,
+        max_attempts=envelope.max_attempts,
+        idempotency_key=envelope.idempotency_key,
+        schema_version=envelope.schema_version,
+        submitted_at=envelope.submitted_at,
+    )
+
+
 __all__ = ["DistributedPipelineCoordinator", "idempotency_key_for"]
 
 
@@ -152,28 +165,12 @@ class DistributedPipelineCoordinator:
                     if self.job_service and result.error is not None
                     else None
                 )
-                next_envelope = QueueEnvelope(
-                    request=envelope.request,
-                    queue_backend=envelope.queue_backend,
-                    queue_name=envelope.queue_name,
-                    attempts=envelope.attempts + 1,
-                    max_attempts=envelope.max_attempts,
-                    idempotency_key=envelope.idempotency_key,
-                    schema_version=envelope.schema_version,
-                    submitted_at=envelope.submitted_at,
-                )
+                next_envelope = _advance_envelope(envelope)
                 next_receipt = self.queue_adapter.requeue(receipt, envelope=next_envelope)
                 self._emit("job_requeued", envelope, {"receipt_id": next_receipt.receipt_id})
                 return stored or result
 
-            dead_envelope = QueueEnvelope(
-                request=envelope.request,
-                queue_backend=envelope.queue_backend,
-                queue_name=envelope.queue_name,
-                attempts=envelope.attempts + 1,
-                max_attempts=envelope.max_attempts,
-                idempotency_key=envelope.idempotency_key,
-            )
+            dead_envelope = _advance_envelope(envelope)
             stored = (
                 self.job_service.mark_dead_lettered(
                     job_id=str(envelope.request.job_id),
@@ -196,6 +193,7 @@ class DistributedPipelineCoordinator:
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception as exc:
+            failed_envelope = _advance_envelope(envelope)
             if self.job_service is not None:
                 from iocparser.pipeline_errors import classify_pipeline_exception
 
@@ -205,7 +203,7 @@ class DistributedPipelineCoordinator:
                     error=classify_pipeline_exception(exc),
                 )
             with suppress(Exception):
-                self.queue_adapter.dead_letter(receipt, envelope=envelope)
+                self.queue_adapter.dead_letter(receipt, envelope=failed_envelope)
             self._emit(
                 "job_dead_lettered",
                 envelope,

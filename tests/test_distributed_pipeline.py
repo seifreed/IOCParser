@@ -196,6 +196,10 @@ def test_distributed_pipeline_dead_letters_on_unexpected_exception(tmp_path: Pat
     dead_letters = service.list_dead_letters(limit=10)
     assert len(dead_letters) == 1
     assert dead_letters[0].error.code == "UNEXPECTED_FAILURE"
+    dead_queue_payloads = list((tmp_path / "queue" / "unexpected" / "dead").glob("*.json"))
+    assert len(dead_queue_payloads) == 1
+    dead_queue_record = json.loads(dead_queue_payloads[0].read_text(encoding="utf-8"))
+    assert dead_queue_record["attempts"] == 1
 
 
 def test_queue_factory_and_client_wrapper(tmp_path: Path) -> None:

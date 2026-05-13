@@ -6,6 +6,7 @@ from logging import Logger
 from typing import ClassVar
 from urllib.parse import urlparse
 
+from iocparser.domain.enums import IOCType
 from iocparser.infrastructure.logger import get_logger
 from iocparser.infrastructure.warninglists_match_checks import (
     check_cidr as _check_cidr_value,
@@ -164,20 +165,9 @@ class WarningListMatchingMixin:
         ]
 
     def _is_known_ioc_type(self, ioc_type: str) -> bool:
-        known_types = set(self.IOC_TYPE_MAPPING.values()) | set(self.MISP_TYPE_MAPPING)
-        known_types.update(
-            {
-                "md5",
-                "sha1",
-                "sha256",
-                "sha512",
-                "ssdeep",
-                "imphash",
-                "bitcoin",
-                "ethereum",
-                "monero",
-            }
-        )
+        known_types = {known_type.value for known_type in IOCType}
+        known_types.update(self.IOC_TYPE_MAPPING.values())
+        known_types.update(self.MISP_TYPE_MAPPING)
         return ioc_type in known_types
 
     def _get_candidate_list_ids(self, ioc_type: str) -> list[str]:

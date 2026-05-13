@@ -1573,6 +1573,26 @@ class TestWarningListsCheckValueEdgeCases:
         assert not is_warning
         assert info is None
 
+    def test_all_builtin_ioc_types_avoid_unrelated_warning_list_fallback(self):
+        warning_lists = make_warning_lists()
+
+        warning_lists.warning_lists = {
+            "email-only": {
+                "name": "Email Only",
+                "description": "Values that only apply to email IOCs",
+                "type": "string",
+                "matching_attributes": ["email"],
+                "list": [r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run"],
+            }
+        }
+        warning_lists._preprocess_lists()
+
+        is_warning, info = warning_lists.check_value(
+            r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run", "registry"
+        )
+        assert not is_warning
+        assert info is None
+
     def test_unscoped_warning_lists_still_apply_when_relevant_lists_exist(self):
         warning_lists = make_warning_lists()
 

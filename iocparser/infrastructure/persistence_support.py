@@ -147,15 +147,15 @@ def load_result(session: Session, run_id: int) -> ExtractionResult:
         tags = _tags_from_json(run_ioc.tags_json or "[]")
         if model.is_warning:
             inferred_type = IOC.from_raw(model.ioc_type, model.value).ioc_type
+            warning_severity, warning_tags = classify_ioc(inferred_type, is_warning=True)
             warnings.append(
                 WarningMatch(
                     ioc=IOC.from_raw(
                         model.ioc_type,
                         model.value,
                         evidence=evidence,
-                        severity=run_ioc.severity
-                        or classify_ioc(inferred_type, is_warning=True)[0],
-                        tags=tags,
+                        severity=run_ioc.severity or warning_severity,
+                        tags=tags or warning_tags,
                     ),
                     warning_list=model.warning_list,
                     description=model.warning_description,

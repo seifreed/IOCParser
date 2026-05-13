@@ -2054,6 +2054,51 @@ def test_query_filters_and_previous_successful_baseline(tmp_path: Path) -> None:
     assert compared.left_run_id != failed_run_id
 
 
+def test_export_run_rehydrates_legacy_warning_tags(tmp_path: Path) -> None:
+    db_uri = f"sqlite:///{tmp_path / 'legacy-warning-tags.db'}"
+    service = SQLAlchemyPersistenceService(db_uri)
+    warning_result = ExtractionResult(
+        warnings=(
+            WarningMatch(
+                ioc=IOC.from_raw(
+                    "domains",
+                    "legacy-warning.example",
+                    severity="informational",
+                    tags=("warning-list-match", "network"),
+                ),
+                warning_list="Legacy List",
+                description="legacy row",
+            ),
+        ),
+    )
+    (run_id,) = service.persist_multiple_runs(
+        [("file", "legacy-warning.txt", warning_result)],
+        tool_version="5.0.0",
+        options=PersistOptions(
+            defang=False, check_warnings=True, force_update=False, output_format="json"
+        ),
+    )
+
+    from iocparser.infrastructure.persistence_schema import RunIOCModel
+
+    unit_of_work = SQLAlchemyUnitOfWork(db_uri)
+    try:
+        run_ioc = unit_of_work.session.query(RunIOCModel).one()
+        run_ioc.tags_json = "[]"
+        run_ioc.tags_search = ""
+        unit_of_work.commit()
+    finally:
+        unit_of_work.close()
+
+    exported = service.export_run(run_id=run_id)
+    warning_tags = exported.result.warnings[0].ioc.tags
+
+    assert "warning-list-match" in warning_tags
+    assert exported.result.filter_analyst_view(
+        tags=("warning-list-match",), include_normal=False
+    ).warnings
+
+
 def test_batch_report_and_partial_url_failures_are_printed(tmp_path: Path) -> None:
     buffer = StringIO()
     with redirect_stdout(buffer):

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 from iocparser.distributed_pipeline import DistributedPipelineService
@@ -108,9 +109,10 @@ class DistributedWorkerService:
         stop_event: threading.Event | None = None,
         max_cycles: int | None = None,
     ) -> int:
+        if max_cycles is not None and max_cycles <= 0:
+            return 0
         workers = self.concurrency
-        cycles = 0
-        processed = 0
+        cycles = processed = 0
         if workers <= 1:
             while stop_event is None or not stop_event.is_set():
                 current = self.run_once()
@@ -121,8 +123,6 @@ class DistributedWorkerService:
                 if current == 0:
                     time.sleep(self.poll_interval_seconds)
         else:
-            from concurrent.futures import ThreadPoolExecutor
-
             with ThreadPoolExecutor(max_workers=workers) as executor:
                 while stop_event is None or not stop_event.is_set():
                     futures = [executor.submit(self.run_once) for _ in range(workers)]

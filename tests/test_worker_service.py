@@ -290,6 +290,22 @@ def test_worker_service_single_worker_sleep_on_empty():
     assert w.run_forever(max_cycles=2) == 0
 
 
+def test_worker_service_zero_max_cycles_does_not_process():
+    calls = [0]
+
+    def process_next(**_kwargs):
+        calls[0] += 1
+        return "processed"
+
+    svc = _SimpleNamespace(process_next=process_next)
+    w = DistributedWorkerService(
+        service=svc, queue_name="zero", poll_interval_seconds=0.0, max_messages_per_cycle=1
+    )
+
+    assert w.run_forever(max_cycles=0) == 0
+    assert calls == [0]
+
+
 def test_worker_service_concurrent_positive_result():
     """Concurrent path must take short sleep when messages are processed."""
     svc = _SimpleNamespace(
@@ -358,6 +374,6 @@ def test_worker_service_propagates_keyboard_interrupt_forever():
     w = DistributedWorkerService(
         service=svc, queue_name="k", poll_interval_seconds=0.0, max_messages_per_cycle=1
     )
-    with patch("concurrent.futures.ThreadPoolExecutor", _FakeExecutor):
+    with patch("iocparser.worker_service.ThreadPoolExecutor", _FakeExecutor):
         with pytest.raises(KeyboardInterrupt):
             w.run_forever(max_cycles=1)

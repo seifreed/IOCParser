@@ -2245,6 +2245,45 @@ def test_plugin_registry_and_structured_records(tmp_path: Path) -> None:
         plugins_module._plugin_state["entry_points_loaded"] = False
 
 
+def test_ioc_type_plugin_lookup_loads_entry_points() -> None:
+    import iocparser.plugins as plugins_module
+
+    class _EntryPoints:
+        @staticmethod
+        def select(*, group: str):
+            if group == "iocparser.ioc_types":
+                return [
+                    type(
+                        "EP",
+                        (),
+                        {
+                            "name": "entry-ioc-type",
+                            "load": staticmethod(
+                                lambda: (
+                                    lambda: {
+                                        "name": "entry_ioc_type",
+                                        "base_type": "urls",
+                                    }
+                                )
+                            ),
+                        },
+                    )()
+                ]
+            return []
+
+    plugins_module._plugin_state["entry_points_loaded"] = False
+    plugins_module._ioc_type_registry.pop("entry-ioc-type", None)
+    original_entry_points = plugins_module.entry_points
+    try:
+        plugins_module.entry_points = _EntryPoints
+        definition = plugins_module.get_ioc_type_plugin("entry-ioc-type")
+        assert definition["name"] == "entry_ioc_type"
+    finally:
+        plugins_module.entry_points = original_entry_points
+        plugins_module._ioc_type_registry.pop("entry-ioc-type", None)
+        plugins_module._plugin_state["entry_points_loaded"] = False
+
+
 def test_internal_http_mapping_and_static_timeout_helpers() -> None:
     assert _parse_http_mapping("", separator=":") == {}
     assert _parse_http_mapping('{"X-Test": "1"}', separator=":") == {"X-Test": "1"}

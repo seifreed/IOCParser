@@ -128,9 +128,14 @@ def register_ioc_type_plugin(name: str, factory: IOCTypePluginFactory) -> None:
     _ioc_type_registry[name.lower()] = factory
 
 
+def _ioc_type_plugin_definition(name: str) -> dict[str, object]:
+    return dict(_ioc_type_registry[name.lower()]())
+
+
 def get_ioc_type_plugin(name: str) -> dict[str, object]:
     """Resolve a custom IOC type plugin definition."""
-    return dict(_ioc_type_registry[name.lower()]())
+    _load_entry_point_plugins()
+    return _ioc_type_plugin_definition(name)
 
 
 def ioc_type_plugin_names() -> tuple[str, ...]:
@@ -173,7 +178,7 @@ def _load_discovered_entry_points(discovered: EntryPoints) -> None:
 def _register_discovered_ioc_types() -> None:
     for plugin_name in tuple(sorted(_ioc_type_registry)):
         try:
-            definition = get_ioc_type_plugin(plugin_name)
+            definition = _ioc_type_plugin_definition(plugin_name)
             base_type_raw = str(definition.get("base_type", "urls")).strip()
             if not base_type_raw:
                 _logger.warning("Plugin '%s' has empty base_type, skipping", plugin_name)

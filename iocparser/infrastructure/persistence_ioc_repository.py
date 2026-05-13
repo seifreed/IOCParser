@@ -17,6 +17,11 @@ from iocparser.infrastructure.persistence_repository_support import (
 from iocparser.interfaces.ports import IOCRepository
 
 
+def _refresh_search_value(ioc: IOCModel, search_value: str) -> None:
+    if getattr(ioc, "value_search", search_value) != search_value:
+        ioc.value_search = search_value
+
+
 class SQLAlchemyIOCRepository(IOCRepository):
     def __init__(self, session: Session) -> None:
         self.session = session
@@ -30,6 +35,7 @@ class SQLAlchemyIOCRepository(IOCRepository):
         warning_list: str,
         warning_description: str,
     ) -> int:
+        search_value = normalize_ioc_search(value)
         stmt = select(IOC_MODEL).where(
             IOCModel.ioc_type == ioc_type,
             IOCModel.value == value,
@@ -40,11 +46,12 @@ class SQLAlchemyIOCRepository(IOCRepository):
         ioc_rows: list[IOCModel] = self.session.execute(stmt).scalars().all()
         ioc = ioc_rows[0] if ioc_rows else None
         if ioc is not None:
+            _refresh_search_value(ioc, search_value)
             return ioc.id
         ioc = IOC_MODEL(
             ioc_type=ioc_type,
             value=value,
-            value_search=normalize_ioc_search(value),
+            value_search=search_value,
             is_warning=is_warning,
             warning_list=warning_list,
             warning_description=warning_description,
@@ -63,7 +70,9 @@ class SQLAlchemyIOCRepository(IOCRepository):
                 ioc_rows = self.session.execute(stmt).scalars().all()
             if not ioc_rows:
                 raise
-            return ioc_rows[0].id
+            ioc = ioc_rows[0]
+            _refresh_search_value(ioc, search_value)
+            return ioc.id
         return ioc.id
 
     def get_or_create_normal(self, result: ExtractionResultLike | ExtractionResult) -> list[int]:

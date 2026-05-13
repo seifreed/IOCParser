@@ -104,6 +104,38 @@ def test_repositories_reuse_existing_source_and_iocs(tmp_path) -> None:
     unit_of_work.close()
 
 
+def test_ioc_repository_refreshes_legacy_defanged_search_value(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-legacy-search.db"
+    unit_of_work = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
+    try:
+        legacy_ioc = IOCModel(
+            ioc_type="urls",
+            value="hxxps://Example[.]COM/a",
+            value_search="hxxps://example[.]com/a",
+            is_warning=False,
+            warning_list="",
+            warning_description="",
+        )
+        unit_of_work.session.add(legacy_ioc)
+        unit_of_work.session.flush()
+        legacy_id = legacy_ioc.id
+
+        ids = unit_of_work.ioc_repository.get_or_create_normal(
+            ExtractionResult.from_grouped_payload(
+                {"urls": ["hxxps://Example[.]COM/a"]},
+                {},
+            )
+        )
+        unit_of_work.commit()
+
+        refreshed = unit_of_work.session.get(IOCModel, legacy_id)
+        assert ids == [legacy_id]
+        assert refreshed is not None
+        assert refreshed.value_search == "https://example.com/a"
+    finally:
+        unit_of_work.close()
+
+
 def test_persisted_diff_compares_canonical_ioc_values(tmp_path) -> None:
     db_path = tmp_path / "iocparser-diff-canonical.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")

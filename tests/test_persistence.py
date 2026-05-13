@@ -249,6 +249,36 @@ def test_import_history_matches_existing_url_sources_by_normalized_identity(tmp_
     assert len(sources) == 1
 
 
+def test_import_history_normalizes_new_url_source_metadata(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-import-new-url-source.db"
+    service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
+    timestamp = "2026-05-13T00:00:00"
+    payload: dict[str, object] = {
+        "sources": [
+            {
+                "id": 99,
+                "kind": "url",
+                "value": "HTTPS://Example.TEST/report#section",
+                "value_search": "https://example.test/report#section",
+                "normalized_url": "HTTPS://Example.TEST/report#section",
+                "first_seen": timestamp,
+                "last_seen": timestamp,
+            }
+        ]
+    }
+
+    counts = service.import_history(payload)
+
+    checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
+    with Session(checker.engine) as session:
+        (source,) = session.execute(select(Source)).scalars().all()
+    checker.close()
+
+    assert counts["sources"] == 1
+    assert source.original_url == "HTTPS://Example.TEST/report#section"
+    assert source.normalized_url == "https://example.test/report"
+
+
 def test_persisted_diff_compares_canonical_ioc_values(tmp_path) -> None:
     db_path = tmp_path / "iocparser-diff-canonical.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")

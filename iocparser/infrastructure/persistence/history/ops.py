@@ -553,6 +553,9 @@ def _import_sources(session: Session, rows: list[dict[str, object]]) -> tuple[in
     source_map: dict[int, int] = {}
     for row in rows:
         typed = typed_row(row)
+        if str(typed.get("kind", "")) == "url":
+            typed["original_url"] = typed.get("original_url") or typed.get("value")
+            typed["normalized_url"] = _source_identity(typed)[1]
         existing = _existing_source(session, typed)
         if existing is None:
             source = SourceModel(**{key: value for key, value in typed.items() if key != "id"})

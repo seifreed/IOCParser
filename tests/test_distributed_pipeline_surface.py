@@ -217,6 +217,16 @@ def test_filesystem_queue_rejects_external_receipt_paths(tmp_path: Path) -> None
     assert victim.read_text(encoding="utf-8") == "do-not-delete"
 
 
+def test_filesystem_queue_rejects_pending_receipt_ack(tmp_path: Path) -> None:
+    adapter = FilesystemQueueAdapter(tmp_path / "queue")
+    pending_receipt = adapter.enqueue(queue_name="safe", envelope=_envelope("pending-job"))
+
+    with pytest.raises(ValueError, match="receipt"):
+        adapter.ack(pending_receipt)
+
+    assert Path(pending_receipt.receipt_id).exists()
+
+
 def test_filesystem_queue_quarantines_invalid_payload_and_continues(tmp_path: Path) -> None:
     adapter = FilesystemQueueAdapter(tmp_path / "queue")
     pending_dir = tmp_path / "queue" / "bad-payload" / "pending"

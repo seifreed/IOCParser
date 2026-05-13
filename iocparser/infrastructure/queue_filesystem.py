@@ -138,8 +138,11 @@ class FilesystemQueueAdapter:
 
     def _receipt_path(self, receipt: QueueReceipt) -> Path:
         receipt_path = Path(receipt.receipt_id)
+        expected_dir = (self.root_dir / receipt.queue_name / "processing").resolve()
         try:
-            receipt_path.resolve().relative_to(self.root_dir.resolve())
+            resolved = receipt_path.resolve()
+            resolved.relative_to(self.root_dir.resolve())
+            resolved.relative_to(expected_dir)
         except ValueError as exc:
             raise ValueError(INVALID_RECEIPT_PATH_ERROR) from exc
         return receipt_path

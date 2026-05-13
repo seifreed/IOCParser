@@ -11,6 +11,7 @@ from iocparser.infrastructure.persistence_models import IOCModel
 from iocparser.infrastructure.persistence_repository_support import (
     IOC_MODEL,
     ExtractionResultLike,
+    normalize_ioc_search,
     normalized_ioc_type_name,
 )
 from iocparser.interfaces.ports import IOCRepository
@@ -43,7 +44,7 @@ class SQLAlchemyIOCRepository(IOCRepository):
         ioc = IOC_MODEL(
             ioc_type=ioc_type,
             value=value,
-            value_search=value.strip().lower(),
+            value_search=normalize_ioc_search(value),
             is_warning=is_warning,
             warning_list=warning_list,
             warning_description=warning_description,

@@ -7,6 +7,7 @@ from typing import Protocol, cast, runtime_checkable
 from iocparser.domain.enums import ioc_type_name
 from iocparser.domain.models import ExtractionResult
 from iocparser.infrastructure.persistence_models import IOCModel, RunIOCModel, RunModel, SourceModel
+from iocparser.shared_utils import refang_ioc
 
 SOURCE_MODEL: type[SourceModel] = SourceModel
 IOC_MODEL: type[IOCModel] = IOCModel
@@ -16,6 +17,10 @@ RUN_IOC_MODEL: type[RunIOCModel] = RunIOCModel
 
 def normalize_search(value: str | None) -> str:
     return (value or "").strip().lower()
+
+
+def normalize_ioc_search(value: str | None) -> str:
+    return refang_ioc(value or "").strip().lower()
 
 
 def int_metadata_value(metadata: dict[str, int | str | None], key: str, default: int) -> int:

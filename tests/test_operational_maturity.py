@@ -233,6 +233,37 @@ def test_search_page_uses_sql_side_filters_and_indexes(tmp_path: Path) -> None:
     assert "ix_run_iocs_tags_search" in run_ioc_indexes
 
 
+def test_persisted_ioc_search_matches_refanged_values(tmp_path: Path) -> None:
+    db_uri = f"sqlite:///{tmp_path / 'refanged-search.sqlite'}"
+    unit_of_work = SQLAlchemyUnitOfWork(db_uri)
+    try:
+        persist_run(
+            PersistRunInput(
+                source=Source.from_raw("file", "defanged.txt"),
+                result=ExtractionResult(iocs=(IOC.from_raw("urls", "hxxps://Example[.]COM/a"),)),
+                tool_version="5.0.0",
+                options=PersistOptions(
+                    defang=False,
+                    check_warnings=False,
+                    force_update=False,
+                    output_format="json",
+                ),
+            ),
+            unit_of_work=unit_of_work,
+        )
+    finally:
+        unit_of_work.close()
+
+    page = query_persisted_iocs(
+        db_uri=db_uri,
+        value="https://example.com/a",
+        search_backend="like",
+    )
+
+    assert page.total == 1
+    assert page.items[0].value == "hxxps://Example[.]COM/a"
+
+
 def test_search_page_applies_multiple_exclude_tags(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'exclude-tags.sqlite'}"
     _persist_result(db_uri, source_value="one.txt", ioc_value="one.example", tags=("phishing",))

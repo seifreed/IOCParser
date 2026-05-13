@@ -52,6 +52,7 @@ from iocparser.infrastructure.persistence.history import (
 from iocparser.infrastructure.persistence.query.diff import diff_run_exports
 from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
 from iocparser.infrastructure.persistence_fts import build_fts_query, has_fts_table
+from iocparser.infrastructure.persistence_repository_support import normalize_ioc_search
 from iocparser.infrastructure.persistence_schema import (
     IOCModel,
     RunIOCModel,
@@ -147,7 +148,7 @@ def query_runs_page(query: RunPageQuery) -> PersistedRunsPage:
 def search_iocs_page(query: IOCSearchPageQuery) -> PersistedIOCSearchPage:
     unit_of_work = SQLAlchemyUnitOfWork(query.db_uri)
     try:
-        normalized_value = query.value.strip().lower()
+        normalized_value = normalize_ioc_search(query.value)
         if not normalized_value:
             raise ValueError(SEARCH_QUERY_REQUIRED)
         stmt = (

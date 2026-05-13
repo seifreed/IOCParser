@@ -269,8 +269,18 @@ def _prepare_url_input(
     temp_file = client.downloader.download(url)
     try:
         metadata = dict(client.downloader.last_download_metadata or {})
-        input_size = metadata_int(metadata, "input_size") or 0
+        downloaded_path = Path(temp_file)
+        input_size = metadata_int(metadata, "input_size")
+        if input_size is None:
+            input_size = downloaded_path.stat().st_size
+            metadata["input_size"] = input_size
         enforce_size_limit(limits=limits, input_size_bytes=input_size)
+        if not isinstance(metadata.get("content_hash"), str):
+            content_hash = hashlib.sha256(downloaded_path.read_bytes()).hexdigest()
+            metadata["content_hash"] = content_hash
+            metadata["fingerprint"] = content_hash[:16]
+        elif not isinstance(metadata.get("fingerprint"), str):
+            metadata["fingerprint"] = str(metadata["content_hash"])[:16]
         url_metadata = dict(metadata)
         url_metadata["temp_file"] = temp_file
         url_metadata["source_kind"] = "url"

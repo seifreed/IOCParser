@@ -244,6 +244,45 @@ def test_pipeline_worker_cleans_downloaded_url_when_runtime_size_limit_fails(
     assert not temp_file.exists()
 
 
+def test_pipeline_worker_enforces_downloaded_file_size_when_url_metadata_omits_size(
+    tmp_path: Path,
+) -> None:
+    temp_file = tmp_path / "downloaded.txt"
+    temp_file.write_text("too large", encoding="utf-8")
+
+    class FakeDownloader:
+        last_download_metadata: dict[str, object] | None = {}
+
+        def download(self, url: str) -> str:
+            assert url == "https://example.test/report"
+            return str(temp_file)
+
+    class FakeClient:
+        downloader = FakeDownloader()
+
+        def extract_result_from_text(self, text_content: str, **kwargs: object) -> ExtractionResult:
+            raise AssertionError("text extraction should not run")
+
+        def extract_result_from_file(self, file_path: str, **kwargs: object) -> ExtractionResult:
+            raise AssertionError("oversized URL extraction should not run")
+
+    result = PipelineWorker(
+        client=FakeClient(),
+        limits=ResourceLimits(max_input_size_bytes=1),
+    ).process(
+        PipelineJobRequest(
+            input_kind="url",
+            source_value="https://example.test/report",
+            check_warnings=False,
+        )
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "VALIDATION_FAILED"
+    assert not temp_file.exists()
+
+
 def test_pipeline_worker_cleans_downloaded_url_when_processed_run_is_skipped(
     tmp_path: Path,
 ) -> None:

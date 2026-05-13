@@ -34,6 +34,7 @@ def _dedup_case_insensitive(items: list[str]) -> list[str]:
 @dataclass(frozen=True)
 class NetworkHeuristicPolicy:
     file_sharing_sites: frozenset[str]
+    code_hosting_domains: tuple[str, ...]
     suspicious_path_keywords: tuple[str, ...]
     documentation_domains: tuple[str, ...]
     filtered_url_suffixes: tuple[str, ...]
@@ -75,8 +76,13 @@ class NetworkHeuristicPolicy:
             domain == site or domain.endswith(f".{site}") for site in self.file_sharing_sites
         )
 
+    def is_code_hosting_url(self, domain: str) -> bool:
+        return any(
+            domain == site or domain.endswith(f".{site}") for site in self.code_hosting_domains
+        )
+
     def is_suspicious_code_hosting_url(self, domain: str, path: str) -> bool:
-        if not ("github.com" in domain or "gitlab.com" in domain or "bitbucket.org" in domain):
+        if not self.is_code_hosting_url(domain):
             return False
         return any(keyword in path for keyword in self.suspicious_path_keywords)
 
@@ -98,12 +104,7 @@ class NetworkHeuristicPolicy:
     def should_keep_url(self, domain: str, path: str) -> bool:
         if self.is_file_sharing_url(domain) or self.is_suspicious_code_hosting_url(domain, path):
             return True
-        if (
-            "github.com" in domain
-            or "gitlab.com" in domain
-            or "bitbucket.org" in domain
-            or self.should_exclude_documentation_url(domain, path)
-        ):
+        if self.is_code_hosting_url(domain) or self.should_exclude_documentation_url(domain, path):
             return False
         return bool(domain) and not path.endswith(self.filtered_url_suffixes)
 
@@ -224,6 +225,7 @@ DEFAULT_NETWORK_POLICY = NetworkHeuristicPolicy(
             "bayfiles.com",
         }
     ),
+    code_hosting_domains=("github.com", "gitlab.com", "bitbucket.org"),
     suspicious_path_keywords=(
         "malware",
         "exploit",

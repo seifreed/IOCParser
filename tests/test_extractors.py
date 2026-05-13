@@ -588,6 +588,20 @@ class TestCoverageMissing:
         # Normal GitHub URLs should be filtered
         assert not any("normal-repo" in url for url in result)
 
+    def test_extract_urls_does_not_treat_embedded_code_host_names_as_code_hosts(self):
+        """Test domains containing code-host names are not filtered as real code hosts."""
+        text = """
+        Lookalike: https://mygithub.com/repo
+        Chained host: https://github.com.evil.example/login
+        Real normal GitHub: https://github.com/user/normal-repo
+        """
+
+        result = self.extractor.extract_urls(text)
+
+        assert "https://mygithub.com/repo" in result
+        assert "https://github.com.evil.example/login" in result
+        assert "https://github.com/user/normal-repo" not in result
+
     def test_extract_urls_documentation_sites(self):
         """Test extract_urls filters documentation sites unless they mention exploits."""
         text = """

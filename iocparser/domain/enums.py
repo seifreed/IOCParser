@@ -191,7 +191,8 @@ def resolve_custom_ioc_type(value: str) -> IOCTypeName:
 
 def get_custom_ioc_type(name: IOCType | IOCTypeName | str) -> CustomIOCTypeDefinition | None:
     """Return the custom IOC type metadata if the type is registered."""
-    key = ioc_type_name(name)
+    key = ioc_type_name(name).strip().lower()
+    key = _custom_ioc_aliases.get(key, key)
     return _custom_ioc_types.get(key)
 
 

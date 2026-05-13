@@ -13,6 +13,7 @@ from iocparser.domain.models import (
     UrlValue,
     classify_ioc,
     indicator_value_for,
+    register_custom_ioc_type,
 )
 from iocparser.domain.sources import normalize_url_value
 
@@ -64,6 +65,24 @@ def test_classify_ioc_normalizes_string_type_names() -> None:
 
     assert severity == "medium"
     assert tags == ("urls", "network")
+
+
+def test_custom_ioc_aliases_use_registered_metadata_for_direct_helpers() -> None:
+    register_custom_ioc_type(
+        "alias_url_type",
+        base_type="urls",
+        aliases=("alias-url",),
+        severity="high",
+        tags=("custom-tag",),
+    )
+
+    severity, tags = classify_ioc("alias-url")
+    value = indicator_value_for("alias-url", "hxxps://Example[.]COM/path")
+
+    assert severity == "high"
+    assert tags == ("alias_url_type", "custom-tag")
+    assert isinstance(value, UrlValue)
+    assert value.canonical() == "https://Example.COM/path"
 
 
 def test_malformed_urls_do_not_break_source_normalization() -> None:

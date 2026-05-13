@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
+
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -46,18 +48,18 @@ class SQLAlchemyIOCRepository(IOCRepository):
             warning_list=warning_list,
             warning_description=warning_description,
         )
-        self.session.add(ioc)
         savepoint = self.session.begin_nested()
         try:
+            self.session.add(ioc)
             self.session.flush()
-            savepoint.commit()
         except IntegrityError:
             try:
                 savepoint.rollback()
             except Exception:
                 self.session.rollback()
                 raise
-            ioc_rows = self.session.execute(stmt).scalars().all()
+            with getattr(self.session, "no_autoflush", nullcontext()):
+                ioc_rows = self.session.execute(stmt).scalars().all()
             if not ioc_rows:
                 raise
             return ioc_rows[0].id

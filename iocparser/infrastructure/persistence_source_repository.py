@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
 from datetime import UTC, datetime
 from typing import override
 
@@ -71,24 +72,26 @@ class SQLAlchemySourceRepository(SourceRepository):
             first_seen=now,
             last_seen=now,
         )
-        self.session.add(source)
         savepoint = self.session.begin_nested()
         try:
+            self.session.add(source)
             self.session.flush()
-            savepoint.commit()
         except IntegrityError:
             try:
                 savepoint.rollback()
             except Exception:
                 self.session.rollback()
                 raise
-            source_rows = (
-                self.session.execute(
-                    select(SOURCE_MODEL).where(SourceModel.kind == kind, SourceModel.value == value)
+            with getattr(self.session, "no_autoflush", nullcontext()):
+                source_rows = (
+                    self.session.execute(
+                        select(SOURCE_MODEL).where(
+                            SourceModel.kind == kind, SourceModel.value == value
+                        )
+                    )
+                    .scalars()
+                    .all()
                 )
-                .scalars()
-                .all()
-            )
             if not source_rows:
                 raise
             existing = source_rows[0]

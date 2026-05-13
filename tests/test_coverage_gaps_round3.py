@@ -27,6 +27,52 @@ from tests.coverage_helpers import fresh_db
 
 
 class TestIOCRepositoryIntegrityRetry:
+    def test_savepoint_catches_race_inserted_ioc_before_flush(self, tmp_path: Path) -> None:
+        from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
+
+        db_uri = fresh_db(tmp_path, "ioc_race_retry.db")
+        engine = create_engine(db_uri, future=True)
+        session = Session(engine)
+        repo = SQLAlchemyIOCRepository(session)
+        existing_id = repo._get_or_create(
+            ioc_type="md5",
+            value="abc",
+            is_warning=False,
+            warning_list="",
+            warning_description="",
+        )
+        session.commit()
+
+        class EmptyResult:
+            def scalars(self) -> EmptyResult:
+                return self
+
+            def all(self) -> list[object]:
+                return []
+
+        original_execute = session.execute
+        calls = 0
+
+        def hide_existing_once(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                return EmptyResult()
+            return original_execute(*args, **kwargs)
+
+        with patch.object(session, "execute", side_effect=hide_existing_once):
+            raced_id = repo._get_or_create(
+                ioc_type="md5",
+                value="abc",
+                is_warning=False,
+                warning_list="",
+                warning_description="",
+            )
+
+        assert raced_id == existing_id
+        session.close()
+        engine.dispose()
+
     def test_integrity_error_triggers_retry_and_finds_existing(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
 
@@ -97,6 +143,52 @@ class TestIOCRepositoryIntegrityRetry:
 
 
 class TestSourceRepositoryIntegrityRetry:
+    def test_savepoint_catches_race_inserted_source_before_flush(self, tmp_path: Path) -> None:
+        from iocparser.infrastructure.persistence_source_repository import (
+            SQLAlchemySourceRepository,
+        )
+
+        db_uri = fresh_db(tmp_path, "src_race_retry.db")
+        engine = create_engine(db_uri, future=True)
+        session = Session(engine)
+        repo = SQLAlchemySourceRepository(session)
+        existing_id = repo.get_or_create(kind="file", value="race.pdf")
+        session.commit()
+
+        class EmptyResult:
+            def scalars(self) -> EmptyResult:
+                return self
+
+            def all(self) -> list[object]:
+                return []
+
+        original_execute = session.execute
+        calls = 0
+
+        def hide_existing_once(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                return EmptyResult()
+            return original_execute(*args, **kwargs)
+
+        with patch.object(session, "execute", side_effect=hide_existing_once):
+            raced_id = repo.get_or_create(
+                kind="file",
+                value="race.pdf",
+                mime_type="application/pdf",
+                content_hash="deadbeef",
+            )
+
+        from iocparser.infrastructure.persistence_models import SourceModel
+
+        assert raced_id == existing_id
+        source = session.get(SourceModel, existing_id)
+        assert source.mime_type == "application/pdf"
+        assert source.content_hash == "deadbeef"
+        session.close()
+        engine.dispose()
+
     def test_integrity_error_triggers_retry_with_metadata_update(self, tmp_path: Path) -> None:
         from iocparser.infrastructure.persistence_source_repository import (
             SQLAlchemySourceRepository,

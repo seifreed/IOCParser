@@ -91,7 +91,7 @@ Keep secrets out of the base file. Inject these through environment or secret mo
 
 ## Included assets
 
-- `Dockerfile.worker`
+- `Dockerfile`
 - `deploy/docker-compose.rabbitmq.yml`
 - `deploy/k8s/worker-configmap.yaml`
 - `deploy/k8s/worker-secret.example.yaml`

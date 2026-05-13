@@ -8,7 +8,6 @@ services:
   worker:
     build:
       context: ..
-      dockerfile: Dockerfile.worker
     depends_on:
       - rabbitmq
     environment:

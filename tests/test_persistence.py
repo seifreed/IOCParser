@@ -202,6 +202,53 @@ def test_import_history_normalizes_imported_ioc_search_values(tmp_path) -> None:
     assert page.items[0].value == "hxxps://Example[.]COM/a"
 
 
+def test_import_history_matches_existing_url_sources_by_normalized_identity(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-import-url-source.db"
+    service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
+    options = PersistOptions(
+        defang=False,
+        check_warnings=False,
+        force_update=False,
+        output_format="json",
+    )
+    service.persist_multiple_runs(
+        [
+            (
+                "url",
+                "https://example.test/report",
+                ExtractionResult.from_grouped_payload({"domains": ["existing.example"]}, {}),
+            )
+        ],
+        tool_version="5.0.0",
+        options=options,
+    )
+    timestamp = "2026-05-13T00:00:00"
+    payload: dict[str, object] = {
+        "sources": [
+            {
+                "id": 99,
+                "kind": "url",
+                "value": "HTTPS://Example.TEST/report#section",
+                "value_search": "https://example.test/report#section",
+                "original_url": "HTTPS://Example.TEST/report#section",
+                "normalized_url": "HTTPS://Example.TEST/report#section",
+                "first_seen": timestamp,
+                "last_seen": timestamp,
+            }
+        ]
+    }
+
+    counts = service.import_history(payload)
+
+    checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
+    with Session(checker.engine) as session:
+        sources = session.execute(select(Source)).scalars().all()
+    checker.close()
+
+    assert counts["sources"] == 0
+    assert len(sources) == 1
+
+
 def test_persisted_diff_compares_canonical_ioc_values(tmp_path) -> None:
     db_path = tmp_path / "iocparser-diff-canonical.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")

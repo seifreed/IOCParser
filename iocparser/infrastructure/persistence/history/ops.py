@@ -211,9 +211,7 @@ def _existing_source(session: Session, row: dict[str, object]) -> SourceModel | 
     identity = _source_identity(row)
     if identity[0] == "url":
         value = str(row.get("value", ""))
-        normalized_url = (
-            str(row.get("normalized_url", "")) if row.get("normalized_url") is not None else None
-        )
+        normalized_url = str(identity[1])
         stmt = select(SourceModel).where(SourceModel.kind == "url")
         clauses = []
         if value:

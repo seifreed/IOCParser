@@ -197,6 +197,11 @@ def plugin_client(
 
 
 def batch_downloader(downloader: URLDownloader) -> URLDownloader:
+    with_policy = getattr(downloader, "with_policy", None)
+    if callable(with_policy):
+        cloned = with_policy()
+        if cloned is not None:
+            return cast("URLDownloader", cloned)
     return downloader
 
 

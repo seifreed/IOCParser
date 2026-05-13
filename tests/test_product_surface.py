@@ -517,6 +517,54 @@ def test_url_batch_preserves_duplicate_inputs_through_report_and_persistence(
     )
 
 
+def test_parallel_url_batch_keeps_downloader_metadata_per_url(tmp_path: Path) -> None:
+    url_file = tmp_path / "urls.txt"
+    first_url = "https://metadata-one.example/feed"
+    second_url = "https://metadata-two.example/feed"
+    url_file.write_text(f"{first_url}\n{second_url}\n", encoding="utf-8")
+    second_downloaded = threading.Event()
+
+    class RaceDownloader:
+        def __init__(self) -> None:
+            self.last_download_metadata: dict[str, object] | None = None
+
+        def with_policy(self, **overrides: object) -> RaceDownloader:
+            del overrides
+            return RaceDownloader()
+
+        def download(self, url: str) -> str:
+            marker = "one" if url == first_url else "two"
+            target = tmp_path / f"{marker}.txt"
+            target.write_text(f"IOC URL: https://{marker}.example/path", encoding="utf-8")
+            self.last_download_metadata = {"marker": marker, "input_size": target.stat().st_size}
+            if marker == "two":
+                second_downloaded.set()
+            else:
+                assert second_downloaded.wait(timeout=5)
+            return str(target)
+
+        def download_metadata(self) -> dict[str, object]:
+            return dict(self.last_download_metadata or {})
+
+    class TextReader:
+        def read(self, source_path: str, options) -> str:
+            del options
+            return Path(source_path).read_text(encoding="utf-8")
+
+    args = _args(url_file=str(url_file), url_workers=2)
+
+    _, _, _, _, report = process_url_file_input_with_report(
+        args,
+        reader=TextReader(),
+        warning_service=None,
+        downloader=RaceDownloader(),
+    )
+
+    metadata_by_url = {item["url"]: item["metadata"] for item in report["items"]}
+    assert metadata_by_url[first_url]["marker"] == "one"
+    assert metadata_by_url[second_url]["marker"] == "two"
+
+
 def test_successful_retry_uses_original_batch_url_for_retry_history_when_completed_url_changes(
     tmp_path: Path,
 ) -> None:

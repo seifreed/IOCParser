@@ -73,7 +73,7 @@ def process_url(
     downloader: URLDownloader,
     configured_plugin_client: PluginClient | None,
 ) -> tuple[str, ExtractionResult, dict[str, object], int]:
-    batch_downloader = shared_batch_downloader(downloader)
+    batch_downloader = downloader
     started_at = time.perf_counter()
     if configured_plugin_client is not None:
         only, exclude = joined_type_filters(options)
@@ -86,6 +86,7 @@ def process_url(
             exclude=exclude,
         )
     else:
+        batch_downloader = shared_batch_downloader(downloader)
         result = app_extract_from_url(
             ExtractURLInput(url=url, options=options),
             downloader=batch_downloader,

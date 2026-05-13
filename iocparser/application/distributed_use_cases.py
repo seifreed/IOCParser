@@ -18,6 +18,7 @@ from iocparser.interfaces.ports import (
     QueueAdapter,
     TelemetrySink,
 )
+from iocparser.pipeline_errors import classify_pipeline_exception, error_for_failed_result
 
 
 def _phase_metrics(result: PipelineJobResult) -> dict[str, object]:
@@ -148,21 +149,20 @@ class DistributedPipelineCoordinator:
                 )
                 return stored or result
 
+            failure_error = error_for_failed_result(result)
             should_retry = bool(
-                result.error
-                and result.error.retryable
-                and (envelope.attempts + 1) < envelope.max_attempts
+                failure_error.retryable and (envelope.attempts + 1) < envelope.max_attempts
             )
             if should_retry:
                 stored = (
                     self.job_service.mark_failed(
                         job_id=str(envelope.request.job_id),
                         attempts=envelope.attempts + 1,
-                        error=result.error,
+                        error=failure_error,
                         will_retry=True,
                         metrics=_phase_metrics(result),
                     )
-                    if self.job_service and result.error is not None
+                    if self.job_service
                     else None
                 )
                 next_envelope = _advance_envelope(envelope)
@@ -175,9 +175,9 @@ class DistributedPipelineCoordinator:
                 self.job_service.mark_dead_lettered(
                     job_id=str(envelope.request.job_id),
                     attempts=envelope.attempts + 1,
-                    error=result.error,
+                    error=failure_error,
                 )
-                if self.job_service and result.error is not None
+                if self.job_service
                 else None
             )
             dead_receipt = self.queue_adapter.dead_letter(receipt, envelope=dead_envelope)
@@ -186,7 +186,7 @@ class DistributedPipelineCoordinator:
                 envelope,
                 {
                     "receipt_id": dead_receipt.receipt_id,
-                    "error_code": result.error.code if result.error else "",
+                    "error_code": failure_error.code,
                 },
             )
             return stored or result
@@ -195,8 +195,6 @@ class DistributedPipelineCoordinator:
         except Exception as exc:
             failed_envelope = _advance_envelope(envelope)
             if self.job_service is not None:
-                from iocparser.pipeline_errors import classify_pipeline_exception
-
                 self.job_service.mark_dead_lettered(
                     job_id=str(envelope.request.job_id),
                     attempts=envelope.attempts + 1,

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from iocparser.domain.pipeline import PipelineErrorInfo
+from iocparser.domain.pipeline import PipelineErrorInfo, PipelineJobResult
 from iocparser.errors import (
     DownloadError,
     FileExistenceError,
@@ -34,3 +34,15 @@ def classify_pipeline_exception(exc: Exception) -> PipelineErrorInfo:
         if isinstance(exc, error_type):
             return PipelineErrorInfo(code, category, retryable, status, str(exc))
     return PipelineErrorInfo("UNEXPECTED_FAILURE", "non_retryable", False, "failed", str(exc))
+
+
+def error_for_failed_result(result: PipelineJobResult) -> PipelineErrorInfo:
+    if result.error is not None:
+        return result.error
+    return PipelineErrorInfo(
+        code="PIPELINE_FAILED",
+        category="non_retryable",
+        retryable=False,
+        status="failed",
+        message="Pipeline processor returned failed status without error details",
+    )

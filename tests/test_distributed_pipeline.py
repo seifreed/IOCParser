@@ -11,13 +11,16 @@ from iocparser.api_pipeline import (
     JOB_STATUS_QUEUED,
     DistributedPipelineClient,
     PipelineJobRequest,
+    PipelineJobResult,
     PipelineWorker,
+    ResourceLimits,
     default_queue_backend,
 )
 from iocparser.application.distributed_use_cases import idempotency_key_for
 from iocparser.client import IOCParserClient
 from iocparser.distributed_pipeline import DistributedPipelineService
 from iocparser.domain.distributed import QueueEnvelope
+from iocparser.domain.models import ExtractionResult
 from iocparser.errors import IOCTimeoutError
 from iocparser.infrastructure.queue_factory import create_queue_adapter
 from iocparser.infrastructure.queue_filesystem import FilesystemQueueAdapter
@@ -34,6 +37,21 @@ class RuntimeErrorClient(IOCParserClient):
     def extract_result_from_text(self, text_content: str, **kwargs: object):  # type: ignore[override]
         del text_content, kwargs
         raise RuntimeError("unexpected failure")
+
+
+class FailedWithoutErrorProcessor:
+    def __init__(self) -> None:
+        self.limits = ResourceLimits()
+
+    def process(self, request: PipelineJobRequest) -> PipelineJobResult:
+        return PipelineJobResult(
+            input_kind=request.input_kind,
+            source_value=request.source_value,
+            status="failed",
+            result=ExtractionResult(),
+            job_id=str(request.job_id),
+            correlation_id=str(request.correlation_id or request.job_id),
+        )
 
 
 class RecordingDigester:
@@ -234,6 +252,30 @@ def test_distributed_pipeline_dead_letters_on_unexpected_exception(tmp_path: Pat
     assert len(dead_queue_payloads) == 1
     dead_queue_record = json.loads(dead_queue_payloads[0].read_text(encoding="utf-8"))
     assert dead_queue_record["attempts"] == 1
+
+
+def test_distributed_pipeline_dead_letters_failed_result_without_error(tmp_path: Path) -> None:
+    db_uri = f"sqlite:///{tmp_path / 'failed-without-error.sqlite'}"
+    queue = FilesystemQueueAdapter(tmp_path / "queue")
+    service = DistributedPipelineService(
+        queue_adapter=queue,
+        worker=FailedWithoutErrorProcessor(),
+        db_uri=db_uri,
+    )
+    queued = service.submit(
+        PipelineJobRequest(input_kind="text", source_value="bad", check_warnings=False),
+        queue_name="missing-error",
+        max_attempts=1,
+    )
+
+    processed = service.process_next(queue_name="missing-error")
+
+    assert getattr(processed, "status", "") == JOB_STATUS_DEAD_LETTERED
+    assert service.get_job(job_id=queued.job_id).status == JOB_STATUS_DEAD_LETTERED
+    dead_letters = service.list_dead_letters(limit=10)
+    assert len(dead_letters) == 1
+    assert dead_letters[0].error.code == "PIPELINE_FAILED"
+    assert queue.dead_count(queue_name="missing-error") == 1
 
 
 def test_queue_factory_and_client_wrapper(tmp_path: Path) -> None:

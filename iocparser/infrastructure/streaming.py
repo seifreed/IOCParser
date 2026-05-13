@@ -26,6 +26,28 @@ from iocparser.infrastructure.utils import deduplicate_iocs_with_state
 logger = get_logger(__name__)
 
 
+def _aligned_utf8_chunk_end(
+    mmapped_file: mmap.mmap,
+    *,
+    offset: int,
+    chunk_end: int,
+    file_size: int,
+) -> int:
+    if chunk_end >= file_size:
+        return chunk_end
+
+    adjusted_end = chunk_end
+    while adjusted_end > offset and mmapped_file[adjusted_end] & 0xC0 == 0x80:
+        adjusted_end -= 1
+    if adjusted_end != offset:
+        return adjusted_end
+
+    adjusted_end = chunk_end
+    while adjusted_end < file_size and mmapped_file[adjusted_end] & 0xC0 == 0x80:
+        adjusted_end += 1
+    return adjusted_end
+
+
 class StreamingIOCExtractor:
     """
     Streaming IOC extractor for processing large files efficiently.
@@ -310,11 +332,12 @@ class StreamingIOCExtractor:
                     # Calculate chunk boundaries
                     chunk_end = min(offset + self.chunk_size, file_size)
 
-                    # Align chunk_end to a valid UTF-8 boundary to avoid
-                    # splitting multi-byte characters across chunks.
-                    if chunk_end < file_size:
-                        while chunk_end > offset and mmapped_file[chunk_end] & 0xC0 == 0x80:
-                            chunk_end -= 1
+                    chunk_end = _aligned_utf8_chunk_end(
+                        mmapped_file,
+                        offset=offset,
+                        chunk_end=chunk_end,
+                        file_size=file_size,
+                    )
 
                     # Read chunk
                     chunk = decode_chunk(mmapped_file[offset:chunk_end])

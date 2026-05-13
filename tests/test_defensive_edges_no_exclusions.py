@@ -558,6 +558,33 @@ def test_streaming_mmap_boundary_and_interruptions(
         interrupting.extract_from_mmap(text_file)
 
 
+def test_streaming_mmap_advances_when_chunk_starts_with_multibyte_utf8(tmp_path) -> None:
+    from iocparser.infrastructure.streaming import StreamingIOCExtractor
+
+    text_file = tmp_path / "multibyte-start.txt"
+    text_file.write_text("é evil.example", encoding="utf-8")
+    max_expected_progress_calls = len(text_file.read_bytes()) + 1
+    progress_calls = 0
+
+    def fail_if_stuck(_progress: int) -> None:
+        nonlocal progress_calls
+        progress_calls += 1
+        if progress_calls > max_expected_progress_calls:
+            raise RuntimeError("mmap chunk loop did not advance")
+
+    extractor = StreamingIOCExtractor(
+        chunk_size=1,
+        overlap=0,
+        defang=False,
+        progress_callback=fail_if_stuck,
+    )
+
+    result = extractor.extract_from_mmap(text_file)
+
+    assert isinstance(result, dict)
+    assert progress_calls <= max_expected_progress_calls
+
+
 def test_pipeline_worker_and_service_preserve_operational_interruptions() -> None:
     from iocparser.domain.pipeline import ResourceLimits
     from iocparser.pipeline_worker import PipelineWorker

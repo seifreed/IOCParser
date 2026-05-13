@@ -68,6 +68,46 @@ def failed_batch_lookup_service(db_uri: str) -> FailedBatchLookupService:
     return SQLAlchemyPersistenceService(db_uri)
 
 
+def _matches_retry_error_filters(
+    *,
+    error_type: str,
+    error_message: str,
+    error_type_filter: str | None,
+    error_substring: str | None,
+) -> bool:
+    return (error_type_filter is None or error_type.lower() == error_type_filter.lower()) and (
+        error_substring is None or error_substring.lower() in error_message.lower()
+    )
+
+
+def _report_item_matches_retry_filters(
+    item: BatchItemReport,
+    *,
+    error_type_filter: str | None,
+    error_substring: str | None,
+) -> bool:
+    return str(item.get("status", "")).lower() == "failed" and _matches_retry_error_filters(
+        error_type=str(item.get("error_type", "")),
+        error_message=str(item.get("error", "")),
+        error_type_filter=error_type_filter,
+        error_substring=error_substring,
+    )
+
+
+def _failed_batch_item_matches_retry_filters(
+    item: FailedBatchItem,
+    *,
+    error_type_filter: str | None,
+    error_substring: str | None,
+) -> bool:
+    return _matches_retry_error_filters(
+        error_type=str(getattr(item, "error_type", "")),
+        error_message=str(getattr(item, "error_message", "")),
+        error_type_filter=error_type_filter,
+        error_substring=error_substring,
+    )
+
+
 def _failed_urls_from_report(
     report_path: Path,
     *,
@@ -85,14 +125,11 @@ def _failed_urls_from_report(
     urls = [
         str(item.get("url", "")).strip()
         for item in _report_items(payload)
-        if str(item.get("status", "")).lower() == "failed"
-        and str(item.get("url", "")).strip()
-        and (
-            error_type_filter is None
-            or str(item.get("error_type", "")).lower() == error_type_filter.lower()
-        )
-        and (
-            error_substring is None or error_substring.lower() in str(item.get("error", "")).lower()
+        if str(item.get("url", "")).strip()
+        and _report_item_matches_retry_filters(
+            item,
+            error_type_filter=error_type_filter,
+            error_substring=error_substring,
         )
     ]
     if not urls:
@@ -111,8 +148,11 @@ def _failed_urls_from_batch(
     urls = [
         item.source_value
         for item in service.list_failed_batch_items(batch_job_id=batch_job_id)
-        if (error_type_filter is None or item.error_type.lower() == error_type_filter.lower())
-        and (error_substring is None or error_substring.lower() in item.error_message.lower())
+        if _failed_batch_item_matches_retry_filters(
+            item,
+            error_type_filter=error_type_filter,
+            error_substring=error_substring,
+        )
     ]
     if not urls:
         raise _no_failed_urls_for_batch_job(batch_job_id)
@@ -120,7 +160,12 @@ def _failed_urls_from_batch(
 
 
 def _retry_attempt_from_report(
-    url: str, retry_report: str | None, *, occurrence: int
+    url: str,
+    retry_report: str | None,
+    *,
+    occurrence: int,
+    error_type_filter: str | None = None,
+    error_substring: str | None = None,
 ) -> int | None:
     if not retry_report:
         return None
@@ -128,6 +173,11 @@ def _retry_attempt_from_report(
         item
         for item in _report_items(_json_dict(Path(retry_report)))
         if str(item.get("url", "")).strip() == url
+        and _report_item_matches_retry_filters(
+            item,
+            error_type_filter=error_type_filter,
+            error_substring=error_substring,
+        )
     ]
     if 0 < occurrence <= len(matches):
         return int_value(matches[occurrence - 1].get("retry_attempt", 0)) + 1
@@ -142,6 +192,8 @@ def _retry_attempt_from_batch(
     batch_job_id: int | None,
     url: str,
     occurrence: int,
+    error_type_filter: str | None = None,
+    error_substring: str | None = None,
 ) -> int | None:
     if not db_uri or batch_job_id is None:
         return None
@@ -150,6 +202,11 @@ def _retry_attempt_from_batch(
         item
         for item in service.list_failed_batch_items(batch_job_id=batch_job_id)
         if item.source_value == url
+        and _failed_batch_item_matches_retry_filters(
+            item,
+            error_type_filter=error_type_filter,
+            error_substring=error_substring,
+        )
     ]
     if 0 < occurrence <= len(matches):
         return matches[occurrence - 1].retry_attempt + 1
@@ -165,8 +222,16 @@ def retry_attempt_for_url(
     retry_batch_job: int | None = None,
     db_uri: str | None = None,
     occurrence: int = 1,
+    error_type_filter: str | None = None,
+    error_substring: str | None = None,
 ) -> int:
-    retry_attempt = _retry_attempt_from_report(url, retry_report, occurrence=occurrence)
+    retry_attempt = _retry_attempt_from_report(
+        url,
+        retry_report,
+        occurrence=occurrence,
+        error_type_filter=error_type_filter,
+        error_substring=error_substring,
+    )
     if retry_attempt is not None:
         return retry_attempt
     retry_attempt = _retry_attempt_from_batch(
@@ -174,6 +239,8 @@ def retry_attempt_for_url(
         batch_job_id=retry_batch_job,
         url=url,
         occurrence=occurrence,
+        error_type_filter=error_type_filter,
+        error_substring=error_substring,
     )
     if retry_attempt is not None:
         return retry_attempt
@@ -229,6 +296,8 @@ def _record_failed_url(
     retry_report: str | None,
     retry_batch_job: int | None,
     db_uri: str | None,
+    retry_error_type: str | None = None,
+    retry_error_contains: str | None = None,
     failures: dict[str, str],
     run_metadata_map: dict[str, dict[str, int | str]],
     item_reports: list[BatchItemReport],
@@ -261,6 +330,8 @@ def _record_failed_url(
                 retry_batch_job=retry_batch_job,
                 db_uri=db_uri,
                 occurrence=occurrence,
+                error_type_filter=retry_error_type,
+                error_substring=retry_error_contains,
             ),
         },
     )

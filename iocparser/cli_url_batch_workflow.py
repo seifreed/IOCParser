@@ -124,6 +124,8 @@ def _collect_url_results(
     from iocparser import cli_processing_urls as _support
 
     max_workers = max(1, get_int_arg(request.args, "url_workers", 4))
+    retry_error_type = get_optional_str_arg(request.args, "retry_error_type")
+    retry_error_contains = get_optional_str_arg(request.args, "retry_error_contains")
     url_occurrences: dict[str, int] = {}
     item_occurrences: dict[str, int] = {}
     item_indexes: dict[str, int] = {}
@@ -161,6 +163,8 @@ def _collect_url_results(
                     retry_report=retry_report,
                     retry_batch_job=retry_batch_job,
                     db_uri=request.db_uri,
+                    retry_error_type=retry_error_type,
+                    retry_error_contains=retry_error_contains,
                     failures=state.failures,
                     run_metadata_map=state.run_metadata_map,
                     item_reports=state.item_reports,
@@ -188,6 +192,8 @@ def _collect_url_results(
                         retry_batch_job=retry_batch_job,
                         db_uri=request.db_uri,
                         occurrence=occurrence,
+                        error_type_filter=retry_error_type,
+                        error_substring=retry_error_contains,
                     ),
                 },
             )

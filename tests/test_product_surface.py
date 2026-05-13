@@ -51,7 +51,11 @@ from iocparser.cli_output import (
     save_batch_report,
     save_diff_output,
 )
-from iocparser.cli_persistence import persist_failed_batch_items, persist_many_results
+from iocparser.cli_persistence import (
+    persist_batch_job,
+    persist_failed_batch_items,
+    persist_many_results,
+)
 from iocparser.cli_processing import process_url_file_input_with_report
 from iocparser.cli_processing_files import merge_batch_results
 from iocparser.cli_processing_support import BatchResultsCollection, batch_item_keys
@@ -591,6 +595,98 @@ def test_successful_retry_uses_original_batch_url_for_retry_history_when_complet
     ).list_runs(limit=10)
     assert len(runs) == 1
     assert runs[0].source_value == original_url
+
+
+def test_retry_report_attempts_follow_filtered_failed_items(tmp_path: Path) -> None:
+    report_path = tmp_path / "filtered-retry-report.json"
+    with StableLocalHTTPServer(body=b"IOC URL: https://filtered-retry.example/path") as url:
+        report_path.write_text(
+            json.dumps(
+                {
+                    "items": [
+                        {
+                            "url": url,
+                            "status": "failed",
+                            "error": "timeout waiting",
+                            "error_type": "IOCTimeoutError",
+                            "retry_attempt": 1,
+                        },
+                        {
+                            "url": url,
+                            "status": "failed",
+                            "error": "tls verify failed",
+                            "error_type": "NetworkDownloadError",
+                            "retry_attempt": 5,
+                        },
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        args = _args(
+            retry_failed_from=str(report_path),
+            retry_error_type="NetworkDownloadError",
+            url_workers=1,
+        )
+        _normal_iocs, _warning_iocs, _label, _results, report = process_url_file_input_with_report(
+            args,
+            reader=MagicTextSourceReader(),
+            warning_service=None,
+            downloader=RequestsURLDownloader(),
+        )
+
+    assert report["successful"] == 1
+    assert report["items"][0]["retry_attempt"] == 6
+
+
+def test_retry_batch_job_attempts_follow_filtered_failed_items(tmp_path: Path) -> None:
+    db_uri = f"sqlite:///{tmp_path / 'filtered-retry-batch.sqlite'}"
+    config = load_config(cli_persist=True, cli_db_uri=db_uri, cli_config_path=None)
+    with StableLocalHTTPServer(body=b"IOC URL: https://filtered-batch.example/path") as url:
+        batch_job_id = persist_batch_job(
+            {
+                "total": 2,
+                "successful": 0,
+                "failed": 2,
+                "status": "failed",
+                "items": [
+                    {
+                        "url": url,
+                        "status": "failed",
+                        "error": "timeout waiting",
+                        "error_type": "IOCTimeoutError",
+                        "retry_attempt": 1,
+                    },
+                    {
+                        "url": url,
+                        "status": "failed",
+                        "error": "tls verify failed",
+                        "error_type": "NetworkDownloadError",
+                        "retry_attempt": 5,
+                    },
+                ],
+            },
+            config=config,
+            source_kind="url",
+            run_ids=(),
+            effective_config={},
+        )
+        assert batch_job_id is not None
+        args = _args(
+            retry_batch_job=batch_job_id,
+            retry_error_type="NetworkDownloadError",
+            url_workers=1,
+        )
+        _normal_iocs, _warning_iocs, _label, _results, report = process_url_file_input_with_report(
+            args,
+            reader=MagicTextSourceReader(),
+            warning_service=None,
+            downloader=RequestsURLDownloader(),
+            db_uri=db_uri,
+        )
+
+    assert report["successful"] == 1
+    assert report["items"][0]["retry_attempt"] == 6
 
 
 def test_source_value_file_filter_preserves_case_sensitive_identity(tmp_path: Path) -> None:

@@ -93,6 +93,15 @@ def test_malformed_urls_do_not_break_source_normalization() -> None:
     assert source.normalized_url is None
 
 
+def test_normalize_url_preserves_userinfo_case() -> None:
+    # Host is lowercased for canonicalisation, but credentials are case-sensitive
+    # and must not be folded (which would also collapse two distinct URLs).
+    assert (
+        normalize_url_value("http://User:PassWord@Host.COM/Path")
+        == "http://User:PassWord@host.com/Path"
+    )
+
+
 def test_extraction_result_from_grouped_payload_groups_and_deduplicates() -> None:
     result = ExtractionResult.from_grouped_payload(
         normal_iocs={

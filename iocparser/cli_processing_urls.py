@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import time
+from collections.abc import Callable, Sequence
 from json import JSONDecodeError
 from pathlib import Path
 from typing import Protocol, cast
@@ -167,6 +168,18 @@ def _failed_urls_from_batch(
     return urls
 
 
+def _next_retry_attempt[RetryMatchT](
+    matches: Sequence[RetryMatchT],
+    occurrence: int,
+    retry_attempt_of: Callable[[RetryMatchT], int],
+) -> int | None:
+    if 0 < occurrence <= len(matches):
+        return retry_attempt_of(matches[occurrence - 1]) + 1
+    if matches:
+        return 1
+    return None
+
+
 def _retry_attempt_from_report(
     url: str,
     retry_report: str | None,
@@ -188,11 +201,9 @@ def _retry_attempt_from_report(
             error_substring=error_substring,
         )
     ]
-    if 0 < occurrence <= len(matches):
-        return int_value(matches[occurrence - 1].get("retry_attempt", 0)) + 1
-    if matches:
-        return 1
-    return None
+    return _next_retry_attempt(
+        matches, occurrence, lambda item: int_value(item.get("retry_attempt", 0))
+    )
 
 
 def _retry_attempt_from_batch(
@@ -217,11 +228,7 @@ def _retry_attempt_from_batch(
             error_substring=error_substring,
         )
     ]
-    if 0 < occurrence <= len(matches):
-        return matches[occurrence - 1].retry_attempt + 1
-    if matches:
-        return 1
-    return None
+    return _next_retry_attempt(matches, occurrence, lambda item: item.retry_attempt)
 
 
 def retry_attempt_for_url(

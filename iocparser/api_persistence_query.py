@@ -37,7 +37,11 @@ from iocparser.errors import ValidationError
 from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
 from iocparser.interfaces.ports import OutputRenderer
 from iocparser.plugins import get_renderer
-from iocparser.shared_utils import parse_bool_token, parse_string_filters
+from iocparser.shared_utils import (
+    parse_bool_token,
+    parse_string_filters,
+    validated_diff_only,
+)
 
 
 class QueryRunsOptions(TypedDict, total=False):
@@ -105,7 +109,6 @@ INVALID_MIN_SEVERITY_ERROR = "Invalid min_severity: {value}"
 INVALID_TAG_MODE_ERROR = "Invalid tag_mode: {value}"
 INVALID_SORT_BY_ERROR = "Invalid sort_by: {value}"
 INVALID_SEARCH_BACKEND_ERROR = "Invalid search_backend: {value}"
-INVALID_DIFF_ONLY_ERROR = "Invalid diff_only: {value}"
 INVALID_LIMIT_ERROR = "Invalid limit: {value}"
 INVALID_OFFSET_ERROR = "Invalid offset: {value}"
 INVALID_BOOLEAN_ERROR = "Invalid boolean option: {value}"
@@ -114,7 +117,6 @@ VALID_TAG_MODES = {"all", "any"}
 VALID_RUN_SORT_VALUES = {"newest", "oldest", "source"}
 VALID_SEARCH_SORT_VALUES = {"newest", "oldest", "source"}
 VALID_SEARCH_BACKENDS = {"auto", "fts", "like"}
-VALID_DIFF_ONLY_VALUES = {"all", "added", "removed"}
 INVALID_FTS_QUERY_ERROR = "Invalid FTS query: {value}"
 INVALID_EMPTY_SEARCH_QUERY_ERROR = "Invalid search value: {value}"
 T = TypeVar("T")
@@ -254,15 +256,6 @@ def validated_search_backend(value: str) -> str:
     normalized = value.strip().lower()
     if normalized not in VALID_SEARCH_BACKENDS:
         raise ValidationError(INVALID_SEARCH_BACKEND_ERROR.format(value=value))
-    return normalized
-
-
-def validated_diff_only(value: str | None) -> str:
-    if value is None:
-        return "all"
-    normalized = value.strip().lower()
-    if normalized not in VALID_DIFF_ONLY_VALUES:
-        raise ValidationError(INVALID_DIFF_ONLY_ERROR.format(value=value))
     return normalized
 
 

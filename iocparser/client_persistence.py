@@ -5,7 +5,6 @@ from typing import TypedDict, Unpack
 
 from iocparser.api_persistence_query import (
     optional_str,
-    parse_string_filters,
     validated_ioc_type_filter,
     validated_iso_datetime,
     validated_min_severity,
@@ -28,6 +27,7 @@ from iocparser.domain.models import (
     PersistedRunSummary,
 )
 from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
+from iocparser.shared_utils import parse_string_filters
 
 
 class QueryRunsOptions(TypedDict, total=False):

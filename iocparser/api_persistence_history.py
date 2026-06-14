@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from iocparser.api_persistence_query import parse_string_filters, query_service
+from iocparser.api_persistence_query import query_service
 from iocparser.application.contracts import (
     BatchJobInput,
     DeletePersistedRunInput,
@@ -40,6 +40,7 @@ from iocparser.application.query_use_cases import (
     prune_persisted_runs as _prune_persisted_runs,
 )
 from iocparser.domain.models import BatchJobDetail, BatchJobSummary, PersistedRunSummary
+from iocparser.shared_utils import parse_string_filters
 
 
 def list_failed_batch_jobs(*, db_uri: str, limit: int = 20) -> list[BatchJobSummary]:

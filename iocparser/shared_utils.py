@@ -1,7 +1,11 @@
 import re as _re
 
+from iocparser.errors import ValidationError
+
 TRUE_BOOL_VALUES: frozenset[str] = frozenset({"1", "true", "yes", "on"})
 FALSE_BOOL_VALUES: frozenset[str] = frozenset({"0", "false", "no", "off"})
+VALID_DIFF_ONLY_VALUES: frozenset[str] = frozenset({"all", "added", "removed"})
+INVALID_DIFF_ONLY_ERROR = "Invalid diff_only: {value}"
 
 
 def parse_bool_token(value: str) -> bool | None:
@@ -32,6 +36,16 @@ def parse_string_filters(value: object) -> tuple[str, ...]:
             items.extend(part.strip() for part in str(entry).split(",") if part.strip())
         return tuple(items)
     return tuple(part.strip() for part in str(value).split(",") if part.strip())
+
+
+def validated_diff_only(value: str | None) -> str:
+    """Normalize and validate a diff-only selector, defaulting None to "all"."""
+    if value is None:
+        return "all"
+    normalized = value.strip().lower()
+    if normalized not in VALID_DIFF_ONLY_VALUES:
+        raise ValidationError(INVALID_DIFF_ONLY_ERROR.format(value=value))
+    return normalized
 
 
 DEFANG_REPLACEMENTS: tuple[tuple[str, str], ...] = (

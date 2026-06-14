@@ -7,13 +7,13 @@ Configuration loader for IOCParser.
 from __future__ import annotations
 
 import os
-from collections.abc import Iterable
-from configparser import ConfigParser
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict
 
 from dotenv import load_dotenv
+
+from iocparser.runtime_config import find_default_config_paths, load_ini_sections
 
 TRUE_BOOL_VALUES = {"1", "true", "yes", "on"}
 FALSE_BOOL_VALUES = {"0", "false", "no", "off"}
@@ -135,19 +135,6 @@ def default_config_values() -> ConfigValues:
     }
 
 
-def _find_default_config_paths() -> Iterable[Path]:
-    """Return default config locations in priority order."""
-    cwd = Path.cwd()
-    yield cwd / "iocparser.ini"
-    yield Path.home() / ".config" / "iocparser" / "config.ini"
-
-
-def _load_ini_sections(config_path: Path) -> ConfigParser:
-    parser = ConfigParser()
-    parser.read(config_path)
-    return parser
-
-
 def _parse_bool_value(value: str, *, option_name: str) -> bool:
     normalized = value.strip().lower()
     if normalized in TRUE_BOOL_VALUES:
@@ -159,7 +146,7 @@ def _parse_bool_value(value: str, *, option_name: str) -> bool:
 
 def _load_ini_config(config_path: Path) -> ConfigValues:
     """Load config values from an INI file."""
-    parser = _load_ini_sections(config_path)
+    parser = load_ini_sections(config_path)
 
     values = default_config_values()
 
@@ -224,7 +211,7 @@ def load_config(
             raise FileNotFoundError(config_path)
         file_values = _load_ini_config(config_path)
     else:
-        for path in _find_default_config_paths():
+        for path in find_default_config_paths():
             if path.exists():
                 config_path = path
                 file_values = _load_ini_config(path)

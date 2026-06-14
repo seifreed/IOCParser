@@ -25,6 +25,7 @@ from iocparser.infrastructure.persistence_batch import (
     FailedBatchItemModel,
     load_failed_batch_items,
 )
+from iocparser.infrastructure.persistence_distributed_records import HISTORY_IMPORT_MARKER_KEY
 from iocparser.infrastructure.persistence_migrations import migrate_engine
 from iocparser.infrastructure.persistence_repository_support import normalize_ioc_search
 from iocparser.infrastructure.persistence_schema import (
@@ -66,7 +67,6 @@ def _managed_connection(db_uri: str) -> Iterator[Connection]:
 
 INVALID_HISTORY_ARCHIVE = "invalid history archive"
 AMBIGUOUS_LEGACY_HISTORY_ARCHIVE = "ambiguous legacy history archive"
-HISTORY_IMPORT_MARKER_KEY = "__history_import__"
 HISTORY_ARCHIVE_ID_KEY = "__history_archive_id__"
 HISTORY_ORIGIN_ID_KEY = "__history_origin_id__"
 HistoryModel = (

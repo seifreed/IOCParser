@@ -18,7 +18,10 @@ from iocparser.domain.models import (
     PipelineErrorInfo,
     QueueEnvelope,
 )
-from iocparser.infrastructure.persistence_distributed_records import job_record
+from iocparser.infrastructure.persistence_distributed_records import (
+    HISTORY_IMPORT_MARKER_KEY,
+    job_record,
+)
 from iocparser.infrastructure.persistence_schema import (
     DeadLetterJobModel,
     DistributedJobModel,
@@ -27,7 +30,6 @@ from iocparser.infrastructure.persistence_schema import (
 from iocparser.infrastructure.queue_records import serialize_queue_record
 
 ACTIVE_JOB_STATUSES = (JOB_STATUS_QUEUED, JOB_STATUS_RUNNING, JOB_STATUS_COMPLETED)
-HISTORY_IMPORT_MARKER_KEY = "__history_import__"
 
 
 class RunningTransition(TypedDict):

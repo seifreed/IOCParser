@@ -171,6 +171,7 @@ class HashPatternRule:
 
 HASH_PATTERN_RULES: tuple[HashPatternRule, ...] = (
     HashPatternRule("extract_md5", "md5"),
+    HashPatternRule("extract_imphash", "imphash", validate=False),
     HashPatternRule("extract_sha1", "sha1"),
     HashPatternRule("extract_sha256", "sha256"),
     HashPatternRule("extract_sha512", "sha512"),
@@ -185,6 +186,25 @@ def _hash_rule_method(rule: HashPatternRule) -> Callable[[ExtractorBase, str], l
 
     extractor.__name__ = rule.method_name
     return extractor
+
+
+def _separate_imphash_from_md5(iocs: dict[str, list[str]]) -> None:
+    """Drop explicitly-labelled imphash values from the generic md5 bucket.
+
+    The md5 pattern matches any standalone 32-hex string, so a value introduced
+    as ``imphash: <hash>`` is also captured as an md5. An import hash is its own
+    IOC type, so keep it only under ``imphash``.
+    """
+    imphashes = iocs.get("imphash")
+    md5s = iocs.get("md5")
+    if not imphashes or not md5s:
+        return
+    imphash_values = {value.lower() for value in imphashes}
+    remaining = [value for value in md5s if value.lower() not in imphash_values]
+    if remaining:
+        iocs["md5"] = remaining
+    else:
+        del iocs["md5"]
 
 
 class ExtractorBase:
@@ -392,6 +412,7 @@ class ExtractionAggregateMixin:
             if results:
                 iocs[ioc_type] = results
 
+        _separate_imphash_from_md5(iocs)
         return iocs
 
 

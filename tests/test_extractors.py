@@ -30,6 +30,22 @@ class TestHashExtractors:
         assert len(result) == 1
         assert "5f4dcc3b5aa765d61d8327deb882cf99" in result
 
+    def test_extract_imphash_reported_under_own_type(self):
+        """An explicitly-labelled import hash is reported as imphash, not md5."""
+        result = self.extractor.extract_all(
+            "Sample imphash: d41d8cd98f00b204e9800998ecf8427e in the report"
+        )
+        assert result.get("imphash") == ["d41d8cd98f00b204e9800998ecf8427e"]
+        assert "md5" not in result
+
+    def test_extract_imphash_keeps_unrelated_md5(self):
+        """A separate standalone md5 stays under md5 while the imphash is split out."""
+        result = self.extractor.extract_all(
+            "imphash: d41d8cd98f00b204e9800998ecf8427e and md5 5d41402abc4b2a76b9719d911017c592"
+        )
+        assert result.get("imphash") == ["d41d8cd98f00b204e9800998ecf8427e"]
+        assert result.get("md5") == ["5d41402abc4b2a76b9719d911017c592"]
+
     def test_extract_sha1(self):
         """Test SHA1 hash extraction."""
         text = """

@@ -47,9 +47,9 @@ from iocparser.application.query_use_cases import (
 from iocparser.application.query_use_cases import (
     search_persisted_iocs as uc_search_persisted_iocs,
 )
+from iocparser.cli_persistence import query_service_for
 from iocparser.config import AppConfig
 from iocparser.errors import ValidationError
-from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
 from iocparser.interfaces.ports import FileWriter, PersistenceQueryService
 
 PERSISTENCE_QUERY_MESSAGE = "Persistence query commands require --db-uri or configured persistence"
@@ -57,10 +57,7 @@ BATCH_JOB_NOT_FOUND = "Batch job not found"
 
 
 def _query_service_for(config: AppConfig) -> PersistenceQueryService:
-    db_uri = config.db_uri
-    if not db_uri:
-        raise ValidationError(PERSISTENCE_QUERY_MESSAGE)
-    return SQLAlchemyPersistenceService(db_uri)
+    return query_service_for(config, missing_message=PERSISTENCE_QUERY_MESSAGE)
 
 
 def _optional_int_attr(args: argparse.Namespace, field_name: str) -> int | None:

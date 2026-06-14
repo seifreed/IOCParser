@@ -9,12 +9,21 @@ from iocparser import cli_output as _cli_output
 from iocparser.cli_processing_support import BatchResultsCollection, GroupedIocs, GroupedWarnings
 from iocparser.config import AppConfig
 from iocparser.domain.models import PersistOptions
+from iocparser.errors import ValidationError
 from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
+from iocparser.interfaces.ports import PersistenceQueryService
 from iocparser.shared_utils import normalize_metadata_values
 
 VERSION = _cli_args.VERSION
 get_bool_arg = _cli_args.get_bool_arg
 BatchResults = BatchResultsCollection
+
+
+def query_service_for(config: AppConfig, *, missing_message: str) -> PersistenceQueryService:
+    db_uri = config.db_uri
+    if not db_uri:
+        raise ValidationError(missing_message)
+    return SQLAlchemyPersistenceService(db_uri)
 
 
 @dataclass(frozen=True)
@@ -249,4 +258,5 @@ __all__ = [
     "persist_batch_job",
     "persist_failed_batch_items",
     "persist_many_results",
+    "query_service_for",
 ]

@@ -26,10 +26,10 @@ from iocparser.application.maintenance_use_cases import (
 from iocparser.application.maintenance_use_cases import (
     retain_persisted_history as uc_retain_persisted_history,
 )
+from iocparser.cli_persistence import query_service_for
 from iocparser.config import AppConfig
 from iocparser.errors import ValidationError
 from iocparser.infrastructure.persistence import (
-    SQLAlchemyPersistenceService,
     migrate_db_uri,
     revision_history,
     schema_version,
@@ -47,10 +47,7 @@ HISTORY_IMPORT_OBJECT_REQUIRED = "history import file must contain a JSON object
 
 
 def _query_service_for(config: AppConfig) -> PersistenceQueryService:
-    db_uri = config.db_uri
-    if not db_uri:
-        raise ValidationError(PERSISTENCE_REQUIRED)
-    return SQLAlchemyPersistenceService(db_uri)
+    return query_service_for(config, missing_message=PERSISTENCE_REQUIRED)
 
 
 def _history_payload(path: str) -> dict[str, object]:

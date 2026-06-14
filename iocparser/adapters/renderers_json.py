@@ -19,6 +19,8 @@ class JSONOutputRenderer(OutputRenderer):
     """Render extraction results as JSON."""
 
     def __init__(self, *, include_context: bool = False) -> None:
+        # Accepted for renderer-interface parity; JSON records always carry
+        # evidence via to_records(), so the flag does not change the payload.
         self.include_context = include_context
 
     def render(self, result: ExtractionResult) -> str:
@@ -39,8 +41,6 @@ class JSONOutputRenderer(OutputRenderer):
             )
         if warnings:
             payload["warning_list_matches"] = warnings
-        if self.include_context:
-            payload["records"] = result.to_records()
         return serialize_pretty_json(payload)
 
 

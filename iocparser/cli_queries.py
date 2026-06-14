@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable
 from typing import NoReturn
 
 from iocparser import cli_args as _cli_args
@@ -87,6 +88,18 @@ def _raise_batch_job_not_found() -> NoReturn:
     raise ValidationError(BATCH_JOB_NOT_FOUND)
 
 
+def _emit_query_result(
+    args: argparse.Namespace,
+    *,
+    json_payload: dict[str, object],
+    render_text: Callable[[], None],
+) -> None:
+    if _cli_args.get_bool_arg(args, "json"):
+        _cli_output.print_json_payload(json_payload)
+    else:
+        render_text()
+
+
 def _handle_list_runs(args: argparse.Namespace, config: AppConfig) -> bool:
     if not _cli_args.get_bool_arg(args, "list_runs"):
         return False
@@ -102,10 +115,11 @@ def _handle_list_runs(args: argparse.Namespace, config: AppConfig) -> bool:
         ),
         persistence_query_service=_query_service_for(config),
     )
-    if _cli_args.get_bool_arg(args, "json"):
-        _cli_output.print_json_payload({"items": [run.to_record() for run in runs]})
-    else:
-        _cli_output.print_run_summaries(runs)
+    _emit_query_result(
+        args,
+        json_payload={"items": [run.to_record() for run in runs]},
+        render_text=lambda: _cli_output.print_run_summaries(runs),
+    )
     return True
 
 
@@ -133,10 +147,11 @@ def _handle_search_ioc(args: argparse.Namespace, config: AppConfig) -> bool:
         ),
         persistence_query_service=_query_service_for(config),
     )
-    if _cli_args.get_bool_arg(args, "json"):
-        _cli_output.print_json_payload({"items": [hit.to_record() for hit in hits]})
-    else:
-        _cli_output.print_query_hits(hits)
+    _emit_query_result(
+        args,
+        json_payload={"items": [hit.to_record() for hit in hits]},
+        render_text=lambda: _cli_output.print_query_hits(hits),
+    )
     return True
 
 
@@ -219,10 +234,11 @@ def _handle_list_batches(args: argparse.Namespace, config: AppConfig) -> bool:
         ),
         persistence_query_service=_query_service_for(config),
     )
-    if _cli_args.get_bool_arg(args, "json"):
-        _cli_output.print_json_payload({"items": [job.to_record() for job in jobs]})
-    else:
-        _cli_output.print_failed_batch_jobs(jobs)
+    _emit_query_result(
+        args,
+        json_payload={"items": [job.to_record() for job in jobs]},
+        render_text=lambda: _cli_output.print_failed_batch_jobs(jobs),
+    )
     return True
 
 
@@ -236,10 +252,11 @@ def _handle_batch_job_detail(args: argparse.Namespace, config: AppConfig) -> boo
     )
     if detail is None:
         _raise_batch_job_not_found()
-    if _cli_args.get_bool_arg(args, "json"):
-        _cli_output.print_json_payload(detail.to_record())
-    else:
-        _cli_output.print_batch_job_detail(detail)
+    _emit_query_result(
+        args,
+        json_payload=detail.to_record(),
+        render_text=lambda: _cli_output.print_batch_job_detail(detail),
+    )
     return True
 
 
@@ -251,10 +268,11 @@ def _handle_batch_runs(args: argparse.Namespace, config: AppConfig) -> bool:
         BatchJobInput(batch_job_id=batch_runs_id),
         persistence_query_service=_query_service_for(config),
     )
-    if _cli_args.get_bool_arg(args, "json"):
-        _cli_output.print_json_payload({"items": [run.to_record() for run in runs]})
-    else:
-        _cli_output.print_run_summaries(runs)
+    _emit_query_result(
+        args,
+        json_payload={"items": [run.to_record() for run in runs]},
+        render_text=lambda: _cli_output.print_run_summaries(runs),
+    )
     return True
 
 

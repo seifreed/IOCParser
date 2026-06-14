@@ -5,6 +5,7 @@ from typing import TypedDict, Unpack
 
 from iocparser.api_persistence_query import (
     optional_str,
+    parse_string_filters,
     validated_ioc_type_filter,
     validated_iso_datetime,
     validated_min_severity,
@@ -54,12 +55,6 @@ class SearchIOCsOptions(TypedDict, total=False):
     tag_mode: str | None
     sort_by: str | None
     search_backend: str | None
-
-
-def parse_string_filters(value: str | None) -> tuple[str, ...]:
-    if value is None:
-        return ()
-    return tuple(item.strip() for item in value.split(",") if item.strip())
 
 
 def validated_severity_values(values: tuple[str, ...]) -> tuple[str, ...]:

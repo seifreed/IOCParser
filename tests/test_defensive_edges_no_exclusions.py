@@ -900,8 +900,8 @@ def test_history_private_edges_with_real_models(tmp_path) -> None:
             )
             session.add_all([distributed_model, dead_model])
             session.flush()
-            assert ops._distributed_public_job_id(distributed_model) == "public-job"
-            assert ops._dead_letter_public_job_id(dead_model) == "public-job"
+            assert ops._public_job_id(distributed_model) == "public-job"
+            assert ops._public_job_id(dead_model) == "public-job"
 
             same_origin_distributed = DistributedJobModel(
                 **_job_model_kwargs(job_id="same-origin-job", payload_json="{}"),

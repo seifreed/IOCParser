@@ -48,16 +48,7 @@ def _public_queue_metadata(raw_value: str) -> dict[str, object]:
     return payload
 
 
-def _public_job_id(model: DistributedJobModel) -> str:
-    payload = _public_queue_metadata(model.payload_json or "{}")
-    request_payload = payload.get("request")
-    raw_job_id = request_payload.get("job_id") if isinstance(request_payload, dict) else None
-    if isinstance(raw_job_id, str) and raw_job_id.strip():
-        return raw_job_id
-    return model.job_id
-
-
-def _public_dead_letter_job_id(model: DeadLetterJobModel) -> str:
+def _public_job_id(model: DistributedJobModel | DeadLetterJobModel) -> str:
     payload = _public_queue_metadata(model.payload_json or "{}")
     request_payload = payload.get("request")
     raw_job_id = request_payload.get("job_id") if isinstance(request_payload, dict) else None
@@ -103,7 +94,7 @@ def job_record(model: DistributedJobModel) -> DistributedJobRecord:
 
 def dead_letter_record(model: DeadLetterJobModel) -> DeadLetterRecord:
     return DeadLetterRecord(
-        job_id=_public_dead_letter_job_id(model),
+        job_id=_public_job_id(model),
         correlation_id=model.correlation_id,
         queue_backend=model.queue_backend,
         queue_name=model.queue_name,

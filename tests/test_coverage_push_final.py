@@ -252,12 +252,10 @@ class TestDistributedImportedJob:
 # ── 5. persistence_distributed_records: dead_letter public job id fallback ─
 class TestDeadLetterPublicJobId:
     def test_dead_letter_public_job_id_no_marker(self) -> None:
-        from iocparser.infrastructure.persistence_distributed_records import (
-            _public_dead_letter_job_id,
-        )
+        from iocparser.infrastructure.persistence_distributed_records import _public_job_id
 
         model = SimpleNamespace(job_id="dl-fallback", payload_json='{"request": {}}')
-        assert _public_dead_letter_job_id(model) == "dl-fallback"
+        assert _public_job_id(model) == "dl-fallback"
 
 
 # ── 6. worker_service: concurrent empty queue sleep ────────────────────────

@@ -298,17 +298,6 @@ class TestDistributedRecords:
         )
         assert _public_job_id(model) == "original-j1"
 
-    def test_public_dead_letter_job_id_with_import_marker(self) -> None:
-        from iocparser.infrastructure.persistence_distributed_records import (
-            _public_dead_letter_job_id,
-        )
-
-        model = SimpleNamespace(
-            job_id="dl1#history:abc",
-            payload_json='{"request": {"job_id": "orig-dl"}, "__history_import__": {"archive_id": "abc"}}',
-        )
-        assert _public_dead_letter_job_id(model) == "orig-dl"
-
 
 # ── migration rev_0008: history_metadata on existing DB ───────────────────
 class TestRev0008:

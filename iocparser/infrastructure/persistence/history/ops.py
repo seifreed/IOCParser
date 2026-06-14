@@ -348,17 +348,7 @@ def _distributed_internal_job_id(*, job_id: str, archive_id: str) -> str:
     return f"{job_id}#history:{archive_id}"
 
 
-def _distributed_public_job_id(model: DistributedJobModel) -> str:
-    payload = _json_object(model.payload_json or "{}")
-    marker = _json_import_marker(model.payload_json or "{}")
-    request_payload = payload.get("request")
-    original_job_id = request_payload.get("job_id") if isinstance(request_payload, dict) else None
-    if isinstance(original_job_id, str) and original_job_id.strip() and marker is not None:
-        return original_job_id
-    return model.job_id
-
-
-def _dead_letter_public_job_id(model: DeadLetterJobModel) -> str:
+def _public_job_id(model: DistributedJobModel | DeadLetterJobModel) -> str:
     payload = _json_object(model.payload_json or "{}")
     marker = _json_import_marker(model.payload_json or "{}")
     request_payload = payload.get("request")
@@ -1002,7 +992,7 @@ def _row_dict(model: HistoryModel) -> dict[str, object]:
     if isinstance(model, DistributedJobModel):
         return {
             "id": model.id,
-            "job_id": _distributed_public_job_id(model),
+            "job_id": _public_job_id(model),
             "correlation_id": model.correlation_id,
             "queue_backend": model.queue_backend,
             "queue_name": model.queue_name,
@@ -1032,7 +1022,7 @@ def _row_dict(model: HistoryModel) -> dict[str, object]:
         }
     return {
         "id": model.id,
-        "job_id": _dead_letter_public_job_id(model),
+        "job_id": _public_job_id(model),
         "correlation_id": model.correlation_id,
         "queue_backend": model.queue_backend,
         "queue_name": model.queue_name,

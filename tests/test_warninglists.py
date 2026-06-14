@@ -17,6 +17,7 @@ from tests.test_warninglists_offline import (
     OfflineWarningLists,
     TrackingWarningLists,
     WarningListServer,
+    patched_github_bases,
 )
 
 _warninglist_tempdirs: list[tempfile.TemporaryDirectory[str]] = []
@@ -376,16 +377,11 @@ class TestWarningListsDownloadAndUpdate:
                 "bad-domains": (500, {}),
             }
 
-            with WarningListServer(["good-domains", "bad-domains"], payloads) as base_url:
-                original_api = OfflineWarningLists.GITHUB_API_BASE
-                original_raw = OfflineWarningLists.GITHUB_RAW_BASE
-                OfflineWarningLists.GITHUB_API_BASE = f"{base_url}/contents/lists"
-                OfflineWarningLists.GITHUB_RAW_BASE = f"{base_url}/lists"
-                try:
-                    warning_lists._update_warning_lists()
-                finally:
-                    OfflineWarningLists.GITHUB_API_BASE = original_api
-                    OfflineWarningLists.GITHUB_RAW_BASE = original_raw
+            with (
+                WarningListServer(["good-domains", "bad-domains"], payloads) as base_url,
+                patched_github_bases(base_url),
+            ):
+                warning_lists._update_warning_lists()
 
             assert "good-domains" in warning_lists.warning_lists
             assert warning_lists.cache_metadata_file.exists()
@@ -1407,16 +1403,11 @@ class TestWarningListsUpdateAndDownload:
                 ),
             }
 
-            with WarningListServer(["test-domains"], payloads) as base_url:
-                original_api = OfflineWarningLists.GITHUB_API_BASE
-                original_raw = OfflineWarningLists.GITHUB_RAW_BASE
-                OfflineWarningLists.GITHUB_API_BASE = f"{base_url}/contents/lists"
-                OfflineWarningLists.GITHUB_RAW_BASE = f"{base_url}/lists"
-                try:
-                    warning_lists._update_warning_lists()
-                finally:
-                    OfflineWarningLists.GITHUB_API_BASE = original_api
-                    OfflineWarningLists.GITHUB_RAW_BASE = original_raw
+            with (
+                WarningListServer(["test-domains"], payloads) as base_url,
+                patched_github_bases(base_url),
+            ):
+                warning_lists._update_warning_lists()
 
             assert len(warning_lists.warning_lists) == 1
             assert warning_lists.cache_file.exists()

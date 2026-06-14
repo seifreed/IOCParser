@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
@@ -45,6 +47,20 @@ class TrackingWarningLists(OfflineWarningLists):
                 "list": ["fallback.example"],
             }
         }
+
+
+@contextmanager
+def patched_github_bases(base_url: str) -> Iterator[None]:
+    """Point OfflineWarningLists at a local server for the duration of the block."""
+    original_api = OfflineWarningLists.GITHUB_API_BASE
+    original_raw = OfflineWarningLists.GITHUB_RAW_BASE
+    OfflineWarningLists.GITHUB_API_BASE = f"{base_url}/contents/lists"
+    OfflineWarningLists.GITHUB_RAW_BASE = f"{base_url}/lists"
+    try:
+        yield
+    finally:
+        OfflineWarningLists.GITHUB_API_BASE = original_api
+        OfflineWarningLists.GITHUB_RAW_BASE = original_raw
 
 
 class WarningListServer(ThreadedHTTPServer):
@@ -163,16 +179,11 @@ def test_update_warning_lists_downloads_from_local_server_and_writes_cache(tmp_p
         "bad-domains": (500, {}),
     }
 
-    with WarningListServer(["good-domains", "bad-domains"], payloads) as base_url:
-        original_api = OfflineWarningLists.GITHUB_API_BASE
-        original_raw = OfflineWarningLists.GITHUB_RAW_BASE
-        OfflineWarningLists.GITHUB_API_BASE = f"{base_url}/contents/lists"
-        OfflineWarningLists.GITHUB_RAW_BASE = f"{base_url}/lists"
-        try:
-            warning_lists._update_warning_lists()
-        finally:
-            OfflineWarningLists.GITHUB_API_BASE = original_api
-            OfflineWarningLists.GITHUB_RAW_BASE = original_raw
+    with (
+        WarningListServer(["good-domains", "bad-domains"], payloads) as base_url,
+        patched_github_bases(base_url),
+    ):
+        warning_lists._update_warning_lists()
 
     assert "good-domains" in warning_lists.warning_lists
     assert warning_lists.cache_file.exists()
@@ -201,13 +212,8 @@ def test_update_warning_lists_falls_back_to_cache_and_handles_bad_cache(tmp_path
 
             return Handler
 
-    with BadJSONServer() as base_url:
-        original_api = OfflineWarningLists.GITHUB_API_BASE
-        OfflineWarningLists.GITHUB_API_BASE = f"{base_url}/contents/lists"
-        try:
-            warning_lists._update_warning_lists()
-        finally:
-            OfflineWarningLists.GITHUB_API_BASE = original_api
+    with BadJSONServer() as base_url, patched_github_bases(base_url):
+        warning_lists._update_warning_lists()
 
     assert warning_lists.warning_lists == {}
 

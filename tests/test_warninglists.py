@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from tests.test_warninglists_offline import (
+    GOOD_BAD_DOMAIN_PAYLOADS,
     OfflineWarningLists,
     TrackingWarningLists,
     WarningListServer,
@@ -364,18 +365,7 @@ class TestWarningListsDownloadAndUpdate:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmppath = Path(tmpdir)
             warning_lists = OfflineWarningLists(tmppath, cache_duration=24, force_update=False)
-            payloads = {
-                "good-domains": (
-                    200,
-                    {
-                        "name": "Good Domains",
-                        "type": "string",
-                        "matching_attributes": ["domain"],
-                        "list": ["good.example"],
-                    },
-                ),
-                "bad-domains": (500, {}),
-            }
+            payloads = GOOD_BAD_DOMAIN_PAYLOADS
 
             with (
                 WarningListServer(["good-domains", "bad-domains"], payloads) as base_url,

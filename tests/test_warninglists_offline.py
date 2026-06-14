@@ -10,6 +10,19 @@ from pathlib import Path
 from iocparser.infrastructure.warninglists import MISPWarningLists, WarningListLookups
 from tests.http_server_helpers import ThreadedHTTPServer
 
+GOOD_BAD_DOMAIN_PAYLOADS: dict[str, tuple[int, object]] = {
+    "good-domains": (
+        200,
+        {
+            "name": "Good Domains",
+            "type": "string",
+            "matching_attributes": ["domain"],
+            "list": ["good.example"],
+        },
+    ),
+    "bad-domains": (500, {}),
+}
+
 
 class OfflineWarningLists(MISPWarningLists):
     def __init__(
@@ -166,18 +179,7 @@ def test_safe_unlink_ignores_unlink_errors(tmp_path: Path) -> None:
 
 def test_update_warning_lists_downloads_from_local_server_and_writes_cache(tmp_path: Path) -> None:
     warning_lists = OfflineWarningLists(tmp_path)
-    payloads = {
-        "good-domains": (
-            200,
-            {
-                "name": "Good Domains",
-                "type": "string",
-                "matching_attributes": ["domain"],
-                "list": ["good.example"],
-            },
-        ),
-        "bad-domains": (500, {}),
-    }
+    payloads = GOOD_BAD_DOMAIN_PAYLOADS
 
     with (
         WarningListServer(["good-domains", "bad-domains"], payloads) as base_url,

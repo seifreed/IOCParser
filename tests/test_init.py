@@ -21,60 +21,8 @@ import pytest
 import iocparser as iocparser_module
 from iocparser.api_extraction import extract_iocs_from_file, extract_iocs_from_text
 from iocparser.errors import FileExistenceError
+from tests.test_file_parser import create_minimal_pdf
 from tests.warning_service_helpers import StaticWarningListService, swap_warning_service
-
-
-def create_minimal_pdf(pdf_path: Path, text_content: str) -> None:
-    """
-    Create a minimal valid PDF file with text content.
-
-    This uses the raw PDF format to create a real, parseable PDF
-    without requiring external PDF creation libraries.
-
-    Args:
-        pdf_path: Path where PDF will be created
-        text_content: Text to include in the PDF
-    """
-    # Minimal PDF structure with text content
-    # This is a valid PDF 1.4 file that pdfplumber can parse
-    pdf_content = f"""%PDF-1.4
-1 0 obj
-<< /Type /Catalog /Pages 2 0 R >>
-endobj
-2 0 obj
-<< /Type /Pages /Kids [3 0 R] /Count 1 >>
-endobj
-3 0 obj
-<< /Type /Page /Parent 2 0 R /Resources 4 0 R /MediaBox [0 0 612 792] /Contents 5 0 R >>
-endobj
-4 0 obj
-<< /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >>
-endobj
-5 0 obj
-<< /Length {len(text_content) + 50} >>
-stream
-BT
-/F1 12 Tf
-100 700 Td
-({text_content}) Tj
-ET
-endstream
-endobj
-xref
-0 6
-0000000000 65535 f
-0000000009 00000 n
-0000000058 00000 n
-0000000115 00000 n
-0000000214 00000 n
-0000000304 00000 n
-trailer
-<< /Size 6 /Root 1 0 R >>
-startxref
-{400 + len(text_content)}
-%%EOF
-"""
-    pdf_path.write_text(pdf_content, encoding="latin-1")
 
 
 class TestExtractIocsFromFile:

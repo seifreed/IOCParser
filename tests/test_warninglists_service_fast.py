@@ -7,7 +7,8 @@ import requests
 
 import iocparser.infrastructure.warninglists_service as warninglists_service_module
 from iocparser.domain.models import IOC
-from iocparser.infrastructure.warninglists import MISPWarningLists, WarningListLookups
+from iocparser.infrastructure.warninglists import MISPWarningLists
+from tests.test_warninglists_offline import OfflineWarningLists
 
 
 class InitProbeWarningLists(MISPWarningLists):
@@ -33,21 +34,7 @@ class InitProbeWarningLists(MISPWarningLists):
         super()._preprocess_lists()
 
 
-class CacheFallbackWarningLists(MISPWarningLists):
-    def __init__(self, data_dir: Path) -> None:
-        self.cache_duration = 24
-        self.force_update = False
-        self.warning_lists = {}
-        self.data_dir = data_dir
-        self.cache_file = data_dir / "misp_warninglists_cache.json"
-        self.cache_metadata_file = data_dir / "misp_warninglists_metadata.json"
-        self.lookup_data = WarningListLookups(
-            string_lookups={},
-            compiled_regex={},
-            cidr_networks={},
-            lists_by_ioc_type={},
-        )
-
+class CacheFallbackWarningLists(OfflineWarningLists):
     def _fetch_list_directories(self) -> list[str]:
         raise requests.RequestException("boom")
 
@@ -112,19 +99,8 @@ def test_warninglists_update_uses_cached_lists_after_request_failure(tmp_path: P
         encoding="utf-8",
     )
 
-    warning_lists = object.__new__(CacheFallbackWarningLists)
-    warning_lists.cache_duration = 24
-    warning_lists.force_update = False
-    warning_lists.warning_lists = {}
-    warning_lists.data_dir = tmp_path
-    warning_lists.cache_file = cache_file
-    warning_lists.cache_metadata_file = tmp_path / "misp_warninglists_metadata.json"
-    warning_lists.lookup_data = WarningListLookups(
-        string_lookups={},
-        compiled_regex={},
-        cidr_networks={},
-        lists_by_ioc_type={},
-    )
+    warning_lists = CacheFallbackWarningLists(tmp_path)
+    assert warning_lists.cache_file == cache_file
 
     CacheFallbackWarningLists._update_warning_lists(warning_lists)
 

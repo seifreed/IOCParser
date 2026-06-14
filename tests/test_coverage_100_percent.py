@@ -14,100 +14,14 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
 
 from iocparser.domain.models import IOC, ExtractionResult, WarningMatch
 from tests.coverage_helpers import fresh_db, persist_run_into
 
-
-# ── IOC repo: directly test the retry logic (lines 54-59) ─────────────────
-class TestIOCRepoRetryLogic:
-    def test_retry_path_finds_existing_row(self, tmp_path: Path) -> None:
-        """Exercise the except IntegrityError branch by simulating the state
-        that exists after rollback: the row exists in DB but wasn't found
-        by the initial SELECT."""
-        from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
-        from iocparser.infrastructure.persistence_models import IOCModel
-
-        engine = create_engine(fresh_db(tmp_path, "ioc_direct.db"), future=True)
-        session = Session(engine)
-
-        # Insert a row directly
-        ioc = IOCModel(
-            ioc_type="md5",
-            value="direct_val",
-            value_search="direct_val",
-            is_warning=False,
-            warning_list="",
-            warning_description="",
-        )
-        session.add(ioc)
-        session.flush()
-        session.commit()
-        existing_id = ioc.id
-
-        # Now simulate the retry path: after IntegrityError, rollback happened,
-        # and we re-execute the SELECT which should find the row
-        SQLAlchemyIOCRepository(session)
-        from sqlalchemy import select
-
-        stmt = select(IOCModel).where(
-            IOCModel.ioc_type == "md5",
-            IOCModel.value == "direct_val",
-            IOCModel.is_warning.is_(False),
-            IOCModel.warning_list == "",
-            IOCModel.warning_description == "",
-        )
-        ioc_rows = session.execute(stmt).scalars().all()
-        assert len(ioc_rows) > 0
-        assert ioc_rows[0].id == existing_id
-        session.close()
-        engine.dispose()
-
-
-# ── Source repo: directly test the retry logic (lines 70-86) ──────────────
-class TestSourceRepoRetryLogic:
-    def test_retry_path_updates_metadata(self, tmp_path: Path) -> None:
-        """Exercise the metadata update that happens in the except block."""
-        from iocparser.infrastructure.persistence_models import SourceModel
-        from iocparser.infrastructure.persistence_repository_support import normalize_search
-
-        engine = create_engine(fresh_db(tmp_path, "src_direct.db"), future=True)
-        session = Session(engine)
-
-        # Insert source directly
-        source = SourceModel(
-            kind="file",
-            value="direct.txt",
-            value_search="direct.txt",
-            first_seen=datetime.now(UTC),
-            last_seen=datetime.now(UTC),
-        )
-        session.add(source)
-        session.flush()
-        session.commit()
-        src_id = source.id
-
-        # Simulate what the except block does: find existing and update metadata
-        existing = session.get(SourceModel, src_id)
-        now = datetime.now(UTC)
-        existing.last_seen = now
-        existing.original_url = "https://test.com"
-        existing.normalized_url = "https://test.com"
-        existing.mime_type = "text/html"
-        existing.input_size = 999
-        existing.content_hash = "abc123"
-        existing.fingerprint = "abc"
-        existing.value_search = normalize_search(existing.value)
-        session.commit()
-
-        refreshed = session.get(SourceModel, src_id)
-        assert refreshed.mime_type == "text/html"
-        assert refreshed.content_hash == "abc123"
-        assert refreshed.input_size == 999
-        session.close()
-        engine.dispose()
+# Repository IntegrityError retry/reraise paths are covered by
+# test_defensive_edges_no_exclusions (test_ioc_repository_integrity_retry_and_reraise_paths,
+# test_source_repository_integrity_retry_and_reraise_paths) and the real-DB savepoint-race
+# tests in test_coverage_gaps_round3.
 
 
 # ── History: rich import with distributed + dead_letter jobs ──────────────

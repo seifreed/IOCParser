@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from iocparser.adapters.renderers import STIXOutputRenderer
@@ -13,6 +11,7 @@ from iocparser.infrastructure.file_readers import MagicTextSourceReader
 from iocparser.infrastructure.http_download import RequestsURLDownloader
 from iocparser.infrastructure.streaming import ParallelStreamingExtractor, StreamingIOCExtractor
 from iocparser.infrastructure.warninglists_diagnostics import WarningListDiagnosticsMixin
+from tests.http_server_helpers import LocalHTTPTextServer
 
 
 class PlainTextHtmlReader(MagicTextSourceReader):
@@ -28,43 +27,6 @@ class TimeoutDownloader(RequestsURLDownloader):
         from requests.exceptions import Timeout
 
         raise Timeout("simulated timeout")
-
-
-class StaticHTTPServer:
-    def __init__(self, body: bytes) -> None:
-        self.body = body
-        self.server: ThreadingHTTPServer | None = None
-        self.thread: threading.Thread | None = None
-
-    def __enter__(self) -> str:
-        body = self.body
-
-        class Handler(BaseHTTPRequestHandler):
-            def do_GET(self) -> None:
-                self.send_response(200)
-                self.send_header("Content-Type", "text/plain")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-
-            def log_message(self, fmt: str, *args) -> None:
-                del fmt, args
-
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.thread = threading.Thread(
-            target=lambda: self.server.serve_forever(poll_interval=0.01),
-            daemon=True,
-        )
-        self.thread.start()
-        return f"http://127.0.0.1:{self.server.server_address[1]}/sample.txt"
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        del exc_type, exc, tb
-        assert self.server is not None
-        assert self.thread is not None
-        self.server.shutdown()
-        self.server.server_close()
-        self.thread.join(timeout=5)
 
 
 class DiagnosticProbe(WarningListDiagnosticsMixin):
@@ -95,7 +57,7 @@ def test_file_reader_treats_plain_text_html_extension_as_html(tmp_path: Path) ->
 
 
 def test_http_downloader_wraps_timeout_from_download_phase() -> None:
-    with StaticHTTPServer(b"IOC URL: https://timeout.example/path\n") as url:
+    with LocalHTTPTextServer(b"IOC URL: https://timeout.example/path\n") as url:
         with_path = TimeoutDownloader()
         try:
             with_path.download(url)

@@ -190,6 +190,9 @@ def search_iocs_page(query: IOCSearchPageQuery) -> PersistedIOCSearchPage:
             allowed = tuple(name for name, rank in SEVERITY_ORDER.items() if rank >= threshold)
             stmt = stmt.where(RunIOCModel.severity.in_(allowed))
         stmt = _order_run_query_stmt(stmt, sort_by=query.sort_by)
+        # Several IOCs can share one run's sort key; add a unique per-row tiebreaker
+        # so LIMIT/OFFSET paging is deterministic and never skips or repeats a hit.
+        stmt = stmt.order_by(RunIOCModel.id.asc())
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = _coerce_count(unit_of_work.session.execute(count_stmt).scalar_one())
         limit = max(0, query.limit)

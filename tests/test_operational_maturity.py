@@ -557,6 +557,41 @@ def test_tag_search_backfill_matches_query_format(tmp_path: Path) -> None:
     assert sorted(tags_search.split()) == ["bar", "foo"]
 
 
+def test_ioc_search_pagination_is_stable_within_one_run(tmp_path: Path) -> None:
+    db_uri = f"sqlite:///{tmp_path / 'ioc-pagination.sqlite'}"
+    values = [f"host{index}.example" for index in range(5)]
+    unit_of_work = SQLAlchemyUnitOfWork(db_uri)
+    try:
+        persist_run(
+            PersistRunInput(
+                source=Source.from_raw("file", "multi.txt"),
+                result=ExtractionResult(
+                    iocs=tuple(IOC.from_raw("domains", value) for value in values)
+                ),
+                tool_version="5.0.0",
+                options=PersistOptions(
+                    defang=False, check_warnings=False, force_update=False, output_format="json"
+                ),
+            ),
+            unit_of_work=unit_of_work,
+        )
+        unit_of_work.commit()
+    except Exception:
+        unit_of_work.rollback()
+        raise
+    finally:
+        unit_of_work.close()
+
+    # Paging one hit at a time over several IOCs sharing a single run must return
+    # every IOC exactly once, with no skips or duplicates across pages.
+    collected = []
+    for offset in range(len(values)):
+        page = query_persisted_iocs(db_uri=db_uri, value=".example", limit=1, offset=offset)
+        assert len(page.items) == 1
+        collected.append(page.items[0].value)
+    assert sorted(collected) == sorted(values)
+
+
 def test_query_pagination_is_stable_when_runs_share_started_at(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'stable-pagination.sqlite'}"
     first_run_id = _persist_result(db_uri, source_value="first.txt", ioc_value="first.example")

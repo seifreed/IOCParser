@@ -16,6 +16,21 @@ def serialize_queue_record(envelope: QueueEnvelope) -> str:
     return json.dumps(envelope.to_record(), sort_keys=True)
 
 
+def build_invalid_payload_record(
+    *, payload: str, queue_name: str, message_id: str, error: Exception
+) -> str:
+    """Serialize a quarantined invalid-payload record to canonical JSON."""
+    return json.dumps(
+        {
+            "invalid_payload": payload,
+            "queue_name": queue_name,
+            "message_id": message_id,
+            "error": str(error),
+        },
+        sort_keys=True,
+    )
+
+
 def load_queue_record(payload: str) -> dict[str, object]:
     decoded = cast("object", json.loads(payload))
     if not isinstance(decoded, dict):

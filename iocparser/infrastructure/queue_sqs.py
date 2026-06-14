@@ -7,7 +7,11 @@ from typing import NotRequired, Protocol, TypedDict, cast
 from uuid import uuid4
 
 from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
-from iocparser.infrastructure.queue_records import load_queue_record, serialize_queue_record
+from iocparser.infrastructure.queue_records import (
+    build_invalid_payload_record,
+    load_queue_record,
+    serialize_queue_record,
+)
 
 
 class _SQSMessageAttribute(TypedDict):
@@ -43,20 +47,6 @@ class _Boto3Module(Protocol):
 
 def _boto3_module() -> _Boto3Module:
     return cast("_Boto3Module", import_module("boto3"))
-
-
-def _invalid_payload_record(
-    *, payload: str, queue_name: str, message_id: str, error: Exception
-) -> str:
-    return json.dumps(
-        {
-            "invalid_payload": payload,
-            "queue_name": queue_name,
-            "message_id": message_id,
-            "error": str(error),
-        },
-        sort_keys=True,
-    )
 
 
 class SQSQueueAdapter:
@@ -147,7 +137,7 @@ class SQSQueueAdapter:
             self._queue_urls[dead_queue_name] = self.dead_letter_queue_url
             self.client.send_message(
                 QueueUrl=self.dead_letter_queue_url,
-                MessageBody=_invalid_payload_record(
+                MessageBody=build_invalid_payload_record(
                     payload=payload,
                     queue_name=receipt.queue_name,
                     message_id=receipt.message_id,

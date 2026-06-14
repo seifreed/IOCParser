@@ -7,7 +7,11 @@ from typing import Protocol, cast
 from uuid import uuid4
 
 from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
-from iocparser.infrastructure.queue_records import load_queue_record, serialize_queue_record
+from iocparser.infrastructure.queue_records import (
+    build_invalid_payload_record,
+    load_queue_record,
+    serialize_queue_record,
+)
 
 
 class _RabbitMQMethodFrame(Protocol):
@@ -76,14 +80,11 @@ def _payload_text(payload: bytes) -> str:
 def _invalid_payload_body(
     *, payload: bytes, queue_name: str, message_id: str, error: Exception
 ) -> bytes:
-    return json.dumps(
-        {
-            "invalid_payload": _payload_text(payload),
-            "queue_name": queue_name,
-            "message_id": message_id,
-            "error": str(error),
-        },
-        sort_keys=True,
+    return build_invalid_payload_record(
+        payload=_payload_text(payload),
+        queue_name=queue_name,
+        message_id=message_id,
+        error=error,
     ).encode("utf-8")
 
 

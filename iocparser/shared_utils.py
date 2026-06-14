@@ -1,4 +1,5 @@
 import re as _re
+from collections.abc import Iterable
 
 from iocparser.errors import ValidationError
 
@@ -22,6 +23,11 @@ def parse_bool_token(value: str) -> bool | None:
     if normalized == "" or normalized in FALSE_BOOL_VALUES:
         return False
     return None
+
+
+def normalize_tokens(items: Iterable[str]) -> tuple[str, ...]:
+    """Strip and lowercase each item, dropping blanks and preserving order."""
+    return tuple(item.strip().lower() for item in items if item.strip())
 
 
 def parse_string_filters(value: object) -> tuple[str, ...]:

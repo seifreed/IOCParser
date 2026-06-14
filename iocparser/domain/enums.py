@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
+from iocparser.shared_utils import normalize_tokens
+
 
 class RunStatus(StrEnum):
     """Canonical run status values."""
@@ -181,9 +183,9 @@ def register_custom_ioc_type(
     definition = CustomIOCTypeDefinition(
         name=normalized,
         base_type=base,
-        aliases=tuple(alias.strip().lower() for alias in aliases if alias.strip()),
+        aliases=normalize_tokens(aliases),
         severity=severity.lower().strip() if severity else None,
-        tags=tuple(tag.strip().lower() for tag in tags if tag.strip()),
+        tags=normalize_tokens(tags),
         stix_pattern=stix_pattern,
     )
     _custom_ioc_types[normalized] = definition

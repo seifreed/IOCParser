@@ -11,7 +11,7 @@ from iocparser.domain.enums import (
     ioc_type_name,
 )
 from iocparser.domain.values import IndicatorValue, indicator_value_for
-from iocparser.shared_utils import deduplicate_iocs
+from iocparser.shared_utils import deduplicate_iocs, normalize_tokens
 
 INVALID_ANALYST_SORT_BY_ERROR = "Invalid sort_by: {value}"
 VALID_ANALYST_SORT_VALUES = {"severity", "type", "value"}
@@ -262,10 +262,8 @@ class ExtractionResult:
         normalized_sort_by = sort_by.strip().lower()
         if normalized_sort_by not in VALID_ANALYST_SORT_VALUES:
             raise ValueError(INVALID_ANALYST_SORT_BY_ERROR.format(value=sort_by))
-        normalized_severities = {
-            severity.strip().lower() for severity in severities if severity.strip()
-        }
-        normalized_tags = {tag.strip().lower() for tag in tags if tag.strip()}
+        normalized_severities = set(normalize_tokens(severities))
+        normalized_tags = set(normalize_tokens(tags))
 
         def matches(ioc: IOC) -> bool:
             if normalized_severities and ioc.severity.lower() not in normalized_severities:

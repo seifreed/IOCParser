@@ -204,8 +204,10 @@ class ReferenceDataPolicy:
         tlds_file = data_dir / "tlds.txt"
         if tlds_file.exists():
             try:
+                from iocparser.shared_utils import normalize_tokens
+
                 with tlds_file.open(encoding="utf-8") as handle:
-                    return {line.strip().lower() for line in handle if line.strip()}
+                    return set(normalize_tokens(handle))
             except (OSError, ValueError) as exc:
                 logger.debug("Failed to load TLD list from file: %s", exc)
         return set(self.default_tlds)

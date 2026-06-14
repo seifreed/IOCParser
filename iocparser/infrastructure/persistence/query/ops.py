@@ -71,6 +71,7 @@ from iocparser.infrastructure.persistence_support import (
     source_value_clause,
 )
 from iocparser.interfaces.ports import PersistenceQueryService
+from iocparser.shared_utils import normalize_tokens
 
 RUN_NOT_FOUND_TEMPLATE = "Run not found: {run_id}"
 PREVIOUS_RUN_NOT_FOUND_TEMPLATE = "No previous run found for source of run {run_id}"
@@ -175,9 +176,7 @@ def search_iocs_page(query: IOCSearchPageQuery) -> PersistedIOCSearchPage:
         if query.severity:
             stmt = stmt.where(RunIOCModel.severity.in_(query.severity))
         if query.tags:
-            tag_filters = [
-                _tag_search_clause(tag.strip().lower()) for tag in query.tags if tag.strip()
-            ]
+            tag_filters = [_tag_search_clause(tag) for tag in normalize_tokens(query.tags)]
             if tag_filters:
                 stmt = stmt.where(
                     or_(*tag_filters) if query.tag_mode == "any" else and_(*tag_filters)

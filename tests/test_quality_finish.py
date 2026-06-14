@@ -80,9 +80,8 @@ from iocparser.infrastructure.persistence_repository_support import (
 )
 from iocparser.infrastructure.persistence_schema import IOCModel, RunIOCModel, RunModel, SourceModel
 from iocparser.infrastructure.persistence_support import _evidence_from_json, _json_list
-from iocparser.infrastructure.queue_filesystem import _load_queue_record as load_fs_queue_record
 from iocparser.infrastructure.queue_rabbitmq import _load_queue_record as load_rabbit_queue_record
-from iocparser.infrastructure.queue_sqs import _load_queue_record as load_sqs_queue_record
+from iocparser.infrastructure.queue_records import load_queue_record
 from iocparser.infrastructure.warninglists_matching import WarningListMatchingMixin
 from iocparser.infrastructure.warninglists_preprocess import WarningListPreprocessMixin
 from iocparser.infrastructure.warninglists_types import WarningListLookups
@@ -368,11 +367,9 @@ def test_http_and_queue_helpers_cover_error_paths() -> None:
         _optional_float_arg(argparse.Namespace(rate=[]), "rate")
 
     with pytest.raises(TypeError):
-        load_fs_queue_record("[]")
+        load_queue_record("[]")
     with pytest.raises(TypeError):
         load_rabbit_queue_record(b"[]")
-    with pytest.raises(TypeError):
-        load_sqs_queue_record("[]")
 
     downloader = RequestsURLDownloader()
     downloader.retries = -1

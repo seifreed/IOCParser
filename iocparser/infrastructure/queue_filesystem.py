@@ -4,24 +4,13 @@ import json
 import re
 import threading
 from pathlib import Path
-from typing import cast
 from uuid import uuid4
 
 from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
+from iocparser.infrastructure.queue_records import load_queue_record
 
 INVALID_QUEUE_NAME_ERROR = "Invalid queue name"
 INVALID_RECEIPT_PATH_ERROR = "Invalid filesystem queue receipt"
-
-
-def _load_queue_record(payload: str) -> dict[str, object]:
-    decoded = cast("object", json.loads(payload))
-    if not isinstance(decoded, dict):
-        raise _queue_payload_type_error()
-    return cast("dict[str, object]", decoded)
-
-
-def _queue_payload_type_error() -> TypeError:
-    return TypeError("Queue payload must be a JSON object")
 
 
 def _safe_filename_component(value: object) -> str:
@@ -67,7 +56,7 @@ class FilesystemQueueAdapter:
                 except FileNotFoundError:
                     continue
                 try:
-                    payload = _load_queue_record(target.read_text(encoding="utf-8"))
+                    payload = load_queue_record(target.read_text(encoding="utf-8"))
                     envelope = QueueEnvelope.from_record(payload)
                 except (json.JSONDecodeError, TypeError, ValueError):
                     self._quarantine_invalid_payload(queue_name, target)

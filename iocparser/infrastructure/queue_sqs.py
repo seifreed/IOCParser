@@ -7,6 +7,7 @@ from typing import NotRequired, Protocol, TypedDict, cast
 from uuid import uuid4
 
 from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
+from iocparser.infrastructure.queue_records import load_queue_record
 
 
 class _SQSMessageAttribute(TypedDict):
@@ -42,17 +43,6 @@ class _Boto3Module(Protocol):
 
 def _boto3_module() -> _Boto3Module:
     return cast("_Boto3Module", import_module("boto3"))
-
-
-def _load_queue_record(payload: str) -> dict[str, object]:
-    decoded = cast("object", json.loads(payload))
-    if not isinstance(decoded, dict):
-        raise _queue_payload_type_error()
-    return cast("dict[str, object]", decoded)
-
-
-def _queue_payload_type_error() -> TypeError:
-    return TypeError("Queue payload must be a JSON object")
 
 
 def _invalid_payload_record(
@@ -124,7 +114,7 @@ class SQSQueueAdapter:
                 str(message.get("MessageId", uuid4())),
             )
             try:
-                envelope = QueueEnvelope.from_record(_load_queue_record(message["Body"]))
+                envelope = QueueEnvelope.from_record(load_queue_record(message["Body"]))
             except (json.JSONDecodeError, TypeError, ValueError) as exc:
                 self._quarantine_invalid_payload(receipt, payload=message["Body"], error=exc)
                 return None

@@ -7,6 +7,7 @@ from typing import Protocol, cast
 from uuid import uuid4
 
 from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
+from iocparser.infrastructure.queue_records import load_queue_record
 
 
 class _RabbitMQMethodFrame(Protocol):
@@ -62,14 +63,7 @@ def _pika_module() -> _PikaModule:
 
 
 def _load_queue_record(payload: bytes) -> dict[str, object]:
-    decoded = cast("object", json.loads(payload.decode("utf-8")))
-    if not isinstance(decoded, dict):
-        raise _queue_payload_type_error()
-    return cast("dict[str, object]", decoded)
-
-
-def _queue_payload_type_error() -> TypeError:
-    return TypeError("Queue payload must be a JSON object")
+    return load_queue_record(payload.decode("utf-8"))
 
 
 def _payload_text(payload: bytes) -> str:

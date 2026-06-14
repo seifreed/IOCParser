@@ -182,25 +182,9 @@ def test_distributed_get_job_history_prefix_not_found(tmp_path):
     assert svc.get_job(job_id="abc#history:xyz") is None
 
 
-# rendering_support.py:118 — Bundle serializes to non-dict (shouldn't happen but defensive)
-def test_stix_bundle_empty_produces_dict():
-    from iocparser.rendering_support import build_stix_bundle
-
-    result = json.loads(build_stix_bundle([], build_indicator=lambda e: None))
-    assert isinstance(result, dict)
-
-
-# worker_service.py:116-117 — concurrent worker empty queue sleep
-def test_worker_concurrent_empty_sleeps():
-    from iocparser.worker_service import DistributedWorkerService
-
-    svc = SimpleNamespace(
-        process_next=lambda queue_name: None, limits=SimpleNamespace(max_workers=2)
-    )
-    w = DistributedWorkerService(
-        service=svc, queue_name="t", poll_interval_seconds=0.01, max_messages_per_cycle=1
-    )
-    assert w.run_forever(max_cycles=2) == 0
+# Empty-bundle dict output and concurrent worker empty-queue sleep are covered by
+# test_coverage_100_percent (test_stix_bundle_empty_indicators,
+# test_worker_concurrent_sleeps_on_empty).
 
 
 # IntegrityError handlers (mock: session.flush — simulates concurrent DB writer)
@@ -290,17 +274,8 @@ def test_source_repo_integrity_retry(tmp_path):
     engine.dispose()
 
 
-def test_source_repo_integrity_reraise(tmp_path):
-    from iocparser.infrastructure.persistence_source_repository import SQLAlchemySourceRepository
-
-    engine = create_engine(fresh_db(tmp_path), future=True)
-    s = Session(engine)
-    r = SQLAlchemySourceRepository(s)
-    with patch.object(s, "flush", side_effect=IntegrityError("x", {}, Exception())):
-        with pytest.raises(IntegrityError):
-            r.get_or_create(kind="file", value="ghost.pdf")
-    s.close()
-    engine.dispose()
+# Source-repository integrity reraise is covered by
+# test_coverage_push_final.TestSourceRepoIntegrity.test_reraise_when_not_found.
 
 
 # cli_processing_urls.py:199 — _retry_attempt_from_batch with matches but occurrence out of range

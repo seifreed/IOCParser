@@ -258,18 +258,8 @@ class TestDeadLetterPublicJobId:
         assert _public_job_id(model) == "dl-fallback"
 
 
-# ── 6. worker_service: concurrent empty queue sleep ────────────────────────
-class TestWorkerConcurrentSleep:
-    def test_sleep_on_empty_concurrent(self) -> None:
-        from iocparser.worker_service import DistributedWorkerService
-
-        svc = SimpleNamespace(
-            process_next=lambda queue_name: None, limits=SimpleNamespace(max_workers=2)
-        )
-        w = DistributedWorkerService(
-            service=svc, queue_name="t", poll_interval_seconds=0.01, max_messages_per_cycle=1
-        )
-        assert w.run_forever(max_cycles=1) == 0
+# worker_service concurrent empty-queue sleep is covered by
+# test_coverage_final.TestWorkerService.test_concurrent_empty_queue_sleeps
 
 
 # ── 7. renderers: json decode dict, stix return None, bundle non-dict ──────

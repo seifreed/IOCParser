@@ -96,6 +96,8 @@ class FilesystemQueueAdapter:
         dead_dir = self._queue_dir(receipt.queue_name, "dead")
         temp_path = dead_dir / f"tmp-{uuid4().hex}.json"
         target = dead_dir / processing_path.name
+        if target.exists():
+            target = dead_dir / f"{processing_path.stem}-{uuid4().hex}{processing_path.suffix}"
         temp_path.write_text(serialize_queue_record(envelope), encoding="utf-8")
         temp_path.rename(target)
         processing_path.unlink(missing_ok=True)

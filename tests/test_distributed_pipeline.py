@@ -149,6 +149,32 @@ def test_filesystem_queue_dequeue_survives_race_condition(tmp_path: Path) -> Non
     assert queue.pending_count(queue_name="race") == 0
 
 
+def test_filesystem_dead_letter_preserves_existing_dead_record(tmp_path: Path) -> None:
+    """Regression: dead_letter must not overwrite a same-named existing dead record."""
+    queue = FilesystemQueueAdapter(tmp_path / "queue")
+    request = PipelineJobRequest(
+        input_kind="text",
+        source_value="dead letter me",
+        persist=False,
+        check_warnings=False,
+    )
+    envelope = QueueEnvelope(request=request, queue_backend="filesystem", queue_name="dl")
+    queue.enqueue(queue_name="dl", envelope=envelope)
+    dequeued = queue.dequeue(queue_name="dl")
+    assert dequeued is not None
+    receipt, dequeued_envelope = dequeued
+
+    dead_dir = tmp_path / "queue" / "dl" / "dead"
+    dead_dir.mkdir(parents=True, exist_ok=True)
+    existing = dead_dir / Path(receipt.receipt_id).name
+    existing.write_text("existing-dead-record", encoding="utf-8")
+
+    queue.dead_letter(receipt, envelope=dequeued_envelope)
+
+    assert existing.read_text(encoding="utf-8") == "existing-dead-record"
+    assert queue.dead_count(queue_name="dl") == 2
+
+
 def test_distributed_pipeline_deduplicates_submit_before_enqueue(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'dedupe.sqlite'}"
     service = DistributedPipelineService(

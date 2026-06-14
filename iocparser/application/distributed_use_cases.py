@@ -180,14 +180,19 @@ class DistributedPipelineCoordinator:
                 if self.job_service
                 else None
             )
-            dead_receipt = self.queue_adapter.dead_letter(receipt, envelope=dead_envelope)
+            try:
+                dead_receipt_id = self.queue_adapter.dead_letter(
+                    receipt, envelope=dead_envelope
+                ).receipt_id
+            except Exception:
+                # Job already recorded dead-lettered; drop the message so a backend
+                # that cannot archive it (e.g. SQS with no DLQ) never redelivers it.
+                self.queue_adapter.ack(receipt)
+                dead_receipt_id = receipt.receipt_id
             self._emit(
                 "job_dead_lettered",
                 envelope,
-                {
-                    "receipt_id": dead_receipt.receipt_id,
-                    "error_code": failure_error.code,
-                },
+                {"receipt_id": dead_receipt_id, "error_code": failure_error.code},
             )
             return stored or result
         except (KeyboardInterrupt, SystemExit):

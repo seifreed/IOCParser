@@ -149,6 +149,47 @@ def test_filesystem_queue_dequeue_survives_race_condition(tmp_path: Path) -> Non
     assert queue.pending_count(queue_name="race") == 0
 
 
+def test_process_next_drops_message_when_dead_letter_archival_fails(tmp_path: Path) -> None:
+    """Regression: a backend that cannot archive (e.g. SQS with no DLQ) must not loop.
+
+    The job is recorded dead-lettered, so the poison message is acked/removed instead
+    of raising out of process_next and being redelivered forever.
+    """
+
+    class DeadLetterFailsAdapter(FilesystemQueueAdapter):
+        def __init__(self, root: Path) -> None:
+            super().__init__(root)
+            self.acked: list[str] = []
+
+        def dead_letter(self, receipt, *, envelope):  # type: ignore[no-untyped-def]
+            raise RuntimeError("dead-letter queue not configured")
+
+        def ack(self, receipt):  # type: ignore[no-untyped-def]
+            self.acked.append(receipt.receipt_id)
+            super().ack(receipt)
+
+    queue = DeadLetterFailsAdapter(tmp_path / "queue")
+    service = DistributedPipelineService(
+        queue_adapter=queue,
+        worker=PipelineWorker(client=TimeoutClient()),
+    )
+    request = PipelineJobRequest(
+        input_kind="text",
+        source_value="poison",
+        persist=False,
+        check_warnings=False,
+    )
+    service.submit(request, queue_name="poison", max_attempts=1)
+
+    result = service.process_next(queue_name="poison")
+
+    assert result is not None
+    assert getattr(result, "status", "") == "failed"
+    assert len(queue.acked) == 1
+    assert queue.pending_count(queue_name="poison") == 0
+    assert not list((tmp_path / "queue" / "poison" / "processing").glob("*.json"))
+
+
 def test_filesystem_dead_letter_preserves_existing_dead_record(tmp_path: Path) -> None:
     """Regression: dead_letter must not overwrite a same-named existing dead record."""
     queue = FilesystemQueueAdapter(tmp_path / "queue")

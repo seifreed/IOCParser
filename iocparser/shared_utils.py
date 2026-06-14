@@ -18,6 +18,22 @@ def parse_bool_token(value: str) -> bool | None:
     return None
 
 
+def parse_string_filters(value: object) -> tuple[str, ...]:
+    """Split comma-separated filter values, stripping blanks.
+
+    Accepts ``None`` (yields an empty tuple), a single scalar, or a
+    list/tuple of scalars whose items are each split on commas.
+    """
+    if value is None:
+        return ()
+    if isinstance(value, (list, tuple)):
+        items: list[str] = []
+        for entry in value:
+            items.extend(part.strip() for part in str(entry).split(",") if part.strip())
+        return tuple(items)
+    return tuple(part.strip() for part in str(value).split(",") if part.strip())
+
+
 DEFANG_REPLACEMENTS: tuple[tuple[str, str], ...] = (
     ("[.]", "."),
     ("(.)", "."),

@@ -8,7 +8,20 @@ from typing import cast
 from iocparser.domain.models import ExtractionOptions, IOCType, IOCTypeName
 from iocparser.domain.type_filters import parse_ioc_types
 from iocparser.errors import ValidationError
-from iocparser.shared_utils import parse_bool_token
+from iocparser.shared_utils import parse_bool_token, parse_string_filters
+
+__all__ = [
+    "ProcessingOptions",
+    "get_bool_arg",
+    "get_int_arg",
+    "get_list_arg",
+    "get_optional_str_arg",
+    "get_str_arg",
+    "int_arg_value",
+    "int_value",
+    "namespace_value",
+    "parse_string_filters",
+]
 
 INTEGER_VALUE_REQUIRED = "{field_name} requires an integer value"
 
@@ -82,18 +95,6 @@ def get_optional_str_arg(args: argparse.Namespace, name: str) -> str | None:
     """Get optional string argument from argparse namespace."""
     value: object = getattr(args, name, None)
     return str(value) if value is not None else None
-
-
-def parse_string_filters(value: object) -> tuple[str, ...]:
-    """Parse comma-separated filter values from a CLI argument."""
-    if value is None:
-        return ()
-    if isinstance(value, (list, tuple)):
-        items: list[str] = []
-        for entry in value:
-            items.extend(part.strip() for part in str(entry).split(",") if part.strip())
-        return tuple(items)
-    return tuple(part.strip() for part in str(value).split(",") if part.strip())
 
 
 @dataclass(frozen=True)

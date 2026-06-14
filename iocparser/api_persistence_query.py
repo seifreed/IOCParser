@@ -37,7 +37,7 @@ from iocparser.errors import ValidationError
 from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
 from iocparser.interfaces.ports import OutputRenderer
 from iocparser.plugins import get_renderer
-from iocparser.shared_utils import parse_bool_token
+from iocparser.shared_utils import parse_bool_token, parse_string_filters
 
 
 class QueryRunsOptions(TypedDict, total=False):
@@ -139,12 +139,6 @@ def bool_option(value: object | None, default: bool = False) -> bool:
             return parsed
         raise ValidationError(INVALID_BOOLEAN_ERROR.format(value=value))
     raise ValidationError(INVALID_BOOLEAN_ERROR.format(value=value))
-
-
-def parse_string_filters(value: str | None) -> tuple[str, ...]:
-    if value is None:
-        return ()
-    return tuple(item.strip() for item in value.split(",") if item.strip())
 
 
 def runs_input(options: QueryRunsOptions) -> QueryRunsInput:

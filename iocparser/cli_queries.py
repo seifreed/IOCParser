@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from collections.abc import Mapping
-from typing import NoReturn, cast
+from typing import NoReturn
 
 from iocparser import cli_args as _cli_args
 from iocparser import cli_output as _cli_output
@@ -54,7 +53,6 @@ from iocparser.interfaces.ports import FileWriter, PersistenceQueryService
 
 PERSISTENCE_QUERY_MESSAGE = "Persistence query commands require --db-uri or configured persistence"
 BATCH_JOB_NOT_FOUND = "Batch job not found"
-INTEGER_VALUE_REQUIRED = "{field_name} requires an integer value"
 
 
 def _query_service_for(config: AppConfig) -> PersistenceQueryService:
@@ -64,38 +62,24 @@ def _query_service_for(config: AppConfig) -> PersistenceQueryService:
     return SQLAlchemyPersistenceService(db_uri)
 
 
-def _int_arg_value(raw_value: object, field_name: str) -> int:
-    if isinstance(raw_value, bool) or not isinstance(raw_value, int | str):
-        raise ValidationError(INTEGER_VALUE_REQUIRED.format(field_name=field_name))
-    try:
-        return int(raw_value)
-    except ValueError as exc:
-        raise ValidationError(INTEGER_VALUE_REQUIRED.format(field_name=field_name)) from exc
-
-
 def _optional_int_attr(args: argparse.Namespace, field_name: str) -> int | None:
-    raw_value = _namespace_value(args, field_name)
+    raw_value = _cli_args.namespace_value(args, field_name)
     if raw_value is None:
         return None
-    return _int_arg_value(raw_value, field_name)
-
-
-def _namespace_value(args: argparse.Namespace, field_name: str) -> object | None:
-    namespace = cast("Mapping[str, object]", vars(args))
-    return namespace.get(field_name)
+    return _cli_args.int_arg_value(raw_value, field_name)
 
 
 def _string_filters_attr(args: argparse.Namespace, field_name: str) -> tuple[str, ...]:
-    return _cli_args.parse_string_filters(_namespace_value(args, field_name))
+    return _cli_args.parse_string_filters(_cli_args.namespace_value(args, field_name))
 
 
 def _diff_run_ids(args: argparse.Namespace) -> tuple[int, int] | None:
-    raw_value = _namespace_value(args, "diff_runs")
+    raw_value = _cli_args.namespace_value(args, "diff_runs")
     if not isinstance(raw_value, (list, tuple)) or len(raw_value) != 2:
         return None
     return (
-        _int_arg_value(raw_value[0], "diff-runs"),
-        _int_arg_value(raw_value[1], "diff-runs"),
+        _cli_args.int_arg_value(raw_value[0], "diff-runs"),
+        _cli_args.int_arg_value(raw_value[1], "diff-runs"),
     )
 
 

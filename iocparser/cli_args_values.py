@@ -1,10 +1,31 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import cast
 
 from iocparser.domain.models import ExtractionOptions, IOCType, IOCTypeName
 from iocparser.domain.type_filters import parse_ioc_types
+from iocparser.errors import ValidationError
+
+INTEGER_VALUE_REQUIRED = "{field_name} requires an integer value"
+
+
+def int_arg_value(raw_value: object, field_name: str) -> int:
+    """Coerce an argparse value to int, rejecting bools and non-numeric input."""
+    if isinstance(raw_value, bool) or not isinstance(raw_value, int | str):
+        raise ValidationError(INTEGER_VALUE_REQUIRED.format(field_name=field_name))
+    try:
+        return int(raw_value)
+    except ValueError as exc:
+        raise ValidationError(INTEGER_VALUE_REQUIRED.format(field_name=field_name)) from exc
+
+
+def namespace_value(args: argparse.Namespace, field_name: str) -> object | None:
+    """Return the raw attribute value for ``field_name`` from an argparse namespace."""
+    namespace = cast("Mapping[str, object]", vars(args))
+    return namespace.get(field_name)
 
 
 def get_str_arg(args: argparse.Namespace, name: str, default: str = "") -> str:

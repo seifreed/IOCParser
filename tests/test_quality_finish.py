@@ -22,6 +22,7 @@ from iocparser.adapters.renderers import (
 from iocparser.adapters.renderers import (
     _json_object as renderer_json_object,
 )
+from iocparser.cli_args_values import int_arg_value
 from iocparser.cli_output import _int_value as batch_int_value
 from iocparser.cli_output import print_batch_report, save_batch_report
 from iocparser.cli_output_rendering import (
@@ -44,10 +45,8 @@ from iocparser.cli_processing_urls import (
 from iocparser.cli_processing_urls import (
     _plugin_client as url_plugin_client,
 )
-from iocparser.cli_queries import _int_arg_value as query_int_arg_value
 from iocparser.cli_runtime import _optional_float_arg
 from iocparser.cli_schema import _history_payload
-from iocparser.cli_schema import _int_arg_value as schema_int_arg_value
 from iocparser.client_persistence import _parse_string_filters
 from iocparser.domain.distributed import _int_from_payload
 from iocparser.domain.enums import IOCType, register_custom_ioc_type
@@ -286,13 +285,13 @@ def test_cli_rendering_metadata_helpers_accept_strings() -> None:
 
 def test_cli_and_schema_integer_helpers_raise_validation_errors() -> None:
     with pytest.raises(ValidationError):
-        query_int_arg_value([], "offset")
+        int_arg_value([], "offset")
     with pytest.raises(ValidationError):
-        query_int_arg_value("oops", "offset")
+        int_arg_value("oops", "offset")
     with pytest.raises(ValidationError):
-        schema_int_arg_value(False, "keep_latest")
+        int_arg_value(False, "keep_latest")
     with pytest.raises(ValidationError):
-        schema_int_arg_value("nope", "keep_latest")
+        int_arg_value("nope", "keep_latest")
 
     payload_path = Path("bad-history.json")
     payload_path.write_text("[]", encoding="utf-8")

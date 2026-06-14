@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from pathlib import Path
-from typing import cast
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
@@ -44,7 +43,6 @@ PERSISTENCE_REQUIRED = "Persistence maintenance commands require --db-uri or con
 SCHEMA_VERSION_REQUIRED = "schema-version requires persistence configuration"
 MIGRATE_REQUIRED = "migrate requires persistence configuration"
 VALIDATE_REQUIRED = "validate-schema requires persistence configuration"
-INTEGER_VALUE_REQUIRED = "{field_name} requires an integer value"
 HISTORY_IMPORT_OBJECT_REQUIRED = "history import file must contain a JSON object"
 
 
@@ -55,25 +53,11 @@ def _query_service_for(config: AppConfig) -> PersistenceQueryService:
     return SQLAlchemyPersistenceService(db_uri)
 
 
-def _int_arg_value(raw_value: object, field_name: str) -> int:
-    if isinstance(raw_value, bool) or not isinstance(raw_value, int | str):
-        raise ValidationError(INTEGER_VALUE_REQUIRED.format(field_name=field_name))
-    try:
-        return int(raw_value)
-    except ValueError as exc:
-        raise ValidationError(INTEGER_VALUE_REQUIRED.format(field_name=field_name)) from exc
-
-
 def _history_payload(path: str) -> dict[str, object]:
     loaded: object = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(loaded, dict):
         raise ValidationError(HISTORY_IMPORT_OBJECT_REQUIRED)
     return {str(key): value for key, value in loaded.items()}
-
-
-def _namespace_value(args: argparse.Namespace, field_name: str) -> object | None:
-    namespace = cast("Mapping[str, object]", vars(args))
-    return namespace.get(field_name)
 
 
 def _run_with_engine[T](db_uri: str, operation: Callable[[Engine], T]) -> T:
@@ -142,12 +126,14 @@ def _handle_history_maintenance(args: argparse.Namespace, config: AppConfig) -> 
         uc_compact_persisted_history(persistence_query_service=_query_service_for(config))
         _cli_output.print_status_line("history_compacted", "true")
         return True
-    retain_days = _namespace_value(args, "retain_days")
+    retain_days = _cli_args.namespace_value(args, "retain_days")
     if retain_days is not None:
         deleted = uc_retain_persisted_history(
             RetainHistoryInput(
-                days=_int_arg_value(retain_days, "retain-days"),
-                statuses=_cli_args.parse_string_filters(_namespace_value(args, "prune_status")),
+                days=_cli_args.int_arg_value(retain_days, "retain-days"),
+                statuses=_cli_args.parse_string_filters(
+                    _cli_args.namespace_value(args, "prune_status")
+                ),
             ),
             persistence_query_service=_query_service_for(config),
         )

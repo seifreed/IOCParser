@@ -8,18 +8,22 @@ from iocparser.cli_args_parser import (
     create_argument_parser,
 )
 from iocparser.cli_args_values import (
+    INTEGER_VALUE_REQUIRED,
     ProcessingOptions,
     get_bool_arg,
     get_int_arg,
     get_list_arg,
     get_optional_str_arg,
     get_str_arg,
+    int_arg_value,
+    namespace_value,
     parse_string_filters,
 )
 from iocparser.domain.type_filters import parse_ioc_types
 
 __all__ = [
     "DEFAULT_URL_WORKERS",
+    "INTEGER_VALUE_REQUIRED",
     "MAX_FILENAME_LENGTH",
     "MAX_WORKERS",
     "VERSION",
@@ -32,6 +36,8 @@ __all__ = [
     "get_output_filename",
     "get_str_arg",
     "has_input_args",
+    "int_arg_value",
+    "namespace_value",
     "parse_ioc_types",
     "parse_string_filters",
 ]

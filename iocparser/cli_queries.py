@@ -6,6 +6,7 @@ from typing import NoReturn
 
 from iocparser import cli_args as _cli_args
 from iocparser import cli_output as _cli_output
+from iocparser.api_persistence_query import validated_ioc_type_filters
 from iocparser.application.contracts import (
     BatchJobInput,
     DeletePersistedRunInput,
@@ -166,7 +167,7 @@ def _handle_diff_runs(
             only_removed=_cli_args.get_optional_str_arg(args, "diff_only") == "removed",
             only_warnings=_cli_args.get_bool_arg(args, "diff_warnings_only"),
             only_normal=_cli_args.get_bool_arg(args, "only_normal"),
-            ioc_types=_string_filters_attr(args, "ioc_type"),
+            ioc_types=validated_ioc_type_filters(_cli_args.get_optional_str_arg(args, "ioc_type")),
             severity=_string_filters_attr(args, "severity"),
             tags=_string_filters_attr(args, "tag"),
         ),
@@ -189,7 +190,7 @@ def _handle_diff_latest(
             only_removed=_cli_args.get_optional_str_arg(args, "diff_only") == "removed",
             only_warnings=_cli_args.get_bool_arg(args, "diff_warnings_only"),
             only_normal=_cli_args.get_bool_arg(args, "only_normal"),
-            ioc_types=_string_filters_attr(args, "ioc_type"),
+            ioc_types=validated_ioc_type_filters(_cli_args.get_optional_str_arg(args, "ioc_type")),
             severity=_string_filters_attr(args, "severity"),
             tags=_string_filters_attr(args, "tag"),
         ),

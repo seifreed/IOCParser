@@ -402,6 +402,34 @@ def test_cli_output_helpers_cover_text_and_export_paths(tmp_path: Path) -> None:
     )
 
 
+def test_cli_diff_invalid_ioc_type_raises_validation_error(tmp_path: Path) -> None:
+    db_uri = f"sqlite:///{tmp_path / 'diff-bad-type.sqlite'}"
+    service = SQLAlchemyPersistenceService(db_uri)
+    run_ids = service.persist_multiple_runs(
+        [
+            ("file", "alpha.txt", ExtractionResult.from_grouped_payload({"domains": ["a.x"]}, {})),
+            ("file", "beta.txt", ExtractionResult.from_grouped_payload({"domains": ["b.x"]}, {})),
+        ],
+        tool_version="1.0.0",
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
+    )
+    config = SimpleNamespace(db_uri=db_uri)
+
+    # A bad --ioc-type must surface a clean ValidationError, not a raw ValueError
+    # that the top-level handler reports as an "Unexpected error" with a traceback.
+    with pytest.raises(ValidationError, match="Invalid ioc_type"):
+        cli_queries.handle_query_commands(
+            _query_args(
+                diff_runs=[str(run_ids[0]), str(run_ids[1])],
+                ioc_type="bogus",
+            ),
+            config,
+            file_writer=LocalFileWriter(),
+        )
+
+
 def test_cli_queries_and_dispatch_paths(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'queries.sqlite'}"
     service = SQLAlchemyPersistenceService(db_uri)

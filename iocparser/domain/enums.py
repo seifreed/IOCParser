@@ -124,6 +124,18 @@ class IOCType(StrEnum):
             return resolve_custom_ioc_type(normalized)
 
 
+HASH_IOC_TYPES = frozenset(
+    {
+        IOCType.MD5,
+        IOCType.SHA1,
+        IOCType.SHA256,
+        IOCType.SHA512,
+        IOCType.SSDEEP,
+        IOCType.IMPHASH,
+    }
+)
+
+
 class IOCTypeName(str):
     """String IOC type compatible with built-in enum access patterns."""
 

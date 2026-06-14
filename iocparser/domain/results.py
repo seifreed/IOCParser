@@ -3,7 +3,13 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass, replace
 
-from iocparser.domain.enums import IOCType, IOCTypeName, get_custom_ioc_type, ioc_type_name
+from iocparser.domain.enums import (
+    HASH_IOC_TYPES,
+    IOCType,
+    IOCTypeName,
+    get_custom_ioc_type,
+    ioc_type_name,
+)
 from iocparser.domain.values import IndicatorValue, indicator_value_for
 from iocparser.shared_utils import deduplicate_iocs
 
@@ -47,14 +53,7 @@ def classify_ioc(
     }:
         severity = "medium"
         tags.append("network")
-    elif canonical_type in {
-        IOCType.MD5,
-        IOCType.SHA1,
-        IOCType.SHA256,
-        IOCType.SHA512,
-        IOCType.SSDEEP,
-        IOCType.IMPHASH,
-    }:
+    elif canonical_type in HASH_IOC_TYPES:
         severity = "medium"
         tags.append("artifact")
     else:

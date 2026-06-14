@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from ipaddress import ip_address
 from urllib.parse import urlparse
 
-from iocparser.domain.enums import IOCType, IOCTypeName, get_custom_ioc_type
+from iocparser.domain.enums import HASH_IOC_TYPES, IOCType, IOCTypeName, get_custom_ioc_type
 from iocparser.shared_utils import refang_ioc
 
 
@@ -90,14 +90,7 @@ def indicator_value_for(ioc_type: IOCType | IOCTypeName | str, raw: str) -> Indi
         return HostValue(raw)
     if canonical_type == IOCType.URL:
         return UrlValue(raw)
-    if canonical_type in {
-        IOCType.MD5,
-        IOCType.SHA1,
-        IOCType.SHA256,
-        IOCType.SHA512,
-        IOCType.SSDEEP,
-        IOCType.IMPHASH,
-    }:
+    if canonical_type in HASH_IOC_TYPES:
         return HashValue(raw)
     if canonical_type in {IOCType.IP, IOCType.IPV6}:
         return IpValue(raw)

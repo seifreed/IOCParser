@@ -131,7 +131,7 @@ def query_runs_page(query: RunPageQuery) -> PersistedRunsPage:
         ):
             stmt = stmt.where(clause)
             count_stmt = count_stmt.where(clause)
-        stmt = _order_run_stmt(stmt, sort_by=query.sort_by)
+        stmt = _order_run_query_stmt(stmt, sort_by=query.sort_by)
         total = _coerce_count(unit_of_work.session.execute(count_stmt).scalar_one())
         limit = max(0, query.limit)
         offset = max(0, query.offset)
@@ -189,7 +189,7 @@ def search_iocs_page(query: IOCSearchPageQuery) -> PersistedIOCSearchPage:
             threshold = SEVERITY_ORDER.get(query.min_severity.lower(), 0)
             allowed = tuple(name for name, rank in SEVERITY_ORDER.items() if rank >= threshold)
             stmt = stmt.where(RunIOCModel.severity.in_(allowed))
-        stmt = _order_search_stmt(stmt, sort_by=query.sort_by)
+        stmt = _order_run_query_stmt(stmt, sort_by=query.sort_by)
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = _coerce_count(unit_of_work.session.execute(count_stmt).scalar_one())
         limit = max(0, query.limit)
@@ -224,20 +224,9 @@ def _run_filter_clauses(
     return tuple(clauses)
 
 
-def _order_run_stmt(stmt: RunSelect, *, sort_by: str) -> RunSelect:
-    if sort_by == "oldest":
-        return stmt.order_by(RunModel.started_at.asc(), RunModel.id.asc())
-    if sort_by == "source":
-        return stmt.order_by(
-            SourceModel.kind.asc(),
-            SourceModel.value.asc(),
-            RunModel.started_at.desc(),
-            RunModel.id.desc(),
-        )
-    return stmt.order_by(RunModel.started_at.desc(), RunModel.id.desc())
-
-
-def _order_search_stmt(stmt: SearchSelect, *, sort_by: str) -> SearchSelect:
+def _order_run_query_stmt[SelectT: (RunSelect, SearchSelect)](
+    stmt: SelectT, *, sort_by: str
+) -> SelectT:
     if sort_by == "oldest":
         return stmt.order_by(RunModel.started_at.asc(), RunModel.id.asc())
     if sort_by == "source":

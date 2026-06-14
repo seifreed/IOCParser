@@ -58,7 +58,7 @@ from iocparser.infrastructure.http_download import RequestsURLDownloader
 from iocparser.infrastructure.persistence.history.ops import _json_object as history_json_object
 from iocparser.infrastructure.persistence.history.ops import _row_dict
 from iocparser.infrastructure.persistence.query import query_runs_page, search_iocs_page
-from iocparser.infrastructure.persistence.query.ops import _coerce_count, _order_search_stmt
+from iocparser.infrastructure.persistence.query.ops import _coerce_count, _order_run_query_stmt
 from iocparser.infrastructure.persistence_batch import (
     BatchJobModel,
     FailedBatchItemModel,
@@ -482,7 +482,7 @@ def test_persistence_history_and_page_query_helpers_cover_remaining_branches() -
 
     from sqlalchemy import select
 
-    stmt = _order_search_stmt(
+    stmt = _order_run_query_stmt(
         select(RunModel, SourceModel, IOCModel, RunIOCModel),
         sort_by="oldest",
     )

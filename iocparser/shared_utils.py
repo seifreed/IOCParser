@@ -1,7 +1,18 @@
 import re as _re
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
+from threading import Lock
 
 from iocparser.errors import ValidationError
+
+
+def lazy_singleton[T](holder: list[T], lock: Lock, factory: Callable[[], T]) -> T:
+    """Return a process-wide singleton, building it once via double-checked locking."""
+    if not holder:
+        with lock:
+            if not holder:
+                holder.append(factory())
+    return holder[0]
+
 
 TRUE_BOOL_VALUES: frozenset[str] = frozenset({"1", "true", "yes", "on"})
 FALSE_BOOL_VALUES: frozenset[str] = frozenset({"0", "false", "no", "off"})

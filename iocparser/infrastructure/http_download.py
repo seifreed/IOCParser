@@ -22,6 +22,7 @@ from iocparser.errors import (
 )
 from iocparser.infrastructure.logger import get_logger
 from iocparser.interfaces.ports import URLDownloader
+from iocparser.shared_utils import lazy_singleton
 
 MAX_URL_SIZE = 50 * 1024 * 1024
 REQUEST_TIMEOUT = 30
@@ -36,11 +37,9 @@ _DEFAULT_DOWNLOADER_LOCK = Lock()
 
 
 def _default_downloader() -> RequestsURLDownloader:
-    if not _DEFAULT_DOWNLOADER_HOLDER:
-        with _DEFAULT_DOWNLOADER_LOCK:
-            if not _DEFAULT_DOWNLOADER_HOLDER:
-                _DEFAULT_DOWNLOADER_HOLDER.append(RequestsURLDownloader())
-    return _DEFAULT_DOWNLOADER_HOLDER[0]
+    return lazy_singleton(
+        _DEFAULT_DOWNLOADER_HOLDER, _DEFAULT_DOWNLOADER_LOCK, RequestsURLDownloader
+    )
 
 
 @dataclass(frozen=True)

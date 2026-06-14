@@ -12,6 +12,7 @@ from iocparser.errors import FileSizeError, SourceNotFoundError
 from iocparser.infrastructure.file_parser import HTMLParser, PDFParser
 from iocparser.infrastructure.logger import get_logger
 from iocparser.interfaces.ports import TextSourceReader
+from iocparser.shared_utils import lazy_singleton
 
 MAX_FILE_SIZE = 100 * 1024 * 1024
 logger = get_logger(__name__)
@@ -46,11 +47,7 @@ _DEFAULT_READER_LOCK = _threading.Lock()
 
 
 def _default_reader() -> MagicTextSourceReader:
-    if not _DEFAULT_READER_HOLDER:
-        with _DEFAULT_READER_LOCK:
-            if not _DEFAULT_READER_HOLDER:
-                _DEFAULT_READER_HOLDER.append(MagicTextSourceReader())
-    return _DEFAULT_READER_HOLDER[0]
+    return lazy_singleton(_DEFAULT_READER_HOLDER, _DEFAULT_READER_LOCK, MagicTextSourceReader)
 
 
 class MagicTextSourceReader(TextSourceReader):

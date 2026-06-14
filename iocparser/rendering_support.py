@@ -5,6 +5,8 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 
 from stix2 import Bundle, Indicator
 
+from iocparser.domain.models import ExtractionResult, ioc_type_name
+
 SectionValue = str | dict[str, str]
 WarningValue = dict[str, str] | str
 ContextMap = Mapping[tuple[str, str], Sequence[str]]
@@ -40,6 +42,14 @@ SECTION_ORDER: list[tuple[str, str]] = [
     ("jwt", "JWT Tokens"),
     ("cert_serials", "Certificate Serial Numbers"),
 ]
+
+
+def group_canonical_by_type(result: ExtractionResult) -> dict[str, list[str]]:
+    """Group an extraction result's canonical values by display type name."""
+    return {
+        ioc_type_name(ioc_type): list(values)
+        for ioc_type, values in result.canonical_by_type().items()
+    }
 
 
 def render_text_output(

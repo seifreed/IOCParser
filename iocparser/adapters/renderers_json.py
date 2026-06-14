@@ -5,10 +5,10 @@ from csv import DictWriter
 from io import StringIO
 from typing import ClassVar
 
-from iocparser.domain.models import ExtractionResult, ioc_type_name
+from iocparser.domain.models import ExtractionResult
 from iocparser.domain.pipeline import RESULT_SCHEMA_VERSION
 from iocparser.interfaces.ports import OutputRenderer
-from iocparser.rendering_support import serialize_pretty_json
+from iocparser.rendering_support import group_canonical_by_type, serialize_pretty_json
 
 
 class JSONOutputRenderer(OutputRenderer):
@@ -18,10 +18,7 @@ class JSONOutputRenderer(OutputRenderer):
         self.include_context = include_context
 
     def render(self, result: ExtractionResult) -> str:
-        grouped = {
-            ioc_type_name(ioc_type): list(values)
-            for ioc_type, values in result.canonical_by_type().items()
-        }
+        grouped = group_canonical_by_type(result)
         warnings = result.grouped_warnings()
         payload: dict[str, object] = {
             "schema_version": RESULT_SCHEMA_VERSION,

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from iocparser.domain.models import ExtractionResult, ioc_type_name
+from iocparser.domain.models import ExtractionResult
 from iocparser.interfaces.ports import OutputRenderer
-from iocparser.rendering_support import SECTION_ORDER, render_text_output
+from iocparser.rendering_support import SECTION_ORDER, group_canonical_by_type, render_text_output
 from iocparser.shared_utils import refang_ioc
 
 
@@ -17,10 +17,7 @@ class TextOutputRenderer(OutputRenderer):
         self.include_context = include_context
 
     def render(self, result: ExtractionResult) -> str:
-        grouped = {
-            ioc_type_name(ioc_type): list(values)
-            for ioc_type, values in result.canonical_by_type().items()
-        }
+        grouped = group_canonical_by_type(result)
         warning_grouped = result.grouped_warnings()
         context_map: dict[tuple[str, str], list[str]] = {}
         if self.include_context:

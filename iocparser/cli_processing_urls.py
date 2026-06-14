@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Protocol, cast
 
 from iocparser import cli_processing_urls_execution as _execution
-from iocparser.cli_args import get_optional_str_arg
+from iocparser.cli_args import get_optional_str_arg, int_value
 from iocparser.cli_processing_support import (
     BatchResultsCollection,
     GroupedIocs,
@@ -24,7 +24,6 @@ from iocparser.cli_processing_url_reports import (
     _report_items,
     _set_batch_item_int,
     build_batch_report,
-    int_value,
     public_batch_report,
 )
 from iocparser.domain.models import FailedBatchItem

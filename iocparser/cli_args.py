@@ -16,6 +16,7 @@ from iocparser.cli_args_values import (
     get_optional_str_arg,
     get_str_arg,
     int_arg_value,
+    int_value,
     namespace_value,
     parse_string_filters,
 )
@@ -37,6 +38,7 @@ __all__ = [
     "get_str_arg",
     "has_input_args",
     "int_arg_value",
+    "int_value",
     "namespace_value",
     "parse_ioc_types",
     "parse_string_filters",

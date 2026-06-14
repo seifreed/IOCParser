@@ -14,6 +14,7 @@ from iocparser.cli_args import (
     get_bool_arg,
     get_optional_str_arg,
     get_output_filename,
+    int_value,
     parse_string_filters,
 )
 from iocparser.config import AppConfig
@@ -81,20 +82,7 @@ def source_metadata_values(
 def int_run_metadata_value(
     run_metadata: dict[str, int | str | None], key: str, default: int
 ) -> int:
-    raw_value = run_metadata.get(key)
-    if raw_value is None:
-        return default
-    if isinstance(raw_value, bool):
-        return default
-    if isinstance(raw_value, int):
-        return raw_value
-    stripped = raw_value.strip()
-    if not stripped:
-        return default
-    try:
-        return int(stripped)
-    except ValueError:
-        return default
+    return int_value(run_metadata.get(key), default=default)
 
 
 def optional_int_run_metadata_value(

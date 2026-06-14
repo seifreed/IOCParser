@@ -5,6 +5,7 @@ from json import loads
 from pathlib import Path
 from typing import TypedDict, cast
 
+from iocparser.cli_args_values import int_value
 from iocparser.domain.pipeline import BATCH_REPORT_SCHEMA_VERSION
 
 
@@ -58,21 +59,6 @@ class BatchReportContext(TypedDict):
     input_load_ms: int
     batch_started: float
     batch_started_wall: float
-
-
-def int_value(value: object, *, default: int = 0) -> int:
-    if isinstance(value, bool):
-        return default
-    if isinstance(value, int):
-        return value
-    if isinstance(value, str):
-        stripped = value.strip()
-        if stripped:
-            try:
-                return int(stripped)
-            except ValueError:
-                return default
-    return default
 
 
 def bool_value(value: object, *, default: bool = False) -> bool:

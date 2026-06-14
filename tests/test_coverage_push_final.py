@@ -327,17 +327,17 @@ class TestApiQueryValidation:
 # Covered indirectly via test_cli_layer_expansion.py tests.
 
 
-# ── 10. cli_persistence: _int_value edge cases ────────────────────────────
+# ── 10. cli_args_values: int_value edge cases ─────────────────────────────
 class TestCliPersistenceInt:
     def test_int_value_with_raw_int(self) -> None:
-        from iocparser.cli_persistence import _int_value
+        from iocparser.cli_args_values import int_value
 
-        assert _int_value(42, default=0) == 42
+        assert int_value(42, default=0) == 42
 
     def test_int_value_with_string(self) -> None:
-        from iocparser.cli_persistence import _int_value
+        from iocparser.cli_args_values import int_value
 
-        assert _int_value("  7  ", default=0) == 7
+        assert int_value("  7  ", default=0) == 7
 
 
 # ── 11. cli_processing_files: streaming duplicate path ─────────────────────

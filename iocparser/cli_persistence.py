@@ -195,7 +195,7 @@ def _failed_item_run_metadata(
         if fallback is None:
             fallback = run_metadata_map.get(source_value)
     return {
-        "duration_ms": _int_value(
+        "duration_ms": _cli_args.int_value(
             item.get("duration_ms"), default=fallback_int(fallback, "duration_ms", 0)
         ),
         "processed_items": 1,
@@ -207,24 +207,11 @@ def _failed_item_run_metadata(
     }
 
 
-def _int_value(value: object, *, default: int) -> int:
-    if isinstance(value, bool):
-        return default
-    if isinstance(value, int):
-        return value
-    if isinstance(value, str) and value.strip():
-        try:
-            return int(value.strip())
-        except ValueError:
-            return default
-    return default
-
-
 def fallback_int(metadata: Mapping[str, int | str | None] | None, key: str, default: int) -> int:
     if metadata is None:
         return default
     value = metadata.get(key)
-    return _int_value(value, default=default)
+    return _cli_args.int_value(value, default=default)
 
 
 def fallback_str(metadata: Mapping[str, int | str | None] | None, key: str, default: str) -> str:

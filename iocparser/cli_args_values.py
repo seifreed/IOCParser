@@ -28,6 +28,22 @@ def namespace_value(args: argparse.Namespace, field_name: str) -> object | None:
     return namespace.get(field_name)
 
 
+def int_value(value: object, *, default: int = 0) -> int:
+    """Leniently coerce a scalar value to int, returning ``default`` on failure."""
+    if isinstance(value, bool):
+        return default
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped:
+            try:
+                return int(stripped)
+            except ValueError:
+                return default
+    return default
+
+
 def get_str_arg(args: argparse.Namespace, name: str, default: str = "") -> str:
     """Get string argument from argparse namespace."""
     value: object = getattr(args, name, None)

@@ -73,12 +73,12 @@ def test_cli_dispatch_schema_version(tmp_path):
         execute(["--schema-version", "--db-uri", uri])
 
 
-# cli_persistence.py:201 — _int_value with bool
+# cli_args_values.py — int_value lenient coercion with bool/invalid input
 def test_cli_int_value_bool():
-    from iocparser.cli_persistence import _int_value
+    from iocparser.cli_args_values import int_value
 
-    assert _int_value(True, default=7) == 7
-    assert _int_value("bad", default=7) == 7
+    assert int_value(True, default=7) == 7
+    assert int_value("bad", default=7) == 7
 
 
 # cli_processing_support.py:90 — KeyError when source match conflicts

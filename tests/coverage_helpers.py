@@ -60,3 +60,33 @@ def persist_run_into(
         raise
     finally:
         unit.close()
+
+
+def complete_distributed_job(
+    db_uri: str,
+    *,
+    source_value: str,
+    run_id: int,
+    receipt_prefix: str = "r",
+) -> str:
+    """Create a distributed job for source_value and mark it running then completed.
+
+    Returns the public job id.
+    """
+    from iocparser.domain.distributed import QueueEnvelope
+    from iocparser.domain.pipeline import PipelineJobRequest
+    from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
+
+    service = SQLAlchemyDistributedJobService(db_uri)
+    request = PipelineJobRequest(input_kind="url", source_value=source_value)
+    envelope = QueueEnvelope(request=request, queue_backend="filesystem", queue_name="default")
+    service.create_or_get_job(envelope=envelope, receipt_id=f"{receipt_prefix}0")
+    service.mark_running(job_id=str(request.job_id), receipt_id=f"{receipt_prefix}1", attempts=1)
+    service.mark_completed(
+        job_id=str(request.job_id),
+        attempts=1,
+        run_id=run_id,
+        result_json={"ok": True},
+        metrics={"parse_ms": 10},
+    )
+    return str(request.job_id)

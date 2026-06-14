@@ -13,7 +13,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from iocparser.domain.models import IOC, ExtractionResult
-from tests.coverage_helpers import fresh_db, persist_run_into
+from tests.coverage_helpers import complete_distributed_job, fresh_db, persist_run_into
 
 # IntegrityError retry/reraise paths for both repositories are covered by
 # test_defensive_edges_no_exclusions (test_ioc_repository_integrity_retry_and_reraise_paths,
@@ -39,22 +39,7 @@ class TestHistoryImportFull:
             config={},
         )
 
-        from iocparser.domain.distributed import QueueEnvelope
-        from iocparser.domain.pipeline import PipelineJobRequest
-        from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
-
-        dsvc = SQLAlchemyDistributedJobService(uri)
-        req = PipelineJobRequest(input_kind="url", source_value="https://example.com/report")
-        env = QueueEnvelope(request=req, queue_backend="filesystem", queue_name="default")
-        dsvc.create_or_get_job(envelope=env, receipt_id="r0")
-        dsvc.mark_running(job_id=str(req.job_id), receipt_id="r1", attempts=1)
-        dsvc.mark_completed(
-            job_id=str(req.job_id),
-            attempts=1,
-            run_id=rid,
-            result_json={"ok": True},
-            metrics={"parse_ms": 10},
-        )
+        complete_distributed_job(uri, source_value="https://example.com/report", run_id=rid)
         return uri
 
     def test_full_export_import_with_url_sources_and_distributed_jobs(self, tmp_path: Path) -> None:

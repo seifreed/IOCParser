@@ -16,7 +16,7 @@ from types import SimpleNamespace
 import pytest
 
 from iocparser.domain.models import IOC, ExtractionResult, WarningMatch
-from tests.coverage_helpers import fresh_db, persist_run_into
+from tests.coverage_helpers import complete_distributed_job, fresh_db, persist_run_into
 
 # Repository IntegrityError retry/reraise paths are covered by
 # test_defensive_edges_no_exclusions (test_ioc_repository_integrity_retry_and_reraise_paths,
@@ -56,20 +56,10 @@ class TestHistoryRichImport:
             config={"url_workers": 2},
         )
 
-        dsvc = SQLAlchemyDistributedJobService(uri)
-        req = PipelineJobRequest(input_kind="url", source_value="https://target.com")
-        env = QueueEnvelope(request=req, queue_backend="filesystem", queue_name="default")
-        dsvc.create_or_get_job(envelope=env, receipt_id="r0")
-        dsvc.mark_running(job_id=str(req.job_id), receipt_id="r1", attempts=1)
-        dsvc.mark_completed(
-            job_id=str(req.job_id),
-            attempts=1,
-            run_id=rid,
-            result_json={"ok": True},
-            metrics={"parse_ms": 10},
-        )
+        complete_distributed_job(uri, source_value="https://target.com", run_id=rid)
 
         # Create a dead-lettered job
+        dsvc = SQLAlchemyDistributedJobService(uri)
         req2 = PipelineJobRequest(input_kind="url", source_value="https://dead.com")
         env2 = QueueEnvelope(request=req2, queue_backend="filesystem", queue_name="default")
         dsvc.create_or_get_job(envelope=env2, receipt_id="r2")

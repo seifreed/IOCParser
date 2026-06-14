@@ -13,9 +13,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from iocparser.domain.models import ExtractionResult
@@ -73,68 +71,8 @@ class TestIOCRepositoryIntegrityRetry:
         session.close()
         engine.dispose()
 
-    def test_integrity_error_triggers_retry_and_finds_existing(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
-
-        db_uri = fresh_db(tmp_path, "ioc_retry.db")
-        engine = create_engine(db_uri, future=True)
-        session = Session(engine)
-        repo = SQLAlchemyIOCRepository(session)
-
-        id1 = repo._get_or_create(
-            ioc_type="md5",
-            value="abc",
-            is_warning=False,
-            warning_list="",
-            warning_description="",
-        )
-        session.commit()
-
-        original_flush = session.flush
-        call_count = 0
-
-        def flush_that_fails_once(*args, **kwargs):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 2:
-                raise IntegrityError("mock", {}, Exception())
-            return original_flush(*args, **kwargs)
-
-        with patch.object(session, "flush", side_effect=flush_that_fails_once):
-            id2 = repo._get_or_create(
-                ioc_type="md5",
-                value="abc",
-                is_warning=False,
-                warning_list="",
-                warning_description="",
-            )
-
-        assert id1 == id2
-        session.close()
-        engine.dispose()
-
-    def test_integrity_error_reraises_when_row_not_found(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
-
-        db_uri = fresh_db(tmp_path, "ioc_reraise.db")
-        engine = create_engine(db_uri, future=True)
-        session = Session(engine)
-        repo = SQLAlchemyIOCRepository(session)
-
-        def always_fail(*_args, **_kwargs):
-            raise IntegrityError("mock", {}, Exception())
-
-        with patch.object(session, "flush", side_effect=always_fail):
-            with pytest.raises(IntegrityError):
-                repo._get_or_create(
-                    ioc_type="sha256",
-                    value="ghost",
-                    is_warning=False,
-                    warning_list="",
-                    warning_description="",
-                )
-        session.close()
-        engine.dispose()
+    # IntegrityError flush retry/reraise for the IOC repository is covered by
+    # test_defensive_edges_no_exclusions.test_ioc_repository_integrity_retry_and_reraise_paths.
 
 
 # ---------------------------------------------------------------------------
@@ -189,69 +127,8 @@ class TestSourceRepositoryIntegrityRetry:
         session.close()
         engine.dispose()
 
-    def test_integrity_error_triggers_retry_with_metadata_update(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence_source_repository import (
-            SQLAlchemySourceRepository,
-        )
-
-        db_uri = fresh_db(tmp_path, "src_retry.db")
-        engine = create_engine(db_uri, future=True)
-        session = Session(engine)
-        repo = SQLAlchemySourceRepository(session)
-
-        id1 = repo.get_or_create(kind="file", value="test.pdf")
-        session.commit()
-
-        original_flush = session.flush
-        call_count = 0
-
-        def flush_that_fails_once(*args, **kwargs):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 2:
-                raise IntegrityError("mock", {}, Exception())
-            return original_flush(*args, **kwargs)
-
-        with patch.object(session, "flush", side_effect=flush_that_fails_once):
-            id2 = repo.get_or_create(
-                kind="file",
-                value="test.pdf",
-                mime_type="application/pdf",
-                content_hash="deadbeef",
-                fingerprint="dead",
-                input_size=12345,
-                original_url="https://x.com/test.pdf",
-                normalized_url="https://x.com/test.pdf",
-            )
-
-        assert id1 == id2
-        from iocparser.infrastructure.persistence_models import SourceModel
-
-        source = session.get(SourceModel, id1)
-        assert source.mime_type == "application/pdf"
-        assert source.content_hash == "deadbeef"
-        assert source.input_size == 12345
-        session.close()
-        engine.dispose()
-
-    def test_integrity_error_reraises_when_source_not_found(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence_source_repository import (
-            SQLAlchemySourceRepository,
-        )
-
-        db_uri = fresh_db(tmp_path, "src_reraise.db")
-        engine = create_engine(db_uri, future=True)
-        session = Session(engine)
-        repo = SQLAlchemySourceRepository(session)
-
-        def always_fail(*_args, **_kwargs):
-            raise IntegrityError("mock", {}, Exception())
-
-        with patch.object(session, "flush", side_effect=always_fail):
-            with pytest.raises(IntegrityError):
-                repo.get_or_create(kind="file", value="ghost.pdf")
-        session.close()
-        engine.dispose()
+    # IntegrityError flush retry/reraise for the source repository is covered by
+    # test_defensive_edges_no_exclusions.test_source_repository_integrity_retry_and_reraise_paths.
 
 
 # ---------------------------------------------------------------------------

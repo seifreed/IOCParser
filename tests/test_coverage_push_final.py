@@ -7,119 +7,17 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
 
 import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from iocparser.domain.models import IOC, ExtractionResult
 from tests.coverage_helpers import fresh_db, persist_run_into
 
-
-# ── 1. IntegrityError paths (mock: session.flush) ─────────────────────────
-class TestIOCRepoIntegrity:
-    def test_retry_on_integrity_error(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
-
-        engine = create_engine(fresh_db(tmp_path), future=True)
-        s = Session(engine)
-        r = SQLAlchemyIOCRepository(s)
-        id1 = r._get_or_create(
-            ioc_type="md5", value="v1", is_warning=False, warning_list="", warning_description=""
-        )
-        s.commit()
-        orig = s.flush
-        n = [0]
-
-        def f(*a, **k):
-            n[0] += 1
-            if n[0] == 2:
-                raise IntegrityError("d", {}, Exception())
-            return orig(*a, **k)
-
-        with patch.object(s, "flush", side_effect=f):
-            assert (
-                r._get_or_create(
-                    ioc_type="md5",
-                    value="v1",
-                    is_warning=False,
-                    warning_list="",
-                    warning_description="",
-                )
-                == id1
-            )
-        s.close()
-        engine.dispose()
-
-    def test_reraise_when_not_found(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
-
-        engine = create_engine(fresh_db(tmp_path), future=True)
-        s = Session(engine)
-        r = SQLAlchemyIOCRepository(s)
-        with patch.object(s, "flush", side_effect=IntegrityError("x", {}, Exception())):
-            with pytest.raises(IntegrityError):
-                r._get_or_create(
-                    ioc_type="sha1",
-                    value="ghost",
-                    is_warning=False,
-                    warning_list="",
-                    warning_description="",
-                )
-        s.close()
-        engine.dispose()
-
-
-class TestSourceRepoIntegrity:
-    def test_retry_updates_metadata(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence_source_repository import (
-            SQLAlchemySourceRepository,
-        )
-
-        engine = create_engine(fresh_db(tmp_path), future=True)
-        s = Session(engine)
-        r = SQLAlchemySourceRepository(s)
-        id1 = r.get_or_create(kind="file", value="a.txt")
-        s.commit()
-        orig = s.flush
-        n = [0]
-
-        def f(*a, **k):
-            n[0] += 1
-            if n[0] == 2:
-                raise IntegrityError("d", {}, Exception())
-            return orig(*a, **k)
-
-        with patch.object(s, "flush", side_effect=f):
-            id2 = r.get_or_create(
-                kind="file",
-                value="a.txt",
-                mime_type="text/html",
-                content_hash="ch",
-                fingerprint="fp",
-                input_size=99,
-                original_url="u",
-                normalized_url="n",
-            )
-        assert id1 == id2
-        s.close()
-        engine.dispose()
-
-    def test_reraise_when_not_found(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence_source_repository import (
-            SQLAlchemySourceRepository,
-        )
-
-        engine = create_engine(fresh_db(tmp_path), future=True)
-        s = Session(engine)
-        r = SQLAlchemySourceRepository(s)
-        with patch.object(s, "flush", side_effect=IntegrityError("x", {}, Exception())):
-            with pytest.raises(IntegrityError):
-                r.get_or_create(kind="file", value="ghost.pdf")
-        s.close()
-        engine.dispose()
+# IntegrityError retry/reraise paths for both repositories are covered by
+# test_defensive_edges_no_exclusions (test_ioc_repository_integrity_retry_and_reraise_paths,
+# test_source_repository_integrity_retry_and_reraise_paths).
 
 
 # ── 2. History import with URL sources, distributed jobs, dead letters ─────

@@ -11,7 +11,6 @@ from unittest.mock import patch
 
 import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from iocparser.domain.models import IOC, ExtractionResult, WarningMatch
@@ -187,100 +186,13 @@ def test_distributed_get_job_history_prefix_not_found(tmp_path):
 # test_worker_concurrent_sleeps_on_empty).
 
 
-# IntegrityError handlers (mock: session.flush — simulates concurrent DB writer)
-def test_ioc_repo_integrity_retry(tmp_path):
-    from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
-
-    engine = create_engine(fresh_db(tmp_path), future=True)
-    s = Session(engine)
-    r = SQLAlchemyIOCRepository(s)
-    id1 = r._get_or_create(
-        ioc_type="md5", value="v1", is_warning=False, warning_list="", warning_description=""
-    )
-    s.commit()
-    orig, n = s.flush, [0]
-
-    def f(*a, **k):
-        n[0] += 1
-        if n[0] == 2:
-            raise IntegrityError("d", {}, Exception())
-        return orig(*a, **k)
-
-    with patch.object(s, "flush", side_effect=f):
-        assert (
-            r._get_or_create(
-                ioc_type="md5",
-                value="v1",
-                is_warning=False,
-                warning_list="",
-                warning_description="",
-            )
-            == id1
-        )
-    s.close()
-    engine.dispose()
-
-
-def test_ioc_repo_integrity_reraise(tmp_path):
-    from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
-
-    engine = create_engine(fresh_db(tmp_path), future=True)
-    s = Session(engine)
-    r = SQLAlchemyIOCRepository(s)
-    with patch.object(s, "flush", side_effect=IntegrityError("x", {}, Exception())):
-        with pytest.raises(IntegrityError):
-            r._get_or_create(
-                ioc_type="sha1",
-                value="g",
-                is_warning=False,
-                warning_list="",
-                warning_description="",
-            )
-    s.close()
-    engine.dispose()
-
-
-def test_source_repo_integrity_retry(tmp_path):
-    from iocparser.infrastructure.persistence_source_repository import SQLAlchemySourceRepository
-
-    engine = create_engine(fresh_db(tmp_path), future=True)
-    s = Session(engine)
-    r = SQLAlchemySourceRepository(s)
-    id1 = r.get_or_create(kind="file", value="a.txt")
-    s.commit()
-    orig, n = s.flush, [0]
-
-    def f(*a, **k):
-        n[0] += 1
-        if n[0] == 2:
-            raise IntegrityError("d", {}, Exception())
-        return orig(*a, **k)
-
-    with patch.object(s, "flush", side_effect=f):
-        assert (
-            r.get_or_create(
-                kind="file",
-                value="a.txt",
-                mime_type="t",
-                content_hash="c",
-                fingerprint="f",
-                input_size=1,
-                original_url="o",
-                normalized_url="n",
-            )
-            == id1
-        )
-    s.close()
-    engine.dispose()
-
-
-# Source-repository integrity reraise is covered by
-# test_coverage_push_final.TestSourceRepoIntegrity.test_reraise_when_not_found.
+# IntegrityError retry/reraise paths for both repositories are covered by
+# test_defensive_edges_no_exclusions (test_ioc_repository_integrity_retry_and_reraise_paths,
+# test_source_repository_integrity_retry_and_reraise_paths).
 
 
 # cli_processing_urls.py:199 — _retry_attempt_from_batch with matches but occurrence out of range
 def test_retry_attempt_from_batch_matches_occurrence_out_of_range(tmp_path):
-    from unittest.mock import patch
 
     from iocparser.cli_processing_urls import _retry_attempt_from_batch
 
@@ -301,7 +213,7 @@ def test_retry_attempt_for_url_wrapper():
 
 # queue_rabbitmq.py:92-95 — _channel_for reconnect on exception
 def test_rabbitmq_channel_for_reconnect_on_exception():
-    from unittest.mock import MagicMock, patch
+    from unittest.mock import MagicMock
 
     from iocparser.infrastructure.queue_rabbitmq import RabbitMQQueueAdapter
 

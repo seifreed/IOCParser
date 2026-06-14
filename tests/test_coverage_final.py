@@ -13,7 +13,6 @@ from unittest.mock import patch
 
 import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from iocparser.domain.models import (
@@ -23,108 +22,9 @@ from iocparser.domain.models import (
 )
 from tests.coverage_helpers import fresh_db, persist_run_into
 
-
-# === persistence_ioc_repository IntegrityError (mock: simulates DB unique constraint) ===
-class TestIOCRepoIntegrity:
-    def test_retry_finds_existing(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
-
-        engine = create_engine(fresh_db(tmp_path), future=True)
-        session = Session(engine)
-        repo = SQLAlchemyIOCRepository(session)
-        id1 = repo._get_or_create(
-            ioc_type="md5", value="a1", is_warning=False, warning_list="", warning_description=""
-        )
-        session.commit()
-        orig = session.flush
-        n = [0]
-
-        def fail_once(*a, **k):
-            n[0] += 1
-            if n[0] == 2:
-                raise IntegrityError("dup", {}, Exception())
-            return orig(*a, **k)
-
-        with patch.object(session, "flush", side_effect=fail_once):
-            id2 = repo._get_or_create(
-                ioc_type="md5",
-                value="a1",
-                is_warning=False,
-                warning_list="",
-                warning_description="",
-            )
-        assert id1 == id2
-        session.close()
-        engine.dispose()
-
-    def test_reraises_when_not_found(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
-
-        engine = create_engine(fresh_db(tmp_path), future=True)
-        session = Session(engine)
-        repo = SQLAlchemyIOCRepository(session)
-        with patch.object(session, "flush", side_effect=IntegrityError("x", {}, Exception())):
-            with pytest.raises(IntegrityError):
-                repo._get_or_create(
-                    ioc_type="sha1",
-                    value="ghost",
-                    is_warning=False,
-                    warning_list="",
-                    warning_description="",
-                )
-        session.close()
-        engine.dispose()
-
-
-# === persistence_source_repository IntegrityError (mock: simulates DB unique constraint) ===
-class TestSourceRepoIntegrity:
-    def test_retry_updates_metadata(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence_source_repository import (
-            SQLAlchemySourceRepository,
-        )
-
-        engine = create_engine(fresh_db(tmp_path), future=True)
-        session = Session(engine)
-        repo = SQLAlchemySourceRepository(session)
-        id1 = repo.get_or_create(kind="file", value="t.pdf")
-        session.commit()
-        orig = session.flush
-        n = [0]
-
-        def fail_once(*a, **k):
-            n[0] += 1
-            if n[0] == 2:
-                raise IntegrityError("dup", {}, Exception())
-            return orig(*a, **k)
-
-        with patch.object(session, "flush", side_effect=fail_once):
-            id2 = repo.get_or_create(
-                kind="file",
-                value="t.pdf",
-                mime_type="application/pdf",
-                content_hash="ch",
-                fingerprint="fp",
-                input_size=99,
-                original_url="u",
-                normalized_url="n",
-            )
-        assert id1 == id2
-        session.close()
-        engine.dispose()
-
-    def test_reraises_when_not_found(self, tmp_path: Path) -> None:
-        from iocparser.infrastructure.persistence_source_repository import (
-            SQLAlchemySourceRepository,
-        )
-
-        engine = create_engine(fresh_db(tmp_path), future=True)
-        session = Session(engine)
-        repo = SQLAlchemySourceRepository(session)
-        with patch.object(session, "flush", side_effect=IntegrityError("x", {}, Exception())):
-            with pytest.raises(IntegrityError):
-                repo.get_or_create(kind="file", value="ghost.pdf")
-        session.close()
-        engine.dispose()
+# IntegrityError retry/reraise paths for both repositories are covered by
+# test_defensive_edges_no_exclusions (test_ioc_repository_integrity_retry_and_reraise_paths,
+# test_source_repository_integrity_retry_and_reraise_paths).
 
 
 # === SQS dead_letter (mock: simulates AWS SQS) ===

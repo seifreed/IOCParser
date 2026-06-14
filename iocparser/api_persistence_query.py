@@ -190,24 +190,24 @@ def validated_iso_datetime(value: str | None) -> str | None:
     return value
 
 
-def validated_min_severity(value: str | None) -> str | None:
-    if value is None:
-        return None
+def _validated_choice(value: str, *, valid: set[str], error: str) -> str:
     normalized = value.strip().lower()
-    if normalized not in VALID_MIN_SEVERITIES:
-        raise ValidationError(INVALID_MIN_SEVERITY_ERROR.format(value=value))
+    if normalized not in valid:
+        raise ValidationError(error.format(value=value))
     return normalized
 
 
+def validated_min_severity(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return _validated_choice(value, valid=VALID_MIN_SEVERITIES, error=INVALID_MIN_SEVERITY_ERROR)
+
+
 def validated_severity_filters(value: str | None) -> tuple[str, ...]:
-    severities = parse_string_filters(value)
-    normalized: list[str] = []
-    for severity in severities:
-        candidate = severity.strip().lower()
-        if candidate not in VALID_MIN_SEVERITIES:
-            raise ValidationError(INVALID_SEVERITY_ERROR.format(value=severity))
-        normalized.append(candidate)
-    return tuple(normalized)
+    return tuple(
+        _validated_choice(severity, valid=VALID_MIN_SEVERITIES, error=INVALID_SEVERITY_ERROR)
+        for severity in parse_string_filters(value)
+    )
 
 
 def validated_ioc_type_filter(value: str | None) -> str | None:
@@ -232,31 +232,19 @@ def validated_ioc_type_filters(value: str | None) -> tuple[str, ...]:
 
 
 def validated_tag_mode(value: str) -> str:
-    normalized = value.strip().lower()
-    if normalized not in VALID_TAG_MODES:
-        raise ValidationError(INVALID_TAG_MODE_ERROR.format(value=value))
-    return normalized
+    return _validated_choice(value, valid=VALID_TAG_MODES, error=INVALID_TAG_MODE_ERROR)
 
 
 def validated_run_sort(value: str) -> str:
-    normalized = value.strip().lower()
-    if normalized not in VALID_RUN_SORT_VALUES:
-        raise ValidationError(INVALID_SORT_BY_ERROR.format(value=value))
-    return normalized
+    return _validated_choice(value, valid=VALID_RUN_SORT_VALUES, error=INVALID_SORT_BY_ERROR)
 
 
 def validated_search_sort(value: str) -> str:
-    normalized = value.strip().lower()
-    if normalized not in VALID_SEARCH_SORT_VALUES:
-        raise ValidationError(INVALID_SORT_BY_ERROR.format(value=value))
-    return normalized
+    return _validated_choice(value, valid=VALID_SEARCH_SORT_VALUES, error=INVALID_SORT_BY_ERROR)
 
 
 def validated_search_backend(value: str) -> str:
-    normalized = value.strip().lower()
-    if normalized not in VALID_SEARCH_BACKENDS:
-        raise ValidationError(INVALID_SEARCH_BACKEND_ERROR.format(value=value))
-    return normalized
+    return _validated_choice(value, valid=VALID_SEARCH_BACKENDS, error=INVALID_SEARCH_BACKEND_ERROR)
 
 
 def validated_non_negative_int(value: object, *, field: str) -> int:

@@ -3,9 +3,7 @@ from __future__ import annotations
 import argparse
 import io
 import sys
-import threading
 from contextlib import redirect_stdout
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import iocparser.cli as cli_module
@@ -49,48 +47,11 @@ from iocparser.domain.models import (
 )
 from iocparser.infrastructure.extraction import DefaultIOCExtractionEngine
 from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
-
-
-class LocalHTTPServer:
-    def __init__(self, body: bytes, content_type: str = "text/plain") -> None:
-        self.body = body
-        self.content_type = content_type
-        self.server: ThreadingHTTPServer | None = None
-        self.thread: threading.Thread | None = None
-
-    def __enter__(self) -> str:
-        body = self.body
-        content_type = self.content_type
-
-        class Handler(BaseHTTPRequestHandler):
-            def do_GET(self) -> None:
-                self.send_response(200)
-                self.send_header("Content-Type", content_type)
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-
-            def log_message(self, fmt: str, *args) -> None:
-                del fmt, args
-
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.thread = threading.Thread(
-            target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True
-        )
-        self.thread.start()
-        return f"http://127.0.0.1:{self.server.server_address[1]}/sample.txt"
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        del exc_type, exc, tb
-        assert self.server is not None
-        assert self.thread is not None
-        self.server.shutdown()
-        self.server.server_close()
-        self.thread.join(timeout=5)
+from tests.http_server_helpers import LocalHTTPTextServer
 
 
 def test_public_api_extract_iocs_from_url_supports_filters() -> None:
-    with LocalHTTPServer(b"IOC URL: https://evil.example/path Domain: sample.org") as url:
+    with LocalHTTPTextServer(b"IOC URL: https://evil.example/path Domain: sample.org") as url:
         normal_iocs, warning_iocs = extract_iocs_from_url(
             url, check_warnings=False, only="urls", defang=False
         )
@@ -226,7 +187,7 @@ def test_cli_supports_stdin_directory_streaming_and_url_file(tmp_path: Path) -> 
     assert normal_iocs == {"domains": ["stream.example.com"]}
 
     url_file = tmp_path / "urls.txt"
-    with LocalHTTPServer(b"IOC URL: https://batch.example/path\n") as url:
+    with LocalHTTPTextServer(b"IOC URL: https://batch.example/path\n") as url:
         url_file.write_text(f"{url}\n", encoding="utf-8")
         url_args = argparse.Namespace(
             url_file=str(url_file),

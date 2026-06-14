@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import argparse
 import io
-import threading
 from contextlib import redirect_stdout
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -16,45 +14,7 @@ from iocparser.cli import handle_misp_init, process_single_input, save_output
 from iocparser.cli_output import PersistResultsRequest, persist_results
 from iocparser.config import AppConfig
 from iocparser.domain.models import PersistOptions
-
-
-class SimpleTextServer:
-    def __init__(self, body: bytes, content_type: str = "text/plain") -> None:
-        self.body = body
-        self.content_type = content_type
-        self.server: ThreadingHTTPServer | None = None
-        self.thread: threading.Thread | None = None
-
-    def __enter__(self) -> str:
-        body = self.body
-        content_type = self.content_type
-
-        class Handler(BaseHTTPRequestHandler):
-            def do_GET(self) -> None:
-                self.send_response(200)
-                self.send_header("Content-Type", content_type)
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-
-            def log_message(self, format: str, *args) -> None:
-                del format, args
-
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.thread = threading.Thread(
-            target=lambda: self.server.serve_forever(poll_interval=0.01),
-            daemon=True,
-        )
-        self.thread.start()
-        return f"http://127.0.0.1:{self.server.server_address[1]}/sample.txt"
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        del exc_type, exc, tb
-        assert self.server is not None
-        assert self.thread is not None
-        self.server.shutdown()
-        self.server.server_close()
-        self.thread.join(timeout=5)
+from tests.http_server_helpers import LocalHTTPTextServer
 
 
 @pytest.mark.slow
@@ -69,7 +29,7 @@ def test_process_single_input_with_real_url_server() -> None:
         force_update=False,
     )
 
-    with SimpleTextServer(b"IOC URL: https://from-server.example/path\n") as url:
+    with LocalHTTPTextServer(b"IOC URL: https://from-server.example/path\n") as url:
         args.url = url
         normal_iocs, warning_iocs, input_display = process_single_input(args)
 

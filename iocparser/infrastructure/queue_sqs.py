@@ -78,20 +78,23 @@ class SQSQueueAdapter:
     def _resolve_queue_url(self, queue_name: str) -> str:
         return self._queue_urls.get(queue_name, self.queue_url)
 
+    def _send_envelope(self, *, queue_url: str, envelope: QueueEnvelope) -> str:
+        response = self.client.send_message(
+            QueueUrl=queue_url,
+            MessageBody=serialize_queue_record(envelope),
+            MessageAttributes={
+                "job_id": {
+                    "StringValue": str(envelope.request.job_id or uuid4()),
+                    "DataType": "String",
+                },
+            },
+        )
+        return str(response["MessageId"])
+
     def enqueue(self, *, queue_name: str, envelope: QueueEnvelope) -> QueueReceipt:
         with self._lock:
             resolved_url = self._resolve_queue_url(queue_name)
-            response = self.client.send_message(
-                QueueUrl=resolved_url,
-                MessageBody=serialize_queue_record(envelope),
-                MessageAttributes={
-                    "job_id": {
-                        "StringValue": str(envelope.request.job_id or uuid4()),
-                        "DataType": "String",
-                    },
-                },
-            )
-            message_id = str(response["MessageId"])
+            message_id = self._send_envelope(queue_url=resolved_url, envelope=envelope)
             return QueueReceipt("sqs", queue_name, message_id, message_id)
 
     def dequeue(self, *, queue_name: str) -> tuple[QueueReceipt, QueueEnvelope] | None:
@@ -128,17 +131,7 @@ class SQSQueueAdapter:
     def requeue(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
         with self._lock:
             resolved_url = self._resolve_queue_url(receipt.queue_name)
-            response = self.client.send_message(
-                QueueUrl=resolved_url,
-                MessageBody=serialize_queue_record(envelope),
-                MessageAttributes={
-                    "job_id": {
-                        "StringValue": str(envelope.request.job_id or uuid4()),
-                        "DataType": "String",
-                    },
-                },
-            )
-            message_id = str(response["MessageId"])
+            message_id = self._send_envelope(queue_url=resolved_url, envelope=envelope)
             self.client.delete_message(QueueUrl=resolved_url, ReceiptHandle=receipt.receipt_id)
             return QueueReceipt("sqs", receipt.queue_name, message_id, message_id)
 

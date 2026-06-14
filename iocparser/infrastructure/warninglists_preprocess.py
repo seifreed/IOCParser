@@ -12,6 +12,7 @@ from iocparser.infrastructure.warninglists_types import (
     WarningListEntry,
     WarningListLookups,
     get_mixin_logger,
+    matching_attribute_name,
 )
 
 logger = get_logger("iocparser.infrastructure.warninglists")
@@ -103,13 +104,7 @@ class WarningListPreprocessMixin:
         if not isinstance(matching_attrs, list):
             return
         for attr in matching_attrs:
-            if isinstance(attr, str):
-                attr_str = attr
-            elif isinstance(attr, dict):
-                attr_str = str(attr.get("name", ""))
-            else:
-                attr_str = str(attr)
-            attr_lower = attr_str.lower()
+            attr_lower = matching_attribute_name(attr).lower()
             attr_parts = set(re.split(r"[|\-_ /]", attr_lower))
             for keyword, ioc_type in self.IOC_TYPE_MAPPING.items():
                 if keyword == attr_lower or keyword in attr_parts:

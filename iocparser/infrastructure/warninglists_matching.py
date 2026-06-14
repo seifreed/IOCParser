@@ -37,6 +37,7 @@ from iocparser.infrastructure.warninglists_types import (
     WarningListDict,
     WarningListLookups,
     get_mixin_logger,
+    matching_attribute_name,
 )
 
 logger = get_logger("iocparser.infrastructure.warninglists")
@@ -148,17 +149,8 @@ class WarningListMatchingMixin:
         matching_attrs = warning_list.get("matching_attributes")
         if not isinstance(matching_attrs, list):
             return []
-        attrs_list: list[str] = []
-        for attr in matching_attrs:
-            if isinstance(attr, str):
-                attr_name = attr
-            elif isinstance(attr, dict):
-                attr_name = str(attr.get("name", ""))
-            else:
-                attr_name = str(attr)
-            if attr_name.strip():
-                attrs_list.append(attr_name)
-        return attrs_list
+        names = (matching_attribute_name(attr) for attr in matching_attrs)
+        return [name for name in names if name.strip()]
 
     def _get_unscoped_list_ids(self) -> list[str]:
         return [

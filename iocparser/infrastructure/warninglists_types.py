@@ -13,6 +13,15 @@ JSONValue = str | int | bool | list[str] | list[dict[str, str]] | dict[str, str]
 JSONData = dict[str, JSONValue] | list[JSONValue]
 
 
+def matching_attribute_name(attr: WarningListEntry) -> str:
+    """Resolve a matching-attribute entry to its name string."""
+    if isinstance(attr, str):
+        return attr
+    if isinstance(attr, dict):
+        return str(attr.get("name", ""))
+    return str(attr)
+
+
 def get_mixin_logger(instance: object, fallback: Logger) -> Logger:
     """Shared logger accessor for warning-list mixins."""
     logger = getattr(instance, "logger", None)

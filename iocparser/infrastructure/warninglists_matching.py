@@ -24,6 +24,9 @@ from iocparser.infrastructure.warninglists_match_checks import (
     check_value_in_list as _check_value_against_list_type,
 )
 from iocparser.infrastructure.warninglists_match_separation import (
+    extract_ioc_value,
+)
+from iocparser.infrastructure.warninglists_match_separation import (
     get_warnings_for_iocs as _get_warnings_for_iocs,
 )
 from iocparser.infrastructure.warninglists_match_separation import (
@@ -358,11 +361,6 @@ class WarningListMatchingMixin:
     ) -> dict[str, list[dict[str, str]]]:
         return _get_warnings_for_iocs(self.check_value, iocs)
 
-    def _extract_ioc_value(self, ioc: str | dict[str, str]) -> str:
-        if isinstance(ioc, dict) and "value" in ioc:
-            return str(ioc["value"])
-        return str(ioc)
-
     def _build_warning_entry(
         self,
         value: str,
@@ -386,7 +384,7 @@ class WarningListMatchingMixin:
     ) -> tuple[dict[str, list[str | dict[str, str]]], dict[str, list[dict[str, str]]]]:
         return _separate_iocs_by_warnings(
             get_logger=self._get_logger,
-            extract_ioc_value=self._extract_ioc_value,
+            extract_ioc_value=extract_ioc_value,
             email_domain_in_warning_list=self._email_domain_in_warning_list,
             check_value=self.check_value,
             build_warning_entry=self._build_warning_entry,

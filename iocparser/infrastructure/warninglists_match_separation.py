@@ -4,6 +4,13 @@ from collections.abc import Callable
 from logging import Logger
 
 
+def extract_ioc_value(ioc: str | dict[str, str]) -> str:
+    """Return an IOC's string value, unwrapping the ``value`` key of dict IOCs."""
+    if isinstance(ioc, dict) and "value" in ioc:
+        return str(ioc["value"])
+    return str(ioc)
+
+
 def get_warnings_for_iocs(
     check_value: Callable[[str, str], tuple[bool, dict[str, str] | None]],
     iocs: dict[str, list[str | dict[str, str]]],
@@ -12,7 +19,7 @@ def get_warnings_for_iocs(
     for ioc_type, ioc_list in iocs.items():
         type_warnings: list[dict[str, str]] = []
         for ioc in ioc_list:
-            value = str(ioc["value"]) if isinstance(ioc, dict) and "value" in ioc else str(ioc)
+            value = extract_ioc_value(ioc)
             in_warning_list, warning_info = check_value(value, ioc_type)
             if in_warning_list and warning_info:
                 type_warnings.append(

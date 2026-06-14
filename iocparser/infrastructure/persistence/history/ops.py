@@ -291,27 +291,6 @@ def _batch_job_signature(row: dict[str, object]) -> tuple[object, ...]:
     )
 
 
-def _batch_job_config_with_import_marker(
-    raw_config_json: object,
-    *,
-    archive_id: str,
-    original_id: int | None,
-) -> str:
-    config = _json_object(str(raw_config_json or "{}"))
-    if original_id is not None:
-        config[HISTORY_IMPORT_MARKER_KEY] = {
-            "archive_id": archive_id,
-            "original_id": original_id,
-        }
-    return json.dumps(config, sort_keys=True)
-
-
-def _batch_job_config_without_import_marker(raw_config_json: object) -> str:
-    config = _json_object(str(raw_config_json or "{}"))
-    config.pop(HISTORY_IMPORT_MARKER_KEY, None)
-    return json.dumps(config, sort_keys=True)
-
-
 def _public_batch_job_config(raw_config_json: object) -> dict[str, object]:
     config = _json_object(str(raw_config_json or "{}"))
     config.pop(HISTORY_IMPORT_MARKER_KEY, None)
@@ -629,9 +608,9 @@ def _import_batch_jobs(
             candidate = session.get(BatchJobModel, batch_job_id)
             if candidate is None:
                 continue
-            if _batch_job_config_without_import_marker(
-                candidate.config_json
-            ) != _batch_job_config_without_import_marker(typed.get("config_json", "{}")):
+            if _json_without_import_marker(candidate.config_json) != _json_without_import_marker(
+                typed.get("config_json", "{}")
+            ):
                 continue
             candidate_config = _json_object(candidate.config_json)
             if candidate_config.get(HISTORY_IMPORT_MARKER_KEY) == import_marker:
@@ -643,7 +622,7 @@ def _import_batch_jobs(
         if existing is None:
             batch_job = BatchJobModel(
                 **{key: value for key, value in typed.items() if key not in {"id", "config_json"}},
-                config_json=_batch_job_config_with_import_marker(
+                config_json=_json_with_import_marker(
                     typed.get("config_json"),
                     archive_id=archive_id,
                     original_id=original_id if isinstance(original_id, int) else None,

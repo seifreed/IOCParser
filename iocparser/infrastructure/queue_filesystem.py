@@ -7,7 +7,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
-from iocparser.infrastructure.queue_records import load_queue_record
+from iocparser.infrastructure.queue_records import load_queue_record, serialize_queue_record
 
 INVALID_QUEUE_NAME_ERROR = "Invalid queue name"
 INVALID_RECEIPT_PATH_ERROR = "Invalid filesystem queue receipt"
@@ -37,7 +37,7 @@ class FilesystemQueueAdapter:
         message_id = envelope.request.job_id or str(uuid4())
         queue_dir = self._queue_dir(queue_name, "pending")
         receipt_path = queue_dir / f"{_safe_filename_component(message_id)}-{uuid4().hex}.json"
-        receipt_path.write_text(json.dumps(envelope.to_record(), sort_keys=True), encoding="utf-8")
+        receipt_path.write_text(serialize_queue_record(envelope), encoding="utf-8")
         return QueueReceipt(
             queue_backend="filesystem",
             queue_name=queue_name,
@@ -81,7 +81,7 @@ class FilesystemQueueAdapter:
         temp_path = queue_dir / f"tmp-{uuid4().hex}.json"
         message_name = _safe_filename_component(envelope.request.job_id or uuid4())
         new_path = queue_dir / f"{message_name}-{uuid4().hex}.json"
-        temp_path.write_text(json.dumps(envelope.to_record(), sort_keys=True), encoding="utf-8")
+        temp_path.write_text(serialize_queue_record(envelope), encoding="utf-8")
         temp_path.rename(new_path)
         processing_path.unlink(missing_ok=True)
         return QueueReceipt(
@@ -96,7 +96,7 @@ class FilesystemQueueAdapter:
         dead_dir = self._queue_dir(receipt.queue_name, "dead")
         temp_path = dead_dir / f"tmp-{uuid4().hex}.json"
         target = dead_dir / processing_path.name
-        temp_path.write_text(json.dumps(envelope.to_record(), sort_keys=True), encoding="utf-8")
+        temp_path.write_text(serialize_queue_record(envelope), encoding="utf-8")
         temp_path.rename(target)
         processing_path.unlink(missing_ok=True)
         return QueueReceipt(

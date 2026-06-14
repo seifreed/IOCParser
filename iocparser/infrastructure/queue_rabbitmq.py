@@ -7,7 +7,7 @@ from typing import Protocol, cast
 from uuid import uuid4
 
 from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
-from iocparser.infrastructure.queue_records import load_queue_record
+from iocparser.infrastructure.queue_records import load_queue_record, serialize_queue_record
 
 
 class _RabbitMQMethodFrame(Protocol):
@@ -131,7 +131,7 @@ class RabbitMQQueueAdapter:
         channel.basic_publish(
             exchange="",
             routing_key=queue_name,
-            body=json.dumps(envelope.to_record(), sort_keys=True).encode("utf-8"),
+            body=serialize_queue_record(envelope).encode("utf-8"),
             properties=pika.BasicProperties(delivery_mode=2, message_id=message_id),
         )
         return QueueReceipt("rabbitmq", queue_name, message_id, message_id)

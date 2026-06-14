@@ -24,6 +24,7 @@ from iocparser.infrastructure.persistence_schema import (
     DistributedJobModel,
     SQLAlchemyUnitOfWork,
 )
+from iocparser.infrastructure.queue_records import serialize_queue_record
 
 ACTIVE_JOB_STATUSES = (JOB_STATUS_QUEUED, JOB_STATUS_RUNNING, JOB_STATUS_COMPLETED)
 HISTORY_IMPORT_MARKER_KEY = "__history_import__"
@@ -130,7 +131,7 @@ def build_new_job(*, envelope: QueueEnvelope, receipt_id: str) -> DistributedJob
         attempts=envelope.attempts,
         max_attempts=envelope.max_attempts,
         receipt_id=receipt_id,
-        payload_json=json.dumps(envelope.to_record(), sort_keys=True),
+        payload_json=serialize_queue_record(envelope),
         submitted_at=now,
     )
 
@@ -139,7 +140,7 @@ def update_envelope(
     model: DistributedJobModel, *, envelope: QueueEnvelope, receipt_id: str
 ) -> None:
     model.receipt_id = receipt_id
-    model.payload_json = json.dumps(envelope.to_record(), sort_keys=True)
+    model.payload_json = serialize_queue_record(envelope)
 
 
 def apply_transition(model: DistributedJobModel, update: TransitionUpdate) -> None:

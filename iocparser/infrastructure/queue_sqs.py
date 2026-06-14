@@ -7,7 +7,7 @@ from typing import NotRequired, Protocol, TypedDict, cast
 from uuid import uuid4
 
 from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
-from iocparser.infrastructure.queue_records import load_queue_record
+from iocparser.infrastructure.queue_records import load_queue_record, serialize_queue_record
 
 
 class _SQSMessageAttribute(TypedDict):
@@ -83,7 +83,7 @@ class SQSQueueAdapter:
             resolved_url = self._resolve_queue_url(queue_name)
             response = self.client.send_message(
                 QueueUrl=resolved_url,
-                MessageBody=json.dumps(envelope.to_record(), sort_keys=True),
+                MessageBody=serialize_queue_record(envelope),
                 MessageAttributes={
                     "job_id": {
                         "StringValue": str(envelope.request.job_id or uuid4()),
@@ -130,7 +130,7 @@ class SQSQueueAdapter:
             resolved_url = self._resolve_queue_url(receipt.queue_name)
             response = self.client.send_message(
                 QueueUrl=resolved_url,
-                MessageBody=json.dumps(envelope.to_record(), sort_keys=True),
+                MessageBody=serialize_queue_record(envelope),
                 MessageAttributes={
                     "job_id": {
                         "StringValue": str(envelope.request.job_id or uuid4()),
@@ -176,7 +176,7 @@ class SQSQueueAdapter:
             self._queue_urls[dead_queue_name] = target_queue
             response = self.client.send_message(
                 QueueUrl=target_queue,
-                MessageBody=json.dumps(envelope.to_record(), sort_keys=True),
+                MessageBody=serialize_queue_record(envelope),
             )
             message_id = str(response["MessageId"])
             resolved_url = self._resolve_queue_url(receipt.queue_name)

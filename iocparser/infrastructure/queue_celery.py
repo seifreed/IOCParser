@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import json
 from importlib import import_module
 from typing import Protocol, cast
 from uuid import uuid4
 
 from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
+from iocparser.infrastructure.queue_records import serialize_queue_record
 
 
 class _CeleryAsyncResult(Protocol):
@@ -85,4 +85,4 @@ class CeleryQueueAdapter:
 
 def build_celery_task_payload(envelope: QueueEnvelope) -> str:
     """Serialize a queue envelope for external Celery workers."""
-    return json.dumps(envelope.to_record(), sort_keys=True)
+    return serialize_queue_record(envelope)

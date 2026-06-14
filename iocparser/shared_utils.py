@@ -1,5 +1,5 @@
 import re as _re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 from iocparser.errors import ValidationError
 
@@ -28,6 +28,14 @@ def parse_bool_token(value: str) -> bool | None:
 def normalize_tokens(items: Iterable[str]) -> tuple[str, ...]:
     """Strip and lowercase each item, dropping blanks and preserving order."""
     return tuple(item.strip().lower() for item in items if item.strip())
+
+
+def normalize_metadata_values(metadata: Mapping[str, object]) -> dict[str, int | str | None]:
+    """Coerce each metadata value to int/str/None, stringifying anything else."""
+    return {
+        key: value if isinstance(value, (int, str)) or value is None else str(value)
+        for key, value in metadata.items()
+    }
 
 
 def parse_string_filters(value: object) -> tuple[str, ...]:

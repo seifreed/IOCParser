@@ -34,6 +34,7 @@ from iocparser.interfaces.ports import (
     SourceRepository,
 )
 from iocparser.pipeline_errors import classify_pipeline_exception
+from iocparser.shared_utils import normalize_metadata_values
 
 BACKPRESSURE_MESSAGE = "worker queue is at capacity"
 
@@ -138,13 +139,7 @@ def normalize_run_metadata(
 ) -> dict[str, int | str | None] | None:
     if metadata is None:
         return None
-    normalized: dict[str, int | str | None] = {}
-    for key, value in metadata.items():
-        if isinstance(value, (int, str)) or value is None:
-            normalized[key] = value
-        else:
-            normalized[key] = str(value)
-    return normalized
+    return normalize_metadata_values(metadata)
 
 
 class Downloader(Protocol):

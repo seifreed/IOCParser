@@ -10,6 +10,7 @@ from iocparser.cli_processing_support import BatchResultsCollection, GroupedIocs
 from iocparser.config import AppConfig
 from iocparser.domain.models import PersistOptions
 from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
+from iocparser.shared_utils import normalize_metadata_values
 
 VERSION = _cli_args.VERSION
 get_bool_arg = _cli_args.get_bool_arg
@@ -55,10 +56,7 @@ def _normalized_run_metadata_map(
     if run_metadata_map is None:
         return None
     return {
-        source_path: {
-            key: value if isinstance(value, (int, str)) or value is None else str(value)
-            for key, value in metadata.items()
-        }
+        source_path: normalize_metadata_values(metadata)
         for source_path, metadata in run_metadata_map.items()
     }
 

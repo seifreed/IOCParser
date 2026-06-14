@@ -1,8 +1,14 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
+from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
 from typing import Protocol, cast, runtime_checkable
+
+from sqlalchemy import Select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from iocparser.domain.enums import ioc_type_name
 from iocparser.domain.models import ExtractionResult
@@ -13,6 +19,38 @@ SOURCE_MODEL: type[SourceModel] = SourceModel
 IOC_MODEL: type[IOCModel] = IOCModel
 RUN_MODEL: type[RunModel] = RunModel
 RUN_IOC_MODEL: type[RunIOCModel] = RunIOCModel
+
+
+def insert_or_refetch[RowT](
+    session: Session,
+    entity: object,
+    refetch_stmt: Select[RowT],
+    *,
+    on_insert: Callable[[], int],
+    on_conflict: Callable[[RowT], int],
+) -> int:
+    """Insert ``entity`` inside a savepoint, refetching the row on a unique clash.
+
+    On success ``on_insert`` supplies the new row id; on an ``IntegrityError`` the
+    savepoint is rolled back, ``refetch_stmt`` is re-run, and ``on_conflict``
+    reconciles the existing row and returns its id.
+    """
+    savepoint = session.begin_nested()
+    try:
+        session.add(entity)
+        session.flush()
+    except IntegrityError:
+        try:
+            savepoint.rollback()
+        except Exception:
+            session.rollback()
+            raise
+        with getattr(session, "no_autoflush", nullcontext()):
+            rows = session.execute(refetch_stmt).scalars().all()
+        if not rows:
+            raise
+        return on_conflict(rows[0])
+    return on_insert()
 
 
 def normalize_search(value: str | None) -> str:

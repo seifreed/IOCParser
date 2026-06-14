@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-from contextlib import nullcontext
 from datetime import UTC, datetime
 from typing import override
 
 from sqlalchemy import or_, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from iocparser.infrastructure.persistence_models import SourceModel
-from iocparser.infrastructure.persistence_repository_support import SOURCE_MODEL, normalize_search
+from iocparser.infrastructure.persistence_repository_support import (
+    SOURCE_MODEL,
+    insert_or_refetch,
+    normalize_search,
+)
 from iocparser.interfaces.ports import SourceRepository
 
 
@@ -72,29 +74,11 @@ class SQLAlchemySourceRepository(SourceRepository):
             first_seen=now,
             last_seen=now,
         )
-        savepoint = self.session.begin_nested()
-        try:
-            self.session.add(source)
-            self.session.flush()
-        except IntegrityError:
-            try:
-                savepoint.rollback()
-            except Exception:
-                self.session.rollback()
-                raise
-            with getattr(self.session, "no_autoflush", nullcontext()):
-                source_rows = (
-                    self.session.execute(
-                        select(SOURCE_MODEL).where(
-                            SourceModel.kind == kind, SourceModel.value == value
-                        )
-                    )
-                    .scalars()
-                    .all()
-                )
-            if not source_rows:
-                raise
-            existing = source_rows[0]
+        refetch_stmt = select(SOURCE_MODEL).where(
+            SourceModel.kind == kind, SourceModel.value == value
+        )
+
+        def _on_conflict(existing: SourceModel) -> int:
             existing.last_seen = now
             existing.original_url = original_url or existing.original_url
             existing.normalized_url = normalized_url or existing.normalized_url
@@ -104,4 +88,11 @@ class SQLAlchemySourceRepository(SourceRepository):
             existing.fingerprint = fingerprint or existing.fingerprint
             existing.value_search = normalize_search(existing.value)
             return existing.id
-        return source.id
+
+        return insert_or_refetch(
+            self.session,
+            source,
+            refetch_stmt,
+            on_insert=lambda: source.id,
+            on_conflict=_on_conflict,
+        )

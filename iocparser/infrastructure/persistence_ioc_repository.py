@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from contextlib import nullcontext
-
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from iocparser.domain.models import ExtractionResult
@@ -11,6 +8,7 @@ from iocparser.infrastructure.persistence_models import IOCModel
 from iocparser.infrastructure.persistence_repository_support import (
     IOC_MODEL,
     ExtractionResultLike,
+    insert_or_refetch,
     normalize_ioc_search,
     normalized_ioc_type_name,
 )
@@ -44,10 +42,10 @@ class SQLAlchemyIOCRepository(IOCRepository):
             IOCModel.warning_description == warning_description,
         )
         ioc_rows: list[IOCModel] = self.session.execute(stmt).scalars().all()
-        ioc = ioc_rows[0] if ioc_rows else None
-        if ioc is not None:
-            _refresh_search_value(ioc, search_value)
-            return ioc.id
+        existing = ioc_rows[0] if ioc_rows else None
+        if existing is not None:
+            _refresh_search_value(existing, search_value)
+            return existing.id
         ioc = IOC_MODEL(
             ioc_type=ioc_type,
             value=value,
@@ -56,24 +54,18 @@ class SQLAlchemyIOCRepository(IOCRepository):
             warning_list=warning_list,
             warning_description=warning_description,
         )
-        savepoint = self.session.begin_nested()
-        try:
-            self.session.add(ioc)
-            self.session.flush()
-        except IntegrityError:
-            try:
-                savepoint.rollback()
-            except Exception:
-                self.session.rollback()
-                raise
-            with getattr(self.session, "no_autoflush", nullcontext()):
-                ioc_rows = self.session.execute(stmt).scalars().all()
-            if not ioc_rows:
-                raise
-            ioc = ioc_rows[0]
-            _refresh_search_value(ioc, search_value)
-            return ioc.id
-        return ioc.id
+
+        def _on_conflict(row: IOCModel) -> int:
+            _refresh_search_value(row, search_value)
+            return row.id
+
+        return insert_or_refetch(
+            self.session,
+            ioc,
+            stmt,
+            on_insert=lambda: ioc.id,
+            on_conflict=_on_conflict,
+        )
 
     def get_or_create_normal(self, result: ExtractionResultLike | ExtractionResult) -> list[int]:
         return [

@@ -180,7 +180,9 @@ def upgrade_to_v3(engine: Engine, inspector: Inspector) -> None:
     if "run_iocs" in table_names:
         statements.extend(
             (
-                "UPDATE run_iocs SET tags_search = lower(replace(replace(tags_json, '[', ''), ']', '')) WHERE tags_search = ''",
+                "UPDATE run_iocs SET tags_search = trim(replace(lower("
+                "replace(replace(replace(replace(replace(tags_json, '[', ''), ']', ''),"
+                " '\"', ''), ',', ' '), '  ', ' ')), '  ', ' ')) WHERE tags_search = ''",
                 "CREATE INDEX IF NOT EXISTS ix_run_iocs_run_severity ON run_iocs(run_id, severity)",
                 "CREATE INDEX IF NOT EXISTS ix_run_iocs_tags_search ON run_iocs(tags_search)",
             ),

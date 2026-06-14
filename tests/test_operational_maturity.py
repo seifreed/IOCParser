@@ -524,6 +524,39 @@ def test_tag_filters_match_whole_tags_not_substrings(tmp_path: Path) -> None:
     assert "prefix.example" in [hit.value for hit in excluded_hits.items]
 
 
+def test_tag_search_backfill_matches_query_format(tmp_path: Path) -> None:
+    from sqlalchemy import create_engine, inspect, text
+
+    from iocparser.infrastructure.persistence_migration_steps import upgrade_to_v3
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'legacy-tags.sqlite'}", future=True)
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "CREATE TABLE run_iocs (id INTEGER PRIMARY KEY, run_id INTEGER, ioc_id INTEGER,"
+                    " severity TEXT, tags_json TEXT, evidence_json TEXT)"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO run_iocs (run_id, ioc_id, severity, tags_json, evidence_json)"
+                    " VALUES (1, 1, 'medium', '[\"Foo\", \"bar\"]', '[]')"
+                )
+            )
+        upgrade_to_v3(engine, inspect(engine))
+        with engine.connect() as connection:
+            tags_search = connection.execute(text("SELECT tags_search FROM run_iocs")).scalar_one()
+    finally:
+        engine.dispose()
+
+    # The backfill must reproduce the format the runtime writes and the tag query
+    # expects: bare, lowercase, single-space-delimited tokens with no JSON punctuation.
+    assert '"' not in tags_search
+    assert "," not in tags_search
+    assert sorted(tags_search.split()) == ["bar", "foo"]
+
+
 def test_query_pagination_is_stable_when_runs_share_started_at(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'stable-pagination.sqlite'}"
     first_run_id = _persist_result(db_uri, source_value="first.txt", ioc_value="first.example")

@@ -4,7 +4,12 @@ from typing import ClassVar
 
 from iocparser.domain.models import ExtractionResult
 from iocparser.interfaces.ports import OutputRenderer
-from iocparser.rendering_support import SECTION_ORDER, group_canonical_by_type, render_text_output
+from iocparser.rendering_support import (
+    SECTION_ORDER,
+    evidence_excerpts,
+    group_canonical_by_type,
+    render_text_output,
+)
 from iocparser.shared_utils import refang_ioc
 
 
@@ -28,11 +33,7 @@ class TextOutputRenderer(OutputRenderer):
                 evidence_items = record.get("evidence", ())
                 if not isinstance(evidence_items, list):
                     continue
-                excerpts = [
-                    str(evidence["excerpt"])
-                    for evidence in evidence_items
-                    if isinstance(evidence, dict) and evidence.get("excerpt")
-                ]
+                excerpts = evidence_excerpts(evidence_items)
                 for variant in {
                     raw_val,
                     raw_val.lower(),

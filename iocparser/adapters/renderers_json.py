@@ -8,7 +8,11 @@ from typing import ClassVar
 from iocparser.domain.models import ExtractionResult
 from iocparser.domain.pipeline import RESULT_SCHEMA_VERSION
 from iocparser.interfaces.ports import OutputRenderer
-from iocparser.rendering_support import group_canonical_by_type, serialize_pretty_json
+from iocparser.rendering_support import (
+    evidence_excerpts,
+    group_canonical_by_type,
+    serialize_pretty_json,
+)
 
 
 class JSONOutputRenderer(OutputRenderer):
@@ -76,11 +80,7 @@ class CSVOutputRenderer(OutputRenderer):
                 for entry in evidence_list
                 if isinstance(entry, dict) and entry.get("line_number") is not None
             )
-            evidence_text = " | ".join(
-                str(entry["excerpt"])
-                for entry in evidence_list
-                if isinstance(entry, dict) and entry.get("excerpt")
-            )
+            evidence_text = " | ".join(evidence_excerpts(evidence_list))
             writer.writerow(
                 {
                     "schema_version": RESULT_SCHEMA_VERSION,

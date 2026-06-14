@@ -52,6 +52,15 @@ def group_canonical_by_type(result: ExtractionResult) -> dict[str, list[str]]:
     }
 
 
+def evidence_excerpts(evidence_items: Sequence[object]) -> list[str]:
+    """Collect non-empty excerpt strings from a record's evidence entries."""
+    return [
+        str(entry["excerpt"])
+        for entry in evidence_items
+        if isinstance(entry, dict) and entry.get("excerpt")
+    ]
+
+
 def render_text_output(
     grouped: Mapping[str, Sequence[SectionValue]],
     warning_grouped: Mapping[str, Sequence[WarningValue]],

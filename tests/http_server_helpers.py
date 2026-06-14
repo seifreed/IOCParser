@@ -4,15 +4,42 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
-class LocalHTTPFileServer:
+class ThreadedHTTPServer:
+    """Run a request handler on an ephemeral 127.0.0.1 port in a daemon thread.
+
+    Subclasses set ``path`` and implement ``build_handler``; the start/shutdown
+    lifecycle lives here so individual servers only describe how they respond.
+    """
+
+    path = "/"
+
+    def build_handler(self) -> type[BaseHTTPRequestHandler]:
+        raise NotImplementedError
+
+    def __enter__(self) -> str:
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), self.build_handler())
+        self.thread = threading.Thread(
+            target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True
+        )
+        self.thread.start()
+        return f"http://127.0.0.1:{self.server.server_address[1]}{self.path}"
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        del exc_type, exc, tb
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=5)
+
+
+class LocalHTTPFileServer(ThreadedHTTPServer):
     """Context manager serving a fixed body at /feed.txt on an ephemeral port."""
+
+    path = "/feed.txt"
 
     def __init__(self, body: bytes) -> None:
         self.body = body
-        self.server: ThreadingHTTPServer | None = None
-        self.thread: threading.Thread | None = None
 
-    def __enter__(self) -> str:
+    def build_handler(self) -> type[BaseHTTPRequestHandler]:
         body = self.body
 
         class Handler(BaseHTTPRequestHandler):
@@ -26,32 +53,19 @@ class LocalHTTPFileServer:
             def log_message(self, fmt: str, *args) -> None:
                 del fmt, args
 
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.thread = threading.Thread(
-            target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True
-        )
-        self.thread.start()
-        return f"http://127.0.0.1:{self.server.server_address[1]}/feed.txt"
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        del exc_type, exc, tb
-        assert self.server is not None
-        assert self.thread is not None
-        self.server.shutdown()
-        self.server.server_close()
-        self.thread.join(timeout=5)
+        return Handler
 
 
-class LocalHTTPTextServer:
+class LocalHTTPTextServer(ThreadedHTTPServer):
     """Context manager serving a fixed body at /sample.txt with a chosen content type."""
+
+    path = "/sample.txt"
 
     def __init__(self, body: bytes, content_type: str = "text/plain") -> None:
         self.body = body
         self.content_type = content_type
-        self.server: ThreadingHTTPServer | None = None
-        self.thread: threading.Thread | None = None
 
-    def __enter__(self) -> str:
+    def build_handler(self) -> type[BaseHTTPRequestHandler]:
         body = self.body
         content_type = self.content_type
 
@@ -66,17 +80,4 @@ class LocalHTTPTextServer:
             def log_message(self, fmt: str, *args) -> None:
                 del fmt, args
 
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.thread = threading.Thread(
-            target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True
-        )
-        self.thread.start()
-        return f"http://127.0.0.1:{self.server.server_address[1]}/sample.txt"
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        del exc_type, exc, tb
-        assert self.server is not None
-        assert self.thread is not None
-        self.server.shutdown()
-        self.server.server_close()
-        self.thread.join(timeout=5)
+        return Handler

@@ -10,9 +10,8 @@ Tests for current CLI and infrastructure modules - argument parsing, file proces
 import argparse
 import io
 import tempfile
-import threading
 from contextlib import redirect_stdout
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
 import pytest
@@ -64,21 +63,22 @@ from iocparser.infrastructure.file_readers import (
 )
 from iocparser.infrastructure.http_download import download_url_to_temp
 from iocparser.infrastructure.logger import setup_logger
+from tests.http_server_helpers import ThreadedHTTPServer
 from tests.test_file_parser import create_minimal_pdf
 from tests.warning_service_helpers import StaticWarningListService, swap_warning_service
 
 
-class LocalDownloadServer:
+class LocalDownloadServer(ThreadedHTTPServer):
+    path = "/sample"
+
     def __init__(
         self, *, body: bytes, content_type: str = "text/plain", content_length: str | None = None
     ) -> None:
         self.body = body
         self.content_type = content_type
         self.content_length = content_length
-        self.server: ThreadingHTTPServer | None = None
-        self.thread: threading.Thread | None = None
 
-    def __enter__(self) -> str:
+    def build_handler(self) -> type[BaseHTTPRequestHandler]:
         body = self.body
         content_type = self.content_type
         content_length = self.content_length
@@ -94,21 +94,7 @@ class LocalDownloadServer:
             def log_message(self, format: str, *args) -> None:
                 del format, args
 
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.thread = threading.Thread(
-            target=lambda: self.server.serve_forever(poll_interval=0.01),
-            daemon=True,
-        )
-        self.thread.start()
-        return f"http://127.0.0.1:{self.server.server_address[1]}/sample"
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        del exc_type, exc, tb
-        assert self.server is not None
-        assert self.thread is not None
-        self.server.shutdown()
-        self.server.server_close()
-        self.thread.join(timeout=5)
+        return Handler
 
 
 class TestArgumentHelpers:

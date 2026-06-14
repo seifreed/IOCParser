@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import json
-import threading
 import time
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
 from iocparser.infrastructure.warninglists import MISPWarningLists, WarningListLookups
+from tests.http_server_helpers import ThreadedHTTPServer
 
 
 class OfflineWarningLists(MISPWarningLists):
@@ -47,14 +47,14 @@ class TrackingWarningLists(OfflineWarningLists):
         }
 
 
-class WarningListServer:
+class WarningListServer(ThreadedHTTPServer):
+    path = ""
+
     def __init__(self, directories: list[str], payloads: dict[str, tuple[int, object]]) -> None:
         self.directories = directories
         self.payloads = payloads
-        self.server: ThreadingHTTPServer | None = None
-        self.thread: threading.Thread | None = None
 
-    def __enter__(self) -> str:
+    def build_handler(self) -> type[BaseHTTPRequestHandler]:
         directories = self.directories
         payloads = self.payloads
 
@@ -88,21 +88,7 @@ class WarningListServer:
             def log_message(self, format: str, *args) -> None:
                 del format, args
 
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.thread = threading.Thread(
-            target=lambda: self.server.serve_forever(poll_interval=0.01),
-            daemon=True,
-        )
-        self.thread.start()
-        return f"http://127.0.0.1:{self.server.server_address[1]}"
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        del exc_type, exc, tb
-        assert self.server is not None
-        assert self.thread is not None
-        self.server.shutdown()
-        self.server.server_close()
-        self.thread.join(timeout=5)
+        return Handler
 
 
 def test_load_or_update_lists_uses_valid_cache_without_network(tmp_path: Path) -> None:
@@ -197,8 +183,10 @@ def test_update_warning_lists_falls_back_to_cache_and_handles_bad_cache(tmp_path
     warning_lists = OfflineWarningLists(tmp_path)
     warning_lists.cache_file.write_text("{broken", encoding="utf-8")
 
-    class BadJSONServer:
-        def __enter__(self) -> str:
+    class BadJSONServer(ThreadedHTTPServer):
+        path = ""
+
+        def build_handler(self) -> type[BaseHTTPRequestHandler]:
             class Handler(BaseHTTPRequestHandler):
                 def do_GET(self) -> None:
                     body = b"not-json"
@@ -211,19 +199,7 @@ def test_update_warning_lists_falls_back_to_cache_and_handles_bad_cache(tmp_path
                 def log_message(self, format: str, *args) -> None:
                     del format, args
 
-            self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-            self.thread = threading.Thread(
-                target=lambda: self.server.serve_forever(poll_interval=0.01),
-                daemon=True,
-            )
-            self.thread.start()
-            return f"http://127.0.0.1:{self.server.server_address[1]}"
-
-        def __exit__(self, exc_type, exc, tb) -> None:
-            del exc_type, exc, tb
-            self.server.shutdown()
-            self.server.server_close()
-            self.thread.join(timeout=5)
+            return Handler
 
     with BadJSONServer() as base_url:
         original_api = OfflineWarningLists.GITHUB_API_BASE

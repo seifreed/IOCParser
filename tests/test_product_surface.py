@@ -6,7 +6,7 @@ import sqlite3
 import threading
 import time
 from contextlib import redirect_stdout
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from io import StringIO
 from pathlib import Path
 
@@ -92,7 +92,7 @@ from iocparser.plugins import (
     register_renderer,
     renderer_names,
 )
-from tests.http_server_helpers import LocalHTTPFileServer
+from tests.http_server_helpers import LocalHTTPFileServer, ThreadedHTTPServer
 
 
 def _args(**overrides: object) -> argparse.Namespace:
@@ -187,13 +187,13 @@ class _Writer:
         Path(path).write_text(content, encoding="utf-8")
 
 
-class FlakyLocalHTTPServer:
+class FlakyLocalHTTPServer(ThreadedHTTPServer):
+    path = "/feed.txt"
+
     def __init__(self) -> None:
         self.calls = 0
-        self.server: ThreadingHTTPServer | None = None
-        self.thread: threading.Thread | None = None
 
-    def __enter__(self) -> str:
+    def build_handler(self) -> type[BaseHTTPRequestHandler]:
         outer = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -216,29 +216,16 @@ class FlakyLocalHTTPServer:
             def log_message(self, fmt: str, *args) -> None:
                 del fmt, args
 
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.thread = threading.Thread(
-            target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True
-        )
-        self.thread.start()
-        return f"http://127.0.0.1:{self.server.server_address[1]}/feed.txt"
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        del exc_type, exc, tb
-        assert self.server is not None
-        assert self.thread is not None
-        self.server.shutdown()
-        self.server.server_close()
-        self.thread.join(timeout=5)
+        return Handler
 
 
-class SlowLocalHTTPServer:
+class SlowLocalHTTPServer(ThreadedHTTPServer):
+    path = "/slow.txt"
+
     def __init__(self, *, delay: float) -> None:
         self.delay = delay
-        self.server: ThreadingHTTPServer | None = None
-        self.thread: threading.Thread | None = None
 
-    def __enter__(self) -> str:
+    def build_handler(self) -> type[BaseHTTPRequestHandler]:
         delay = self.delay
 
         class Handler(BaseHTTPRequestHandler):
@@ -254,20 +241,7 @@ class SlowLocalHTTPServer:
             def log_message(self, fmt: str, *args) -> None:
                 del fmt, args
 
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.thread = threading.Thread(
-            target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True
-        )
-        self.thread.start()
-        return f"http://127.0.0.1:{self.server.server_address[1]}/slow.txt"
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        del exc_type, exc, tb
-        assert self.server is not None
-        assert self.thread is not None
-        self.server.shutdown()
-        self.server.server_close()
-        self.thread.join(timeout=5)
+        return Handler
 
 
 def test_public_query_api_and_diff_previous_source(tmp_path: Path) -> None:
@@ -1208,12 +1182,10 @@ def test_public_rich_extraction_api(tmp_path: Path) -> None:
     assert "ips" in {ioc.ioc_type.value for ioc in text_result.iocs}
     assert text_result.iocs
 
-    class OneShotServer:
-        def __init__(self) -> None:
-            self.server: ThreadingHTTPServer | None = None
-            self.thread: threading.Thread | None = None
+    class OneShotServer(ThreadedHTTPServer):
+        path = "/report.txt"
 
-        def __enter__(self) -> str:
+        def build_handler(self) -> type[BaseHTTPRequestHandler]:
             class Handler(BaseHTTPRequestHandler):
                 def do_GET(self) -> None:
                     body = b"gamma.example https://gamma.example/x"
@@ -1226,20 +1198,7 @@ def test_public_rich_extraction_api(tmp_path: Path) -> None:
                 def log_message(self, fmt: str, *args) -> None:
                     del fmt, args
 
-            self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-            self.thread = threading.Thread(
-                target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True
-            )
-            self.thread.start()
-            return f"http://127.0.0.1:{self.server.server_address[1]}/report.txt"
-
-        def __exit__(self, exc_type, exc, tb) -> None:
-            del exc_type, exc, tb
-            assert self.server is not None
-            assert self.thread is not None
-            self.server.shutdown()
-            self.server.server_close()
-            self.thread.join(timeout=5)
+            return Handler
 
     with OneShotServer() as url:
         url_result = extract_result_from_url(url)

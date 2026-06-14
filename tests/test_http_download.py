@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import contextlib
-import threading
 import time
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -27,6 +26,7 @@ from iocparser.infrastructure.http_download import (
     generate_temp_filename,
     validate_url,
 )
+from tests.http_server_helpers import ThreadedHTTPServer
 
 
 class StaticResponse:
@@ -39,7 +39,9 @@ class StaticResponse:
             yield chunk
 
 
-class LocalHTTPServer:
+class LocalHTTPServer(ThreadedHTTPServer):
+    path = "/sample"
+
     def __init__(
         self,
         *,
@@ -54,10 +56,8 @@ class LocalHTTPServer:
         self.content_length = content_length
         self.delay = delay
         self.status = status
-        self.server: ThreadingHTTPServer | None = None
-        self.thread: threading.Thread | None = None
 
-    def __enter__(self) -> str:
+    def build_handler(self) -> type[BaseHTTPRequestHandler]:
         body = self.body
         content_type = self.content_type
         content_length = self.content_length
@@ -80,21 +80,7 @@ class LocalHTTPServer:
             def log_message(self, format: str, *args) -> None:
                 del format, args
 
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.thread = threading.Thread(
-            target=lambda: self.server.serve_forever(poll_interval=0.01),
-            daemon=True,
-        )
-        self.thread.start()
-        return f"http://127.0.0.1:{self.server.server_address[1]}/sample"
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        del exc_type, exc, tb
-        assert self.server is not None
-        assert self.thread is not None
-        self.server.shutdown()
-        self.server.server_close()
-        self.thread.join(timeout=5)
+        return Handler
 
 
 def test_validate_url_accepts_valid_url() -> None:

@@ -14,8 +14,7 @@ implementations without mocks.
 Author: Marc Rivero | @seifreed
 """
 
-import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
 import pytest
@@ -34,6 +33,7 @@ from iocparser.infrastructure.file_parser import (
     get_parser,
 )
 from iocparser.infrastructure.http_download import MAX_URL_SIZE
+from tests.http_server_helpers import ThreadedHTTPServer
 
 
 def create_minimal_pdf(pdf_path: Path, text_content: str) -> None:
@@ -728,7 +728,9 @@ class TestPDFParserTableExtraction:
 class TestHTMLParserURLFetching:
     """Test HTML parser URL fetching functionality."""
 
-    class _LocalHTTPServer:
+    class _LocalHTTPServer(ThreadedHTTPServer):
+        path = "/page"
+
         def __init__(
             self,
             *,
@@ -741,10 +743,8 @@ class TestHTMLParserURLFetching:
             self.status = status
             self.content_type = content_type
             self.content_length = content_length
-            self.server: ThreadingHTTPServer | None = None
-            self.thread: threading.Thread | None = None
 
-        def __enter__(self) -> str:
+        def build_handler(self) -> type[BaseHTTPRequestHandler]:
             body = self.body
             status = self.status
             content_type = self.content_type
@@ -762,21 +762,7 @@ class TestHTMLParserURLFetching:
                 def log_message(self, format: str, *args) -> None:
                     del format, args
 
-            self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-            self.thread = threading.Thread(
-                target=lambda: self.server.serve_forever(poll_interval=0.01),
-                daemon=True,
-            )
-            self.thread.start()
-            return f"http://127.0.0.1:{self.server.server_address[1]}/page"
-
-        def __exit__(self, exc_type, exc, tb) -> None:
-            del exc_type, exc, tb
-            assert self.server is not None
-            assert self.thread is not None
-            self.server.shutdown()
-            self.server.server_close()
-            self.thread.join(timeout=5)
+            return Handler
 
     def test_extract_text_from_http_url(self) -> None:
         """
@@ -881,31 +867,24 @@ class TestHTMLParserErrorHandling:
         assert isinstance(result, str)
 
     def test_html_parser_raises_url_access_error_for_local_404(self) -> None:
-        import threading
-        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        class NotFoundServer(ThreadedHTTPServer):
+            path = "/missing.html"
 
-        class Handler(BaseHTTPRequestHandler):
-            def do_GET(self) -> None:
-                self.send_response(404)
-                self.end_headers()
+            def build_handler(self) -> type[BaseHTTPRequestHandler]:
+                class Handler(BaseHTTPRequestHandler):
+                    def do_GET(self) -> None:
+                        self.send_response(404)
+                        self.end_headers()
 
-            def log_message(self, format: str, *args) -> None:
-                del format, args
+                    def log_message(self, format: str, *args) -> None:
+                        del format, args
 
-        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        thread = threading.Thread(
-            target=lambda: server.serve_forever(poll_interval=0.01),
-            daemon=True,
-        )
-        thread.start()
-        try:
-            parser = HTMLParser(f"http://127.0.0.1:{server.server_address[1]}/missing.html")
+                return Handler
+
+        with NotFoundServer() as url:
+            parser = HTMLParser(url)
             with pytest.raises(URLAccessError):
                 parser.extract_text()
-        finally:
-            server.shutdown()
-            server.server_close()
-            thread.join(timeout=5)
 
     def test_html_parser_wraps_generic_local_errors(self, tmp_path: Path) -> None:
         html_path = tmp_path / "generic-error.html"

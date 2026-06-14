@@ -23,6 +23,7 @@ from iocparser.infrastructure.extractor_base_runtime_support import (
 )
 from iocparser.infrastructure.extractor_patterns import PATTERNS
 from iocparser.infrastructure.logger import get_logger
+from iocparser.shared_utils import dedup_case_insensitive
 
 logger = get_logger(__name__)
 
@@ -248,14 +249,7 @@ class ExtractorBase:
                         break
             if match_value:
                 clean_matches.append(match_value)
-        seen: set[str] = set()
-        deduplicated: list[str] = []
-        for match in clean_matches:
-            key = match.lower()
-            if key not in seen:
-                seen.add(key)
-                deduplicated.append(match)
-        return deduplicated
+        return dedup_case_insensitive(clean_matches)
 
     def _is_valid_hash_pattern(self, hash_string: str) -> bool:
         """

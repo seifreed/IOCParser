@@ -12,10 +12,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from iocparser.infrastructure.extractor_base import ExtractorBase, IPv4_MAX_OCTET, IPv4_PARTS_COUNT
-from iocparser.infrastructure.extractor_network import (
-    DEFAULT_NETWORK_POLICY,
-    _dedup_case_insensitive,
-)
+from iocparser.infrastructure.extractor_network import DEFAULT_NETWORK_POLICY
+from iocparser.shared_utils import dedup_case_insensitive
 
 LEGITIMATE_PROCESS_NAMES = {
     "svchost.exe",
@@ -72,7 +70,7 @@ class ArtifactHeuristicPolicy:
         filenames = [
             match for match in matches if isinstance(match, str) and "." in match and len(match) > 4
         ]
-        return _dedup_case_insensitive(
+        return dedup_case_insensitive(
             [match for match in filenames if match.lower() not in self.legitimate_process_names]
         )
 
@@ -91,7 +89,7 @@ class ArtifactHeuristicPolicy:
                     clean_part.startswith("/") and len(clean_part) > 5
                 ):
                     valid_paths.append(clean_part)
-        return _dedup_case_insensitive(valid_paths)
+        return dedup_case_insensitive(valid_paths)
 
     def valid_mac_addresses(self, candidates: list[str]) -> list[str]:
         valid_macs: list[str] = []
@@ -114,7 +112,7 @@ class ArtifactHeuristicPolicy:
                     for part in parts
                 ):
                     valid_macs.append(normalized)
-        return _dedup_case_insensitive(valid_macs)
+        return dedup_case_insensitive(valid_macs)
 
     def valid_yara_rules(self, raw_rules: list[str]) -> list[str]:
         valid_rules: list[str] = []
@@ -146,7 +144,7 @@ class ArtifactHeuristicPolicy:
                 octets, octet_count=IPv4_PARTS_COUNT, max_octet=IPv4_MAX_OCTET
             ):
                 valid.append(candidate)
-        return _dedup_case_insensitive(valid)
+        return dedup_case_insensitive(valid)
 
     def valid_snort_rules(self, candidates: list[str]) -> list[str]:
         valid_rules: list[str] = []
@@ -181,7 +179,7 @@ class ArtifactHeuristicPolicy:
                         char in "0123456789abcdefABCDEF" for char in normalized.replace(":", "")
                     ):
                         valid_serials.append(normalized.lower())
-        return _dedup_case_insensitive(valid_serials)
+        return dedup_case_insensitive(valid_serials)
 
 
 DEFAULT_ARTIFACT_POLICY = ArtifactHeuristicPolicy(
@@ -202,7 +200,7 @@ class ArtifactPatternRule:
         if self.postprocess is not None:
             return self.postprocess(matches)
         if self.unique:
-            return _dedup_case_insensitive(matches)
+            return dedup_case_insensitive(matches)
         return matches
 
 

@@ -107,6 +107,18 @@ def _dedup_key(item: str | dict[str, str]) -> str:
     return str(item).lower()
 
 
+def dedup_case_insensitive(items: list[str]) -> list[str]:
+    """Drop case-insensitive duplicates from a string list, preserving order."""
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in items:
+        key = item.lower()
+        if key not in seen:
+            seen.add(key)
+            result.append(item)
+    return result
+
+
 def deduplicate_iocs(
     iocs: dict[str, list[str | dict[str, str]]],
 ) -> dict[str, list[str | dict[str, str]]]:

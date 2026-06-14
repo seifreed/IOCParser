@@ -15,20 +15,10 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
 from iocparser.infrastructure.extractor_base import ExtractorBase, IPv4_MAX_OCTET, IPv4_PARTS_COUNT
+from iocparser.shared_utils import dedup_case_insensitive
 
 UNC_HOST_PATTERN = re.compile(r"\\\\([A-Z][A-Z0-9\-]{2,14})(?:\\|\s)", re.IGNORECASE)
 NORMALIZED_DOT_PATTERN = re.compile(r"[\[\(\{]\.[\]\)\}]")
-
-
-def _dedup_case_insensitive(items: list[str]) -> list[str]:
-    seen: set[str] = set()
-    result: list[str] = []
-    for item in items:
-        key = item.lower()
-        if key not in seen:
-            seen.add(key)
-            result.append(item)
-    return result
 
 
 @dataclass(frozen=True)
@@ -150,17 +140,17 @@ class NetworkHeuristicPolicy:
                 continue
             if self.should_keep_url(domain, path):
                 clean_urls.append(defang_url(url) if defang else url)
-        return _dedup_case_insensitive(clean_urls)
+        return dedup_case_insensitive(clean_urls)
 
     def extracted_emails(self, *, raw_emails: list[str], defang: bool) -> list[str]:
         if defang:
             raw_emails = [email.replace("@", "[@]").replace(".", "[.]") for email in raw_emails]
-        return _dedup_case_insensitive(raw_emails)
+        return dedup_case_insensitive(raw_emails)
 
     def extracted_hosts(self, *, domains: list[str], text: str) -> list[str]:
         valid_hosts = [domain for domain in domains if self.is_valid_host_candidate(domain)]
         valid_hosts.extend(self.unc_hosts(text))
-        return _dedup_case_insensitive(valid_hosts)
+        return dedup_case_insensitive(valid_hosts)
 
     def extracted_domains(
         self,
@@ -177,7 +167,7 @@ class NetworkHeuristicPolicy:
             clean_domain = clean_defanged(domain)
             if is_valid_domain(clean_domain):
                 clean_domains.append(defang_dotted(clean_domain) if defang else clean_domain)
-        return _dedup_case_insensitive(clean_domains)
+        return dedup_case_insensitive(clean_domains)
 
     def extracted_ips(
         self,
@@ -197,7 +187,7 @@ class NetworkHeuristicPolicy:
             ):
                 continue
             clean_ips.append(defang_dotted(clean_ip) if defang else clean_ip)
-        return _dedup_case_insensitive(clean_ips)
+        return dedup_case_insensitive(clean_ips)
 
 
 DEFAULT_NETWORK_POLICY = NetworkHeuristicPolicy(

@@ -196,6 +196,12 @@ class StreamingIOCExtractor:
                 filtered[ioc_type] = kept
         return filtered
 
+    def _extract_unique_from_chunk(self, chunk: str, prefix_length: int) -> dict[str, list[str]]:
+        """Extract, drop overlap artifacts, and deduplicate IOCs from one chunk."""
+        chunk_iocs = self.extractor.extract_all(chunk)
+        chunk_iocs = self._filter_overlap_artifacts(chunk, chunk_iocs, prefix_length)
+        return self._deduplicate_iocs(chunk_iocs)
+
     def extract_from_file(
         self,
         file_path: str | Path,
@@ -234,11 +240,7 @@ class StreamingIOCExtractor:
                         progress_callback=self.progress_callback,
                         is_text=True,
                     ):
-                        chunk_iocs = self.extractor.extract_all(chunk)
-                        chunk_iocs = self._filter_overlap_artifacts(
-                            chunk, chunk_iocs, prefix_length
-                        )
-                        unique_iocs = self._deduplicate_iocs(chunk_iocs)
+                        unique_iocs = self._extract_unique_from_chunk(chunk, prefix_length)
                         if unique_iocs:
                             if yield_chunks:
                                 yield unique_iocs
@@ -283,13 +285,7 @@ class StreamingIOCExtractor:
             progress_callback=self.progress_callback,
             is_text=is_text,
         ):
-            # Extract IOCs from chunk
-            chunk_iocs = self.extractor.extract_all(chunk)
-            chunk_iocs = self._filter_overlap_artifacts(chunk, chunk_iocs, prefix_length)
-
-            # Deduplicate
-            unique_iocs = self._deduplicate_iocs(chunk_iocs)
-
+            unique_iocs = self._extract_unique_from_chunk(chunk, prefix_length)
             if unique_iocs:
                 yield unique_iocs
 
@@ -359,9 +355,7 @@ class StreamingIOCExtractor:
                     chunk = prefix_text + chunk
 
                     # Extract and accumulate IOCs
-                    chunk_iocs = self.extractor.extract_all(chunk)
-                    chunk_iocs = self._filter_overlap_artifacts(chunk, chunk_iocs, prefix_length)
-                    unique_iocs = self._deduplicate_iocs(chunk_iocs)
+                    unique_iocs = self._extract_unique_from_chunk(chunk, prefix_length)
                     self._accumulate_iocs(all_iocs, unique_iocs)
 
                     # Progress callback

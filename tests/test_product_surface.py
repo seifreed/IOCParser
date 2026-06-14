@@ -92,6 +92,7 @@ from iocparser.plugins import (
     register_renderer,
     renderer_names,
 )
+from tests.http_server_helpers import LocalHTTPFileServer
 
 
 def _args(**overrides: object) -> argparse.Namespace:
@@ -259,42 +260,6 @@ class SlowLocalHTTPServer:
         )
         self.thread.start()
         return f"http://127.0.0.1:{self.server.server_address[1]}/slow.txt"
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        del exc_type, exc, tb
-        assert self.server is not None
-        assert self.thread is not None
-        self.server.shutdown()
-        self.server.server_close()
-        self.thread.join(timeout=5)
-
-
-class StableLocalHTTPServer:
-    def __init__(self, *, body: bytes) -> None:
-        self.body = body
-        self.server: ThreadingHTTPServer | None = None
-        self.thread: threading.Thread | None = None
-
-    def __enter__(self) -> str:
-        body = self.body
-
-        class Handler(BaseHTTPRequestHandler):
-            def do_GET(self) -> None:
-                self.send_response(200)
-                self.send_header("Content-Type", "text/plain")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-
-            def log_message(self, fmt: str, *args) -> None:
-                del fmt, args
-
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.thread = threading.Thread(
-            target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True
-        )
-        self.thread.start()
-        return f"http://127.0.0.1:{self.server.server_address[1]}/feed.txt"
 
     def __exit__(self, exc_type, exc, tb) -> None:
         del exc_type, exc, tb
@@ -476,7 +441,7 @@ def test_url_batch_preserves_duplicate_inputs_through_report_and_persistence(
     db_uri = f"sqlite:///{tmp_path / 'duplicate-urls.sqlite'}"
     config = load_config(cli_persist=True, cli_db_uri=db_uri, cli_config_path=None)
     url_file = tmp_path / "urls.txt"
-    with StableLocalHTTPServer(body=b"IOC URL: https://duplicate.example/path") as url:
+    with LocalHTTPFileServer(body=b"IOC URL: https://duplicate.example/path") as url:
         url_file.write_text(f"{url}\n{url}\n", encoding="utf-8")
         args = _args(url_file=str(url_file), url_workers=2, persist=True)
         _normal_iocs, warning_iocs, _label, results, report = process_url_file_input_with_report(
@@ -648,7 +613,7 @@ def test_successful_retry_uses_original_batch_url_for_retry_history_when_complet
 
 def test_retry_report_attempts_follow_filtered_failed_items(tmp_path: Path) -> None:
     report_path = tmp_path / "filtered-retry-report.json"
-    with StableLocalHTTPServer(body=b"IOC URL: https://filtered-retry.example/path") as url:
+    with LocalHTTPFileServer(body=b"IOC URL: https://filtered-retry.example/path") as url:
         report_path.write_text(
             json.dumps(
                 {
@@ -691,7 +656,7 @@ def test_retry_report_attempts_follow_filtered_failed_items(tmp_path: Path) -> N
 def test_retry_batch_job_attempts_follow_filtered_failed_items(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'filtered-retry-batch.sqlite'}"
     config = load_config(cli_persist=True, cli_db_uri=db_uri, cli_config_path=None)
-    with StableLocalHTTPServer(body=b"IOC URL: https://filtered-batch.example/path") as url:
+    with LocalHTTPFileServer(body=b"IOC URL: https://filtered-batch.example/path") as url:
         batch_job_id = persist_batch_job(
             {
                 "total": 2,

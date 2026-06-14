@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import io
 import json
-import threading
 from datetime import UTC, datetime
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -85,47 +83,12 @@ from iocparser.plugins import (
     register_postprocessor,
     renderer_names,
 )
+from tests.http_server_helpers import LocalHTTPFileServer
 
 
 class _Writer:
     def write(self, path: str, content: str) -> None:
         Path(path).write_text(content, encoding="utf-8")
-
-
-class _HTTPServer:
-    def __init__(self, body: bytes) -> None:
-        self.body = body
-        self.server: ThreadingHTTPServer | None = None
-        self.thread: threading.Thread | None = None
-
-    def __enter__(self) -> str:
-        body = self.body
-
-        class Handler(BaseHTTPRequestHandler):
-            def do_GET(self) -> None:
-                self.send_response(200)
-                self.send_header("Content-Type", "text/plain")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-
-            def log_message(self, fmt: str, *args) -> None:
-                del fmt, args
-
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.thread = threading.Thread(
-            target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True
-        )
-        self.thread.start()
-        return f"http://127.0.0.1:{self.server.server_address[1]}/feed.txt"
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        del exc_type, exc, tb
-        assert self.server is not None
-        assert self.thread is not None
-        self.server.shutdown()
-        self.server.server_close()
-        self.thread.join(timeout=5)
 
 
 class ExtraExtractor:
@@ -413,7 +376,7 @@ def test_cli_plugin_paths_and_batch_queries(
     )
     assert "plugin-added.example" in merged_normal["domains"]
 
-    with _HTTPServer(b"Remote hxxps://remote.example") as url:
+    with LocalHTTPFileServer(b"Remote hxxps://remote.example") as url:
         url_args = SimpleNamespace(stdin=False, file=None, url=url, url_direct=None, **common)
         normal_iocs, _, _ = cli_processing.process_single_input(
             url_args,
@@ -447,7 +410,7 @@ def test_cli_plugin_paths_and_batch_queries(
             db_uri=None,
         )
 
-    with _HTTPServer(b"Batch hxxps://batch.example") as url:
+    with LocalHTTPFileServer(b"Batch hxxps://batch.example") as url:
         db_uri = f"sqlite:///{tmp_path / 'batch-queries.sqlite'}"
         batch_job_id = _setup_batch_history(db_uri, failed_url=url)
         args = SimpleNamespace(

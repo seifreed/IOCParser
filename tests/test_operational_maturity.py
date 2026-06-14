@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
-import threading
 import time
 from datetime import UTC, datetime
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -108,47 +106,12 @@ from iocparser.plugins import (
     register_extractor,
     register_postprocessor,
 )
+from tests.http_server_helpers import LocalHTTPFileServer
 
 
 class _Writer:
     def write(self, path: str, content: str) -> None:
         Path(path).write_text(content, encoding="utf-8")
-
-
-class _HTTPServer:
-    def __init__(self, body: bytes) -> None:
-        self.body = body
-        self.server: ThreadingHTTPServer | None = None
-        self.thread: threading.Thread | None = None
-
-    def __enter__(self) -> str:
-        body = self.body
-
-        class Handler(BaseHTTPRequestHandler):
-            def do_GET(self) -> None:
-                self.send_response(200)
-                self.send_header("Content-Type", "text/plain")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-
-            def log_message(self, fmt: str, *args) -> None:
-                del fmt, args
-
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.thread = threading.Thread(
-            target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True
-        )
-        self.thread.start()
-        return f"http://127.0.0.1:{self.server.server_address[1]}/feed.txt"
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        del exc_type, exc, tb
-        assert self.server is not None
-        assert self.thread is not None
-        self.server.shutdown()
-        self.server.server_close()
-        self.thread.join(timeout=5)
 
 
 class DemoExtractor:
@@ -1200,7 +1163,7 @@ def test_clients_wrap_reusable_services_and_plugin_pipeline(tmp_path: Path) -> N
     file_path = tmp_path / "client.txt"
     file_path.write_text("client.example", encoding="utf-8")
     assert parser_client.extract_result_from_file(str(file_path), check_warnings=False).iocs
-    with _HTTPServer(b"url.example") as url:
+    with LocalHTTPFileServer(b"url.example") as url:
         assert parser_client.extract_result_from_url(url, check_warnings=False).iocs
     assert "demo-extractor" in extractor_names()
     assert "demo-post" in postprocessor_names()

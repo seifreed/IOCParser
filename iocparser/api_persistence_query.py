@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from typing import TypedDict, TypeVar, Unpack
 
@@ -38,9 +39,11 @@ from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
 from iocparser.interfaces.ports import OutputRenderer
 from iocparser.plugins import get_renderer
 from iocparser.shared_utils import (
+    VALID_SEVERITIES,
     parse_bool_token,
     parse_string_filters,
     validated_diff_only,
+    validated_severity_filters,
 )
 
 
@@ -104,7 +107,6 @@ class PersistedDiffFilters(PersistedExportFilters):
 MISSING_DIFF_TARGET_ERROR = "Missing diff target"
 INVALID_DATE_ERROR = "Invalid ISO date: {value}"
 INVALID_IOC_TYPE_ERROR = "Invalid ioc_type: {value}"
-INVALID_SEVERITY_ERROR = "Invalid severity: {value}"
 INVALID_MIN_SEVERITY_ERROR = "Invalid min_severity: {value}"
 INVALID_TAG_MODE_ERROR = "Invalid tag_mode: {value}"
 INVALID_SORT_BY_ERROR = "Invalid sort_by: {value}"
@@ -112,7 +114,6 @@ INVALID_SEARCH_BACKEND_ERROR = "Invalid search_backend: {value}"
 INVALID_LIMIT_ERROR = "Invalid limit: {value}"
 INVALID_OFFSET_ERROR = "Invalid offset: {value}"
 INVALID_BOOLEAN_ERROR = "Invalid boolean option: {value}"
-VALID_MIN_SEVERITIES = {"informational", "low", "medium", "high"}
 VALID_TAG_MODES = {"all", "any"}
 VALID_RUN_SORT_VALUES = {"newest", "oldest", "source"}
 VALID_SEARCH_SORT_VALUES = {"newest", "oldest", "source"}
@@ -190,7 +191,7 @@ def validated_iso_datetime(value: str | None) -> str | None:
     return value
 
 
-def _validated_choice(value: str, *, valid: set[str], error: str) -> str:
+def _validated_choice(value: str, *, valid: AbstractSet[str], error: str) -> str:
     normalized = value.strip().lower()
     if normalized not in valid:
         raise ValidationError(error.format(value=value))
@@ -200,14 +201,7 @@ def _validated_choice(value: str, *, valid: set[str], error: str) -> str:
 def validated_min_severity(value: str | None) -> str | None:
     if value is None:
         return None
-    return _validated_choice(value, valid=VALID_MIN_SEVERITIES, error=INVALID_MIN_SEVERITY_ERROR)
-
-
-def validated_severity_filters(value: str | None) -> tuple[str, ...]:
-    return tuple(
-        _validated_choice(severity, valid=VALID_MIN_SEVERITIES, error=INVALID_SEVERITY_ERROR)
-        for severity in parse_string_filters(value)
-    )
+    return _validated_choice(value, valid=VALID_SEVERITIES, error=INVALID_MIN_SEVERITY_ERROR)
 
 
 def validated_ioc_type_filter(value: str | None) -> str | None:

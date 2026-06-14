@@ -6,6 +6,8 @@ TRUE_BOOL_VALUES: frozenset[str] = frozenset({"1", "true", "yes", "on"})
 FALSE_BOOL_VALUES: frozenset[str] = frozenset({"0", "false", "no", "off"})
 VALID_DIFF_ONLY_VALUES: frozenset[str] = frozenset({"all", "added", "removed"})
 INVALID_DIFF_ONLY_ERROR = "Invalid diff_only: {value}"
+VALID_SEVERITIES: frozenset[str] = frozenset({"informational", "low", "medium", "high"})
+INVALID_SEVERITY_ERROR = "Invalid severity: {value}"
 
 
 def parse_bool_token(value: str) -> bool | None:
@@ -36,6 +38,17 @@ def parse_string_filters(value: object) -> tuple[str, ...]:
             items.extend(part.strip() for part in str(entry).split(",") if part.strip())
         return tuple(items)
     return tuple(part.strip() for part in str(value).split(",") if part.strip())
+
+
+def validated_severity_filters(value: object) -> tuple[str, ...]:
+    """Split, normalize, and validate comma-separated severity filters."""
+    normalized: list[str] = []
+    for severity in parse_string_filters(value):
+        candidate = severity.strip().lower()
+        if candidate not in VALID_SEVERITIES:
+            raise ValidationError(INVALID_SEVERITY_ERROR.format(value=severity))
+        normalized.append(candidate)
+    return tuple(normalized)
 
 
 def validated_diff_only(value: str | None) -> str:

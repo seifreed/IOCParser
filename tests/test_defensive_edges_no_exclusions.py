@@ -1067,7 +1067,6 @@ def test_history_import_skip_and_same_origin_batch_paths() -> None:
 def test_strict_coverage_option_and_metadata_edge_helpers() -> None:
     from iocparser.api_persistence_query import bool_option, validated_ioc_type_filter
     from iocparser.cli_output_rendering import (
-        _validated_severity_filters,
         int_run_metadata_value,
         optional_int_run_metadata_value,
     )
@@ -1075,6 +1074,7 @@ def test_strict_coverage_option_and_metadata_edge_helpers() -> None:
     from iocparser.cli_runtime_defaults import parse_http_mapping
     from iocparser.client_persistence import validated_severity_values
     from iocparser.domain.distributed import QueueEnvelope
+    from iocparser.shared_utils import validated_severity_filters
 
     assert bool_option("ON") is True
     assert validated_ioc_type_filter("   ") is None
@@ -1082,7 +1082,7 @@ def test_strict_coverage_option_and_metadata_edge_helpers() -> None:
     assert optional_int_run_metadata_value({"duration": True}, "duration") is None
     assert optional_int_run_metadata_value({"duration": "   "}, "duration") is None
     assert optional_int_run_metadata_value({"duration": "bad"}, "duration") is None
-    assert _validated_severity_filters("High,LOW") == ("high", "low")
+    assert validated_severity_filters("High,LOW") == ("high", "low")
     assert bool_value(None, default=True) is True
     assert bool_value(1) is True
     assert parse_http_mapping("X-Test: value", separator=":") == {"X-Test": "value"}

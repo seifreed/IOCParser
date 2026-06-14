@@ -14,9 +14,8 @@ from typing import TypedDict
 from dotenv import load_dotenv
 
 from iocparser.runtime_config import find_default_config_paths, load_ini_sections
+from iocparser.shared_utils import FALSE_BOOL_VALUES, TRUE_BOOL_VALUES
 
-TRUE_BOOL_VALUES = {"1", "true", "yes", "on"}
-FALSE_BOOL_VALUES = {"0", "false", "no", "off"}
 INVALID_BOOLEAN_ERROR = "Invalid boolean for {option_name}: {value!r}"
 
 

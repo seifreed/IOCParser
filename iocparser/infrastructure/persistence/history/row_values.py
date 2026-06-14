@@ -3,6 +3,8 @@ from __future__ import annotations
 from contextlib import suppress
 from datetime import datetime
 
+from iocparser.shared_utils import TRUE_BOOL_VALUES
+
 INT_FIELD_DEFAULTS: dict[str, int | None] = {
     "id": None,
     "source_id": None,
@@ -31,7 +33,7 @@ def bool_from_row(value: object, *, default: bool = False) -> bool:
     if value is None:
         return default
     if isinstance(value, str):
-        return value.strip().lower() in {"1", "true", "yes", "on"}
+        return value.strip().lower() in TRUE_BOOL_VALUES
     return bool(value)
 
 

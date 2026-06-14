@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from iocparser.runtime_config import find_default_config_paths, load_ini_sections
+from iocparser.shared_utils import FALSE_BOOL_VALUES, TRUE_BOOL_VALUES
 
 WORKER_DEFAULTS: dict[str, object] = {
     "queue_backend": "filesystem",
@@ -25,8 +26,6 @@ WORKER_DEFAULTS: dict[str, object] = {
     "max_queue_size": 64,
     "skip_processed": False,
 }
-TRUE_BOOL_VALUES = {"1", "true", "yes", "on"}
-FALSE_BOOL_VALUES = {"0", "false", "no", "off"}
 INVALID_BOOL_ENV_ERROR = "Invalid boolean environment value for {name}: {value!r}"
 
 

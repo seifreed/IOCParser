@@ -8,6 +8,7 @@ from typing import cast
 from iocparser.domain.models import ExtractionOptions, IOCType, IOCTypeName
 from iocparser.domain.type_filters import parse_ioc_types
 from iocparser.errors import ValidationError
+from iocparser.shared_utils import parse_bool_token
 
 INTEGER_VALUE_REQUIRED = "{field_name} requires an integer value"
 
@@ -56,12 +57,8 @@ def get_bool_arg(args: argparse.Namespace, name: str, default: bool = False) -> 
     if value is None:
         return default
     if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"0", "false", "no", "off", ""}:
-            return False
-        if normalized in {"1", "true", "yes", "on"}:
-            return True
-        return False
+        parsed = parse_bool_token(value)
+        return parsed if parsed is not None else False
     return bool(value)
 
 

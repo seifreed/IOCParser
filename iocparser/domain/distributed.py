@@ -8,6 +8,7 @@ from iocparser.domain.pipeline import (
     PipelineErrorInfo,
     PipelineJobRequest,
 )
+from iocparser.shared_utils import parse_bool_token
 
 DISTRIBUTED_JOB_SCHEMA_VERSION = "1.0"
 
@@ -56,11 +57,9 @@ def _bool_from_payload(payload: dict[str, object], key: str, default: bool) -> b
     if isinstance(raw_value, int) and raw_value in {0, 1}:
         return bool(raw_value)
     if isinstance(raw_value, str):
-        normalized = raw_value.strip().lower()
-        if normalized in {"1", "true", "yes", "on"}:
-            return True
-        if normalized in {"0", "false", "no", "off", ""}:
-            return False
+        parsed = parse_bool_token(raw_value)
+        if parsed is not None:
+            return parsed
     raise _invalid_bool_payload_value(key=key, raw_value=raw_value)
 
 

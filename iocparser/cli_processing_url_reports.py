@@ -7,6 +7,7 @@ from typing import TypedDict, cast
 
 from iocparser.cli_args_values import int_value
 from iocparser.domain.pipeline import BATCH_REPORT_SCHEMA_VERSION
+from iocparser.shared_utils import parse_bool_token
 
 
 class BatchItemReport(TypedDict, total=False):
@@ -69,11 +70,9 @@ def bool_value(value: object, *, default: bool = False) -> bool:
     if isinstance(value, int) and value in {0, 1}:
         return bool(value)
     if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"0", "false", "no", "off", ""}:
-            return False
-        if normalized in {"1", "true", "yes", "on"}:
-            return True
+        parsed = parse_bool_token(value)
+        if parsed is not None:
+            return parsed
     return default
 
 

@@ -37,6 +37,7 @@ from iocparser.errors import ValidationError
 from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
 from iocparser.interfaces.ports import OutputRenderer
 from iocparser.plugins import get_renderer
+from iocparser.shared_utils import parse_bool_token
 
 
 class QueryRunsOptions(TypedDict, total=False):
@@ -133,11 +134,9 @@ def bool_option(value: object | None, default: bool = False) -> bool:
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"0", "false", "no", "off", ""}:
-            return False
-        if normalized in {"1", "true", "yes", "on"}:
-            return True
+        parsed = parse_bool_token(value)
+        if parsed is not None:
+            return parsed
         raise ValidationError(INVALID_BOOLEAN_ERROR.format(value=value))
     raise ValidationError(INVALID_BOOLEAN_ERROR.format(value=value))
 

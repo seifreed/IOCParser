@@ -1,5 +1,23 @@
 import re as _re
 
+TRUE_BOOL_VALUES: frozenset[str] = frozenset({"1", "true", "yes", "on"})
+FALSE_BOOL_VALUES: frozenset[str] = frozenset({"0", "false", "no", "off"})
+
+
+def parse_bool_token(value: str) -> bool | None:
+    """Map a string to True/False using the canonical boolean vocabularies.
+
+    A blank/whitespace-only string is treated as False; unrecognized tokens
+    return None so callers can decide whether to fall back to a default or raise.
+    """
+    normalized = value.strip().lower()
+    if normalized in TRUE_BOOL_VALUES:
+        return True
+    if normalized == "" or normalized in FALSE_BOOL_VALUES:
+        return False
+    return None
+
+
 DEFANG_REPLACEMENTS: tuple[tuple[str, str], ...] = (
     ("[.]", "."),
     ("(.)", "."),

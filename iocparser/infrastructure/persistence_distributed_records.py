@@ -59,13 +59,15 @@ def _public_job_id(model: DistributedJobModel | DeadLetterJobModel) -> str:
 
 def job_record(model: DistributedJobModel) -> DistributedJobRecord:
     error = None
-    if model.last_error_code and model.last_error_category and model.last_error_message:
+    # The three error columns are written together; an error with an empty
+    # message (e.g. str(RuntimeError()) == "") must not drop the code/category.
+    if model.last_error_code is not None:
         error = PipelineErrorInfo(
             code=model.last_error_code,
-            category=model.last_error_category,
+            category=model.last_error_category or "",
             retryable=bool(model.retryable),
             status=model.status,
-            message=model.last_error_message,
+            message=model.last_error_message or "",
         )
     return DistributedJobRecord(
         job_id=_public_job_id(model),

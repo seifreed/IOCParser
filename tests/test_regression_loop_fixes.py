@@ -509,3 +509,48 @@ def test_get_warnings_for_iocs_matches_email_domain() -> None:
     assert [w["value"] for w in warnings.get("emails", [])] == [
         w["value"] for w in separated.get("emails", [])
     ]
+
+
+def test_retry_batch_job_conflicts_with_input_source() -> None:
+    """--retry-batch-job is an input source and must not silently override -f.
+
+    It was outside the input mutually-exclusive group, so it could be combined
+    with -f/-u/-m/-d and silently won, dropping the user's real input.
+    """
+    from iocparser.cli_args_parser import create_argument_parser
+
+    parser = create_argument_parser()
+    # Standalone still parses.
+    assert parser.parse_args(["--retry-batch-job", "5"]).retry_batch_job == 5
+    # Combined with a primary input source is now rejected.
+    with pytest.raises(SystemExit):
+        parser.parse_args(["-f", "report.pdf", "--retry-batch-job", "5"])
+
+
+def test_job_record_preserves_error_with_empty_message() -> None:
+    """A persisted failure whose message is empty must keep its code/category.
+
+    job_record gated error reconstruction on all three columns being truthy, so
+    an empty message (e.g. str(RuntimeError()) == "") dropped the whole error.
+    """
+    from iocparser.domain.pipeline import PipelineErrorInfo
+    from iocparser.infrastructure.persistence_distributed_records import job_record
+    from iocparser.infrastructure.persistence_models import DistributedJobModel
+
+    model = DistributedJobModel(
+        job_id="job-empty-error",
+        status="failed",
+        attempts=1,
+        max_attempts=1,
+        retryable=False,
+        last_error_code="UNEXPECTED_FAILURE",
+        last_error_category="non_retryable",
+        last_error_message="",
+    )
+
+    record = job_record(model)
+
+    assert isinstance(record.last_error, PipelineErrorInfo)
+    assert record.last_error.code == "UNEXPECTED_FAILURE"
+    assert record.last_error.category == "non_retryable"
+    assert record.last_error.message == ""

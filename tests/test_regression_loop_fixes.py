@@ -582,3 +582,19 @@ def test_dialect_replace_into_uses_mysql_syntax() -> None:
     assert dialect_replace_into("sqlite", columns) == f"INSERT OR REPLACE INTO {columns}"
     assert dialect_replace_into("mysql", columns) == f"REPLACE INTO {columns}"
     assert dialect_replace_into("mariadb", columns) == f"REPLACE INTO {columns}"
+
+
+def test_worker_config_path_accepts_equals_form_and_any_position() -> None:
+    """The worker must honor --config=path and --config path in any argv position.
+
+    The parser only matched '--config' as argv[1], silently ignoring the GNU
+    '--config=path' form and any non-first-position --config.
+    """
+    from iocparser.worker_main import _config_path_from_argv
+
+    assert _config_path_from_argv(["worker", "--config", "a.ini"]) == "a.ini"
+    assert _config_path_from_argv(["worker", "--config=b.ini"]) == "b.ini"
+    assert _config_path_from_argv(["worker", "--verbose", "--config", "c.ini"]) == "c.ini"
+    assert _config_path_from_argv(["worker", "--verbose", "--config=d.ini"]) == "d.ini"
+    assert _config_path_from_argv(["worker"]) is None
+    assert _config_path_from_argv(["worker", "--config"]) is None

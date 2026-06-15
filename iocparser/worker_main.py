@@ -7,8 +7,12 @@ from iocparser.worker_service import DistributedWorkerService
 
 
 def _config_path_from_argv(argv: list[str]) -> str | None:
-    if len(argv) >= 3 and argv[1] == "--config":
-        return argv[2]
+    # Accept both '--config path' (any position) and the GNU '--config=path' form.
+    for index, arg in enumerate(argv[1:], start=1):
+        if arg == "--config" and index + 1 < len(argv):
+            return argv[index + 1]
+        if arg.startswith("--config="):
+            return arg.split("=", 1)[1]
     return None
 
 

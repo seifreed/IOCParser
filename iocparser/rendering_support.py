@@ -139,11 +139,16 @@ def append_text_section(
         return False
     output.append(f"\n## {section_title}\n")
     lines = format_section(section_key, section_data)
-    output.extend(lines)
-    if context_map is not None and context_lookup is not None:
-        for line in lines:
-            for excerpt in context_lookup(section_key, line):
-                output.append(f"  Context: {excerpt}")
+    if context_map is None or context_lookup is None:
+        output.extend(lines)
+        return True
+    # Emit each value immediately followed by its own context so the excerpts
+    # stay attached to the indicator they describe (a shared trailing block made
+    # it impossible to tell which Context line belonged to which value).
+    for line in lines:
+        output.append(line)
+        for excerpt in context_lookup(section_key, line):
+            output.append(f"  Context: {excerpt}")
     return True
 
 

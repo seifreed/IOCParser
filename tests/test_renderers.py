@@ -5,6 +5,7 @@ from textwrap import dedent
 
 from iocparser.adapters.renderers import JSONOutputRenderer, STIXOutputRenderer, TextOutputRenderer
 from iocparser.domain.models import IOC, ExtractionResult, IOCType, WarningMatch
+from iocparser.domain.results import IOCEvidence
 
 
 def build_result() -> ExtractionResult:
@@ -201,6 +202,31 @@ def test_stix_output_renderer_skips_unsupported_ioc_types() -> None:
     renderer = STIXOutputRenderer()
 
     assert renderer._build_indicator(IOCType.JWT, "header.payload.signature", None) is None
+
+
+def test_text_renderer_attaches_context_to_each_value() -> None:
+    """Each --with-context excerpt must immediately follow the value it describes.
+
+    Regression: all values were emitted first and every context excerpt was then
+    appended in a trailing block, so a reader could not tell which Context line
+    belonged to which indicator.
+    """
+    result = ExtractionResult(
+        iocs=(
+            IOC.from_raw(
+                "domains", "alpha.example", evidence=(IOCEvidence(excerpt="alpha-evidence"),)
+            ),
+            IOC.from_raw(
+                "domains", "beta.example", evidence=(IOCEvidence(excerpt="beta-evidence"),)
+            ),
+        )
+    )
+    lines = TextOutputRenderer(include_context=True).render(result).splitlines()
+
+    alpha_index = lines.index("alpha.example")
+    beta_index = lines.index("beta.example")
+    assert lines[alpha_index + 1] == "  Context: alpha-evidence"
+    assert lines[beta_index + 1] == "  Context: beta-evidence"
 
 
 def test_stix_cidr_uses_address_family_matching_the_value() -> None:

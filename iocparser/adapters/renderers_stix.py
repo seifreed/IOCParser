@@ -35,9 +35,20 @@ class STIXOutputRenderer(OutputRenderer):
 
         def _asn_builder(value: str) -> str:
             # autonomous-system:number is an integer property in STIX 2.1, so the
-            # AS prefix must be stripped and the value emitted unquoted.
+            # AS prefix must be stripped and the value emitted unquoted. A value
+            # with no digits has no valid integer; return "" so the indicator is
+            # skipped instead of emitting an invalid pattern that stix2 rejects.
             digits = "".join(char for char in refang_ioc(value) if char.isdigit())
+            if not digits:
+                return ""
             return f"[autonomous-system:number = {digits}]"
+
+        def _cidr_builder(value: str) -> str:
+            # CIDR covers both address families; pick the matching SCO so an IPv6
+            # CIDR is not emitted as an ipv4-addr pattern.
+            refanged = refang_ioc(value)
+            object_type = "ipv6-addr" if ":" in refanged else "ipv4-addr"
+            return f"[{object_type}:value = '{_escape(refanged)}']"
 
         cls.PATTERN_BUILDERS = {
             IOCType.DOMAIN: _builder("[domain-name:value = '{value}']"),
@@ -57,7 +68,7 @@ class STIXOutputRenderer(OutputRenderer):
             IOCType.MUTEX: _builder("[mutex:name = '{value}']"),
             IOCType.MAC_ADDRESS: _builder("[mac-addr:value = '{value}']"),
             IOCType.ASN: _asn_builder,
-            IOCType.CIDR: _builder("[ipv4-addr:value = '{value}']"),
+            IOCType.CIDR: _cidr_builder,
             IOCType.ONION_ADDRESS: _builder("[domain-name:value = '{value}']"),
             IOCType.AWS_ARN: _builder("[x-cloud-resource:value = '{value}']"),
             IOCType.GCP_SERVICE_ACCOUNT: _builder("[email-addr:value = '{value}']"),
@@ -96,6 +107,9 @@ class STIXOutputRenderer(OutputRenderer):
             builder = self.PATTERN_BUILDERS.get(base_lookup_type)
         if not builder:
             return None
+        pattern = builder(value)
+        if not pattern:
+            return None
         custom_props: dict[str, Any] = {}
         if warning:
             custom_props["x_warning_list"] = warning.warning_list
@@ -103,7 +117,7 @@ class STIXOutputRenderer(OutputRenderer):
                 custom_props["x_warning_description"] = warning.description
         return Indicator(
             name=f"{ioc_type_name(ioc_type)} indicator",
-            pattern=builder(value),
+            pattern=pattern,
             pattern_type="stix",
             pattern_version="2.1",
             valid_from=self.now,

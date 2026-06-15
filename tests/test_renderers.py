@@ -203,6 +203,37 @@ def test_stix_output_renderer_skips_unsupported_ioc_types() -> None:
     assert renderer._build_indicator(IOCType.JWT, "header.payload.signature", None) is None
 
 
+def test_stix_cidr_uses_address_family_matching_the_value() -> None:
+    """An IPv6 CIDR must render as ipv6-addr, not ipv4-addr.
+
+    Regression: IOCType.CIDR mapped unconditionally to an ipv4-addr pattern,
+    so a valid IPv6 CIDR produced semantically wrong STIX.
+    """
+    renderer = STIXOutputRenderer()
+
+    ipv4 = renderer._build_indicator(IOCType.CIDR, "198.51.100.0/24", None)
+    ipv6 = renderer._build_indicator(IOCType.CIDR, "2001:db8::/32", None)
+
+    assert ipv4 is not None
+    assert ipv6 is not None
+    assert ipv4.pattern == "[ipv4-addr:value = '198.51.100.0/24']"
+    assert ipv6.pattern == "[ipv6-addr:value = '2001:db8::/32']"
+
+
+def test_stix_asn_without_digits_is_skipped_not_crashed() -> None:
+    """An ASN value with no digits has no valid integer and must be skipped.
+
+    Regression: _asn_builder emitted '[autonomous-system:number = ]', which
+    stix2 rejected with InvalidValueError instead of skipping the indicator.
+    """
+    renderer = STIXOutputRenderer()
+
+    assert renderer._build_indicator(IOCType.ASN, "AS", None) is None
+    valid = renderer._build_indicator(IOCType.ASN, "AS64512", None)
+    assert valid is not None
+    assert valid.pattern == "[autonomous-system:number = 64512]"
+
+
 def test_stix_output_renderer_initializes_pattern_builders_when_empty() -> None:
     original_builders = dict(STIXOutputRenderer.PATTERN_BUILDERS)
     STIXOutputRenderer.PATTERN_BUILDERS = {}

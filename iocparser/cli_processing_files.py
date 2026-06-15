@@ -498,15 +498,29 @@ def process_multiple_files_payload(
         results = BatchResultsCollection()
         only, exclude = _joined_type_filters(options)
         for item_key, source_value in batch_item_keys(str(file_path) for file_path in files):
-            result = configured_plugin_client.extract_result_from_file(
-                source_value,
-                file_type=options.file_type,
-                check_warnings=options.check_warnings,
-                force_update=options.force_update,
-                defang=options.defang,
-                only=only,
-                exclude=exclude,
-            )
+            try:
+                result = configured_plugin_client.extract_result_from_file(
+                    source_value,
+                    file_type=options.file_type,
+                    check_warnings=options.check_warnings,
+                    force_update=options.force_update,
+                    defang=options.defang,
+                    only=only,
+                    exclude=exclude,
+                )
+            except (KeyboardInterrupt, SystemExit):
+                raise
+            except (FileExistenceError, FileProcessingError):
+                results.add(
+                    item_key=item_key, source_value=source_value, normal_iocs={}, warning_iocs={}
+                )
+                continue
+            except Exception:
+                logger.exception("Batch processing failed for %s", source_value)
+                results.add(
+                    item_key=item_key, source_value=source_value, normal_iocs={}, warning_iocs={}
+                )
+                continue
             results.add(
                 item_key=item_key,
                 source_value=source_value,

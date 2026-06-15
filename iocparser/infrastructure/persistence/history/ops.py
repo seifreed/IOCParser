@@ -1158,7 +1158,7 @@ def list_failed_batches(db_uri: str, *, limit: int = 20) -> list[BatchJobSummary
             session.execute(
                 select(BatchJobModel)
                 .where(BatchJobModel.failed_inputs > 0)
-                .order_by(BatchJobModel.started_at.desc())
+                .order_by(BatchJobModel.started_at.desc(), BatchJobModel.id.desc())
                 .limit(safe_limit)
             )
             .scalars()
@@ -1187,7 +1187,11 @@ def list_batch_jobs(
 ) -> list[BatchJobSummary]:
     safe_limit = max(0, limit)
     with _managed_session(db_uri) as session:
-        stmt = select(BatchJobModel).order_by(BatchJobModel.started_at.desc()).limit(safe_limit)
+        stmt = (
+            select(BatchJobModel)
+            .order_by(BatchJobModel.started_at.desc(), BatchJobModel.id.desc())
+            .limit(safe_limit)
+        )
         if statuses:
             stmt = stmt.where(BatchJobModel.status.in_(statuses))
         jobs = session.execute(stmt).scalars().all()
@@ -1221,7 +1225,7 @@ def list_batch_runs(db_uri: str, *, batch_job_id: int) -> list[PersistedRunSumma
         stmt = (
             select(RunModel)
             .where(RunModel.batch_job_id == batch_job_id)
-            .order_by(RunModel.started_at.asc())
+            .order_by(RunModel.started_at.asc(), RunModel.id.asc())
         )
         return [build_summary(session, run) for run in session.execute(stmt).scalars().all()]
 

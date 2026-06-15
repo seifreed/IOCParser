@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -1322,3 +1322,95 @@ def test_worker_config_bool_env_false_value(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setenv("IOCPARSER_TEST_BOOL", "off")
 
     assert bool_env("IOCPARSER_TEST_BOOL", default=True) is False
+
+
+def test_batch_listings_break_started_at_ties_deterministically(tmp_path) -> None:
+    """Batch listings with a LIMIT must cut ties on started_at by id, not engine order.
+
+    Regression: list_failed_batches/list_batch_jobs ordered only by started_at,
+    so which rows survived a LIMIT (and their order) was engine-defined when
+    timestamps collided. The id tiebreaker makes the cutoff deterministic.
+    """
+    from iocparser.infrastructure.persistence.history import ops
+    from iocparser.infrastructure.persistence_batch import BatchJobModel
+
+    db_uri = _fresh_db(tmp_path, "batch-ties.db")
+    engine = create_engine(db_uri, future=True)
+    shared = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
+    try:
+        with Session(engine) as session:
+            for _ in range(4):
+                session.add(
+                    BatchJobModel(
+                        source_kind="url",
+                        started_at=shared,
+                        finished_at=shared,
+                        total_inputs=1,
+                        successful_inputs=0,
+                        failed_inputs=1,
+                        retry_attempt=0,
+                        status="partial",
+                        config_json="{}",
+                        error_summary_json="{}",
+                        metrics_json="{}",
+                    )
+                )
+            session.commit()
+            all_ids = sorted(row.id for row in session.execute(select(BatchJobModel)).scalars())
+    finally:
+        engine.dispose()
+
+    expected = sorted(all_ids, reverse=True)[:2]
+    failed_ids = [job.batch_job_id for job in ops.list_failed_batches(db_uri, limit=2)]
+    listed_ids = [job.batch_job_id for job in ops.list_batch_jobs(db_uri, limit=2)]
+    assert failed_ids == expected
+    assert listed_ids == expected
+
+
+def test_plugin_multi_file_batch_survives_single_file_failure(tmp_path, monkeypatch) -> None:
+    """A configured-plugin -m batch must skip a failing file, not abort the run.
+
+    Regression: the plugin branch of process_multiple_files_payload had no
+    per-file try/except (unlike every other multi-file path), so one raising
+    file lost the results of every other file in the batch. Interrupts must
+    still propagate.
+    """
+    from iocparser import cli_processing_files
+    from iocparser.domain.results import IOC
+    from iocparser.errors import FileProcessingError
+
+    good1 = tmp_path / "good1.txt"
+    good1.write_text("1.2.3.4")
+    bad = tmp_path / "bad.txt"
+    bad.write_text("boom")
+    good2 = tmp_path / "good2.txt"
+    good2.write_text("5.6.7.8")
+    args = SimpleNamespace(multiple=[str(good1), str(bad), str(good2)])
+
+    def run_with(failure: BaseException):
+        class FlakyPluginClient:
+            def extract_result_from_file(
+                self, source_value: str, **_kwargs: object
+            ) -> ExtractionResult:
+                if source_value == str(bad):
+                    raise failure
+                value = "1.2.3.4" if source_value == str(good1) else "5.6.7.8"
+                return ExtractionResult(iocs=(IOC.from_raw("ip", value),))
+
+        monkeypatch.setattr(
+            cli_processing_files, "_plugin_client", lambda *_a, **_k: FlakyPluginClient()
+        )
+        return cli_processing_files.process_multiple_files_payload(
+            args, reader=SimpleNamespace(), warning_service=None
+        )
+
+    # Both a domain file error and an unexpected error skip only the bad file.
+    for failure in (FileProcessingError("bad.txt", "corrupt"), RuntimeError("plugin blew up")):
+        payload = run_with(failure)
+        extracted = {value for values in payload.normal_iocs.values() for value in values}
+        assert "1.2.3.4" in extracted
+        assert "5.6.7.8" in extracted
+
+    # Interrupts must not be swallowed by the per-file guard.
+    with pytest.raises(KeyboardInterrupt):
+        run_with(KeyboardInterrupt())

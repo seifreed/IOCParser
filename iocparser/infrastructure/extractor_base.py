@@ -188,19 +188,31 @@ def _hash_rule_method(rule: HashPatternRule) -> Callable[[ExtractorBase, str], l
     return extractor
 
 
-def _separate_imphash_from_md5(iocs: dict[str, list[str]]) -> None:
-    """Drop explicitly-labelled imphash values from the generic md5 bucket.
+# 32-hex IOC types that carry an explicit context label and would otherwise be
+# double-reported as a generic md5 file hash. (jarm is 62 hex and ja4 contains
+# underscores, so neither collides with the md5 pattern.)
+_MD5_SHAPED_FINGERPRINT_TYPES = ("imphash", "ja3", "ja3s", "hassh", "hassh_server")
+
+
+def _separate_fingerprints_from_md5(iocs: dict[str, list[str]]) -> None:
+    """Drop explicitly-labelled 32-hex fingerprints from the generic md5 bucket.
 
     The md5 pattern matches any standalone 32-hex string, so a value introduced
-    as ``imphash: <hash>`` is also captured as an md5. An import hash is its own
-    IOC type, so keep it only under ``imphash``.
+    as ``imphash:``/``ja3:``/``hassh:`` (etc.) is also captured as an md5. Each is
+    its own IOC type, so keep it only under that type rather than also emitting a
+    spurious md5 file hash.
     """
-    imphashes = iocs.get("imphash")
     md5s = iocs.get("md5")
-    if not imphashes or not md5s:
+    if not md5s:
         return
-    imphash_values = {value.lower() for value in imphashes}
-    remaining = [value for value in md5s if value.lower() not in imphash_values]
+    fingerprint_values = {
+        value.lower()
+        for type_name in _MD5_SHAPED_FINGERPRINT_TYPES
+        for value in iocs.get(type_name) or ()
+    }
+    if not fingerprint_values:
+        return
+    remaining = [value for value in md5s if value.lower() not in fingerprint_values]
     if remaining:
         iocs["md5"] = remaining
     else:
@@ -412,7 +424,7 @@ class ExtractionAggregateMixin:
             if results:
                 iocs[ioc_type] = results
 
-        _separate_imphash_from_md5(iocs)
+        _separate_fingerprints_from_md5(iocs)
         return iocs
 
 

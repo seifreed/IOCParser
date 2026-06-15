@@ -322,3 +322,24 @@ def test_typed_row_preserves_nullable_retryable() -> None:
     assert typed_row({"retryable": 0})["retryable"] is False
     # Non-nullable is_warning still coerces a missing/None value to False.
     assert typed_row({"is_warning": None})["is_warning"] is False
+
+
+@pytest.mark.parametrize("label", ["ja3", "ja3s", "hassh", "hassh_server", "imphash"])
+def test_labelled_fingerprint_not_duplicated_as_md5(label: str) -> None:
+    """A context-labelled 32-hex fingerprint must not also surface as an md5 hash.
+
+    The md5 pattern matches any standalone 32-hex string; only imphash was being
+    stripped from the md5 bucket, so ja3/ja3s/hassh/hassh_server were reported
+    both correctly and as a spurious file hash.
+    """
+    digest = "deadbeefcafe1234567890abfedc5678"
+    result = IOCExtractor(defang=False).extract_all(f"observed {label}={digest} here")
+    assert result.get(label) == [digest]
+    assert result.get("md5") is None
+
+
+def test_unlabelled_md5_still_extracted() -> None:
+    """A bare 32-hex hash with no fingerprint label is still an md5 IOC."""
+    digest = "5d41402abc4b2a76b9719d911017c592"
+    result = IOCExtractor(defang=False).extract_all(f"file md5 {digest} dropped")
+    assert result.get("md5") == [digest]

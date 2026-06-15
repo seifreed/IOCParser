@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol, cast, runtime_checkable
@@ -312,6 +312,46 @@ def serialize_tags(tags: tuple[str, ...]) -> str:
     serialized_tags: list[str] = []
     serialized_tags.extend(tags)
     return json.dumps(serialized_tags)
+
+
+# Tags are joined into a single searchable column. A plain space delimiter is
+# ambiguous because a tag may itself contain spaces (custom IOC types inject
+# their name/tags verbatim), so a search for "network" would wrongly match the
+# compound tag "internal network". Wrap and join with a control character that
+# cannot occur in a normalized tag, and match on delimiter-bounded substrings.
+TAG_SEARCH_DELIMITER = "\x1f"
+
+
+def build_tags_search(tags: Iterable[str]) -> str:
+    """Build the delimiter-wrapped searchable tags string for a run-IOC row."""
+    cleaned = sorted({tag.strip().lower() for tag in tags if tag.strip()})
+    if not cleaned:
+        return ""
+    return TAG_SEARCH_DELIMITER + TAG_SEARCH_DELIMITER.join(cleaned) + TAG_SEARCH_DELIMITER
+
+
+def tags_from_json(raw: object) -> list[str]:
+    """Parse a tags_json column into a list of tag strings, tolerating bad data."""
+    try:
+        parsed = json.loads(str(raw)) if raw else []
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(parsed, list):
+        return []
+    return [str(tag) for tag in parsed]
+
+
+def rebuild_tags_search(engine: Engine, inspector: Inspector) -> None:
+    """Recompute run_iocs.tags_search using the delimiter-wrapped format."""
+    if "run_iocs" not in set(inspector.get_table_names()):
+        return
+    with engine.begin() as connection:
+        rows = connection.execute(text("SELECT id, tags_json FROM run_iocs")).all()
+        for row in rows:
+            connection.execute(
+                text("UPDATE run_iocs SET tags_search = :value WHERE id = :id"),
+                {"value": build_tags_search(tags_from_json(row.tags_json)), "id": row.id},
+            )
 
 
 def serialize_evidence(evidence_items: tuple[EvidenceLike, ...]) -> str:

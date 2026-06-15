@@ -28,6 +28,9 @@ SCHEMA_REVISIONS = (
     SchemaRevision(
         9, "dedup-hash", "Hash-based IOC/source uniqueness for MySQL/MariaDB compatibility"
     ),
+    SchemaRevision(
+        10, "tags-search-delimiter", "Delimiter-wrapped tags_search to fix multi-word tag matches"
+    ),
 )
 
 CURRENT_SCHEMA_VERSION = SCHEMA_REVISIONS[-1].version

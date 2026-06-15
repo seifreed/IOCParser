@@ -52,7 +52,10 @@ from iocparser.infrastructure.persistence.history import (
 from iocparser.infrastructure.persistence.query.diff import diff_run_exports
 from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
 from iocparser.infrastructure.persistence_fts import build_fts_query, has_fts_table
-from iocparser.infrastructure.persistence_repository_support import normalize_ioc_search
+from iocparser.infrastructure.persistence_repository_support import (
+    TAG_SEARCH_DELIMITER,
+    normalize_ioc_search,
+)
 from iocparser.infrastructure.persistence_schema import (
     IOCModel,
     RunIOCModel,
@@ -247,13 +250,12 @@ def _escaped_like_value(normalized_value: str) -> str:
 
 
 def _tag_search_clause(normalized_tag: str) -> ClauseElement:
+    # tags_search is delimiter-wrapped (see build_tags_search), so an exact
+    # tag is a delimiter-bounded substring. This matches whole tags only, even
+    # when a tag itself contains spaces.
     escaped = _escaped_like_value(normalized_tag)
-    return or_(
-        RunIOCModel.tags_search == normalized_tag,
-        RunIOCModel.tags_search.like(f"{escaped} %", escape="\\"),
-        RunIOCModel.tags_search.like(f"% {escaped}", escape="\\"),
-        RunIOCModel.tags_search.like(f"% {escaped} %", escape="\\"),
-    )
+    pattern = f"%{TAG_SEARCH_DELIMITER}{escaped}{TAG_SEARCH_DELIMITER}%"
+    return RunIOCModel.tags_search.like(pattern, escape="\\")
 
 
 def _apply_search_backend(

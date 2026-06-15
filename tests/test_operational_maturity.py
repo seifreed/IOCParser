@@ -201,6 +201,69 @@ def test_search_page_uses_sql_side_filters_and_indexes(tmp_path: Path) -> None:
     assert "ix_run_iocs_tags_search" in run_ioc_indexes
 
 
+def test_tag_search_matches_whole_tags_not_substrings(tmp_path: Path) -> None:
+    """Searching a single-word tag must not match a compound tag containing it.
+
+    Regression: tags_search was space-joined and matched on space boundaries, so
+    a search for 'network' wrongly matched an IOC whose only tag was the compound
+    'internal network' (reachable via custom IOC types with spaces in tags).
+    """
+    db_uri = f"sqlite:///{tmp_path / 'tagsearch.sqlite'}"
+    _persist_result(
+        db_uri, source_value="a.txt", ioc_value="compound.example", tags=("internal network",)
+    )
+    _persist_result(db_uri, source_value="b.txt", ioc_value="single.example", tags=("network",))
+
+    page = query_persisted_iocs(db_uri=db_uri, value="example", tag="network", limit=10, offset=0)
+    assert {item.value for item in page.items} == {"single.example"}
+
+    compound = query_persisted_iocs(
+        db_uri=db_uri, value="example", tag="internal network", limit=10, offset=0
+    )
+    assert {item.value for item in compound.items} == {"compound.example"}
+
+
+def test_rebuild_tags_search_handles_legacy_and_malformed_rows(tmp_path: Path) -> None:
+    """The rev_0010 rebuild must rewrite legacy rows and tolerate bad tags_json."""
+    from sqlalchemy import create_engine, inspect, text
+
+    from iocparser.infrastructure.persistence_migration_runtime import migrate_engine
+    from iocparser.infrastructure.persistence_repository_support import (
+        TAG_SEARCH_DELIMITER,
+        rebuild_tags_search,
+    )
+
+    db_uri = f"sqlite:///{tmp_path / 'rebuild.sqlite'}"
+    engine = create_engine(db_uri, future=True)
+    try:
+        migrate_engine(engine)
+        insert = text(
+            "INSERT INTO run_iocs (run_id, ioc_id, severity, tags_json, tags_search, evidence_json)"
+            " VALUES (:r, :i, '', :tj, :ts, '[]')"
+        )
+        with engine.begin() as connection:
+            connection.execute(
+                insert,
+                [
+                    {"r": 1, "i": 1, "tj": '["malware family", "network"]', "ts": "old format"},
+                    {"r": 1, "i": 2, "tj": "not valid json", "ts": "x"},
+                    {"r": 1, "i": 3, "tj": '{"unexpected": "object"}', "ts": "y"},
+                ],
+            )
+        rebuild_tags_search(engine, inspect(engine))
+        with engine.connect() as connection:
+            rows = dict(
+                connection.execute(text("SELECT ioc_id, tags_search FROM run_iocs")).all()
+            )
+    finally:
+        engine.dispose()
+
+    delimiter = TAG_SEARCH_DELIMITER
+    assert rows[1] == f"{delimiter}malware family{delimiter}network{delimiter}"
+    assert rows[2] == ""
+    assert rows[3] == ""
+
+
 def test_persisted_ioc_search_matches_refanged_values(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'refanged-search.sqlite'}"
     unit_of_work = SQLAlchemyUnitOfWork(db_uri)

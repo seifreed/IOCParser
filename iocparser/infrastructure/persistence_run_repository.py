@@ -12,6 +12,7 @@ from iocparser.infrastructure.persistence_repository_support import (
     RUN_MODEL,
     ExtractionResultLike,
     PersistOptionsLike,
+    build_tags_search,
     int_metadata_value,
     metadata_ioc,
     optional_int_metadata_value,
@@ -82,9 +83,7 @@ class SQLAlchemyRunRepository(RunRepository):
                 domain_ioc = metadata_ioc(item)
                 severity = domain_ioc.severity
                 tags_json = serialize_tags(domain_ioc.tags)
-                tags_search = " ".join(
-                    sorted(tag.strip().lower() for tag in domain_ioc.tags if tag)
-                )
+                tags_search = build_tags_search(domain_ioc.tags)
                 evidence_json = serialize_evidence(domain_ioc.evidence)
             self.session.add(
                 RUN_IOC_MODEL(

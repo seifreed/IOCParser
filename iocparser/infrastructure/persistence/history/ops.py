@@ -28,11 +28,13 @@ from iocparser.infrastructure.persistence_batch import (
 from iocparser.infrastructure.persistence_distributed_records import HISTORY_IMPORT_MARKER_KEY
 from iocparser.infrastructure.persistence_migrations import migrate_engine
 from iocparser.infrastructure.persistence_repository_support import (
+    build_tags_search,
     dialect_replace_into,
     ioc_dedup_hash,
     normalize_ioc_search,
     quote_identifier,
     source_dedup_hash,
+    tags_from_json,
 )
 from iocparser.infrastructure.persistence_schema import (
     DeadLetterJobModel,
@@ -767,10 +769,12 @@ def _import_run_iocs(
                 **{
                     key: value
                     for key, value in typed.items()
-                    if key not in {"id", "run_id", "ioc_id"}
+                    if key not in {"id", "run_id", "ioc_id", "tags_search"}
                 },
                 run_id=run_id,
                 ioc_id=ioc_id,
+                # Recompute the derived column; older archives stored a different format.
+                tags_search=build_tags_search(tags_from_json(typed.get("tags_json"))),
             )
         )
         inserted += 1

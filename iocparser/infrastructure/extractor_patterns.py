@@ -58,8 +58,9 @@ PATTERNS: dict[str, Pattern[str]] = {
         r"[0-9a-fA-F]{1,4}(?![0-9a-zA-Z])|"
         # xxxx::xxxx
         r"(?<![0-9a-zA-Z])(?:[0-9a-fA-F]{1,4}:){1,6}::[0-9a-fA-F]{1,4}(?![0-9a-zA-Z])|"
-        # xxxx:: (ending)
-        r"(?<![0-9a-zA-Z])(?:[0-9a-fA-F]{1,4}:)+::(?![0-9a-zA-Z])|"
+        # xxxx:: (ending) -- the trailing "::" compresses the remaining groups,
+        # so the hex groups must not also consume the final colon.
+        r"(?<![0-9a-zA-Z])(?:[0-9a-fA-F]{1,4}:){1,7}:(?![0-9a-zA-Z:])|"
         # ::xxxx
         r"(?<![0-9a-zA-Z])::(?:[0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4}(?![0-9a-zA-Z])|"
         # Special cases ::1 and ::

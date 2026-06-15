@@ -12,6 +12,7 @@ from iocparser.application.distributed_idempotency import idempotency_key_for
 from iocparser.cli_output import _build_diff_payload, _render_structured_diff
 from iocparser.domain.models import IOC, ExtractionResult, IOCType, PersistedRunDiff
 from iocparser.domain.pipeline import PipelineJobRequest
+from iocparser.infrastructure.extraction import IOCExtractor
 from iocparser.infrastructure.migration_revisions import rev_0005_fts_metrics
 from iocparser.infrastructure.persistence_fts import build_fts_query
 
@@ -116,3 +117,18 @@ def test_fts_rebuild_indexes_normalized_value_search() -> None:
             {"q": match_query},
         ).fetchall()
     assert [row[0] for row in rows] == [1]
+
+
+def test_extract_ipv6_addresses_ending_in_double_colon() -> None:
+    """Valid IPv6 addresses ending in '::' must be extracted.
+
+    The trailing-'::' regex branch consumed the final colon with its hex groups,
+    so addresses like fe80:: or 2001:db8:: were never matched.
+    """
+    for sample_text, expected in (
+        ("beacon to 2001:db8:: now", "2001:db8::"),
+        ("host fe80:: link", "fe80::"),
+        ("addr 2001:db8:85a3:: end", "2001:db8:85a3::"),
+    ):
+        result = IOCExtractor(defang=False).extract_all(sample_text)
+        assert result.get("ipv6") == [expected], (sample_text, result.get("ipv6"))

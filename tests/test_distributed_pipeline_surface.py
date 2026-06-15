@@ -699,6 +699,95 @@ def test_queue_factory_and_optional_queue_adapters() -> None:
         create_queue_adapter("unsupported")
 
 
+def test_rabbitmq_adapter_serializes_concurrent_access() -> None:
+    """The shared RabbitMQ channel must be accessed by one thread at a time.
+
+    Regression: RabbitMQQueueAdapter shared a single non-thread-safe pika
+    channel across worker threads (concurrency > 1) with no lock, so
+    basic_get/basic_ack frames could interleave and ack the wrong delivery
+    tag. The adapter must serialize channel access.
+    """
+    import threading
+    import time
+
+    class TrackingChannel:
+        def __init__(self) -> None:
+            self.active = 0
+            self.violations = 0
+
+        def _enter(self) -> None:
+            self.active += 1
+            if self.active > 1:
+                self.violations += 1
+            time.sleep(0.001)
+            self.active -= 1
+
+        def queue_declare(self, *, queue: str, durable: bool) -> None:
+            del queue, durable
+            self._enter()
+
+        def basic_publish(
+            self, *, exchange: str, routing_key: str, body: bytes, properties: object
+        ) -> None:
+            del exchange, routing_key, body, properties
+            self._enter()
+
+        def basic_get(self, *, queue: str, auto_ack: bool):
+            del queue, auto_ack
+            self._enter()
+            return None, None, None
+
+        def basic_ack(self, *, delivery_tag: int) -> None:
+            del delivery_tag
+            self._enter()
+
+        def close(self) -> None:
+            return None
+
+    channel = TrackingChannel()
+
+    class TrackingConnection:
+        def __init__(self, params: object) -> None:
+            del params
+
+        def channel(self) -> TrackingChannel:
+            return channel
+
+        def close(self) -> None:
+            return None
+
+    class TrackingPika:
+        class URLParameters:
+            def __init__(self, url: str) -> None:
+                self.url = url
+
+        class BasicProperties:
+            def __init__(self, *, delivery_mode: int, message_id: str) -> None:
+                del delivery_mode, message_id
+
+        @staticmethod
+        def BlockingConnection(params: object) -> TrackingConnection:
+            return TrackingConnection(params)
+
+    envelope = _envelope("concurrent-job")
+    with installed_module("pika", TrackingPika()):
+        adapter = RabbitMQQueueAdapter("amqp://guest:guest@localhost")
+
+        def hammer() -> None:
+            for _ in range(20):
+                receipt = adapter.enqueue(queue_name="jobs", envelope=envelope)
+                adapter.dequeue(queue_name="jobs")
+                adapter.ack(receipt)
+
+        threads = [threading.Thread(target=hammer) for _ in range(6)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+    assert channel.violations == 0
+
+
 def test_optional_queue_adapters_quarantine_invalid_payloads() -> None:
     class FakeRabbitChannel:
         def __init__(self) -> None:

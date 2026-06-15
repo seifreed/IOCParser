@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from collections.abc import Callable
 from importlib import import_module
 from typing import Protocol, cast
@@ -96,6 +97,10 @@ class RabbitMQQueueAdapter:
         self.dead_letter_suffix = dead_letter_suffix
         self._connection: _RabbitMQConnection | None = None
         self._channel: _RabbitMQChannel | None = None
+        # pika BlockingConnection/channel objects are not thread-safe, and this
+        # adapter is shared across worker threads when concurrency > 1. RLock
+        # (not Lock) because requeue/dead_letter call enqueue+ack reentrantly.
+        self._lock = threading.RLock()
 
     def _channel_for(self) -> _RabbitMQChannel:
         channel = self._channel
@@ -125,48 +130,56 @@ class RabbitMQQueueAdapter:
         return channel
 
     def enqueue(self, *, queue_name: str, envelope: QueueEnvelope) -> QueueReceipt:
-        pika = _pika_module()
-        channel = self._channel_for()
-        channel.queue_declare(queue=queue_name, durable=True)
-        message_id = envelope.request.job_id or str(uuid4())
-        channel.basic_publish(
-            exchange="",
-            routing_key=queue_name,
-            body=serialize_queue_record(envelope).encode("utf-8"),
-            properties=pika.BasicProperties(delivery_mode=2, message_id=message_id),
-        )
-        return QueueReceipt("rabbitmq", queue_name, message_id, message_id)
+        with self._lock:
+            pika = _pika_module()
+            channel = self._channel_for()
+            channel.queue_declare(queue=queue_name, durable=True)
+            message_id = envelope.request.job_id or str(uuid4())
+            channel.basic_publish(
+                exchange="",
+                routing_key=queue_name,
+                body=serialize_queue_record(envelope).encode("utf-8"),
+                properties=pika.BasicProperties(delivery_mode=2, message_id=message_id),
+            )
+            return QueueReceipt("rabbitmq", queue_name, message_id, message_id)
 
     def dequeue(self, *, queue_name: str) -> tuple[QueueReceipt, QueueEnvelope] | None:
-        channel = self._channel_for()
-        channel.queue_declare(queue=queue_name, durable=True)
-        method, properties, body = channel.basic_get(queue=queue_name, auto_ack=False)
-        if method is None or properties is None or body is None:
-            return None
-        receipt = QueueReceipt(
-            "rabbitmq", queue_name, str(method.delivery_tag), str(properties.message_id or uuid4())
-        )
-        try:
-            envelope = QueueEnvelope.from_record(_load_queue_record(body))
-        except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError) as exc:
-            self._quarantine_invalid_payload(receipt, payload=body, error=exc)
-            return None
-        return receipt, envelope
+        with self._lock:
+            channel = self._channel_for()
+            channel.queue_declare(queue=queue_name, durable=True)
+            method, properties, body = channel.basic_get(queue=queue_name, auto_ack=False)
+            if method is None or properties is None or body is None:
+                return None
+            receipt = QueueReceipt(
+                "rabbitmq",
+                queue_name,
+                str(method.delivery_tag),
+                str(properties.message_id or uuid4()),
+            )
+            try:
+                envelope = QueueEnvelope.from_record(_load_queue_record(body))
+            except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError) as exc:
+                self._quarantine_invalid_payload(receipt, payload=body, error=exc)
+                return None
+            return receipt, envelope
 
     def ack(self, receipt: QueueReceipt) -> None:
-        self._basic_ack(receipt, receipt.queue_name)
+        with self._lock:
+            self._basic_ack(receipt, receipt.queue_name)
 
     def requeue(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
-        new_receipt = self.enqueue(queue_name=receipt.queue_name, envelope=envelope)
-        self.ack(receipt)
-        return new_receipt
+        with self._lock:
+            new_receipt = self.enqueue(queue_name=receipt.queue_name, envelope=envelope)
+            self.ack(receipt)
+            return new_receipt
 
     def dead_letter(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
-        new_receipt = self.enqueue(
-            queue_name=f"{receipt.queue_name}{self.dead_letter_suffix}", envelope=envelope
-        )
-        self.ack(receipt)
-        return new_receipt
+        with self._lock:
+            new_receipt = self.enqueue(
+                queue_name=f"{receipt.queue_name}{self.dead_letter_suffix}", envelope=envelope
+            )
+            self.ack(receipt)
+            return new_receipt
 
     def _quarantine_invalid_payload(
         self, receipt: QueueReceipt, *, payload: bytes, error: Exception
@@ -194,11 +207,12 @@ class RabbitMQQueueAdapter:
         channel.basic_ack(delivery_tag=int(receipt.receipt_id))
 
     def close(self) -> None:
-        channel = self._channel
-        if channel is not None:
-            channel.close()
-            self._channel = None
-        connection = self._connection
-        if connection is not None:
-            connection.close()
-            self._connection = None
+        with self._lock:
+            channel = self._channel
+            if channel is not None:
+                channel.close()
+                self._channel = None
+            connection = self._connection
+            if connection is not None:
+                connection.close()
+                self._connection = None

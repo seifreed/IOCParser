@@ -14,6 +14,7 @@ def extract_ioc_value(ioc: str | dict[str, str]) -> str:
 def get_warnings_for_iocs(
     check_value: Callable[[str, str], tuple[bool, dict[str, str] | None]],
     iocs: dict[str, list[str | dict[str, str]]],
+    email_domain_in_warning_list: Callable[[str], tuple[bool, dict[str, str] | None]] | None = None,
 ) -> dict[str, list[dict[str, str]]]:
     warnings: dict[str, list[dict[str, str]]] = {}
     for ioc_type, ioc_list in iocs.items():
@@ -21,6 +22,11 @@ def get_warnings_for_iocs(
         for ioc in ioc_list:
             value = extract_ioc_value(ioc)
             in_warning_list, warning_info = check_value(value, ioc_type)
+            if not (in_warning_list and warning_info) and ioc_type == "emails":
+                # Mirror separate_iocs_by_warnings: an email whose domain is
+                # warning-listed is itself a warning match.
+                if email_domain_in_warning_list is not None:
+                    in_warning_list, warning_info = email_domain_in_warning_list(value)
             if in_warning_list and warning_info:
                 type_warnings.append(
                     {

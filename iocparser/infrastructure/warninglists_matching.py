@@ -357,7 +357,7 @@ class WarningListMatchingMixin:
         self,
         iocs: dict[str, list[str | dict[str, str]]],
     ) -> dict[str, list[dict[str, str]]]:
-        return _get_warnings_for_iocs(self.check_value, iocs)
+        return _get_warnings_for_iocs(self.check_value, iocs, self._email_domain_in_warning_list)
 
     def _build_warning_entry(
         self,

@@ -478,3 +478,34 @@ def test_url_batch_file_honors_bom_and_utf16(tmp_path: Path) -> None:
             args, retry_report=None, retry_batch_job=None, db_uri=None
         )
         assert urls == ["https://example.com/a", "https://example.com/b"]
+
+
+def test_get_warnings_for_iocs_matches_email_domain() -> None:
+    """get_warnings_for_iocs must flag an email whose domain is warning-listed.
+
+    separate_iocs_by_warnings already did this; get_warnings_for_iocs did not,
+    so the two public methods disagreed on email IOCs.
+    """
+    from iocparser.infrastructure.warninglists import MISPWarningLists
+
+    warning_lists = MISPWarningLists()
+    warning_lists.warning_lists = {
+        "bad-domains": {
+            "name": "Bad Domains",
+            "description": "phishing",
+            "type": "string",
+            "matching_attributes": ["domain", "hostname"],
+            "list": ["phish.com"],
+        }
+    }
+    warning_lists._preprocess_lists()
+    iocs: dict[str, list[str | dict[str, str]]] = {"emails": ["user@phish.com", "ok@good.test"]}
+
+    warnings = warning_lists.get_warnings_for_iocs(iocs)
+    _normal, separated = warning_lists.separate_iocs_by_warnings(iocs)
+
+    assert [w["value"] for w in warnings.get("emails", [])] == ["user@phish.com"]
+    # The two public methods must agree on which emails are warning-listed.
+    assert [w["value"] for w in warnings.get("emails", [])] == [
+        w["value"] for w in separated.get("emails", [])
+    ]

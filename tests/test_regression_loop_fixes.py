@@ -3,17 +3,27 @@
 from __future__ import annotations
 
 import argparse
+import codecs
 import json
 from pathlib import Path
 
+import pytest
 from sqlalchemy import create_engine, inspect, text
 
 from iocparser.adapters.renderers_stix import STIXOutputRenderer
 from iocparser.application.distributed_idempotency import idempotency_key_for
 from iocparser.cli_output import _build_diff_payload, _render_structured_diff
-from iocparser.domain.models import IOC, ExtractionResult, IOCType, PersistedRunDiff
+from iocparser.domain.models import (
+    IOC,
+    ExtractionOptions,
+    ExtractionResult,
+    IOCType,
+    PersistedRunDiff,
+)
 from iocparser.domain.pipeline import PipelineJobRequest
 from iocparser.infrastructure.extraction import IOCExtractor
+from iocparser.infrastructure.file_parser import decode_file_bytes
+from iocparser.infrastructure.file_readers import MagicTextSourceReader
 from iocparser.infrastructure.migration_revisions import rev_0005_fts_metrics
 from iocparser.infrastructure.persistence_fts import build_fts_query
 from iocparser.worker_config_support import load_worker_file_values
@@ -210,3 +220,46 @@ def test_worker_config_populated_ini_values_are_parsed(tmp_path: Path) -> None:
     assert values["skip_processed"] is True
     assert values["max_cycles"] == 7
     assert values["concurrency"] == 3
+
+
+@pytest.mark.parametrize(
+    "encoding_bytes",
+    [
+        b"",  # no BOM -> utf-8 default
+        codecs.BOM_UTF8,
+        codecs.BOM_UTF16_LE,
+        codecs.BOM_UTF16_BE,
+        codecs.BOM_UTF32_LE,
+        codecs.BOM_UTF32_BE,
+    ],
+)
+def test_decode_file_bytes_honors_bom(encoding_bytes: bytes) -> None:
+    """decode_file_bytes must round-trip text for each BOM and BOM-less UTF-8."""
+    sample = "IP 203.0.113.5 evil.example.com"
+    codec = {
+        b"": "utf-8",
+        codecs.BOM_UTF8: "utf-8",
+        codecs.BOM_UTF16_LE: "utf-16-le",
+        codecs.BOM_UTF16_BE: "utf-16-be",
+        codecs.BOM_UTF32_LE: "utf-32-le",
+        codecs.BOM_UTF32_BE: "utf-32-be",
+    }[encoding_bytes]
+
+    decoded = decode_file_bytes(encoding_bytes + sample.encode(codec))
+
+    assert "203.0.113.5" in decoded
+    assert "evil.example.com" in decoded
+
+
+def test_reader_extracts_iocs_from_utf16_file(tmp_path: Path) -> None:
+    """A UTF-16 text file (BOM) must yield its IOCs, not lose them to utf-8 decode.
+
+    The read path assumed UTF-8 with errors='ignore', so UTF-16's interleaved
+    NUL bytes were dropped and every IOC vanished.
+    """
+    target = tmp_path / "report.txt"
+    target.write_bytes("Malicious IP: 203.0.113.5\n".encode("utf-16"))
+
+    text_content = MagicTextSourceReader().read(str(target), ExtractionOptions())
+
+    assert "203.0.113.5" in text_content

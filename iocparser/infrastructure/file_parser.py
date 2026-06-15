@@ -6,6 +6,7 @@ Module for extracting text from different file types
 Author: Marc Rivero | @seifreed
 """
 
+import codecs
 import re
 import urllib.parse
 from abc import ABC, abstractmethod
@@ -36,6 +37,29 @@ from iocparser.infrastructure.logger import get_logger
 MAX_URL_CONTENT_LINES = 5
 
 logger = get_logger(__name__)
+
+# Byte-order marks, longest-first so a UTF-32 BOM is not misread as UTF-16.
+_BOM_ENCODINGS: tuple[tuple[bytes, str], ...] = (
+    (codecs.BOM_UTF32_LE, "utf-32"),
+    (codecs.BOM_UTF32_BE, "utf-32"),
+    (codecs.BOM_UTF8, "utf-8-sig"),
+    (codecs.BOM_UTF16_LE, "utf-16"),
+    (codecs.BOM_UTF16_BE, "utf-16"),
+)
+
+
+def decode_file_bytes(raw: bytes) -> str:
+    """Decode file bytes, honoring a UTF-8/UTF-16/UTF-32 BOM when present.
+
+    The text and HTML read paths previously assumed UTF-8, so a UTF-16 file
+    (common from Windows tooling) had its interleaved NUL bytes dropped by
+    ``errors="ignore"``, destroying every IOC. Detect the BOM and decode
+    accordingly, defaulting to UTF-8 for BOM-less content.
+    """
+    for bom, encoding in _BOM_ENCODINGS:
+        if raw.startswith(bom):
+            return raw.decode(encoding, errors="ignore")
+    return raw.decode("utf-8", errors="ignore")
 
 
 def _is_remote_source(file_path: str) -> bool:
@@ -165,11 +189,8 @@ class HTMLParser(FileParser):
         logger.info("Extracting text from HTML: %s", self.file_path)
 
         try:
-            with (
-                _local_parse_path(self.file_path) as parse_path,
-                Path(parse_path).open(encoding="utf-8", errors="ignore") as f,
-            ):
-                content = f.read()
+            with _local_parse_path(self.file_path) as parse_path:
+                content = decode_file_bytes(Path(parse_path).read_bytes())
 
             # Check if the content looks like a URL instead of HTML
             content_starts_with_url = content.strip().startswith(

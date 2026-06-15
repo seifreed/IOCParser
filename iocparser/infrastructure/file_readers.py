@@ -9,7 +9,7 @@ from typing import Any
 
 from iocparser.domain.models import ExtractionOptions
 from iocparser.errors import FileSizeError, SourceNotFoundError
-from iocparser.infrastructure.file_parser import HTMLParser, PDFParser
+from iocparser.infrastructure.file_parser import HTMLParser, PDFParser, decode_file_bytes
 from iocparser.infrastructure.logger import get_logger
 from iocparser.interfaces.ports import TextSourceReader
 from iocparser.shared_utils import lazy_singleton
@@ -129,8 +129,7 @@ class MagicTextSourceReader(TextSourceReader):
             return PDFParser(str(path)).extract_text()
         if file_type == "html":
             return HTMLParser(str(path)).extract_text()
-        with path.open(encoding="utf-8", errors="ignore") as handle:
-            return handle.read()
+        return decode_file_bytes(path.read_bytes())
 
 
 def validate_file_size(file_path: Path, max_size: int = MAX_FILE_SIZE) -> None:

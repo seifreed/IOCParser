@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 
 from sqlalchemy import create_engine, inspect, text
 
@@ -15,6 +16,7 @@ from iocparser.domain.pipeline import PipelineJobRequest
 from iocparser.infrastructure.extraction import IOCExtractor
 from iocparser.infrastructure.migration_revisions import rev_0005_fts_metrics
 from iocparser.infrastructure.persistence_fts import build_fts_query
+from iocparser.worker_config_support import load_worker_file_values
 
 
 def test_stix_asn_pattern_emits_integer_not_quoted_string() -> None:
@@ -154,3 +156,57 @@ def test_stix_custom_pattern_overrides_base_type_builder() -> None:
         assert indicator.pattern == "[x-custom:value = 'evil.example.com']"
     finally:
         enums_module._custom_ioc_types.pop("loopfix_custom", None)
+
+
+def test_worker_config_empty_ini_values_use_defaults(tmp_path: Path) -> None:
+    """Present-but-empty INI numeric/boolean values must fall back to defaults.
+
+    ConfigParser.getint/getfloat/getboolean only apply the fallback when the option
+    is absent; an empty value (``key =``) reached the converter and raised
+    ValueError. The shipped deploy/iocparser.scale.example.ini has ``max_cycles =``,
+    so the worker crashed on its own example config.
+    """
+    config_file = tmp_path / "worker.ini"
+    config_file.write_text(
+        "[network]\n"
+        "max_input_seconds =\n"
+        "max_queue_size =\n"
+        "skip_processed =\n"
+        "[worker]\n"
+        "poll_interval_seconds =\n"
+        "max_messages_per_cycle =\n"
+        "max_cycles =\n"
+        "concurrency =\n",
+        encoding="utf-8",
+    )
+
+    values = load_worker_file_values(config_file)
+
+    assert values["max_cycles"] is None
+    assert values["max_queue_size"] == 64
+    assert values["skip_processed"] is False
+    assert values["poll_interval_seconds"] == 1.0
+    assert values["max_messages_per_cycle"] == 1
+    assert values["concurrency"] == 1
+    assert values["max_input_seconds"] is None
+
+
+def test_worker_config_populated_ini_values_are_parsed(tmp_path: Path) -> None:
+    """Non-empty INI values are still parsed (guards the converter branch)."""
+    config_file = tmp_path / "worker.ini"
+    config_file.write_text(
+        "[network]\n"
+        "max_input_seconds = 2.5\n"
+        "skip_processed = true\n"
+        "[worker]\n"
+        "max_cycles = 7\n"
+        "concurrency = 3\n",
+        encoding="utf-8",
+    )
+
+    values = load_worker_file_values(config_file)
+
+    assert values["max_input_seconds"] == 2.5
+    assert values["skip_processed"] is True
+    assert values["max_cycles"] == 7
+    assert values["concurrency"] == 3

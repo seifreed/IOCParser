@@ -1,10 +1,33 @@
 from __future__ import annotations
 
 import os
+from configparser import ConfigParser
 from pathlib import Path
 
 from iocparser.runtime_config import find_default_config_paths, load_ini_sections
 from iocparser.shared_utils import FALSE_BOOL_VALUES, TRUE_BOOL_VALUES
+
+
+def _ini_has_value(parser: ConfigParser, section: str, option: str) -> bool:
+    # ConfigParser.get*(fallback=...) only applies the fallback when the option is
+    # absent, so a present-but-empty value (``key =``) reaches the converter and
+    # raises ValueError. Treat empty/whitespace-only values as absent.
+    return bool(parser.get(section, option, fallback="").strip())
+
+
+def _ini_int[T](parser: ConfigParser, section: str, option: str, *, fallback: T) -> int | T:
+    return parser.getint(section, option) if _ini_has_value(parser, section, option) else fallback
+
+
+def _ini_float[T](parser: ConfigParser, section: str, option: str, *, fallback: T) -> float | T:
+    return parser.getfloat(section, option) if _ini_has_value(parser, section, option) else fallback
+
+
+def _ini_bool[T](parser: ConfigParser, section: str, option: str, *, fallback: T) -> bool | T:
+    return (
+        parser.getboolean(section, option) if _ini_has_value(parser, section, option) else fallback
+    )
+
 
 WORKER_DEFAULTS: dict[str, object] = {
     "queue_backend": "filesystem",
@@ -82,9 +105,11 @@ def load_worker_file_values(config_path: Path | None) -> dict[str, object]:
     if parser.has_section("database"):
         values["db_uri"] = parser.get("database", "uri", fallback=None)
     if parser.has_section("network"):
-        values["max_input_seconds"] = parser.getfloat("network", "max_input_seconds", fallback=None)
-        values["max_queue_size"] = parser.getint("network", "max_queue_size", fallback=64)
-        values["skip_processed"] = parser.getboolean("network", "skip_processed", fallback=False)
+        values["max_input_seconds"] = _ini_float(
+            parser, "network", "max_input_seconds", fallback=None
+        )
+        values["max_queue_size"] = _ini_int(parser, "network", "max_queue_size", fallback=64)
+        values["skip_processed"] = _ini_bool(parser, "network", "skip_processed", fallback=False)
     if parser.has_section("worker"):
         values["queue_backend"] = parser.get("worker", "queue_backend", fallback="filesystem")
         values["queue_name"] = parser.get("worker", "queue_name", fallback="default")
@@ -93,27 +118,29 @@ def load_worker_file_values(config_path: Path | None) -> dict[str, object]:
         values["dead_letter_queue_url"] = parser.get(
             "worker", "dead_letter_queue_url", fallback=None
         )
-        values["poll_interval_seconds"] = parser.getfloat(
-            "worker", "poll_interval_seconds", fallback=1.0
+        values["poll_interval_seconds"] = _ini_float(
+            parser, "worker", "poll_interval_seconds", fallback=1.0
         )
-        values["max_messages_per_cycle"] = parser.getint(
-            "worker", "max_messages_per_cycle", fallback=1
+        values["max_messages_per_cycle"] = _ini_int(
+            parser, "worker", "max_messages_per_cycle", fallback=1
         )
-        values["max_cycles"] = parser.getint("worker", "max_cycles", fallback=None)
-        values["concurrency"] = parser.getint("worker", "concurrency", fallback=1)
+        values["max_cycles"] = _ini_int(parser, "worker", "max_cycles", fallback=None)
+        values["concurrency"] = _ini_int(parser, "worker", "concurrency", fallback=1)
         values["telemetry_mode"] = parser.get("worker", "telemetry_mode", fallback="logging")
     if parser.has_section("runtime"):
-        values["max_input_size_bytes"] = parser.getint(
-            "runtime", "max_input_size_bytes", fallback=None
+        values["max_input_size_bytes"] = _ini_int(
+            parser, "runtime", "max_input_size_bytes", fallback=None
         )
-        values["memory_limit_bytes"] = parser.getint("runtime", "memory_limit_bytes", fallback=None)
-        values["cpu_seconds"] = parser.getint("runtime", "cpu_seconds", fallback=None)
-        values["hard_timeout_seconds"] = parser.getint(
-            "runtime", "hard_timeout_seconds", fallback=None
+        values["memory_limit_bytes"] = _ini_int(
+            parser, "runtime", "memory_limit_bytes", fallback=None
         )
-        if parser.has_option("runtime", "max_queue_size"):
+        values["cpu_seconds"] = _ini_int(parser, "runtime", "cpu_seconds", fallback=None)
+        values["hard_timeout_seconds"] = _ini_int(
+            parser, "runtime", "hard_timeout_seconds", fallback=None
+        )
+        if _ini_has_value(parser, "runtime", "max_queue_size"):
             values["max_queue_size"] = parser.getint("runtime", "max_queue_size")
-        if parser.has_option("runtime", "skip_processed"):
+        if _ini_has_value(parser, "runtime", "skip_processed"):
             values["skip_processed"] = parser.getboolean("runtime", "skip_processed")
     return values
 

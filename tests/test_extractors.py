@@ -508,6 +508,33 @@ class TestCoverageMissing:
         assert self.extractor._is_valid_domain("evil.google.com")
         assert self.extractor._is_valid_domain("backdoor.apple.com")
 
+    def test_domain_validation_strips_longest_legitimate_suffix(self):
+        """Nested legitimate suffixes must resolve deterministically to the longest match.
+
+        Regression: is_valid iterated a set and returned on the first matching
+        suffix, so for legitimate_domains containing both 'amazon.com' and
+        'aws.amazon.com' the stripped subdomain (and thus the result) depended on
+        hash-randomized set order. The most specific suffix must always win.
+        """
+        from iocparser.infrastructure.extractor_base import DomainValidationPolicy
+
+        policy = DomainValidationPolicy(
+            programming_keywords=frozenset(),
+            suspicious_subdomain_keywords=("aws",),
+            max_domain_length=253,
+            max_domain_part_length=63,
+        )
+        kwargs = {
+            "valid_tlds": {"com"},
+            "common_file_extensions": set(),
+            "legitimate_domains": {"amazon.com", "aws.amazon.com"},
+            "legitimate_with_subdomains": set(),
+        }
+        # Longest suffix 'aws.amazon.com' is stripped -> subdomain 'x' has no
+        # suspicious keyword -> False, regardless of set iteration order.
+        results = {policy.is_valid("x.aws.amazon.com", **kwargs) for _ in range(50)}
+        assert results == {False}
+
     def test_is_valid_hash_sha512_with_file_signature(self):
         """Test _is_valid_hash_pattern detects file signatures in SHA512."""
         # MZ header (PE file) encoded as hex

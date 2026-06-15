@@ -247,7 +247,7 @@ class RequestsURLDownloader(URLDownloader):
         self.last_download_metadata = None
         parsed_url = self.validate_url(url)
         temp_dir = Path(tempfile.gettempdir()) / "iocparser"
-        temp_dir.mkdir(exist_ok=True)
+        temp_dir.mkdir(parents=True, exist_ok=True)
 
         for attempt in range(self.retries + 1):
             try:
@@ -354,7 +354,7 @@ def download_url_to_temp(url: str, timeout: int = REQUEST_TIMEOUT) -> str:
             import tempfile
 
             temp_dir = Path(tempfile.gettempdir()) / "iocparser"
-            temp_dir.mkdir(exist_ok=True)
+            temp_dir.mkdir(parents=True, exist_ok=True)
             content_type = str(response.headers.get("Content-Type", "")).lower()
             temp_file = temp_dir / generate_temp_filename(parsed_url, content_type)
             download_with_size_check(response, temp_file, MAX_URL_SIZE)

@@ -220,6 +220,24 @@ def test_requests_url_downloader_downloads_pdf_and_html_files() -> None:
             html_path.unlink(missing_ok=True)
 
 
+def test_download_creates_nested_temp_dir(monkeypatch, tmp_path) -> None:
+    """download() must create the iocparser temp dir even when its parent is missing.
+
+    Regression: temp_dir.mkdir(exist_ok=True) raised FileNotFoundError when
+    tempfile.gettempdir() pointed at a not-yet-existing nested path (e.g. a
+    sandboxed TMPDIR), aborting every download. parents=True fixes it.
+    """
+    nested_tmp = tmp_path / "does" / "not" / "exist"
+    monkeypatch.setattr("tempfile.gettempdir", lambda: str(nested_tmp))
+    downloader = RequestsURLDownloader()
+    with LocalHTTPServer(body=b"<html>ok</html>", content_type="text/html") as html_url:
+        path = Path(downloader.download(html_url))
+        try:
+            assert path.read_text(encoding="utf-8") == "<html>ok</html>"
+        finally:
+            path.unlink(missing_ok=True)
+
+
 def test_download_url_to_temp_reports_timeout_and_network_errors(monkeypatch) -> None:
     with LocalHTTPServer(body=b"slow", delay=0.02) as slow_url, pytest.raises(IOCTimeoutError):
         download_url_to_temp(slow_url, timeout=0.001)

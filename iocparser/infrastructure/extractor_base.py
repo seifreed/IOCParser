@@ -132,10 +132,13 @@ class DomainValidationPolicy:
         domain_lower = domain.lower()
         if domain_lower in legitimate_domains or domain_lower in legitimate_with_subdomains:
             return False
-        for legit in legitimate_domains:
-            if domain_lower.endswith("." + legit):
-                subdomain = domain_lower.removesuffix("." + legit)
-                return any(keyword in subdomain for keyword in self.suspicious_subdomain_keywords)
+        matching_suffixes = [
+            legit for legit in legitimate_domains if domain_lower.endswith("." + legit)
+        ]
+        if matching_suffixes:
+            longest_suffix = max(matching_suffixes, key=len)
+            subdomain = domain_lower.removesuffix("." + longest_suffix)
+            return any(keyword in subdomain for keyword in self.suspicious_subdomain_keywords)
         return (
             len(domain) <= self.max_domain_length
             and all(len(part) <= self.max_domain_part_length for part in parts)

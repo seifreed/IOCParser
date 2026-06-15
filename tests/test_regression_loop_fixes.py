@@ -132,3 +132,25 @@ def test_extract_ipv6_addresses_ending_in_double_colon() -> None:
     ):
         result = IOCExtractor(defang=False).extract_all(sample_text)
         assert result.get("ipv6") == [expected], (sample_text, result.get("ipv6"))
+
+
+def test_stix_custom_pattern_overrides_base_type_builder() -> None:
+    """A custom IOC type's explicit stix_pattern must win over its base type's builder.
+
+    register_custom_ioc_type defaults base_type to URL (which has a builder), so a
+    custom type registered with only a stix_pattern was always rendered with the
+    URL pattern instead of its own.
+    """
+    import iocparser.domain.enums as enums_module
+    from iocparser.domain.enums import register_custom_ioc_type
+
+    enums_module._custom_ioc_types.pop("loopfix_custom", None)
+    try:
+        register_custom_ioc_type("loopfix_custom", stix_pattern="[x-custom:value = '{value}']")
+        indicator = STIXOutputRenderer()._build_indicator(
+            "loopfix_custom", "evil.example.com", None
+        )
+        assert indicator is not None
+        assert indicator.pattern == "[x-custom:value = 'evil.example.com']"
+    finally:
+        enums_module._custom_ioc_types.pop("loopfix_custom", None)

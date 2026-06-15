@@ -79,12 +79,12 @@ class STIXOutputRenderer(OutputRenderer):
             if isinstance(ioc_type, IOCType)
             else None
         )
-        builder = (
-            self.PATTERN_BUILDERS.get(base_lookup_type)
-            if isinstance(base_lookup_type, IOCType)
-            else None
-        )
-        if builder is None and lookup_type is not None and lookup_type.stix_pattern:
+        # An explicit custom stix_pattern is an override and must win over the
+        # base type's built-in builder; otherwise a custom type registered with
+        # only a stix_pattern (base_type defaults to URL, which has a builder)
+        # would always be rendered with the base type's pattern instead.
+        builder: Callable[[str], str] | None = None
+        if lookup_type is not None and lookup_type.stix_pattern:
             captured_pattern = str(lookup_type.stix_pattern)
 
             def custom_builder(current_value: str) -> str:
@@ -92,6 +92,8 @@ class STIXOutputRenderer(OutputRenderer):
                 return captured_pattern.format(value=escaped)
 
             builder = custom_builder
+        if builder is None and isinstance(base_lookup_type, IOCType):
+            builder = self.PATTERN_BUILDERS.get(base_lookup_type)
         if not builder:
             return None
         custom_props: dict[str, Any] = {}

@@ -346,7 +346,9 @@ def rebuild_tags_search(engine: Engine, inspector: Inspector) -> None:
     if "run_iocs" not in set(inspector.get_table_names()):
         return
     with engine.begin() as connection:
-        rows = connection.execute(text("SELECT id, tags_json FROM run_iocs")).all()
+        rows = cast(
+            "list[Any]", connection.execute(text("SELECT id, tags_json FROM run_iocs")).all()
+        )
         for row in rows:
             connection.execute(
                 text("UPDATE run_iocs SET tags_search = :value WHERE id = :id"),

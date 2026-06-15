@@ -1,19 +1,23 @@
 from __future__ import annotations
 
 import hashlib
+import ipaddress
+import os
+import socket
 import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
 from typing import TypeVar, cast
-from urllib.parse import ParseResult, urlparse
+from urllib.parse import ParseResult, urljoin, urlparse
 
 import requests
 from requests.exceptions import RequestException, Timeout
 
 from iocparser.domain.sources import normalize_url_value
 from iocparser.errors import (
+    BlockedURLError,
     DownloadError,
     DownloadSizeError,
     FileSizeError,
@@ -28,8 +32,30 @@ MAX_URL_SIZE = 50 * 1024 * 1024
 REQUEST_TIMEOUT = 30
 DEFAULT_CONNECT_TIMEOUT = 10.0
 DEFAULT_READ_TIMEOUT = float(REQUEST_TIMEOUT)
+MAX_DOWNLOAD_REDIRECTS = 10
+ALLOW_PRIVATE_URLS_ENV = "IOCPARSER_ALLOW_PRIVATE_URLS"
 TimeoutValue = int | float | tuple[float, float]
 logger = get_logger(__name__)
+
+
+def _env_allows_private_urls() -> bool:
+    return os.environ.get(ALLOW_PRIVATE_URLS_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _address_is_blocked(ip_text: str) -> bool:
+    """Return True for addresses an SSRF guard must refuse (private/loopback/etc.)."""
+    try:
+        ip = ipaddress.ip_address(ip_text)
+    except ValueError:
+        return True
+    return (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_reserved
+        or ip.is_multicast
+        or ip.is_unspecified
+    )
 
 
 _DEFAULT_DOWNLOADER_HOLDER: list[RequestsURLDownloader] = []
@@ -57,6 +83,7 @@ class HTTPTransportConfig:
     allow_redirects: bool = True
     verify: bool | str = True
     cert: str | None = None
+    allow_private_networks: bool = False
 
 
 def _positive_timeout(value: int | float, default: float) -> float:
@@ -93,6 +120,7 @@ class RequestsURLDownloader(URLDownloader):
         allow_redirects: bool | None = None,
         verify: bool | str | None = None,
         cert: object = _UNSET,
+        allow_private_networks: bool | None = None,
         **kwargs: object,
     ) -> None:
         cfg = config or HTTPTransportConfig()
@@ -113,6 +141,11 @@ class RequestsURLDownloader(URLDownloader):
         )
         self.verify: bool | str = verify if verify is not None else cfg.verify
         self.cert: str | None = cast("str | None", cert) if cert is not self._UNSET else cfg.cert
+        self.allow_private_networks = (
+            allow_private_networks
+            if allow_private_networks is not None
+            else cfg.allow_private_networks
+        )
         self._rate_limit_lock = Lock()
         self._last_request_started = 0.0
         self.last_download_metadata: dict[str, object] | None = None
@@ -141,6 +174,7 @@ class RequestsURLDownloader(URLDownloader):
             allow_redirects=_pick("allow_redirects", self.allow_redirects),
             verify=_pick("verify", self.verify),
             cert=_pick("cert", self.cert, allow_none=True),
+            allow_private_networks=_pick("allow_private_networks", self.allow_private_networks),
         )
 
     def download_metadata(self) -> dict[str, object]:
@@ -276,6 +310,49 @@ class RequestsURLDownloader(URLDownloader):
                 raise DownloadError(url, str(exc), error_type="unexpected") from exc
         raise DownloadError(url, "Unreachable download state", error_type="unexpected")
 
+    def _assert_host_allowed(self, parsed_url: ParseResult) -> None:
+        """Reject URLs resolving to private/loopback/reserved addresses (SSRF guard).
+
+        The env var is honoured at call time (not just construction) so it overrides
+        even module-level downloaders built before it was set.
+        """
+        if self.allow_private_networks or _env_allows_private_urls():
+            return
+        host = parsed_url.hostname
+        if not host:
+            raise InvalidURLError(parsed_url.geturl())
+        for info in socket.getaddrinfo(host, parsed_url.port, proto=socket.IPPROTO_TCP):
+            if _address_is_blocked(str(info[4][0])):
+                raise BlockedURLError(parsed_url.geturl())
+
+    def _open_validated(
+        self, url: str, request_headers: dict[str, str]
+    ) -> tuple[requests.Response, str]:
+        """Open the URL, re-validating each redirect hop against the SSRF guard."""
+        current = url
+        for _ in range(MAX_DOWNLOAD_REDIRECTS + 1):
+            self._assert_host_allowed(self.validate_url(current))
+            response = requests.get(
+                current,
+                timeout=self.timeout,
+                stream=True,
+                headers=request_headers,
+                cookies=self.cookies or None,
+                proxies=self.proxies or None,
+                allow_redirects=False,
+                verify=self.verify,
+                cert=self.cert,
+            )
+            if self.allow_redirects and response.is_redirect:
+                location = response.headers.get("Location", "")
+                response.close()
+                if not location:
+                    raise DownloadError(url, "redirect missing Location header")
+                current = urljoin(current, location)
+                continue
+            return response, str(response.url)
+        raise DownloadError(url, "exceeded redirect limit")
+
     def _download_once(
         self, url: str, parsed_url: ParseResult, temp_dir: Path, attempt_count: int
     ) -> str:
@@ -284,23 +361,12 @@ class RequestsURLDownloader(URLDownloader):
         started_at = time.perf_counter()
         request_headers = dict(self.headers)
         request_headers.setdefault("User-Agent", self.user_agent)
-        response_url = ""
-        with requests.get(
-            url,
-            timeout=self.timeout,
-            stream=True,
-            headers=request_headers,
-            cookies=self.cookies or None,
-            proxies=self.proxies or None,
-            allow_redirects=self.allow_redirects,
-            verify=self.verify,
-            cert=self.cert,
-        ) as response:
+        response, response_url = self._open_validated(url, request_headers)
+        with response:
             response.raise_for_status()
             self.check_content_size(response.headers.get("Content-Length"))
 
             content_type = str(response.headers.get("Content-Type", "")).lower()
-            response_url = str(response.url)
             temp_file = temp_dir / self.generate_temp_filename(parsed_url, content_type)
             downloaded_size = self.download_with_size_check(response, temp_file, MAX_URL_SIZE)
         content_hash = hashlib.sha256(temp_file.read_bytes()).hexdigest()
@@ -345,29 +411,9 @@ def download_with_size_check(
 
 
 def download_url_to_temp(url: str, timeout: int = REQUEST_TIMEOUT) -> str:
-    """Module-level convenience wrapper for downloading URLs."""
-    try:
-        parsed_url = validate_url(url)
-        with requests.get(url, timeout=timeout, stream=True) as response:
-            response.raise_for_status()
-            check_content_size(response.headers.get("Content-Length"))
-            import tempfile
+    """Module-level convenience wrapper for downloading URLs.
 
-            temp_dir = Path(tempfile.gettempdir()) / "iocparser"
-            temp_dir.mkdir(parents=True, exist_ok=True)
-            content_type = str(response.headers.get("Content-Type", "")).lower()
-            temp_file = temp_dir / generate_temp_filename(parsed_url, content_type)
-            download_with_size_check(response, temp_file, MAX_URL_SIZE)
-            return str(temp_file)
-    except requests.Timeout as exc:
-        from iocparser.errors import IOCTimeoutError
-
-        raise IOCTimeoutError("Download", url) from exc
-    except requests.RequestException as exc:
-        from iocparser.errors import DownloadError
-
-        raise DownloadError(url, str(exc)) from exc
-    except (OSError, ValueError, RuntimeError) as exc:
-        from iocparser.errors import DownloadError
-
-        raise DownloadError(url, str(exc), error_type="unexpected") from exc
+    Delegates to RequestsURLDownloader so the SSRF guard and redirect
+    re-validation apply here too, instead of an unguarded requests.get.
+    """
+    return RequestsURLDownloader(timeout=timeout).download(url)

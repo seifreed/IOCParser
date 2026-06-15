@@ -159,6 +159,13 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--tls-cert", help="Client TLS certificate path for URL downloads")
     parser.add_argument("--ca-bundle", help="CA bundle path for TLS verification")
     parser.add_argument(
+        "--allow-private-urls",
+        action="store_true",
+        default=False,
+        help="Allow downloading URLs that resolve to private/loopback/reserved addresses "
+        "(disables the SSRF guard)",
+    )
+    parser.add_argument(
         "--connect-timeout", type=float, help="Connection timeout for URL downloads"
     )
     parser.add_argument("--read-timeout", type=float, help="Read timeout for URL downloads")

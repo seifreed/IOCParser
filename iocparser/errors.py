@@ -102,6 +102,17 @@ class InvalidURLError(ValidationError):
         super().__init__(f"Invalid URL: {url}")
 
 
+class BlockedURLError(ValidationError):
+    """Raised when a URL resolves to a blocked (private/loopback/metadata) address."""
+
+    def __init__(self, url: str) -> None:
+        self.url = url
+        super().__init__(
+            f"Refusing to fetch URL resolving to a private or reserved address: {url} "
+            f"(set --allow-private-urls or IOCPARSER_ALLOW_PRIVATE_URLS=1 to override)"
+        )
+
+
 class UnsupportedFileTypeError(ValidationError):
     """Exception raised for unsupported file types."""
 

@@ -139,6 +139,7 @@ def downloader_for_args(args: argparse.Namespace) -> RequestsURLDownloader:
         allow_redirects=get_bool_arg(args, "allow_redirects", True),
         verify=verify,
         cert=get_optional_str_arg(args, "tls_cert"),
+        allow_private_networks=get_bool_arg(args, "allow_private_urls", False),
     )
 
 

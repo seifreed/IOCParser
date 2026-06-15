@@ -10,6 +10,7 @@ import pytest
 import requests
 
 from iocparser.errors import (
+    BlockedURLError,
     DownloadError,
     DownloadSizeError,
     FileSizeError,
@@ -20,6 +21,7 @@ from iocparser.infrastructure.http_download import (
     MAX_URL_SIZE,
     REQUEST_TIMEOUT,
     RequestsURLDownloader,
+    _address_is_blocked,
     check_content_size,
     download_url_to_temp,
     download_with_size_check,
@@ -277,7 +279,10 @@ def test_download_url_to_temp_uses_manual_path_for_default_timeout(monkeypatch) 
             {
                 "raise_for_status": lambda _self=None: None,
                 "headers": {"Content-Length": "2", "Content-Type": "text/plain"},
-                "iter_content": lambda chunk_size: [b"ok"],
+                "iter_content": lambda _self, chunk_size=8192: [b"ok"],
+                "is_redirect": False,
+                "url": url,
+                "close": lambda _self=None: None,
                 "__enter__": lambda s: s,
                 "__exit__": lambda *args: None,
             },
@@ -341,3 +346,107 @@ def test_requests_url_downloader_rate_limit_sleep_path_is_deterministic(
 
     assert sleeps == [pytest.approx(0.25)]
     assert downloader._last_request_started == 10.5
+
+
+class _FakeRedirectResponse:
+    def __init__(self, *, is_redirect=False, location=None, url="http://example.com/"):
+        self.is_redirect = is_redirect
+        self.headers = {"Location": location} if location else {}
+        self.url = url
+        self.closed = False
+
+    def close(self):
+        self.closed = True
+
+    def raise_for_status(self):
+        return None
+
+    def iter_content(self, chunk_size=8192):
+        del chunk_size
+        return [b"ok"]
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return None
+
+
+def test_address_is_blocked_classifies_addresses() -> None:
+    assert _address_is_blocked("8.8.8.8") is False
+    assert _address_is_blocked("127.0.0.1") is True
+    assert _address_is_blocked("169.254.169.254") is True  # cloud metadata
+    assert _address_is_blocked("10.0.0.1") is True
+    assert _address_is_blocked("::1") is True
+    assert _address_is_blocked("not-an-ip") is True
+
+
+def test_download_blocks_private_and_metadata_urls(monkeypatch) -> None:
+    monkeypatch.delenv("IOCPARSER_ALLOW_PRIVATE_URLS", raising=False)
+    downloader = RequestsURLDownloader()
+    for blocked in ("http://169.254.169.254/latest/meta-data/", "http://127.0.0.1:1/x"):
+        with pytest.raises(BlockedURLError):
+            downloader.download(blocked)
+
+
+def test_allow_private_networks_opt_out_skips_guard(monkeypatch) -> None:
+    monkeypatch.delenv("IOCPARSER_ALLOW_PRIVATE_URLS", raising=False)
+    downloader = RequestsURLDownloader(allow_private_networks=True)
+    # Guard is disabled, so the loopback URL is attempted and fails to connect
+    # (DownloadError) rather than being refused up front (BlockedURLError).
+    with pytest.raises(DownloadError):
+        downloader.download("http://127.0.0.1:1/x")
+
+
+def test_redirect_to_private_host_is_revalidated_and_blocked(monkeypatch) -> None:
+    monkeypatch.delenv("IOCPARSER_ALLOW_PRIVATE_URLS", raising=False)
+
+    def fake_get(url, **_kwargs):
+        return _FakeRedirectResponse(is_redirect=True, location="http://127.0.0.1/internal", url=url)
+
+    monkeypatch.setattr("iocparser.infrastructure.http_download.requests.get", fake_get)
+    with pytest.raises(BlockedURLError):
+        RequestsURLDownloader().download("http://93.184.216.34/start")
+
+
+def test_redirect_without_location_is_rejected(monkeypatch) -> None:
+    monkeypatch.delenv("IOCPARSER_ALLOW_PRIVATE_URLS", raising=False)
+    monkeypatch.setattr(
+        "iocparser.infrastructure.http_download.requests.get",
+        lambda url, **_kwargs: _FakeRedirectResponse(is_redirect=True, location=None, url=url),
+    )
+    with pytest.raises(DownloadError, match="Location"):
+        RequestsURLDownloader().download("http://93.184.216.34/start")
+
+
+def test_redirect_limit_is_enforced(monkeypatch) -> None:
+    monkeypatch.delenv("IOCPARSER_ALLOW_PRIVATE_URLS", raising=False)
+    monkeypatch.setattr(
+        "iocparser.infrastructure.http_download.requests.get",
+        lambda url, **_kwargs: _FakeRedirectResponse(
+            is_redirect=True, location="http://93.184.216.34/loop", url=url
+        ),
+    )
+    with pytest.raises(DownloadError, match="redirect limit"):
+        RequestsURLDownloader().download("http://93.184.216.34/start")
+
+
+def test_redirect_to_public_host_is_followed(monkeypatch, tmp_path) -> None:
+    monkeypatch.delenv("IOCPARSER_ALLOW_PRIVATE_URLS", raising=False)
+    monkeypatch.setattr("tempfile.gettempdir", lambda: str(tmp_path))
+    responses = [
+        _FakeRedirectResponse(is_redirect=True, location="http://93.184.216.34/final"),
+        _FakeRedirectResponse(is_redirect=False, url="http://93.184.216.34/final"),
+    ]
+    monkeypatch.setattr(
+        "iocparser.infrastructure.http_download.requests.get",
+        lambda url, **_kwargs: responses.pop(0),
+    )
+    path = RequestsURLDownloader().download("http://93.184.216.34/start")
+    assert Path(path).read_text(encoding="utf-8") == "ok"
+
+
+def test_assert_host_allowed_rejects_missing_hostname(monkeypatch) -> None:
+    monkeypatch.delenv("IOCPARSER_ALLOW_PRIVATE_URLS", raising=False)
+    with pytest.raises(InvalidURLError):
+        RequestsURLDownloader()._assert_host_allowed(urlparse("http://@/path"))

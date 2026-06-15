@@ -166,7 +166,10 @@ PATTERNS: dict[str, Pattern[str]] = {
         r"\barn:aws(?:-[a-z]+)?:[a-z0-9-]+:[a-z0-9-]*:[0-9]{0,12}:[a-zA-Z0-9-_/:.]+\b",
     ),
     "gcp_service_accounts": re.compile(
-        r"\b[a-z][a-z0-9-]{4,28}[a-z0-9]@[a-z0-9-]+\.iam\.gserviceaccount\.com\b",
+        # Any *.gserviceaccount.com address: user-managed (<id>.iam.…) plus the
+        # default service accounts (<num>-compute@developer.…, <id>@appspot.…,
+        # <num>@cloudbuild/cloudservices.…), whose local parts may start with a digit.
+        r"\b[a-z0-9][a-z0-9-]{4,28}[a-z0-9]@[a-z0-9.-]+\.gserviceaccount\.com\b",
     ),
     "azure_app_ids": re.compile(
         r"(?:tenant[_-]?id|app[_-]?id|client[_-]?id|directory[_-]?id|object[_-]?id)"

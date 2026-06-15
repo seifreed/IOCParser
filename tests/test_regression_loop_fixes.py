@@ -263,3 +263,27 @@ def test_reader_extracts_iocs_from_utf16_file(tmp_path: Path) -> None:
     text_content = MagicTextSourceReader().read(str(target), ExtractionOptions())
 
     assert "203.0.113.5" in text_content
+
+
+def test_service_names_suffix_branch_keeps_full_name() -> None:
+    """The bareword service form must keep the Service/Svc suffix in the value.
+
+    The suffix was outside the capture group, so BackgroundService was emitted
+    as 'Background' and AcmeSvc as 'Acme'.
+    """
+    result = IOCExtractor(defang=False).extract_all("installs BackgroundService and AcmeSvc here")
+    assert sorted(result.get("service_names") or []) == ["AcmeSvc", "BackgroundService"]
+
+
+def test_ja4_matches_no_alpn_fingerprints() -> None:
+    """JA4 fingerprints with the literal '00' ALPN field must be extracted.
+
+    The ALPN field is two alphanumerics; the old pattern required letter+digit,
+    so every no-ALPN fingerprint (the common case) was missed.
+    """
+    for value in (
+        "t12d190800_d83cc789557e_7af1ed941c26",
+        "t13i190900_e8f1e7e78f70_1f22a2ca17c4",
+    ):
+        result = IOCExtractor(defang=False).extract_all(f"fingerprint {value} seen")
+        assert result.get("ja4") == [value]

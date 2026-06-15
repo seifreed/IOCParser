@@ -102,7 +102,7 @@ PATTERNS: dict[str, Pattern[str]] = {
     ),
     "service_names": re.compile(
         r"\b(?:Service|SERVICE):\s*([A-Za-z0-9][A-Za-z0-9_\-]{2,})\b|"
-        r"\b([A-Za-z0-9][A-Za-z0-9_\-]{2,})(?:Service|Svc)\b",
+        r"\b([A-Za-z0-9][A-Za-z0-9_\-]{2,}(?:Service|Svc))\b",
     ),
     "named_pipes": re.compile(r"\\\\\.\\pipe\\[A-Za-z0-9_\-]+"),
     # File indicators
@@ -152,7 +152,9 @@ PATTERNS: dict[str, Pattern[str]] = {
     ),
     "ja3": re.compile(r"(?:ja3|JA3)[\s:=]+([a-fA-F0-9]{32})\b"),
     "ja3s": re.compile(r"(?:ja3s|JA3S|JA3-S)[\s:=]+([a-fA-F0-9]{32})\b"),
-    "ja4": re.compile(r"\b[qtd][0-9]{2}[dsi][0-9]{2,4}[a-z][0-9]{1,2}_[a-f0-9]{12}_[a-f0-9]{12}\b"),
+    # JA4_a = proto + 2-digit version + d/i/s + 2-digit cipher count + 2-digit
+    # extension count + 2-char ALPN (the literal "00" when no ALPN was negotiated).
+    "ja4": re.compile(r"\b[qtd][0-9]{2}[dsi][0-9]{4}[a-z0-9]{2}_[a-f0-9]{12}_[a-f0-9]{12}\b"),
     "hassh": re.compile(r"(?:hassh|HASSH)[\s:=]+([a-fA-F0-9]{32})\b"),
     "hassh_server": re.compile(r"(?:hassh[_-]?server|HASSHServer)[\s:=]+([a-fA-F0-9]{32})\b"),
     "jarm": re.compile(r"(?:jarm|JARM)[\s:=]+([a-fA-F0-9]{62})\b"),

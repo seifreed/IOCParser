@@ -175,6 +175,16 @@ def backfill_dedup_hash_columns(engine: Engine, inspector: Inspector) -> None:
                 connection.execute(text(f"CREATE UNIQUE INDEX {key} ON {table}(dedup_hash)"))
 
 
+def quote_identifier(dialect_name: str, identifier: str) -> str:
+    """Quote a SQL identifier for the given dialect (e.g. the reserved word 'key').
+
+    MySQL/MariaDB use backticks; SQLite and the SQL standard use double quotes.
+    """
+    if dialect_name in {"mysql", "mariadb"}:
+        return f"`{identifier}`"
+    return f'"{identifier}"'
+
+
 def dialect_replace_into(dialect_name: str, table_and_columns: str) -> str:
     """Return a primary-key upsert statement valid for the given SQL dialect.
 

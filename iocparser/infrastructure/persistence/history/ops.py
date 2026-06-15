@@ -31,6 +31,7 @@ from iocparser.infrastructure.persistence_repository_support import (
     dialect_replace_into,
     ioc_dedup_hash,
     normalize_ioc_search,
+    quote_identifier,
     source_dedup_hash,
 )
 from iocparser.infrastructure.persistence_schema import (
@@ -178,8 +179,10 @@ def _has_legacy_archive_collision(session: Session, *, archive_id: str) -> bool:
 
 
 def _history_origin_id(session: Session) -> str:
+    dialect_name = session.get_bind().dialect.name
+    key = quote_identifier(dialect_name, "key")
     row = session.execute(
-        text("SELECT value FROM history_metadata WHERE key = 'origin_id'")
+        text(f"SELECT value FROM history_metadata WHERE {key} = 'origin_id'")  # noqa: S608
     ).scalar_one_or_none()
     if isinstance(row, str) and row.strip():
         return row.strip()
@@ -187,8 +190,8 @@ def _history_origin_id(session: Session) -> str:
     session.execute(
         text(
             dialect_replace_into(
-                session.get_bind().dialect.name,
-                "history_metadata(key, value) VALUES ('origin_id', :value)",
+                dialect_name,
+                f"history_metadata({key}, value) VALUES ('origin_id', :value)",
             )
         ),
         {"value": origin_id},

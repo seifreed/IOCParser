@@ -671,3 +671,16 @@ def test_schema_ddl_is_valid_for_mysql() -> None:
             index_ddl = str(CreateIndex(index).compile(dialect=mysql.dialect()))
             if "value_search" in index_ddl:
                 assert "value_search(255)" in index_ddl
+
+
+def test_quote_identifier_per_dialect() -> None:
+    """The reserved word 'key' must be backtick-quoted on MySQL, double-quoted else.
+
+    rev_0008's history_metadata and its read/write previously used the bare,
+    reserved word 'key', a syntax error on MySQL/MariaDB.
+    """
+    from iocparser.infrastructure.persistence_repository_support import quote_identifier
+
+    assert quote_identifier("sqlite", "key") == '"key"'
+    assert quote_identifier("mysql", "key") == "`key`"
+    assert quote_identifier("mariadb", "key") == "`key`"

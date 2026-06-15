@@ -5,11 +5,15 @@ from __future__ import annotations
 import argparse
 import json
 
+from sqlalchemy import create_engine, inspect, text
+
 from iocparser.adapters.renderers_stix import STIXOutputRenderer
 from iocparser.application.distributed_idempotency import idempotency_key_for
 from iocparser.cli_output import _build_diff_payload, _render_structured_diff
 from iocparser.domain.models import IOC, ExtractionResult, IOCType, PersistedRunDiff
 from iocparser.domain.pipeline import PipelineJobRequest
+from iocparser.infrastructure.migration_revisions import rev_0005_fts_metrics
+from iocparser.infrastructure.persistence_fts import build_fts_query
 
 
 def test_stix_asn_pattern_emits_integer_not_quoted_string() -> None:
@@ -77,3 +81,38 @@ def test_idempotency_key_distinguishes_file_type() -> None:
     )
 
     assert pdf_key != html_key
+
+
+def test_fts_rebuild_indexes_normalized_value_search() -> None:
+    """The FTS rebuild on schema upgrade must index value_search, not raw value.
+
+    The external-content 'rebuild' command repopulated the index from
+    iocs.value (raw/defanged), but triggers and search use the refanged
+    value_search column, so pre-existing rows were silently unsearchable
+    after an upgrade.
+    """
+    engine = create_engine("sqlite://")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE TABLE iocs ("
+                "id INTEGER PRIMARY KEY, value TEXT, value_search TEXT, ioc_type TEXT)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO iocs(value, value_search, ioc_type) "
+                "VALUES ('hxxp://evil.com', 'http://evil.com', 'urls')"
+            )
+        )
+
+    rev_0005_fts_metrics.apply(engine, inspect(engine))
+
+    match_query = build_fts_query("http://evil.com")
+    assert match_query is not None
+    with engine.connect() as connection:
+        rows = connection.execute(
+            text("SELECT rowid FROM ioc_search_fts WHERE ioc_search_fts MATCH :q"),
+            {"q": match_query},
+        ).fetchall()
+    assert [row[0] for row in rows] == [1]

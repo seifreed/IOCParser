@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from sqlalchemy import Engine, Inspector, text
 
+from iocparser.infrastructure.persistence_fts import rebuild_fts_statements
+
 
 def apply(engine: Engine, inspector: Inspector) -> None:
     """Add batch metrics storage and an optional SQLite FTS index for IOC lookup."""
@@ -45,6 +47,5 @@ def apply(engine: Engine, inspector: Inspector) -> None:
         for statement in statements:
             connection.execute(text(statement))
         if dialect == "sqlite" and "iocs" in table_names:
-            connection.execute(
-                text("INSERT INTO ioc_search_fts(ioc_search_fts) VALUES ('rebuild')")
-            )
+            for statement in rebuild_fts_statements():
+                connection.execute(text(statement))

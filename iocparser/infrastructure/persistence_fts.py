@@ -32,9 +32,27 @@ def build_fts_query(value: str) -> str | None:
     return '"' + " ".join(terms) + '"*'
 
 
+def rebuild_fts_statements() -> tuple[str, str]:
+    """SQL to rebuild the FTS index from the normalized ``value_search`` column.
+
+    The external-content ``'rebuild'`` command repopulates the index from
+    ``iocs.value`` (the raw, defanged value), but the triggers and the search
+    query builder both use the refanged ``value_search`` column. Relying on
+    ``'rebuild'`` therefore indexes values that search can never match (e.g. a
+    stored ``hxxp://evil.com`` is searched as ``http://evil.com``). Clear the
+    index and repopulate it explicitly from ``value_search`` for consistency.
+    """
+    return (
+        "INSERT INTO ioc_search_fts(ioc_search_fts) VALUES ('delete-all')",
+        "INSERT INTO ioc_search_fts(rowid, value, ioc_type) "
+        "SELECT id, value_search, ioc_type FROM iocs",
+    )
+
+
 def sync_fts_index(session: Session) -> None:
     """Rebuild the IOC FTS index from the canonical IOC table."""
     bind = session.get_bind()
     if not has_fts_table(bind):
         return
-    session.execute(text("INSERT INTO ioc_search_fts(ioc_search_fts) VALUES ('rebuild')"))
+    for statement in rebuild_fts_statements():
+        session.execute(text(statement))

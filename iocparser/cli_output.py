@@ -226,12 +226,12 @@ def _render_structured_diff(
     diff_only: str,
 ) -> tuple[str, str]:
     if get_bool_arg(args, "jsonl"):
-        jsonl_sets: list[list[dict[str, object]]] = []
+        rows: list[dict[str, object]] = []
         if diff_only != "removed":
-            jsonl_sets.append(added_records)
+            rows.extend({**record, "change": "added"} for record in added_records)
         if diff_only != "added":
-            jsonl_sets.append(removed_records)
-        return "\n".join(json.dumps(r, sort_keys=True) for s in jsonl_sets for r in s), "jsonl"
+            rows.extend({**record, "change": "removed"} for record in removed_records)
+        return "\n".join(json.dumps(row, sort_keys=True) for row in rows), "jsonl"
     if get_bool_arg(args, "csv"):
         return _render_diff_csv(added_records, removed_records, diff_only), "csv"
     return json.dumps(payload, indent=4, sort_keys=True), "json"

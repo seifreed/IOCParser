@@ -33,6 +33,12 @@ class STIXOutputRenderer(OutputRenderer):
         def _builder(pattern: str) -> Callable[[str], str]:
             return lambda value: pattern.format(value=_escape(refang_ioc(value)))
 
+        def _asn_builder(value: str) -> str:
+            # autonomous-system:number is an integer property in STIX 2.1, so the
+            # AS prefix must be stripped and the value emitted unquoted.
+            digits = "".join(char for char in refang_ioc(value) if char.isdigit())
+            return f"[autonomous-system:number = {digits}]"
+
         cls.PATTERN_BUILDERS = {
             IOCType.DOMAIN: _builder("[domain-name:value = '{value}']"),
             IOCType.HOST: _builder("[domain-name:value = '{value}']"),
@@ -50,7 +56,7 @@ class STIXOutputRenderer(OutputRenderer):
             IOCType.REGISTRY: _builder("[windows-registry-key:key = '{value}']"),
             IOCType.MUTEX: _builder("[mutex:name = '{value}']"),
             IOCType.MAC_ADDRESS: _builder("[mac-addr:value = '{value}']"),
-            IOCType.ASN: _builder("[autonomous-system:number = '{value}']"),
+            IOCType.ASN: _asn_builder,
             IOCType.CIDR: _builder("[ipv4-addr:value = '{value}']"),
             IOCType.ONION_ADDRESS: _builder("[domain-name:value = '{value}']"),
             IOCType.AWS_ARN: _builder("[x-cloud-resource:value = '{value}']"),

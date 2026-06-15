@@ -567,6 +567,25 @@ class TestStreamingIOCExtractor:
         # Should have found various IOC types
         assert len(all_iocs) > 0
 
+    def test_extract_from_stream_keeps_ioc_ending_on_chunk_boundary(self):
+        """Regression: an IOC ending exactly at a chunk boundary must not be lost.
+
+        Such an IOC is deferred by the chunk it ends in and then lands exactly at
+        prefix_length in the next chunk; the boundary check used to drop it in both.
+        """
+        sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        # The 64-char hash (== overlap) is positioned to end exactly on a chunk
+        # boundary; overlap is large enough to re-capture it in the next chunk.
+        text = "x" * 127 + " " + sha256 + " tail"
+        extractor = StreamingIOCExtractor(chunk_size=96, overlap=64, defang=False)
+
+        collected: dict[str, list[str]] = defaultdict(list)
+        for chunk in extractor.extract_from_stream(io.StringIO(text), is_text=True):
+            for ioc_type, ioc_list in chunk.items():
+                collected[ioc_type].extend(ioc_list)
+
+        assert sha256 in collected["sha256"]
+
     def test_extract_from_stream_binary(self):
         """
         Test extraction from binary stream.

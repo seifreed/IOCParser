@@ -43,7 +43,7 @@ def should_keep_ioc(
                 while start != -1:
                     end = start + len(needle)
                     if (
-                        (start >= prefix_length or end > prefix_length)
+                        (start >= prefix_length or end >= prefix_length)
                         and not (prefix_length > 0 and start == 0)
                         and not (
                             end == len(haystack) and (len(haystack) - prefix_length) >= chunk_size

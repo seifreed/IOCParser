@@ -554,3 +554,31 @@ def test_job_record_preserves_error_with_empty_message() -> None:
     assert record.last_error.code == "UNEXPECTED_FAILURE"
     assert record.last_error.category == "non_retryable"
     assert record.last_error.message == ""
+
+
+def test_cli_search_normalizes_ioc_type_and_severity() -> None:
+    """The CLI search filters must be normalized like the API/diff handlers.
+
+    --ioc-type ip (alias of 'ips') and --severity HIGH were passed raw to a
+    case-sensitive exact SQL comparison, silently returning zero hits.
+    """
+    from iocparser.api_persistence_query import validated_ioc_type_filter
+    from iocparser.shared_utils import validated_severity_filters
+
+    assert validated_ioc_type_filter("ip") == "ips"
+    assert validated_ioc_type_filter("domain") == "domains"
+    assert validated_severity_filters("HIGH") == ("high",)
+
+
+def test_dialect_replace_into_uses_mysql_syntax() -> None:
+    """The PK upsert must use REPLACE INTO on MySQL/MariaDB, not SQLite-only syntax.
+
+    INSERT OR REPLACE is SQLite grammar; emitting it on MariaDB raised a syntax
+    error, breaking every migration and history write on that backend.
+    """
+    from iocparser.infrastructure.persistence_repository_support import dialect_replace_into
+
+    columns = "t(a, b) VALUES (:a, :b)"
+    assert dialect_replace_into("sqlite", columns) == f"INSERT OR REPLACE INTO {columns}"
+    assert dialect_replace_into("mysql", columns) == f"REPLACE INTO {columns}"
+    assert dialect_replace_into("mariadb", columns) == f"REPLACE INTO {columns}"

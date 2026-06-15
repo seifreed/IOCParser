@@ -6,7 +6,10 @@ from typing import NoReturn
 
 from iocparser import cli_args as _cli_args
 from iocparser import cli_output as _cli_output
-from iocparser.api_persistence_query import validated_ioc_type_filters
+from iocparser.api_persistence_query import (
+    validated_ioc_type_filter,
+    validated_ioc_type_filters,
+)
 from iocparser.application.contracts import (
     BatchJobInput,
     DeletePersistedRunInput,
@@ -52,6 +55,7 @@ from iocparser.cli_persistence import query_service_for
 from iocparser.config import AppConfig
 from iocparser.errors import ValidationError
 from iocparser.interfaces.ports import FileWriter, PersistenceQueryService
+from iocparser.shared_utils import validated_severity_filters
 
 PERSISTENCE_QUERY_MESSAGE = "Persistence query commands require --db-uri or configured persistence"
 BATCH_JOB_NOT_FOUND = "Batch job not found"
@@ -134,8 +138,8 @@ def _handle_search_ioc(args: argparse.Namespace, config: AppConfig) -> bool:
             date_to=_cli_args.get_optional_str_arg(args, "date_to"),
             source_kind=_cli_args.get_optional_str_arg(args, "source_kind"),
             source_value=_cli_args.get_optional_str_arg(args, "source_value"),
-            ioc_type=_cli_args.get_optional_str_arg(args, "ioc_type"),
-            severity=_string_filters_attr(args, "severity"),
+            ioc_type=validated_ioc_type_filter(_cli_args.get_optional_str_arg(args, "ioc_type")),
+            severity=validated_severity_filters(_cli_args.get_optional_str_arg(args, "severity")),
             tags=_string_filters_attr(args, "tag"),
             exclude_tags=_string_filters_attr(args, "exclude_tag"),
             min_severity=_cli_args.get_optional_str_arg(args, "min_severity"),

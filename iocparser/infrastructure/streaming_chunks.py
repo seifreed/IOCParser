@@ -16,7 +16,7 @@ def read_chunks_with_prefix(
     overlap: int,
     progress_callback: Callable[[int], None] | None,
     is_text: bool = True,
-) -> Iterator[tuple[str, int]]:
+) -> Iterator[tuple[str, int, bool]]:
     chunk_size = max(1, chunk_size)
     if not is_text and isinstance(file_obj, io.TextIOBase) and hasattr(file_obj, "buffer"):
         file_obj = file_obj.buffer
@@ -53,7 +53,13 @@ def read_chunks_with_prefix(
         if progress_callback and total_size:
             progress_callback(min(100, int((bytes_read / total_size) * 100)))
 
-        yield chunk, prefix_length
+        # A chunk whose body fills chunk_size normally defers an IOC ending at its
+        # boundary to the next chunk; on the final chunk there is no next chunk, so
+        # that deferral would drop the IOC. Flag the final chunk for seekable inputs
+        # (a file whose size is an exact multiple of chunk_size still ends on a full
+        # read). Non-seekable streams report total_size 0 and keep the prior behavior.
+        is_final = total_size > 0 and bytes_read >= total_size
+        yield chunk, prefix_length, is_final
         if overlap > 0:
             # Keep one extra character so boundary validation can reject truncated suffixes.
             tail_length = overlap + 1

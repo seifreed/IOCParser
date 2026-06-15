@@ -26,6 +26,7 @@ def should_keep_ioc(
     ioc: str,
     prefix_length: int,
     chunk_size: int,
+    is_final: bool = False,
 ) -> bool:
     if prefix_length <= 0:
         return True
@@ -46,7 +47,9 @@ def should_keep_ioc(
                         (start >= prefix_length or end >= prefix_length)
                         and not (prefix_length > 0 and start == 0)
                         and not (
-                            end == len(haystack) and (len(haystack) - prefix_length) >= chunk_size
+                            not is_final
+                            and end == len(haystack)
+                            and (len(haystack) - prefix_length) >= chunk_size
                         )
                         and is_valid_match_boundary(ioc_type, haystack, start, end)
                     ):

@@ -318,7 +318,7 @@ class TestStreamingIOCExtractor:
 
         chunks = list(extractor._read_chunks_with_prefix(io.StringIO("abcdef"), is_text=True))
 
-        assert chunks == [("abc", 0), ("def", 0)]
+        assert chunks == [("abc", 0, False), ("def", 0, True)]
 
     def test_read_chunks_with_zero_chunk_size_normalizes_to_one(self):
         extractor = StreamingIOCExtractor(chunk_size=0, overlap=0)
@@ -326,7 +326,7 @@ class TestStreamingIOCExtractor:
         assert extractor.chunk_size == 1
         chunks = list(extractor._read_chunks_with_prefix(io.StringIO("abc"), is_text=True))
 
-        assert chunks == [("a", 0), ("b", 0), ("c", 0)]
+        assert chunks == [("a", 0, False), ("b", 0, False), ("c", 0, True)]
 
     def test_read_chunks_binary_stream(self):
         """
@@ -585,6 +585,28 @@ class TestStreamingIOCExtractor:
                 collected[ioc_type].extend(ioc_list)
 
         assert sha256 in collected["sha256"]
+
+    def test_extract_from_file_keeps_ioc_at_eof_on_exact_chunk_multiple(self, tmp_path: Path):
+        """Regression: an IOC ending at EOF must not be dropped when the file size
+        is an exact multiple of chunk_size.
+
+        The final chunk is then a full read (body == chunk_size), which the overlap
+        filter used to read as "deferred to the next chunk" — but there is no next
+        chunk, so the value was silently lost.
+        """
+        sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        chunk_size = 128
+        text = "z" * (chunk_size * 2 - len(sha256) - 1) + " " + sha256
+        assert len(text) % chunk_size == 0
+        sample = tmp_path / "eof-multiple.txt"
+        sample.write_text(text, encoding="utf-8")
+        extractor = StreamingIOCExtractor(chunk_size=chunk_size, overlap=64, defang=False)
+
+        file_result = extractor.extract_from_file(sample)
+        mmap_result = extractor.extract_from_mmap(sample)
+
+        assert sha256 in file_result["sha256"]
+        assert sha256 in mmap_result["sha256"]
 
     def test_extract_from_stream_binary(self):
         """

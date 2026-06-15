@@ -122,7 +122,10 @@ class WarningListPreprocessMixin:
             values_val = warning_list.get("list", [])
             if not isinstance(values_val, list):
                 continue
-            if list_type == "string":
+            if list_type in ("string", "hostname"):
+                # MISP "hostname" lists (Alexa, bank domains, whitelists, ...) match
+                # exactly like "string" lists; without this branch their entries were
+                # never indexed, so 19 shipped lists never produced a single match.
                 self._add_string_values(list_id, values_val)
             elif list_type == "regex":
                 self._add_regex_values(list_id, values_val)

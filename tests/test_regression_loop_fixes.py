@@ -6,8 +6,10 @@ import argparse
 import json
 
 from iocparser.adapters.renderers_stix import STIXOutputRenderer
+from iocparser.application.distributed_idempotency import idempotency_key_for
 from iocparser.cli_output import _build_diff_payload, _render_structured_diff
 from iocparser.domain.models import IOC, ExtractionResult, IOCType, PersistedRunDiff
+from iocparser.domain.pipeline import PipelineJobRequest
 
 
 def test_stix_asn_pattern_emits_integer_not_quoted_string() -> None:
@@ -46,3 +48,32 @@ def test_diff_jsonl_marks_added_and_removed() -> None:
     rows = [json.loads(line) for line in output.splitlines()]
     changes = {(row["raw_value"], row["change"]) for row in rows}
     assert changes == {("beta.example", "added"), ("alpha.example", "removed")}
+
+
+class _FixedDigester:
+    """Digester whose output ignores the path, isolating file_type as the variable."""
+
+    def digest_text(self, value: str) -> str:
+        return "fixed"
+
+    def digest_file(self, file_path: str) -> str:
+        return "fixed"
+
+
+def test_idempotency_key_distinguishes_file_type() -> None:
+    """The same bytes parsed under a different file_type must not be deduplicated.
+
+    file_type forces the parser (pdf/html/text) and changes the extracted IOCs,
+    so it must be part of the idempotency key.
+    """
+    digester = _FixedDigester()
+    pdf_key = idempotency_key_for(
+        PipelineJobRequest(input_kind="file", source_value="/tmp/sample.bin", file_type="pdf"),
+        digester=digester,
+    )
+    html_key = idempotency_key_for(
+        PipelineJobRequest(input_kind="file", source_value="/tmp/sample.bin", file_type="html"),
+        digester=digester,
+    )
+
+    assert pdf_key != html_key

@@ -14,6 +14,7 @@ def _processing_options_key(request: PipelineJobRequest) -> str:
         f":o={request.only or ''}"
         f":e={request.exclude or ''}"
         f":eo={request.emit_only}"
+        f":ft={request.file_type or ''}"
     )
 
 

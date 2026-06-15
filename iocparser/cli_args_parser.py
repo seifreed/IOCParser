@@ -17,6 +17,11 @@ def _add_input_arguments(parser: argparse.ArgumentParser) -> None:
     input_group.add_argument(
         "--retry-failed-from", help="Retry failed URLs from a prior batch report JSON file"
     )
+    # An input source like --retry-failed-from: keep it mutually exclusive with the
+    # other inputs so it cannot silently override -f/-u/-m/-d/--url-file.
+    input_group.add_argument(
+        "--retry-batch-job", type=int, help="Retry failed URLs from a persisted batch job"
+    )
     input_group.add_argument("--stdin", action="store_true", help="Read input text from stdin")
     input_group.add_argument("url_direct", nargs="?", help="Direct URL as positional argument")
 
@@ -296,9 +301,6 @@ def _add_batch_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--batch-job", type=int, help="Show details for a persisted batch job")
     parser.add_argument("--batch-runs", type=int, help="List persisted runs for a batch job")
-    parser.add_argument(
-        "--retry-batch-job", type=int, help="Retry failed URLs from a persisted batch job"
-    )
     parser.add_argument(
         "--batch-limit", type=int, default=20, help="Limit for failed-batch listings"
     )

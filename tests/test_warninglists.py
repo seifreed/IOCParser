@@ -495,6 +495,28 @@ class TestWarningListsPreprocessing:
         assert "unsafe-regex-list" in warning_lists.compiled_regex
         assert len(warning_lists.compiled_regex["unsafe-regex-list"]) == 1
 
+    def test_preprocess_lists_keeps_safe_nested_group_regex(self):
+        """A safe pattern containing a ')quantifier)' substring must not be dropped.
+
+        Regression: the ReDoS guard also rejected the harmless ')+)' shape, so a
+        safe pattern like (\\w(\\d)+) was silently discarded. Only genuine nested
+        quantifiers (a+)+ should be skipped.
+        """
+        warning_lists = make_warning_lists()
+        warning_lists.warning_lists = {
+            "mixed-regex-list": {
+                "name": "Mixed Regex List",
+                "description": "Safe nested group alongside an unsafe pattern",
+                "type": "regex",
+                "matching_attributes": ["domain"],
+                "list": [r"(\w(\d)+)", r"(a+)+", None],
+            }
+        }
+        warning_lists._preprocess_lists()
+        compiled = warning_lists.compiled_regex["mixed-regex-list"]
+        assert len(compiled) == 1
+        assert compiled[0].search("a1") is not None
+
     def test_preprocess_lists_with_invalid_cidr(self):
         """Test preprocessing handles invalid CIDR ranges."""
         warning_lists = make_warning_lists()

@@ -60,13 +60,16 @@ class WarningListPreprocessMixin:
 
     @staticmethod
     def _is_safe_regex(pattern: str) -> bool:
-        """Reject patterns with nested quantifiers that can cause ReDoS."""
+        """Reject patterns with nested quantifiers that can cause ReDoS.
+
+        Catches the quantifier-group-quantifier shape `(X+)+`, `(X*)*`, `(X+)*`,
+        etc. A previous `\\)[+*?]\\)` check was dropped: it matched the harmless
+        `)+)` substring in safe patterns like `(\\w(\\d)+)`, wrongly discarding
+        them, while catching no dangerous pattern the check below misses.
+        """
         import re as _re
 
-        # Detect dangerous nested quantifiers like (a+)+, (a*)*, (a+)*, etc.
-        if _re.search(r"[+*?]\)[+*?]", pattern) or _re.search(r"\)[+*?]\)", pattern):
-            return False
-        return True
+        return _re.search(r"[+*?]\)[+*?]", pattern) is None
 
     def _add_regex_values(self, list_id: str, values_val: list[WarningListEntry]) -> None:
         compiled_patterns: list[re.Pattern[str]] = []

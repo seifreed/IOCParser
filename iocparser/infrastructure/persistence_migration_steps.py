@@ -16,6 +16,9 @@ from iocparser.infrastructure.migration_revisions.rev_0007_distributed_jobs impo
 from iocparser.infrastructure.migration_revisions.rev_0008_history_origin import (
     apply as apply_rev_0008,
 )
+from iocparser.infrastructure.migration_revisions.rev_0009_dedup_hash import (
+    apply as apply_rev_0009,
+)
 from iocparser.infrastructure.persistence_fts import FTS_TABLE
 from iocparser.infrastructure.persistence_repository_support import dialect_replace_into
 
@@ -56,8 +59,8 @@ def missing_column_problems(inspector: Inspector, table_names: set[str]) -> list
     problems: list[str] = []
     expected_columns = {
         "runs": ("status", "error_message", "batch_job_id"),
-        "sources": ("value_search",),
-        "iocs": ("value_search",),
+        "sources": ("value_search", "dedup_hash"),
+        "iocs": ("value_search", "dedup_hash"),
         "run_iocs": ("tags_search",),
         "batch_jobs": ("metrics_json",),
         "distributed_jobs": ("status", "payload_json", "metrics_json"),
@@ -144,6 +147,8 @@ def upgrade_to_version(engine: Engine, inspector: Inspector, version: int) -> No
         apply_rev_0007(engine, inspector)
     elif version == 8:
         apply_rev_0008(engine, inspector)
+    elif version == 9:
+        apply_rev_0009(engine, inspector)
 
 
 def upgrade_to_v2(engine: Engine, inspector: Inspector) -> None:

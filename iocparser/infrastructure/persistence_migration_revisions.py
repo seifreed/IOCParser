@@ -25,6 +25,9 @@ SCHEMA_REVISIONS = (
     SchemaRevision(
         8, "history-origin", "Stable history origin metadata for export/import identity"
     ),
+    SchemaRevision(
+        9, "dedup-hash", "Hash-based IOC/source uniqueness for MySQL/MariaDB compatibility"
+    ),
 )
 
 CURRENT_SCHEMA_VERSION = SCHEMA_REVISIONS[-1].version

@@ -9,6 +9,7 @@ from iocparser.infrastructure.persistence_repository_support import (
     IOC_MODEL,
     ExtractionResultLike,
     insert_or_refetch,
+    ioc_dedup_hash,
     normalize_ioc_search,
     normalized_ioc_type_name,
 )
@@ -50,6 +51,9 @@ class SQLAlchemyIOCRepository(IOCRepository):
             ioc_type=ioc_type,
             value=value,
             value_search=search_value,
+            dedup_hash=ioc_dedup_hash(
+                ioc_type, value, is_warning, warning_list, warning_description
+            ),
             is_warning=is_warning,
             warning_list=warning_list,
             warning_description=warning_description,

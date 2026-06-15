@@ -11,6 +11,7 @@ from iocparser.infrastructure.persistence_repository_support import (
     SOURCE_MODEL,
     insert_or_refetch,
     normalize_search,
+    source_dedup_hash,
 )
 from iocparser.interfaces.ports import SourceRepository
 
@@ -65,6 +66,7 @@ class SQLAlchemySourceRepository(SourceRepository):
             kind=kind,
             value=value,
             value_search=normalize_search(value),
+            dedup_hash=source_dedup_hash(kind, value),
             original_url=original_url,
             normalized_url=normalized_url,
             mime_type=mime_type,

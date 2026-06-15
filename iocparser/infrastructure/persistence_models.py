@@ -16,6 +16,7 @@ class SourceModel(Base):
     kind: Mapped[str] = mapped_column(String(16), nullable=False)
     value: Mapped[str] = mapped_column(Text, nullable=False)
     value_search: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    dedup_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     original_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     normalized_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     mime_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
@@ -25,9 +26,11 @@ class SourceModel(Base):
     first_seen: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     last_seen: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     __table_args__ = (
-        UniqueConstraint("kind", "value", name="uq_sources_kind_value"),
-        Index("ix_sources_kind_value_search", "kind", "value_search"),
-        Index("ix_sources_value_search", "value_search"),
+        # Uniqueness on a hash of (kind, value): a TEXT column cannot be a key on
+        # MySQL/MariaDB, so the natural (kind, value) constraint is invalid there.
+        UniqueConstraint("dedup_hash", name="uq_sources_dedup_hash"),
+        Index("ix_sources_kind_value_search", "kind", "value_search", mysql_length={"value_search": 255}),
+        Index("ix_sources_value_search", "value_search", mysql_length=255),
     )
 
 
@@ -63,21 +66,18 @@ class IOCModel(Base):
     ioc_type: Mapped[str] = mapped_column(String(64), nullable=False)
     value: Mapped[str] = mapped_column(Text, nullable=False)
     value_search: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    dedup_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     is_warning: Mapped[bool] = mapped_column(Boolean, nullable=False)
     warning_list: Mapped[str] = mapped_column(Text, nullable=False, default="")
     warning_description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     __table_args__ = (
-        UniqueConstraint(
-            "ioc_type",
-            "value",
-            "is_warning",
-            "warning_list",
-            "warning_description",
-            name="uq_iocs_value",
-        ),
-        Index("ix_iocs_type_value_search", "ioc_type", "value_search"),
-        Index("ix_iocs_value_search", "value_search"),
-        Index("ix_iocs_value_search_type", "value_search", "ioc_type"),
+        # Uniqueness on a hash of (ioc_type, value, is_warning, warning_list,
+        # warning_description): those TEXT columns cannot form a key on
+        # MySQL/MariaDB and their combined length exceeds InnoDB's index limit.
+        UniqueConstraint("dedup_hash", name="uq_iocs_dedup_hash"),
+        Index("ix_iocs_type_value_search", "ioc_type", "value_search", mysql_length={"value_search": 255}),
+        Index("ix_iocs_value_search", "value_search", mysql_length=255),
+        Index("ix_iocs_value_search_type", "value_search", "ioc_type", mysql_length={"value_search": 255}),
     )
 
 
@@ -93,7 +93,7 @@ class RunIOCModel(Base):
     __table_args__ = (
         UniqueConstraint("run_id", "ioc_id", name="uq_run_ioc"),
         Index("ix_run_iocs_run_severity", "run_id", "severity"),
-        Index("ix_run_iocs_tags_search", "tags_search"),
+        Index("ix_run_iocs_tags_search", "tags_search", mysql_length=255),
         Index("ix_run_iocs_severity", "severity"),
         Index("ix_run_iocs_run_id", "run_id"),
     )

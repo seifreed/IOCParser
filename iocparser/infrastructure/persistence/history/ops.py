@@ -29,7 +29,9 @@ from iocparser.infrastructure.persistence_distributed_records import HISTORY_IMP
 from iocparser.infrastructure.persistence_migrations import migrate_engine
 from iocparser.infrastructure.persistence_repository_support import (
     dialect_replace_into,
+    ioc_dedup_hash,
     normalize_ioc_search,
+    source_dedup_hash,
 )
 from iocparser.infrastructure.persistence_schema import (
     DeadLetterJobModel,
@@ -533,6 +535,9 @@ def _import_sources(session: Session, rows: list[dict[str, object]]) -> tuple[in
         if str(typed.get("kind", "")) == "url":
             typed["original_url"] = typed.get("original_url") or typed.get("value")
             typed["normalized_url"] = _source_identity(typed)[1]
+        typed["dedup_hash"] = source_dedup_hash(
+            str(typed.get("kind", "")), str(typed.get("value", ""))
+        )
         existing = _existing_source(session, typed)
         if existing is None:
             source = SourceModel(**{key: value for key, value in typed.items() if key != "id"})
@@ -560,6 +565,13 @@ def _import_iocs(session: Session, rows: list[dict[str, object]]) -> tuple[int, 
         typed = typed_row(row)
         search_value = normalize_ioc_search(str(typed.get("value", "")))
         typed["value_search"] = search_value
+        typed["dedup_hash"] = ioc_dedup_hash(
+            str(typed.get("ioc_type", "")),
+            str(typed.get("value", "")),
+            bool(typed.get("is_warning")),
+            str(typed.get("warning_list", "")),
+            str(typed.get("warning_description", "")),
+        )
         existing = _existing_ioc(session, typed)
         if existing is None:
             ioc = IOCModel(**{key: value for key, value in typed.items() if key != "id"})

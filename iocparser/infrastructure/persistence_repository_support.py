@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Callable
 from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
-from typing import Protocol, cast, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 
-from sqlalchemy import Select
+from sqlalchemy import Connection, Engine, Inspector, Select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -59,6 +60,119 @@ def normalize_search(value: str | None) -> str:
 
 def normalize_ioc_search(value: str | None) -> str:
     return refang_ioc(value or "").strip().lower()
+
+
+def _dedup_hash(parts: tuple[str, ...]) -> str:
+    """Stable hash of an identity tuple, NUL-joined so parts can't run together."""
+    return hashlib.sha256("\x00".join(parts).encode("utf-8")).hexdigest()
+
+
+def ioc_dedup_hash(
+    ioc_type: str, value: str, is_warning: bool, warning_list: str, warning_description: str
+) -> str:
+    """Identity hash for an IOC row.
+
+    Replaces the multi-column UNIQUE(ioc_type, value, is_warning, warning_list,
+    warning_description), which is invalid on MySQL/MariaDB because TEXT columns
+    cannot participate in a key (and the combined length exceeds InnoDB's limit).
+    """
+    return _dedup_hash(
+        (ioc_type, value, "1" if is_warning else "0", warning_list, warning_description)
+    )
+
+
+def source_dedup_hash(kind: str, value: str) -> str:
+    """Identity hash for a source row (replaces UNIQUE(kind, value))."""
+    return _dedup_hash((kind, value))
+
+
+def _row_source_hash(row: Any) -> str:
+    return source_dedup_hash(str(row.kind), str(row.value))
+
+
+def _row_ioc_hash(row: Any) -> str:
+    return ioc_dedup_hash(
+        str(row.ioc_type),
+        str(row.value),
+        bool(row.is_warning),
+        str(row.warning_list),
+        str(row.warning_description),
+    )
+
+
+_DEDUP_BACKFILL_PLAN = (
+    ("sources", "uq_sources_dedup_hash", ("kind", "value"), _row_source_hash),
+    (
+        "iocs",
+        "uq_iocs_dedup_hash",
+        ("ioc_type", "value", "is_warning", "warning_list", "warning_description"),
+        _row_ioc_hash,
+    ),
+)
+
+
+def _has_dedup_column(inspector: Inspector, table: str) -> bool:
+    return any(col["name"] == "dedup_hash" for col in inspector.get_columns(table))
+
+
+def _has_unique_key(inspector: Inspector, table: str, name: str) -> bool:
+    names = {idx["name"] for idx in inspector.get_indexes(table)}
+    names.update(uc["name"] for uc in inspector.get_unique_constraints(table))
+    return name in names
+
+
+def _backfill_dedup_hash(
+    connection: Connection,
+    table: str,
+    columns: tuple[str, ...],
+    hasher: Callable[[Any], str],
+) -> None:
+    selected = ", ".join(("id", *columns))
+    rows = cast(
+        "list[Any]",
+        connection.execute(
+            text(f"SELECT {selected} FROM {table} WHERE dedup_hash = ''")  # noqa: S608
+        ).all(),
+    )
+    for row in rows:
+        connection.execute(
+            text(f"UPDATE {table} SET dedup_hash = :h WHERE id = :id"),  # noqa: S608
+            {"h": hasher(row), "id": row.id},
+        )
+
+
+def backfill_dedup_hash_columns(engine: Engine, inspector: Inspector) -> None:
+    """Add and backfill the dedup_hash uniqueness column for iocs and sources.
+
+    The original UNIQUE constraints spanned TEXT columns, which cannot form a key
+    on MySQL/MariaDB; fresh databases get dedup_hash from create_all, this migrates
+    legacy SQLite ones. Idempotent and dialect-safe; reflection is resolved before
+    the transaction so it cannot disturb the uncommitted ALTER/backfill.
+    """
+    tables = set(inspector.get_table_names())
+    steps = [
+        (
+            table,
+            key,
+            columns,
+            hasher,
+            _has_dedup_column(inspector, table),
+            _has_unique_key(inspector, table, key),
+        )
+        for table, key, columns, hasher in _DEDUP_BACKFILL_PLAN
+        if table in tables
+    ]
+    with engine.begin() as connection:
+        for table, key, columns, hasher, has_column, has_key in steps:
+            if not has_column:
+                connection.execute(
+                    text(
+                        f"ALTER TABLE {table} ADD COLUMN dedup_hash VARCHAR(64) NOT NULL DEFAULT ''"
+                    )
+                )
+            _backfill_dedup_hash(connection, table, columns, hasher)
+            if not has_key:
+                connection.execute(text(f"CREATE UNIQUE INDEX {key} ON {table}(dedup_hash)"))
 
 
 def dialect_replace_into(dialect_name: str, table_and_columns: str) -> str:

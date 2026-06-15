@@ -598,3 +598,76 @@ def test_worker_config_path_accepts_equals_form_and_any_position() -> None:
     assert _config_path_from_argv(["worker", "--verbose", "--config=d.ini"]) == "d.ini"
     assert _config_path_from_argv(["worker"]) is None
     assert _config_path_from_argv(["worker", "--config"]) is None
+
+
+def test_rev_0009_backfills_dedup_hash_on_legacy_tables() -> None:
+    """The dedup_hash migration must add and backfill the column on legacy DBs.
+
+    Legacy SQLite databases predate dedup_hash; rev_0009 adds it, backfills from
+    the identity columns, and creates the unique index that enforces the
+    MySQL-compatible uniqueness.
+    """
+    from sqlalchemy import inspect as sa_inspect
+
+    from iocparser.infrastructure.migration_revisions import rev_0009_dedup_hash
+    from iocparser.infrastructure.persistence_repository_support import (
+        ioc_dedup_hash,
+        source_dedup_hash,
+    )
+
+    engine = create_engine("sqlite://")
+    with engine.begin() as connection:
+        connection.execute(
+            text("CREATE TABLE sources (id INTEGER PRIMARY KEY, kind TEXT, value TEXT)")
+        )
+        connection.execute(
+            text("INSERT INTO sources(kind, value) VALUES ('url', 'http://evil.example/a')")
+        )
+        connection.execute(
+            text(
+                "CREATE TABLE iocs (id INTEGER PRIMARY KEY, ioc_type TEXT, value TEXT, "
+                "is_warning INTEGER, warning_list TEXT, warning_description TEXT)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO iocs(ioc_type, value, is_warning, warning_list, warning_description) "
+                "VALUES ('domains', 'evil.example', 0, '', '')"
+            )
+        )
+
+    rev_0009_dedup_hash.apply(engine, sa_inspect(engine))
+
+    with engine.connect() as connection:
+        source_hash = connection.execute(text("SELECT dedup_hash FROM sources")).scalar_one()
+        ioc_hash = connection.execute(text("SELECT dedup_hash FROM iocs")).scalar_one()
+        unique_keys = {uc["name"] for uc in sa_inspect(engine).get_unique_constraints("iocs")} | {
+            idx["name"] for idx in sa_inspect(engine).get_indexes("iocs")
+        }
+
+    assert source_hash == source_dedup_hash("url", "http://evil.example/a")
+    assert ioc_hash == ioc_dedup_hash("domains", "evil.example", False, "", "")
+    assert "uq_iocs_dedup_hash" in unique_keys
+
+
+def test_schema_ddl_is_valid_for_mysql() -> None:
+    """The iocs/sources schema must compile to valid MySQL DDL (no TEXT in keys).
+
+    MySQL/MariaDB rejects TEXT columns in a key (error 1170); the unique
+    constraints now use a bounded dedup_hash and the search indexes carry a
+    prefix length, so create_all no longer aborts on MySQL.
+    """
+    from sqlalchemy.dialects import mysql
+    from sqlalchemy.schema import CreateIndex, CreateTable
+
+    from iocparser.infrastructure.persistence_schema import IOCModel, SourceModel
+
+    for model in (IOCModel, SourceModel):
+        table_ddl = str(CreateTable(model.__table__).compile(dialect=mysql.dialect()))
+        assert "UNIQUE (dedup_hash)" in table_ddl
+        # No bare TEXT column appears inside a UNIQUE(...) key clause.
+        assert "value, is_warning" not in table_ddl
+        for index in model.__table__.indexes:
+            index_ddl = str(CreateIndex(index).compile(dialect=mysql.dialect()))
+            if "value_search" in index_ddl:
+                assert "value_search(255)" in index_ddl

@@ -710,10 +710,17 @@ def test_rabbitmq_adapter_serializes_concurrent_access() -> None:
     import threading
     import time
 
+    class TrackingProperties:
+        def __init__(self, *, message_id: str, delivery_mode: int = 2) -> None:
+            del delivery_mode
+            self.message_id = message_id
+
     class TrackingChannel:
         def __init__(self) -> None:
             self.active = 0
             self.violations = 0
+            self.messages: list[tuple[int, str, bytes]] = []
+            self.tag = 0
 
         def _enter(self) -> None:
             self.active += 1
@@ -729,13 +736,18 @@ def test_rabbitmq_adapter_serializes_concurrent_access() -> None:
         def basic_publish(
             self, *, exchange: str, routing_key: str, body: bytes, properties: object
         ) -> None:
-            del exchange, routing_key, body, properties
+            del exchange, routing_key
             self._enter()
+            self.tag += 1
+            self.messages.append((self.tag, properties.message_id, body))
 
         def basic_get(self, *, queue: str, auto_ack: bool):
             del queue, auto_ack
             self._enter()
-            return None, None, None
+            if not self.messages:
+                return None, None, None
+            tag, message_id, body = self.messages.pop(0)
+            return SimpleNamespace(delivery_tag=tag), TrackingProperties(message_id=message_id), body
 
         def basic_ack(self, *, delivery_tag: int) -> None:
             del delivery_tag
@@ -761,9 +773,7 @@ def test_rabbitmq_adapter_serializes_concurrent_access() -> None:
             def __init__(self, url: str) -> None:
                 self.url = url
 
-        class BasicProperties:
-            def __init__(self, *, delivery_mode: int, message_id: str) -> None:
-                del delivery_mode, message_id
+        BasicProperties = TrackingProperties
 
         @staticmethod
         def BlockingConnection(params: object) -> TrackingConnection:
@@ -775,9 +785,10 @@ def test_rabbitmq_adapter_serializes_concurrent_access() -> None:
 
         def hammer() -> None:
             for _ in range(20):
-                receipt = adapter.enqueue(queue_name="jobs", envelope=envelope)
-                adapter.dequeue(queue_name="jobs")
-                adapter.ack(receipt)
+                adapter.enqueue(queue_name="jobs", envelope=envelope)
+                dequeued = adapter.dequeue(queue_name="jobs")
+                if dequeued is not None:
+                    adapter.ack(dequeued[0])
 
         threads = [threading.Thread(target=hammer) for _ in range(6)]
         for thread in threads:

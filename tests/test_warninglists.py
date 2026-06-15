@@ -977,6 +977,30 @@ class TestWarningListsHelperFunctions:
         is_warning, info = warning_lists.check_value("fe80::1", "ipv6")
         assert is_warning
 
+    def test_ipv6_matches_cidr_list_scoped_to_ip_attributes(self):
+        """Regression: IPv6 IOCs must match IP CIDR lists that use only ip-src/ip-dst.
+
+        MISP CIDR lists are typically scoped to ["ip-src", "ip-dst", "ip"] (no
+        explicit "ipv6" attribute), so they index under "ips". IPv6 IOCs must
+        still be checked against them, not silently skipped.
+        """
+        warning_lists = make_warning_lists()
+        warning_lists.warning_lists = {
+            "doc-range": {
+                "name": "Documentation IPv6",
+                "description": "RFC 3849 documentation range",
+                "type": "cidr",
+                "matching_attributes": ["ip-src", "ip-dst", "ip"],
+                "list": ["2001:db8::/32"],
+            }
+        }
+        warning_lists._preprocess_lists()
+
+        is_warning, info = warning_lists.check_value("2001:db8:abcd::42", "ipv6")
+        assert is_warning
+        assert info["name"] == "Documentation IPv6"
+        assert warning_lists.check_value("2001:dead::1", "ipv6")[0] is False
+
     def test_check_value_invalid_ip_for_cidr(self):
         """Test CIDR checking with invalid IP address."""
         warning_lists = make_warning_lists()

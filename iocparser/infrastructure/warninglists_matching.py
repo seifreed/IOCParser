@@ -169,6 +169,12 @@ class WarningListMatchingMixin:
         related_types = [ioc_type]
         if ioc_type == "urls":
             related_types.append("domains")
+        elif ioc_type == "ips":
+            related_types.append("ipv6")
+        elif ioc_type == "ipv6":
+            # MISP ip-src/ip-dst lists are indexed under "ips" but apply to IPv6 too;
+            # the CIDR/string match is address-family-safe, so this cannot false-match.
+            related_types.append("ips")
         relevant_list_ids = [
             list_id
             for related_type in related_types

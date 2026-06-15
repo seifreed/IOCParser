@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import time
 from json import loads
 from pathlib import Path
@@ -224,8 +225,10 @@ def build_batch_report(context: BatchReportContext) -> BatchReport:
             "average_item_duration_ms": int(sum(item_durations) / len(item_durations))
             if item_durations
             else 0,
+            # Nearest-rank p95: ceil(0.95*n)-1. Using int()/floor returned the
+            # absolute maximum (p100) whenever n was a multiple of 20.
             "p95_item_duration_ms": item_durations[
-                min(len(item_durations) - 1, int(len(item_durations) * 0.95))
+                min(len(item_durations) - 1, math.ceil(len(item_durations) * 0.95) - 1)
             ]
             if item_durations
             else 0,

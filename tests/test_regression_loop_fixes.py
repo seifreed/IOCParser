@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import codecs
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ from sqlalchemy import create_engine, inspect, text
 from iocparser.adapters.renderers_stix import STIXOutputRenderer
 from iocparser.application.distributed_idempotency import idempotency_key_for
 from iocparser.cli_output import _build_diff_payload, _render_structured_diff
+from iocparser.cli_processing_url_reports import build_batch_report
 from iocparser.domain.models import (
     IOC,
     ExtractionOptions,
@@ -343,3 +345,63 @@ def test_unlabelled_md5_still_extracted() -> None:
     digest = "5d41402abc4b2a76b9719d911017c592"
     result = IOCExtractor(defang=False).extract_all(f"file md5 {digest} dropped")
     assert result.get("md5") == [digest]
+
+
+def test_gcp_default_service_accounts_are_extracted() -> None:
+    """Default GCP service accounts (not just user-managed .iam ones) must match.
+
+    The pattern required '<id>.iam.gserviceaccount.com' and a letter-leading local
+    part, so the common default SAs were missed entirely.
+    """
+    for sample_text, expected in (
+        (
+            "sa deploy-bot@my-project.iam.gserviceaccount.com x",
+            "deploy-bot@my-project.iam.gserviceaccount.com",
+        ),
+        (
+            "sa 123456789012-compute@developer.gserviceaccount.com x",
+            "123456789012-compute@developer.gserviceaccount.com",
+        ),
+        (
+            "sa my-project-id@appspot.gserviceaccount.com x",
+            "my-project-id@appspot.gserviceaccount.com",
+        ),
+    ):
+        result = IOCExtractor(defang=False).extract_all(sample_text)
+        assert result.get("gcp_service_accounts") == [expected]
+
+
+def test_p95_item_duration_excludes_the_maximum() -> None:
+    """p95 must not return the absolute maximum when n is a multiple of 20.
+
+    The floor-index int(n*0.95) landed one rank too high, so for 20 samples the
+    reported p95 was the 100th-percentile value.
+    """
+    item_reports = [
+        {
+            "item_key": f"batch-item:{i}",
+            "input_index": i,
+            "url": f"https://host{i}.example",
+            "status": "ok",
+            "duration_ms": i,
+        }
+        for i in range(1, 21)
+    ]
+    report = build_batch_report(
+        {
+            "urls": [item["url"] for item in item_reports],
+            "results": {},
+            "failures": {},
+            "item_reports": item_reports,
+            "source_metadata_map": {},
+            "run_metadata_map": {},
+            "job_id": "job-p95",
+            "correlation_id": "corr-p95",
+            "input_load_ms": 0,
+            "batch_started": time.perf_counter(),
+            "batch_started_wall": time.time(),
+        }
+    )
+
+    # Durations are 1..20; nearest-rank p95 is the 19th value, not the max (20).
+    assert report["metrics"]["p95_item_duration_ms"] == 19

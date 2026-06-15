@@ -29,6 +29,7 @@ from iocparser.cli_processing_url_reports import (
 )
 from iocparser.domain.models import FailedBatchItem
 from iocparser.errors import FileExistenceError, ValidationError
+from iocparser.infrastructure.file_parser import decode_file_bytes
 from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
 from iocparser.interfaces.ports import TextSourceReader, URLDownloader, WarningListService
 from iocparser.pipeline_errors import classify_pipeline_exception
@@ -294,7 +295,7 @@ def _load_batch_urls(
             raise FileExistenceError(str(url_file))
         urls = [
             raw_url.strip()
-            for raw_url in url_file.read_text(encoding="utf-8").splitlines()
+            for raw_url in decode_file_bytes(url_file.read_bytes()).splitlines()
             if raw_url.strip() and not raw_url.strip().startswith("#")
         ]
         input_label = "URLs"

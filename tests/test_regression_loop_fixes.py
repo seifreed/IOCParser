@@ -454,3 +454,27 @@ def test_hostname_type_warning_lists_match() -> None:
     warning_lists = MISPWarningListService()._get_lists(force_update=False)
     matched, _info = warning_lists.check_value("google.com", "domains")
     assert matched is True
+
+
+def test_url_batch_file_honors_bom_and_utf16(tmp_path: Path) -> None:
+    """A URL list file with a BOM or UTF-16 encoding must parse cleanly.
+
+    The reader used read_text(encoding='utf-8'), so a UTF-8 BOM left a stray
+    \\ufeff on the first URL and a UTF-16 file raised UnicodeDecodeError.
+    """
+    import argparse as _argparse
+
+    from iocparser.cli_processing_urls import _load_batch_urls
+
+    body = "https://example.com/a\n# comment\nhttps://example.com/b\n"
+    bom_file = tmp_path / "urls_bom.txt"
+    bom_file.write_bytes(codecs.BOM_UTF8 + body.encode("utf-8"))
+    utf16_file = tmp_path / "urls_utf16.txt"
+    utf16_file.write_bytes(body.encode("utf-16"))
+
+    for path in (bom_file, utf16_file):
+        args = _argparse.Namespace(url_file=str(path))
+        urls, _label, _ms = _load_batch_urls(
+            args, retry_report=None, retry_batch_job=None, db_uri=None
+        )
+        assert urls == ["https://example.com/a", "https://example.com/b"]

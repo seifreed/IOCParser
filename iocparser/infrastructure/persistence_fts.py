@@ -18,17 +18,18 @@ def has_fts_table(engine: Engine) -> bool:
 def build_fts_query(value: str) -> str | None:
     """Convert a free-text IOC search into an FTS5 phrase query.
 
-    We use NEAR(..., 0) with ordered terms so that tokens must appear
-    consecutively in the same order as the original value.  This avoids
-    the previous bug where ``192.168.1.1`` was tokenised into independent
-    prefix terms that could match unrelated IOCs containing e.g. ``"1"``.
+    Tokens are joined into a single ordered phrase so they must appear
+    consecutively in the same order as the original value, with a prefix on
+    the final token for partial matches. This avoids the previous bug where
+    ``192.168.1.1`` was tokenised into independent terms that could match
+    unrelated IOCs containing e.g. ``"1"`` -- while still matching values of
+    four or more tokens (such as an IPv4 address), which ``NEAR(..., 0)``
+    failed to match at all.
     """
     terms = [term for term in re.split(r"[^a-zA-Z0-9]+", value.lower()) if term]
     if not terms:
         return None
-    if len(terms) == 1:
-        return f'"{terms[0]}"*'
-    return "NEAR(" + " ".join(f'"{term}"' for term in terms) + ", 0)"
+    return '"' + " ".join(terms) + '"*'
 
 
 def sync_fts_index(session: Session) -> None:

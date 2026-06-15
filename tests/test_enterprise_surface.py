@@ -199,6 +199,26 @@ def _setup_batch_history(db_uri: str, *, failed_url: str = "https://fail.example
     return batch_job_id
 
 
+def test_fts_search_finds_ipv4_address(tmp_path: Path) -> None:
+    """Regression: an IPv4 (4 tokens) must be findable via the FTS backend.
+
+    build_fts_query previously emitted NEAR("1" "2" "3" "4", 0), which FTS5
+    never matched, so the default 'auto'/'fts' search returned nothing for IPs.
+    """
+    db_uri = f"sqlite:///{tmp_path / 'fts-ipv4.sqlite'}"
+    service = SQLAlchemyPersistenceService(db_uri)
+    service.persist_multiple_runs(
+        [("file", "f.txt", ExtractionResult.from_grouped_payload({"ips": ["1.2.3.4"]}, {}))],
+        tool_version="1.0.0",
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
+    )
+    for backend in ("fts", "auto", "like"):
+        page = query_persisted_iocs(db_uri=db_uri, value="1.2.3.4", search_backend=backend)
+        assert [hit.value for hit in page.items] == ["1.2.3.4"], backend
+
+
 def test_custom_ioc_types_fts_and_public_batch_api(tmp_path: Path) -> None:
     register_custom_ioc_type(
         "telegram_handles",
@@ -264,7 +284,8 @@ def test_custom_ioc_types_fts_and_public_batch_api(tmp_path: Path) -> None:
         sync_fts_index(uow.session)
     finally:
         uow.close()
-    assert build_fts_query("ok example") == 'NEAR("ok" "example", 0)'
+    assert build_fts_query("ok example") == '"ok example"*'
+    assert build_fts_query("1.2.3.4") == '"1 2 3 4"*'
     with pytest.raises(ValueError, match="alphanumeric term"):
         service.search_iocs_page(value="!!!", search_backend="fts")
     assert service.search_iocs_page(value="ok", search_backend="like").total >= 1

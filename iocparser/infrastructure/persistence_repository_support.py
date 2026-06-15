@@ -61,6 +61,18 @@ def normalize_ioc_search(value: str | None) -> str:
     return refang_ioc(value or "").strip().lower()
 
 
+def dialect_replace_into(dialect_name: str, table_and_columns: str) -> str:
+    """Return a primary-key upsert statement valid for the given SQL dialect.
+
+    SQLite uses ``INSERT OR REPLACE``; MySQL/MariaDB reject ``OR REPLACE`` and use
+    ``REPLACE INTO``. Both are delete-then-insert upserts on the primary key, so
+    the hard-coded SQLite form broke every migration/history write on MariaDB.
+    """
+    if dialect_name in {"mysql", "mariadb"}:
+        return f"REPLACE INTO {table_and_columns}"
+    return f"INSERT OR REPLACE INTO {table_and_columns}"
+
+
 def int_metadata_value(metadata: dict[str, int | str | None], key: str, default: int) -> int:
     raw_value = metadata.get(key)
     if raw_value is None:

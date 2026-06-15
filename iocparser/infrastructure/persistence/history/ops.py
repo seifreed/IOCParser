@@ -27,7 +27,10 @@ from iocparser.infrastructure.persistence_batch import (
 )
 from iocparser.infrastructure.persistence_distributed_records import HISTORY_IMPORT_MARKER_KEY
 from iocparser.infrastructure.persistence_migrations import migrate_engine
-from iocparser.infrastructure.persistence_repository_support import normalize_ioc_search
+from iocparser.infrastructure.persistence_repository_support import (
+    dialect_replace_into,
+    normalize_ioc_search,
+)
 from iocparser.infrastructure.persistence_schema import (
     DeadLetterJobModel,
     DistributedJobModel,
@@ -180,7 +183,12 @@ def _history_origin_id(session: Session) -> str:
         return row.strip()
     origin_id = str(uuid4())
     session.execute(
-        text("INSERT OR REPLACE INTO history_metadata(key, value) VALUES ('origin_id', :value)"),
+        text(
+            dialect_replace_into(
+                session.get_bind().dialect.name,
+                "history_metadata(key, value) VALUES ('origin_id', :value)",
+            )
+        ),
         {"value": origin_id},
     )
     return origin_id

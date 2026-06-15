@@ -17,6 +17,7 @@ from iocparser.infrastructure.migration_revisions.rev_0008_history_origin import
     apply as apply_rev_0008,
 )
 from iocparser.infrastructure.persistence_fts import FTS_TABLE
+from iocparser.infrastructure.persistence_repository_support import dialect_replace_into
 
 SCHEMA_VERSION_TABLE = "schema_migrations"
 
@@ -107,8 +108,10 @@ def stamp_version(engine: Engine, version: int) -> None:
     with engine.begin() as connection:
         connection.execute(
             text(
-                "INSERT OR REPLACE INTO schema_migrations(version, applied_at) "
-                "VALUES (:version, :applied_at)"
+                dialect_replace_into(
+                    engine.dialect.name,
+                    "schema_migrations(version, applied_at) VALUES (:version, :applied_at)",
+                )
             ),
             {"version": version, "applied_at": datetime.now(UTC).isoformat()},
         )

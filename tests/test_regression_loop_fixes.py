@@ -25,6 +25,7 @@ from iocparser.infrastructure.extraction import IOCExtractor
 from iocparser.infrastructure.file_parser import decode_file_bytes
 from iocparser.infrastructure.file_readers import MagicTextSourceReader
 from iocparser.infrastructure.migration_revisions import rev_0005_fts_metrics
+from iocparser.infrastructure.persistence.history.row_values import typed_row
 from iocparser.infrastructure.persistence_fts import build_fts_query
 from iocparser.worker_config_support import load_worker_file_values
 
@@ -287,3 +288,37 @@ def test_ja4_matches_no_alpn_fingerprints() -> None:
     ):
         result = IOCExtractor(defang=False).extract_all(f"fingerprint {value} seen")
         assert result.get("ja4") == [value]
+
+
+def test_url_with_userinfo_is_extracted() -> None:
+    """A URL carrying embedded credentials must be kept, not truncated and dropped.
+
+    Without userinfo support the regex stopped at the first ':' (http://user),
+    which has no dotted host and was then rejected, losing the IOC entirely.
+    """
+    result = IOCExtractor(defang=False).extract_all("visit http://user:pass@evil.com/path now")
+    assert result.get("urls") == ["http://user:pass@evil.com/path"]
+
+
+def test_docker_image_keeps_registry_host_and_port() -> None:
+    """The registry host (and optional port) must be retained in docker IOCs."""
+    digest = "a" * 64
+    host = IOCExtractor(defang=False).extract_all(
+        f"img myregistry.io/library/nginx@sha256:{digest}"
+    )
+    assert host.get("docker_images") == [f"myregistry.io/library/nginx@sha256:{digest}"]
+    port = IOCExtractor(defang=False).extract_all(f"img myregistry.io:5000/nginx@sha256:{digest}")
+    assert port.get("docker_images") == [f"myregistry.io:5000/nginx@sha256:{digest}"]
+
+
+def test_typed_row_preserves_nullable_retryable() -> None:
+    """retryable is tri-state; a NULL value must survive history import as None.
+
+    It was in the blanket BOOL_FIELDS coercion, so None collapsed to False on
+    export/import, conflating 'not yet determined' with 'not retryable'.
+    """
+    assert typed_row({"retryable": None})["retryable"] is None
+    assert typed_row({"retryable": "true"})["retryable"] is True
+    assert typed_row({"retryable": 0})["retryable"] is False
+    # Non-nullable is_warning still coerces a missing/None value to False.
+    assert typed_row({"is_warning": None})["is_warning"] is False

@@ -26,7 +26,10 @@ INT_FIELD_DEFAULTS: dict[str, int | None] = {
     "attempts": 0,
     "max_attempts": 0,
 }
-BOOL_FIELDS = {"is_warning", "retryable"}
+BOOL_FIELDS = {"is_warning"}
+# retryable is nullable (None == "not yet determined"); coercing None to False
+# on a history export/import round-trip would lose that tri-state distinction.
+NULLABLE_BOOL_FIELDS = {"retryable"}
 
 
 def bool_from_row(value: object, *, default: bool = False) -> bool:
@@ -63,4 +66,6 @@ def typed_row(row: dict[str, object]) -> dict[str, object]:
                 row_dict[key] = parsed
         if key in BOOL_FIELDS:
             row_dict[key] = bool_from_row(value)
+        if key in NULLABLE_BOOL_FIELDS:
+            row_dict[key] = None if value is None else bool_from_row(value)
     return row_dict

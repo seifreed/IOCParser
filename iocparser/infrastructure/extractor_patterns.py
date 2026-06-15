@@ -68,6 +68,10 @@ PATTERNS: dict[str, Pattern[str]] = {
     ),
     "urls": re.compile(
         r"\b(?:https?|hxxps?|h\[\.\]ttps?|s?ftp)://"
+        # Optional userinfo (user[:pass]@); the class excludes '/' so it cannot
+        # spill into the path. Without it, http://user:pass@evil.com was truncated
+        # at the first ':' to http://user and then dropped as host-less.
+        r"(?:[a-zA-Z0-9._~%!$&'()*+,;=:-]+@)?"
         r"(?!DOMAIN_NAME|IP:|\*\.|localhost|example\.)"
         r"[a-zA-Z0-9](?:[-a-zA-Z0-9]|(?:\.|\[\.\]|\(\.\)|\{\.\}))*[a-zA-Z0-9]"
         r"(?:\.[a-zA-Z]{2,63})?(?::[0-9]{1,5})?"
@@ -170,7 +174,13 @@ PATTERNS: dict[str, Pattern[str]] = {
         re.IGNORECASE,
     ),
     "docker_images": re.compile(
-        r"\b(?:[a-z0-9]+(?:[._-][a-z0-9]+)*/)?[a-z0-9]+(?:[._-][a-z0-9]+)*"
+        # Optional registry host[:port], then zero or more namespace segments,
+        # then the image name. The single-segment-only prefix used to drop the
+        # registry host (myregistry.io/library/nginx -> library/nginx) and turn a
+        # host:port into garbage (myregistry.io:5000/nginx -> 5000/nginx).
+        r"\b(?:[a-z0-9]+(?:[._-][a-z0-9]+)*(?::[0-9]+)?/)?"
+        r"(?:[a-z0-9]+(?:[._-][a-z0-9]+)*/)*"
+        r"[a-z0-9]+(?:[._-][a-z0-9]+)*"
         r"(?::[a-zA-Z0-9._-]+)?@sha256:[a-fA-F0-9]{64}\b",
     ),
     "tlsh": re.compile(

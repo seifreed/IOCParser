@@ -50,6 +50,8 @@ WORKER_DEFAULTS: dict[str, object] = {
     "skip_processed": False,
 }
 INVALID_BOOL_ENV_ERROR = "Invalid boolean environment value for {name}: {value!r}"
+INVALID_INT_ENV_ERROR = "Invalid integer environment value for {name}: {value!r}"
+INVALID_FLOAT_ENV_ERROR = "Invalid float environment value for {name}: {value!r}"
 
 
 def _int_type_error(value: object) -> TypeError:
@@ -64,14 +66,20 @@ def int_env(name: str, default: int | None = None) -> int | None:
     raw = os.environ.get(name)
     if raw is None or raw == "":
         return default
-    return int(raw)
+    try:
+        return int(raw)
+    except ValueError as exc:
+        raise ValueError(INVALID_INT_ENV_ERROR.format(name=name, value=raw)) from exc
 
 
 def float_env(name: str, default: float | None = None) -> float | None:
     raw = os.environ.get(name)
     if raw is None or raw == "":
         return default
-    return float(raw)
+    try:
+        return float(raw)
+    except ValueError as exc:
+        raise ValueError(INVALID_FLOAT_ENV_ERROR.format(name=name, value=raw)) from exc
 
 
 def bool_env(name: str, default: bool = False) -> bool:

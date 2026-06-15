@@ -315,6 +315,15 @@ def test_runtime_and_worker_config_support_helpers_cover_error_branches(tmp_path
         assert float_env("IOC_FLOAT_ENV") == 1.5
         assert bool_env("IOC_BOOL_ENV") is True
 
+        # Malformed numeric env values raise a descriptive, env-var-named error
+        # (matching bool_env) instead of an opaque "invalid literal for int()".
+        os_environ["IOC_INT_ENV"] = "not-an-int"
+        os_environ["IOC_FLOAT_ENV"] = "not-a-float"
+        with pytest.raises(ValueError, match="IOC_INT_ENV"):
+            int_env("IOC_INT_ENV")
+        with pytest.raises(ValueError, match="IOC_FLOAT_ENV"):
+            float_env("IOC_FLOAT_ENV")
+
         config_path = tmp_path / "iocparser.ini"
         config_path.write_text("[worker]\nqueue_backend = filesystem\n", encoding="utf-8")
         os_environ["IOCPARSER_CONFIG"] = str(config_path)

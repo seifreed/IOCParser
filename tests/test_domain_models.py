@@ -47,7 +47,7 @@ def test_indicator_value_for_selects_specialized_types() -> None:
     assert type(indicator_value_for(IOCType.EMAIL, "a@b.test")).__name__ == "EmailValue"
     assert type(indicator_value_for("urls", "hxxps://example[.]com")).__name__ == "UrlValue"
     assert indicator_value_for("urls", "hxxps://example[.]com").canonical() == (
-        "https://example.com"
+        "https://example.com/"
     )
 
 

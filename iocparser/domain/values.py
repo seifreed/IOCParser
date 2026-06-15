@@ -46,7 +46,10 @@ class UrlValue(IndicatorValue):
         except ValueError:
             return normalized
         if parsed.scheme and parsed.netloc:
-            return parsed.geturl()
+            # Default an empty path to "/" and drop the (client-only) fragment so
+            # http://x.com, http://x.com/ and http://x.com/#frag dedup to one IOC,
+            # matching the source-layer normalization. Host casing is left as-is.
+            return parsed._replace(path=parsed.path or "/", fragment="").geturl()
         return normalized
 
 

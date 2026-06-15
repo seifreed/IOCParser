@@ -421,3 +421,36 @@ def test_snort_rule_extracted_when_sid_precedes_msg() -> None:
         "alert tcp any any -> any 80 (sid:1000001; rev:1;)"
     )
     assert no_msg.get("snort_rules") is None
+
+
+def test_url_canonical_defaults_path_and_drops_fragment() -> None:
+    """Equivalent URLs must share one canonical value so they dedup to one IOC.
+
+    UrlValue.canonical() used geturl() directly, leaving an empty path and the
+    fragment in place, so http://x.com and http://x.com/ (and #frag variants)
+    produced distinct canonical values and duplicate IOC rows.
+    """
+    assert IOC.from_raw("urls", "http://example.com").canonical_value() == "http://example.com/"
+    assert IOC.from_raw("urls", "http://example.com/").canonical_value() == "http://example.com/"
+    assert (
+        IOC.from_raw("urls", "http://example.com/a#frag").canonical_value()
+        == "http://example.com/a"
+    )
+    # Query strings are part of the resource identity and must be preserved.
+    assert (
+        IOC.from_raw("urls", "http://example.com/p?q=1").canonical_value()
+        == "http://example.com/p?q=1"
+    )
+
+
+def test_hostname_type_warning_lists_match() -> None:
+    """MISP 'hostname'-type warning lists (e.g. Alexa) must produce matches.
+
+    Only string/regex/cidr list types were indexed, so the 19 shipped
+    hostname-type lists were inert and never flagged a value.
+    """
+    from iocparser.infrastructure.warninglists_service import MISPWarningListService
+
+    warning_lists = MISPWarningListService()._get_lists(force_update=False)
+    matched, _info = warning_lists.check_value("google.com", "domains")
+    assert matched is True

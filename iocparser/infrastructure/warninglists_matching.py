@@ -153,10 +153,21 @@ class WarningListMatchingMixin:
         return [name for name in names if name.strip()]
 
     def _get_unscoped_list_ids(self) -> list[str]:
+        # A scoped list is only reachable if it was indexed under some IOC type by
+        # its matching_attributes. Attributes that map to no known IOC type (e.g.
+        # azure-application-id) would otherwise leave the list dead — never a
+        # candidate for any value. Fall back to checking such lists globally, the
+        # same way truly unscoped lists are checked.
+        indexed_list_ids = {
+            list_id
+            for list_ids in self.lookup_data.lists_by_ioc_type.values()
+            for list_id in list_ids
+        }
         return [
             list_id
             for list_id, warning_list in self.warning_lists.items()
             if not self._matching_attribute_names(warning_list)
+            or list_id not in indexed_list_ids
         ]
 
     def _is_known_ioc_type(self, ioc_type: str) -> bool:

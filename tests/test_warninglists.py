@@ -479,6 +479,31 @@ class TestWarningListsPreprocessing:
         assert "invalid-regex-list" in warning_lists.compiled_regex
         assert len(warning_lists.compiled_regex["invalid-regex-list"]) == 1
 
+    def test_scoped_list_with_unmapped_attribute_is_still_checked(self):
+        """A scoped list whose matching_attributes map to no known IOC type must
+        not be dead — its values should still be checked.
+
+        Regression: a list scoped to e.g. 'azure-application-id' was never indexed
+        under any IOC type and was excluded from the unscoped set, so a known Azure
+        application ID present verbatim in the list was never flagged.
+        """
+        warning_lists = make_warning_lists()
+        guid = "14d82eec-204b-4c2f-b7e8-296a70dab67e"
+        warning_lists.warning_lists = {
+            "azure-appid-list": {
+                "name": "Azure App IDs",
+                "description": "Known Microsoft Azure application IDs",
+                "type": "string",
+                "matching_attributes": ["azure-application-id"],
+                "list": [guid],
+            }
+        }
+        warning_lists._preprocess_lists()
+
+        matched, response = warning_lists.check_value(guid, "azure_app_ids")
+        assert matched
+        assert response is not None
+
     def test_preprocess_lists_skips_unsafe_regex(self):
         """Test preprocessing skips regex patterns with nested quantifiers."""
         warning_lists = make_warning_lists()

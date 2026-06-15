@@ -405,3 +405,19 @@ def test_p95_item_duration_excludes_the_maximum() -> None:
 
     # Durations are 1..20; nearest-rank p95 is the 19th value, not the max (20).
     assert report["metrics"]["p95_item_duration_ms"] == 19
+
+
+def test_snort_rule_extracted_when_sid_precedes_msg() -> None:
+    """A complete rule whose sid: comes before msg: must still be extracted.
+
+    The header-then-sid regex shape consumed past an early sid, dropping the
+    rule. The msg: requirement (intentional) is preserved.
+    """
+    rule = 'alert tcp any any -> any any (sid:2001; msg:"x"; content:"a";)'
+    result = IOCExtractor(defang=False).extract_all(rule)
+    assert result.get("snort_rules") == [rule]
+    # A complete rule without msg: is still rejected (intentional behaviour).
+    no_msg = IOCExtractor(defang=False).extract_all(
+        "alert tcp any any -> any 80 (sid:1000001; rev:1;)"
+    )
+    assert no_msg.get("snort_rules") is None

@@ -196,10 +196,12 @@ PATTERNS: dict[str, Pattern[str]] = {
         re.IGNORECASE,
     ),
     "suricata_sids": re.compile(r"\bsid\s*:\s*([0-9]{1,10})\s*;"),
-    # Snort/Suricata rules - bounded line length to avoid ReDoS
+    # Snort/Suricata rules - single line, bounded length to avoid ReDoS. The sid
+    # option may appear anywhere in the rule body; the previous header-then-sid
+    # shape dropped otherwise-valid rules whose sid came before other options.
     "snort_rules": re.compile(
         r"\b((?:alert|drop|reject|pass)\s+(?:tcp|udp|icmp|ip|http|dns|tls|ssh|ftp|smtp)"
-        r"\s.{0,512};\s*(?:.{0,256}?\bsid\s*:\s*[0-9]+\s*;.{0,256}))",
+        r"\s[^\n]{0,512}?\bsid\s*:\s*[0-9]+\s*;[^\n]{0,256})",
     ),
     # Sigma rules - bounded block length to avoid ReDoS
     "sigma_rules": re.compile(

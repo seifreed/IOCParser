@@ -62,7 +62,11 @@ class ParallelStreamingExtractor:
                     logger.exception("Error processing %s", file_path)
                     results[str(file_path)] = {"_errors": [str(file_path)]}
 
-        return results
+        # Return in input order, not thread-completion order, so the downstream merge
+        # dedup is deterministic across runs (see ThreadPoolFileBatchExecutor).
+        return {
+            key: results[key] for fp in file_paths if (key := str(fp)) in results
+        }
 
 
 def extract_iocs_from_large_file(

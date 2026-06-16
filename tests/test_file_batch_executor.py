@@ -4,6 +4,7 @@ Regression tests for file_batch_executor bug fixes
 """
 
 import logging
+import threading
 
 from iocparser.domain.models import ExtractionResult
 from iocparser.infrastructure.file_batch_executor import ThreadPoolFileBatchExecutor
@@ -40,3 +41,26 @@ class TestFileBatchExecutorRegression:
         assert results["key1"] == ExtractionResult()
         assert "Batch processing failed" in caplog.text
         assert "RuntimeError: boom" in caplog.text
+
+    def test_results_returned_in_input_order_not_completion_order(self):
+        """Regression: results must be keyed in input order, not thread-completion order,
+        so the downstream merge dedup (first-seen raw value wins) is deterministic."""
+        executor = ThreadPoolFileBatchExecutor(max_workers=3)
+        c_done = threading.Event()
+
+        def handler(request):
+            # Force "a" (first input) to finish last and "c" (last input) first, so
+            # completion order is the reverse of input order.
+            if request == "a":
+                c_done.wait(timeout=5)
+            elif request == "c":
+                c_done.set()
+            return ExtractionResult()
+
+        results = executor.execute(
+            requests=["a", "b", "c"],
+            handler=handler,
+            key_for=lambda request: request,
+        )
+
+        assert list(results.keys()) == ["a", "b", "c"]

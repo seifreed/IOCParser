@@ -2,18 +2,42 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 
-from iocparser.cli_args import get_bool_arg
+from iocparser.cli_args import get_bool_arg, get_optional_str_arg
 from iocparser.config import AppConfig
 from iocparser.errors import ValidationError
 from iocparser.shared_utils import validated_diff_only
 
 INVALID_HTTP_MAPPING_ERROR = "Invalid HTTP mapping JSON: {value}"
+TLS_FILE_NOT_FOUND = "{flag} file does not exist: {path}"
 
 
 def mb_to_bytes(megabytes: float | None) -> int | None:
     """Convert a megabyte limit (e.g. --max-input-size-mb) to bytes, preserving None."""
     return int(megabytes * 1024 * 1024) if megabytes is not None else None
+
+
+def _validated_tls_file(value: str | None, *, flag: str) -> str | None:
+    """Reject a missing --ca-bundle/--tls-cert path at the CLI boundary.
+
+    Left unchecked, requests raises an OSError mid-download that surfaces as a
+    generic "Unexpected error download <url>", looking like a crash rather than the
+    bad-path user error it is.
+    """
+    if value is not None and not Path(value).is_file():
+        raise ValidationError(TLS_FILE_NOT_FOUND.format(flag=flag, path=value))
+    return value
+
+
+def resolve_tls_options(args: argparse.Namespace) -> tuple[bool | str, str | None]:
+    """Resolve (verify, cert) from TLS args, validating file paths up front."""
+    ca_bundle = _validated_tls_file(get_optional_str_arg(args, "ca_bundle"), flag="--ca-bundle")
+    verify: bool | str = get_bool_arg(args, "tls_verify", True)
+    if verify and ca_bundle:
+        verify = ca_bundle
+    cert = _validated_tls_file(get_optional_str_arg(args, "tls_cert"), flag="--tls-cert")
+    return verify, cert
 
 
 def apply_config_defaults(args: argparse.Namespace, config: AppConfig) -> None:

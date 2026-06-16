@@ -145,6 +145,29 @@ def _args(**overrides: object) -> argparse.Namespace:
     return argparse.Namespace(**base)
 
 
+def test_resolve_tls_options_rejects_missing_paths_cleanly(tmp_path: object) -> None:
+    """Regression: a missing --ca-bundle/--tls-cert path used to surface mid-download
+    as a generic "Unexpected error download <url>"; validate it up front instead."""
+    from iocparser.cli_runtime_defaults import resolve_tls_options
+
+    real = tmp_path / "ca.pem"  # type: ignore[operator]
+    real.write_text("x", encoding="utf-8")
+    verify, cert = resolve_tls_options(
+        argparse.Namespace(tls_verify=True, ca_bundle=str(real), tls_cert=None)
+    )
+    assert verify == str(real)
+    assert cert is None
+
+    with pytest.raises(ValidationError, match="--ca-bundle file does not exist"):
+        resolve_tls_options(
+            argparse.Namespace(tls_verify=True, ca_bundle="/no/such.pem", tls_cert=None)
+        )
+    with pytest.raises(ValidationError, match="--tls-cert file does not exist"):
+        resolve_tls_options(
+            argparse.Namespace(tls_verify=True, ca_bundle=None, tls_cert="/no/such.pem")
+        )
+
+
 def test_persisted_option_overrides_parse_bool_strings() -> None:
     render_options = coerce_render_options(None, {"with_context": "false"})
     export_filters = coerce_export_filters(None, {"only_warnings": "false", "only_normal": "0"})
@@ -1362,6 +1385,10 @@ def test_diff_previous_source_uses_run_id_to_break_started_at_ties(tmp_path: Pat
 
 def test_load_config_supports_extended_defaults(tmp_path: Path) -> None:
     config_path = tmp_path / "iocparser.ini"
+    client_pem = tmp_path / "client.pem"
+    client_pem.write_text("cert", encoding="utf-8")
+    ca_pem = tmp_path / "ca.pem"
+    ca_pem.write_text("ca", encoding="utf-8")
     config_path.write_text(
         (
             "[database]\n"
@@ -1387,8 +1414,8 @@ def test_load_config_supports_extended_defaults(tmp_path: Path) -> None:
             "proxy=http://127.0.0.1:8080\n"
             "allow_redirects=false\n"
             "tls_verify=false\n"
-            "tls_cert=/tmp/client.pem\n"
-            "ca_bundle=/tmp/ca.pem\n"
+            f"tls_cert={client_pem}\n"
+            f"ca_bundle={ca_pem}\n"
             "connect_timeout=1.5\n"
             "read_timeout=3.5\n"
         ),
@@ -1407,8 +1434,8 @@ def test_load_config_supports_extended_defaults(tmp_path: Path) -> None:
     assert config.proxy == "http://127.0.0.1:8080"
     assert config.allow_redirects is False
     assert config.tls_verify is False
-    assert config.tls_cert == "/tmp/client.pem"
-    assert config.ca_bundle == "/tmp/ca.pem"
+    assert config.tls_cert == str(client_pem)
+    assert config.ca_bundle == str(ca_pem)
     assert config.connect_timeout == 1.5
     assert config.read_timeout == 3.5
 
@@ -1448,8 +1475,8 @@ def test_load_config_supports_extended_defaults(tmp_path: Path) -> None:
     assert args.proxy == "http://127.0.0.1:8080"
     assert args.allow_redirects is False
     assert args.tls_verify is False
-    assert args.tls_cert == "/tmp/client.pem"
-    assert args.ca_bundle == "/tmp/ca.pem"
+    assert args.tls_cert == str(client_pem)
+    assert args.ca_bundle == str(ca_pem)
     assert args.connect_timeout == 1.5
     assert args.read_timeout == 3.5
 
@@ -1473,12 +1500,12 @@ def test_load_config_supports_extended_defaults(tmp_path: Path) -> None:
     assert configured_downloader.proxies["https"] == "http://127.0.0.1:8080"
     assert configured_downloader.allow_redirects is False
     assert configured_downloader.verify is False
-    assert configured_downloader.cert == "/tmp/client.pem"
+    assert configured_downloader.cert == str(client_pem)
     assert configured_downloader.timeout == (1.5, 3.5)
 
     args.tls_verify = True
     configured_with_ca = downloader_for_args(args)
-    assert configured_with_ca.verify == "/tmp/ca.pem"
+    assert configured_with_ca.verify == str(ca_pem)
 
 
 def test_cli_boolean_network_flags_override_false_config() -> None:

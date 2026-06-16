@@ -13,6 +13,7 @@ from iocparser.cli_runtime_defaults import (
     _apply_output_defaults,
     apply_config_defaults,
     mb_to_bytes,
+    resolve_tls_options,
 )
 from iocparser.cli_runtime_defaults import (
     parse_http_mapping as _parse_http_mapping,
@@ -104,10 +105,7 @@ def downloader_for_args(args: argparse.Namespace) -> RequestsURLDownloader:
     cookies_source = cookie_items if cookie_items is not None else cookies_json
     headers = _parse_http_mapping(headers_source, separator=":")
     cookies = _parse_http_mapping(cookies_source, separator="=")
-    ca_bundle = get_optional_str_arg(args, "ca_bundle")
-    verify: bool | str = get_bool_arg(args, "tls_verify", True)
-    if verify and ca_bundle:
-        verify = ca_bundle
+    verify, cert = resolve_tls_options(args)
     connect_timeout = _optional_float_arg(args, "connect_timeout")
     read_timeout = _optional_float_arg(args, "read_timeout")
     timeout: int | tuple[float, float]
@@ -139,7 +137,7 @@ def downloader_for_args(args: argparse.Namespace) -> RequestsURLDownloader:
         else None,
         allow_redirects=get_bool_arg(args, "allow_redirects", True),
         verify=verify,
-        cert=get_optional_str_arg(args, "tls_cert"),
+        cert=cert,
         allow_private_networks=get_bool_arg(args, "allow_private_urls", False),
         max_input_size_bytes=mb_to_bytes(_optional_float_arg(args, "max_input_size_mb")),
     )

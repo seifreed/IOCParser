@@ -396,6 +396,29 @@ class TestPluginRegistration:
         definition = get_ioc_type_plugin("test_ioc_type_x")
         assert definition["name"] == "test_ioc_type_x"
 
+    def test_unknown_plugin_names_raise_clean_validation_error(self) -> None:
+        # Regression: selecting a non-existent plugin (--renderer/--enricher/...) raised a
+        # bare KeyError that the CLI reported as an "unexpected error" stack trace; it must
+        # be a ValidationError naming the bad value and the available options.
+        import pytest
+
+        from iocparser.errors import ValidationError
+        from iocparser.plugins import (
+            get_enricher,
+            get_extractor,
+            get_postprocessor,
+            get_renderer,
+        )
+
+        with pytest.raises(ValidationError, match="Unknown renderer 'nope'"):
+            get_renderer("nope")
+        with pytest.raises(ValidationError, match="Unknown enricher 'nope'"):
+            get_enricher("nope")
+        with pytest.raises(ValidationError, match="Unknown extractor 'nope'"):
+            get_extractor("nope")
+        with pytest.raises(ValidationError, match="Unknown postprocessor 'nope'"):
+            get_postprocessor("nope")
+
 
 # ---------------------------------------------------------------------------
 # 5. cli_processing_urls.py — retry_attempt helpers

@@ -18,10 +18,23 @@ from iocparser.domain.models import (
     register_custom_ioc_type,
 )
 from iocparser.domain.type_filters import parse_ioc_types
+from iocparser.errors import ValidationError
 from iocparser.infrastructure.warninglists_service import MISPWarningListService
 from iocparser.interfaces.ports import OutputRenderer, WarningListService
 
 _logger = logging.getLogger(__name__)
+UNKNOWN_PLUGIN_ERROR = "Unknown {kind} '{name}'. Available: {available}"
+
+
+def _resolve_plugin[FactoryT](registry: dict[str, FactoryT], name: str, *, kind: str) -> FactoryT:
+    """Look a plugin up by name, raising a clean error (not a bare KeyError) if absent."""
+    try:
+        return registry[name.lower()]
+    except KeyError as exc:
+        available = ", ".join(sorted(registry)) or "(none)"
+        raise ValidationError(
+            UNKNOWN_PLUGIN_ERROR.format(kind=kind, name=name, available=available)
+        ) from exc
 _BUILTIN_RENDERER_NAMES: set[str] = set()
 _BUILTIN_ENRICHER_NAMES: set[str] = set()
 
@@ -63,7 +76,7 @@ def get_renderer(
 ) -> OutputRenderer:
     """Resolve a renderer by name."""
     _load_entry_point_plugins()
-    return _renderer_registry[name.lower()](with_context, stix_types)
+    return _resolve_plugin(_renderer_registry, name, kind="renderer")(with_context, stix_types)
 
 
 def renderer_names() -> tuple[str, ...]:
@@ -80,7 +93,7 @@ def register_enricher(name: str, factory: EnricherFactory) -> None:
 def get_enricher(name: str = "misp") -> WarningListService:
     """Resolve an enrichment service by name."""
     _load_entry_point_plugins()
-    return _enricher_registry[name.lower()]()
+    return _resolve_plugin(_enricher_registry, name, kind="enricher")()
 
 
 def enricher_names() -> tuple[str, ...]:
@@ -97,7 +110,7 @@ def register_extractor(name: str, factory: ExtractorFactory) -> None:
 def get_extractor(name: str) -> ExtractorPlugin:
     """Resolve an extractor plugin by name."""
     _load_entry_point_plugins()
-    return _extractor_registry[name.lower()]()
+    return _resolve_plugin(_extractor_registry, name, kind="extractor")()
 
 
 def extractor_names() -> tuple[str, ...]:
@@ -114,7 +127,7 @@ def register_postprocessor(name: str, factory: PostProcessorFactory) -> None:
 def get_postprocessor(name: str) -> ResultPostProcessor:
     """Resolve a result post-processor by name."""
     _load_entry_point_plugins()
-    return _postprocessor_registry[name.lower()]()
+    return _resolve_plugin(_postprocessor_registry, name, kind="postprocessor")()
 
 
 def postprocessor_names() -> tuple[str, ...]:

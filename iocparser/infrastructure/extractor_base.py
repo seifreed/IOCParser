@@ -8,7 +8,6 @@ Author: Marc Rivero | @seifreed
 
 from __future__ import annotations
 
-import binascii
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from re import Pattern
@@ -79,30 +78,17 @@ SUSPICIOUS_SUBDOMAIN_KEYWORDS = [
 class HashValidationPolicy:
     min_unique_chars: int
     forbidden_sequences: tuple[str, ...]
-    binary_signatures: tuple[bytes, ...]
-    printable_ratio_threshold: float
 
     def is_valid(self, hash_string: str) -> bool:
+        # Hash regexes only match isolated, fixed-length hex tokens (md5/sha1/
+        # sha256/sha512), so a cryptographic digest's pseudo-random bytes can never
+        # be a hex-encoded file here. Decoding the digest and rejecting it on
+        # file-magic prefixes or printable-byte ratio only produced false negatives,
+        # silently dropping valid hashes whose first bytes happened to spell "MZ"/
+        # "PK"/"7z" or that decoded to mostly-ASCII bytes.
         if len(set(hash_string.lower())) < self.min_unique_chars:
             return False
-        if any(pattern in hash_string.lower() for pattern in self.forbidden_sequences):
-            return False
-        if len(hash_string) < 64:
-            return True
-        try:
-            decoded = binascii.unhexlify(hash_string)
-            if decoded.startswith(self.binary_signatures):
-                return False
-            try:
-                text = decoded.decode("ascii", errors="strict")
-                printable_chars = sum(
-                    1 for char in text if 32 <= ord(char) <= 126 or char in "\t\n\r"
-                )
-                return (printable_chars / len(text)) <= self.printable_ratio_threshold
-            except UnicodeDecodeError:
-                return True
-        except (binascii.Error, ValueError, ImportError):
-            return True
+        return not any(pattern in hash_string.lower() for pattern in self.forbidden_sequences)
 
 
 @dataclass(frozen=True)
@@ -150,8 +136,6 @@ class DomainValidationPolicy:
 DEFAULT_HASH_VALIDATION_POLICY = HashValidationPolicy(
     min_unique_chars=MIN_HASH_UNIQUE_CHARS,
     forbidden_sequences=("0123456789abcdef", "abcdefabcdef", "fedcbafedcba", "9876543210fedcba"),
-    binary_signatures=(b"MZ", b"PK", b"7z", b"\x89PNG", b"\xff\xd8\xff"),
-    printable_ratio_threshold=0.5,
 )
 
 DEFAULT_DOMAIN_VALIDATION_POLICY = DomainValidationPolicy(

@@ -337,6 +337,32 @@ def test_labelled_fingerprint_not_duplicated_as_md5(label: str) -> None:
     digest = "deadbeefcafe1234567890abfedc5678"
     result = IOCExtractor(defang=False).extract_all(f"observed {label}={digest} here")
     assert result.get(label) == [digest]
+
+
+def test_valid_sha256_with_file_magic_prefix_is_kept() -> None:
+    """A real SHA-256 must not be dropped because its first bytes spell a file magic.
+
+    The hash validator used to unhexlify the digest and reject it when the decoded
+    bytes started with MZ/PK/7z/PNG/JPEG signatures. A cryptographic digest is
+    pseudo-random, so ~1 in 22,000 valid SHA-256 hashes (those whose first two
+    bytes happened to be 0x4d5a/0x504b/0x377a) were silently lost.
+    """
+    # Decodes to bytes beginning 0x37 0x7a -> the "7z" magic.
+    digest = "377adeb4cd4096adc7ca64b533938cffc6294a9b3534f883b2336a26252cda9a"
+    result = IOCExtractor(defang=False).extract_all(f"Indicator hash {digest} observed")
+    assert result.get("sha256") == [digest]
+
+
+def test_bare_tlsh_digest_lowercase_is_extracted() -> None:
+    """A bare TLSH digest must match regardless of hex case.
+
+    The labelled form accepted both cases but the bare alternative only matched
+    uppercase T1 + uppercase hex, so lowercase digests (emitted by many tools)
+    were missed unless prefixed with a 'tlsh' keyword.
+    """
+    bare_tlsh = "t1" + "a" * 68
+    result = IOCExtractor(defang=False).extract_all(f"Hash value: {bare_tlsh}")
+    assert result.get("tlsh") == [bare_tlsh]
     assert result.get("md5") is None
 
 

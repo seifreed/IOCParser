@@ -190,7 +190,7 @@ PATTERNS: dict[str, Pattern[str]] = {
     ),
     "tlsh": re.compile(
         r"(?:tlsh|TLSH)[\s:=]+T?1?([0-9A-Fa-f]{70,72})\b|"
-        r"\b(T1[0-9A-F]{68,70})\b",
+        r"\b([Tt]1[0-9A-Fa-f]{68,70})\b",
     ),
     "sigma_rule_ids": re.compile(
         r"(?:id|sigma[-_]?id|rule[-_]?id|detection[-_]?id)"

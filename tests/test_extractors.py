@@ -550,17 +550,32 @@ class TestCoverageMissing:
         results = {policy.is_valid("x.aws.amazon.com", **kwargs) for _ in range(50)}
         assert results == {False}
 
-    def test_is_valid_hash_sha512_with_file_signature(self):
-        """Test _is_valid_hash_pattern detects file signatures in SHA512."""
-        # MZ header (PE file) encoded as hex
-        mz_hex = "4d5a" + "00" * 62  # MZ header + padding to 128 chars
-        assert not self.extractor._is_valid_hash_pattern(mz_hex)
+    def test_is_valid_hash_keeps_digest_with_file_magic_bytes(self):
+        """A digest must not be rejected because its bytes spell a file magic.
 
-    def test_is_valid_hash_sha512_with_ascii_text(self):
-        """Test _is_valid_hash_pattern detects ASCII text in SHA512."""
-        # "Hello World" repeated and padded to 128 hex chars
-        text_hex = "48656c6c6f20576f726c64" * 11 + "48656c"  # ~128 chars
-        assert not self.extractor._is_valid_hash_pattern(text_hex[:128])
+        The old validator unhexlified the digest and rejected MZ/PK/7z/PNG/JPEG
+        prefixes; that dropped ~1 in 22,000 real SHA-256/512 hashes whose random
+        first bytes coincided with a signature. A real high-entropy digest whose
+        bytes begin 0x4d5a ("MZ") must now be kept.
+        """
+        mz_digest = "4d5a" + "3c1e7b9f2a8d6045" * 7 + "9f3c1e7b2a8d"  # 128 hex, high entropy
+        assert len(mz_digest) == 128
+        assert self.extractor._is_valid_hash_pattern(mz_digest)
+
+    def test_is_valid_hash_keeps_digest_decoding_to_ascii(self):
+        """A digest must not be rejected because its bytes happen to be ASCII.
+
+        The printable-byte-ratio heuristic was unsound for cryptographic digests
+        (indistinguishable from same-length hex-encoded text) and only produced
+        false negatives, so it was removed.
+        """
+        text_hex = ("48656c6c6f20576f726c64" * 11 + "48656c")[:128]
+        assert self.extractor._is_valid_hash_pattern(text_hex)
+
+    def test_is_valid_hash_still_rejects_low_entropy_junk(self):
+        """The entropy and forbidden-sequence guards must still reject obvious junk."""
+        assert not self.extractor._is_valid_hash_pattern("ab" * 64)  # 2 unique chars
+        assert not self.extractor._is_valid_hash_pattern("0123456789abcdef" * 8)
 
     def test_defang_url(self):
         """Test _defang_url method."""

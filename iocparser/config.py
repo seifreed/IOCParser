@@ -13,6 +13,7 @@ from typing import TypedDict, cast
 
 from dotenv import load_dotenv
 
+from iocparser.errors import SourceNotFoundError
 from iocparser.runtime_config import find_default_config_paths, load_ini_sections
 from iocparser.shared_utils import FALSE_BOOL_VALUES, TRUE_BOOL_VALUES
 
@@ -292,7 +293,10 @@ def load_config(
     if cli_config_path:
         config_path = Path(cli_config_path)
         if not config_path.is_file():
-            raise FileNotFoundError(config_path)
+            # SourceNotFoundError subclasses both FileNotFoundError (the contract
+            # callers/tests expect) and IOCParserError, so the CLI reports a missing
+            # --config path as a clean message instead of an "unexpected" traceback.
+            raise SourceNotFoundError(str(config_path))
         file_values = _load_ini_config(config_path)
     else:
         for path in find_default_config_paths():

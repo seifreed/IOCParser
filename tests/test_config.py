@@ -135,3 +135,15 @@ def test_explicit_missing_config_path_is_rejected(tmp_path) -> None:
 
     with pytest.raises(FileNotFoundError, match=r"missing\.ini"):
         load_config(None, None, str(missing_config))
+
+
+def test_missing_config_path_error_is_an_iocparser_error(tmp_path) -> None:
+    # The missing-config error must be an IOCParserError (while staying a
+    # FileNotFoundError) so the CLI top-level handler reports it as a clean message
+    # instead of an "unexpected error" stack trace.
+    from iocparser.errors import IOCParserError
+
+    missing_config = tmp_path / "missing.ini"
+
+    with pytest.raises(IOCParserError, match=r"missing\.ini"):
+        load_config(None, None, str(missing_config))

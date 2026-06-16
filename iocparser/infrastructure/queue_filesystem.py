@@ -33,11 +33,20 @@ class FilesystemQueueAdapter:
         self.root_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
 
+    def _atomic_write_record(self, target: Path, envelope: QueueEnvelope) -> None:
+        # Stage under a suffix the dequeue/count globs ("*.json") never match, then
+        # rename into place. A staging file matching "*.json" could be grabbed by a
+        # concurrent dequeue mid-write, which would both crash the rename here (leaking
+        # the source record in processing/) and surface a half-staged message.
+        temp_path = target.with_name(f".staging-{uuid4().hex}-{target.name}.part")
+        temp_path.write_text(serialize_queue_record(envelope), encoding="utf-8")
+        temp_path.rename(target)
+
     def enqueue(self, *, queue_name: str, envelope: QueueEnvelope) -> QueueReceipt:
         message_id = envelope.request.job_id or str(uuid4())
         queue_dir = self._queue_dir(queue_name, "pending")
         receipt_path = queue_dir / f"{_safe_filename_component(message_id)}-{uuid4().hex}.json"
-        receipt_path.write_text(serialize_queue_record(envelope), encoding="utf-8")
+        self._atomic_write_record(receipt_path, envelope)
         return QueueReceipt(
             queue_backend="filesystem",
             queue_name=queue_name,
@@ -78,11 +87,9 @@ class FilesystemQueueAdapter:
     def requeue(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
         queue_dir = self._queue_dir(receipt.queue_name, "pending")
         processing_path = self._receipt_path(receipt)
-        temp_path = queue_dir / f"tmp-{uuid4().hex}.json"
         message_name = _safe_filename_component(envelope.request.job_id or uuid4())
         new_path = queue_dir / f"{message_name}-{uuid4().hex}.json"
-        temp_path.write_text(serialize_queue_record(envelope), encoding="utf-8")
-        temp_path.rename(new_path)
+        self._atomic_write_record(new_path, envelope)
         processing_path.unlink(missing_ok=True)
         return QueueReceipt(
             queue_backend="filesystem",
@@ -94,12 +101,10 @@ class FilesystemQueueAdapter:
     def dead_letter(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
         processing_path = self._receipt_path(receipt)
         dead_dir = self._queue_dir(receipt.queue_name, "dead")
-        temp_path = dead_dir / f"tmp-{uuid4().hex}.json"
         target = dead_dir / processing_path.name
         if target.exists():
             target = dead_dir / f"{processing_path.stem}-{uuid4().hex}{processing_path.suffix}"
-        temp_path.write_text(serialize_queue_record(envelope), encoding="utf-8")
-        temp_path.rename(target)
+        self._atomic_write_record(target, envelope)
         processing_path.unlink(missing_ok=True)
         return QueueReceipt(
             queue_backend="filesystem",

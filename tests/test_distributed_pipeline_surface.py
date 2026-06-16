@@ -190,6 +190,42 @@ def test_filesystem_queue_empty_and_race_branch(tmp_path: Path) -> None:
         Path.rename = original_rename  # type: ignore[assignment]
 
 
+def test_filesystem_queue_stages_records_invisibly_to_dequeue_glob(tmp_path: Path) -> None:
+    # Records must be staged under a name the dequeue/count glob ("*.json") never
+    # matches; otherwise a concurrent dequeue can grab a half-staged file mid-write,
+    # crashing the rename and leaking the source record in processing/.
+    adapter = FilesystemQueueAdapter(tmp_path / "queue")
+    staged: list[tuple[str, str]] = []
+    original_rename = Path.rename
+
+    def recording_rename(path_obj: Path, target: Path) -> Path:
+        target_path = Path(target)
+        # Only renames that publish a new record into a glob-scanned directory matter;
+        # the dequeue claim (pending -> processing) legitimately moves a real .json file.
+        if target_path.parent.name in {"pending", "dead"}:
+            staged.append((Path(path_obj).name, target_path.name))
+        return original_rename(path_obj, target)
+
+    receipt = adapter.enqueue(queue_name="jobs", envelope=_envelope("stage-job"))
+    Path.rename = recording_rename  # type: ignore[assignment]
+    try:
+        dequeued = adapter.dequeue(queue_name="jobs")
+        assert dequeued is not None
+        processing_receipt, envelope = dequeued
+        adapter.requeue(processing_receipt, envelope=envelope)
+        again = adapter.dequeue(queue_name="jobs")
+        assert again is not None
+        adapter.dead_letter(again[0], envelope=again[1])
+    finally:
+        Path.rename = original_rename  # type: ignore[assignment]
+
+    assert receipt.message_id == "stage-job"
+    json_targets = [(src, dst) for src, dst in staged if dst.endswith(".json")]
+    assert json_targets
+    for src, dst in json_targets:
+        assert not src.endswith(".json"), f"staging file {src} renamed to {dst} is glob-visible"
+
+
 def test_filesystem_queue_rejects_path_traversal_components(tmp_path: Path) -> None:
     adapter = FilesystemQueueAdapter(tmp_path / "queue")
     envelope = _envelope("../escape-job")

@@ -146,11 +146,15 @@ def public_batch_report(report: BatchReport) -> BatchReport:
             continue
         url = str(item.get("url", "")).strip()
         error = str(item.get("error", "")).strip()
-        if url and error:
+        if url:
+            # Gate on url only, not error: a message-less exception (str(exc) == "") is
+            # still counted in report["failed"], so requiring a non-empty error here
+            # dropped the failed URL from the summary, making the count disagree with the
+            # listed failures and skewing the [N] occurrence suffix.
             url_counts[url] = url_counts.get(url, 0) + 1
             occurrence = url_counts[url]
             key = url if url_totals.get(url, 0) <= 1 else f"{url} [{occurrence}]"
-            public_failures[key] = error
+            public_failures[key] = error or "unknown error"
     public_report = dict(report)
     public_report["items"] = public_items
     public_report["failures"] = public_failures

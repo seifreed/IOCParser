@@ -1102,6 +1102,40 @@ def test_public_batch_report_preserves_duplicate_failed_urls_in_summary() -> Non
     }
 
 
+def test_public_batch_report_lists_failed_url_with_empty_error_message() -> None:
+    """Regression: a failed URL whose exception had no message (str(exc) == "") is still
+    counted in report['failed'], so it must appear in the public failures summary too --
+    gating on a non-empty error string dropped it and skewed the count vs listing."""
+    report = public_batch_report(
+        {
+            "schema_version": "1.0",
+            "report_type": "url_batch",
+            "job_id": "job-1",
+            "correlation_id": "corr-1",
+            "status": "failed",
+            "failure_cause": "ValueError",
+            "total": 1,
+            "successful": 0,
+            "failed": 1,
+            "failures": {"batch-item:1": ""},
+            "error_groups": {"ValueError": 1},
+            "items": [
+                {
+                    "url": "https://silent.example",
+                    "status": "failed",
+                    "error": "",
+                    "item_key": "batch-item:1",
+                },
+            ],
+            "duration_ms": 5,
+        }
+    )
+
+    assert report["failed"] == 1
+    assert len(report["failures"]) == 1
+    assert report["failures"] == {"https://silent.example": "unknown error"}
+
+
 def test_batch_item_keys_avoid_collision_with_real_source_values() -> None:
     assert batch_item_keys(["dup", "dup", "batch-item:2"]) == [
         ("batch-item:1", "dup"),

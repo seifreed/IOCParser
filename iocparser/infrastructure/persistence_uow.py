@@ -44,6 +44,7 @@ class SQLAlchemyUnitOfWork:
     _MIGRATE_LOCK: ClassVar[threading.Lock] = threading.Lock()
 
     def __init__(self, db_uri: str) -> None:
+        self._db_uri = db_uri
         self.engine = _get_or_create_engine(db_uri)
         SQLAlchemyUnitOfWork.migrate(db_uri)
         self.session = Session(self.engine)
@@ -85,5 +86,9 @@ class SQLAlchemyUnitOfWork:
 
     def close(self) -> None:
         self.session.close()
-        if self.engine.dialect.name == "sqlite":
+        # Disposing an in-memory sqlite engine destroys the database (it lives in
+        # the pooled connection), but the engine stays cached and migrate() is
+        # short-circuited, so the next UnitOfWork would reuse it against an empty
+        # schema. Only dispose file-backed sqlite engines (matches _engine_kwargs).
+        if self._db_uri.startswith("sqlite:///") and ":memory:" not in self._db_uri:
             self.engine.dispose()

@@ -9,6 +9,7 @@ from iocparser import cli_output as _cli_output
 from iocparser.api_persistence_query import (
     validated_ioc_type_filter,
     validated_ioc_type_filters,
+    validated_iso_datetime,
 )
 from iocparser.application.contracts import (
     BatchJobInput,
@@ -291,7 +292,9 @@ def _handle_delete_run(args: argparse.Namespace, config: AppConfig) -> bool:
 
 
 def _handle_prune_runs(args: argparse.Namespace, config: AppConfig) -> bool:
-    prune_before = _cli_args.get_optional_str_arg(args, "prune_before")
+    prune_before = validated_iso_datetime(
+        _cli_args.get_optional_str_arg(args, "prune_before")
+    )
     if prune_before is None:
         return False
     deleted_count = uc_prune_persisted_runs(

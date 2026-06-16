@@ -536,3 +536,49 @@ def test_url_source_filter_preserves_path_case_identity(tmp_path) -> None:
 
     assert page.total == 1
     assert page.items[0].source_value == "https://example.test/report"
+
+
+def test_parse_datetime_normalizes_tz_aware_to_naive_utc() -> None:
+    """A tz-aware ISO filter must be converted to naive UTC to match stored values.
+
+    Regression: parse_datetime returned a tz-aware datetime whose offset was then
+    stripped (not converted) at comparison time, shifting filters by the offset.
+    """
+    from iocparser.infrastructure.persistence_support import parse_datetime
+
+    plus_five = parse_datetime("2024-01-01T14:00:00+05:00")
+    assert plus_five is not None
+    assert plus_five.tzinfo is None
+    assert plus_five.isoformat() == "2024-01-01T09:00:00"
+
+    zulu = parse_datetime("2024-01-01T12:00:00Z")
+    assert zulu is not None
+    assert zulu.tzinfo is None
+    assert zulu.isoformat() == "2024-01-01T12:00:00"
+
+    # Naive input is returned unchanged.
+    naive = parse_datetime("2024-01-01T12:00:00")
+    assert naive is not None
+    assert naive.isoformat() == "2024-01-01T12:00:00"
+    assert parse_datetime(None) is None
+
+
+def test_in_memory_unit_of_work_survives_close_and_reopen() -> None:
+    """An in-memory sqlite UoW must keep its schema after close() + reopen.
+
+    Regression: close() disposed the cached in-memory engine, destroying the DB,
+    while migrate() stayed short-circuited, so the next UoW saw 'no such table'.
+    """
+    from sqlalchemy import text
+
+    uri = "sqlite:///:memory:"
+    first = SQLAlchemyUnitOfWork(uri)
+    first.close()
+
+    second = SQLAlchemyUnitOfWork(uri)
+    try:
+        # Without the fix this raises OperationalError: no such table: runs.
+        count = second.session.execute(text("SELECT COUNT(*) FROM runs")).scalar()
+    finally:
+        second.close()
+    assert count == 0

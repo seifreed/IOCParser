@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import ClauseElement, Select, delete, func, or_, select
 from sqlalchemy.orm import Session
@@ -63,10 +63,18 @@ def _evidence_records_from_json(raw_value: str) -> tuple[dict[str, object], ...]
 
 
 def parse_datetime(value: str | None) -> datetime | None:
-    """Parse an ISO timestamp when present."""
+    """Parse an ISO timestamp when present, normalized to naive UTC.
+
+    Stored timestamps are naive UTC, so a tz-aware filter value (e.g. ...+05:00
+    or ...Z) must be converted to UTC and made naive before comparison;
+    otherwise its wall-clock numbers are compared directly, off by the offset.
+    """
     if not value:
         return None
-    return datetime.fromisoformat(value)
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(UTC).replace(tzinfo=None)
+    return parsed
 
 
 def normalized_source_filter(value: str) -> str:

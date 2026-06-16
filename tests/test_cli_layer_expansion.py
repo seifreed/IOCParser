@@ -286,6 +286,17 @@ def test_cli_repeated_prune_statuses_are_forwarded(monkeypatch: pytest.MonkeyPat
     assert captured["prune"] == ("failed", "partial", "success")
 
 
+def test_cli_prune_before_rejects_invalid_iso_datetime() -> None:
+    """Regression: an invalid --prune-before must raise a clean ValidationError,
+    not let a raw ValueError from datetime.fromisoformat bubble up as a traceback."""
+    with pytest.raises(ValidationError):
+        cli_queries.handle_query_commands(
+            _query_args(prune_before="not-a-date"),
+            SimpleNamespace(db_uri="sqlite:///unused"),
+            file_writer=MemoryWriter(),
+        )
+
+
 def test_cli_persistence_builds_all_output_formats_and_persists(tmp_path: Path) -> None:
     for flag, output_format in (
         ("stix", "stix"),

@@ -434,7 +434,9 @@ def test_hotspots_stay_within_decision_point_budget() -> None:
         IOCPARSER_ROOT / "infrastructure" / "streaming.py": 36,
         IOCPARSER_ROOT / "infrastructure" / "persistence_schema.py": 4,
         IOCPARSER_ROOT / "infrastructure" / "persistence_migrations.py": 6,
-        IOCPARSER_ROOT / "infrastructure" / "persistence_distributed.py": 18,
+        # 19 (was 18): mark_running gained a terminal-state guard (one extra BoolOp) so a
+        # redelivered already-completed/dead-lettered job is not resurrected to running.
+        IOCPARSER_ROOT / "infrastructure" / "persistence_distributed.py": 19,
     }
     for path, limit in budgets.items():
         decisions = _decision_points_for(path)

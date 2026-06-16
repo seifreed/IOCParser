@@ -238,6 +238,50 @@ def test_process_next_drops_message_when_dead_letter_archival_fails(tmp_path: Pa
     assert not list((tmp_path / "queue" / "poison" / "processing").glob("*.json"))
 
 
+def test_redelivered_completed_job_is_not_reprocessed(tmp_path: Path) -> None:
+    """Regression: an at-least-once redelivery of an already-completed job (e.g. one
+    whose post-completion ack failed) must be acked and skipped, not reset to running
+    and reprocessed -- terminal states are not resurrected by mark_running."""
+    from iocparser.infrastructure.queue_records import load_queue_record
+
+    class CountingClient(IOCParserClient):
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def extract_result_from_text(self, text_content: str, **kwargs: object):  # type: ignore[override]
+            del text_content, kwargs
+            self.calls += 1
+            return ExtractionResult()
+
+    db_uri = f"sqlite:///{tmp_path / 'redeliver.sqlite'}"
+    queue = FilesystemQueueAdapter(tmp_path / "queue")
+    client = CountingClient()
+    service = DistributedPipelineService(
+        queue_adapter=queue, db_uri=db_uri, worker=PipelineWorker(client=client)
+    )
+    request = PipelineJobRequest(
+        input_kind="text", source_value="evil.example", persist=False, check_warnings=False
+    )
+    service.submit(request, queue_name="q")
+
+    pending = next((tmp_path / "queue" / "q" / "pending").glob("*.json"))
+    envelope = QueueEnvelope.from_record(load_queue_record(pending.read_text(encoding="utf-8")))
+
+    first = service.process_next(queue_name="q")
+    assert getattr(first, "status", "") == JOB_STATUS_COMPLETED
+    assert client.calls == 1
+
+    queue.enqueue(queue_name="q", envelope=envelope)
+    second = service.process_next(queue_name="q")
+
+    assert second is None
+    assert client.calls == 1
+    assert queue.pending_count(queue_name="q") == 0
+    jobs = service.list_jobs(limit=10)
+    assert len(jobs) == 1
+    assert jobs[0].status == JOB_STATUS_COMPLETED
+
+
 def test_completed_job_not_dead_lettered_when_ack_fails(tmp_path: Path) -> None:
     """Regression: an ack failure AFTER mark_completed (e.g. an SQS receipt handle
     expired past the visibility timeout) must leave the job COMPLETED, not let the

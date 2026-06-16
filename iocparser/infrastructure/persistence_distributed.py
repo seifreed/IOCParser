@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import select
 
 from iocparser.domain.models import (
+    TERMINAL_JOB_STATUSES,
     DeadLetterRecord,
     DistributedJobRecord,
     PipelineErrorInfo,
@@ -154,6 +155,10 @@ class SQLAlchemyDistributedJobService:
             attempts=transition["attempts"],
             receipt_id=transition["receipt_id"],
             started_at=transition["started_at"],
+            # A terminal job must not be resurrected to running by a redelivered message
+            # (e.g. one whose post-completion ack failed); returning None makes the
+            # coordinator ack-and-skip it instead of reprocessing a finished job.
+            forbidden_from=TERMINAL_JOB_STATUSES,
         )
 
     def mark_completed(
@@ -253,12 +258,13 @@ class SQLAlchemyDistributedJobService:
         retryable: bool | None = None,
         started_at: datetime | None = None,
         completed_at: datetime | None = None,
+        forbidden_from: tuple[str, ...] = (),
     ) -> DistributedJobRecord | None:
         unit = SQLAlchemyUnitOfWork(self.db_uri)
         try:
             stmt = job_by_id_stmt(job_id)
             model = unit.session.execute(stmt).scalar_one_or_none()
-            if model is None:
+            if model is None or model.status in forbidden_from:
                 return None
             apply_transition(
                 model,

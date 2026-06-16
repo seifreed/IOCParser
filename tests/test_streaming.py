@@ -1492,6 +1492,55 @@ class TestStreamingUnsupportedOperations:
         full_text = "".join(chunks)
         assert full_text == content
 
+    def test_unseekable_stream_keeps_ioc_at_final_chunk_boundary(self):
+        """Regression: an IOC ending exactly at the last chunk boundary on a
+        non-seekable stream must not be dropped.
+
+        Non-seekable streams report total_size 0, so the final chunk used to never
+        be flagged and the boundary-deferral rule silently discarded any IOC ending
+        at the stream's right edge (the look-ahead fix flags the final chunk for any
+        stream). The seekable BytesIO path is the oracle for correct behavior.
+        """
+
+        class UnseekableStream(io.RawIOBase):
+            def __init__(self, data):
+                self._buffer = io.BytesIO(data)
+
+            def readable(self):
+                return True
+
+            def seekable(self):
+                return False
+
+            def seek(self, *args):
+                raise io.UnsupportedOperation("seek not supported")
+
+            def tell(self):
+                raise io.UnsupportedOperation("tell not supported")
+
+            def readinto(self, target):
+                data = self._buffer.read(len(target))
+                target[: len(data)] = data
+                return len(data)
+
+        # 64 bytes = exact multiple of chunk_size, so the URL ends on the final
+        # full read with an empty read after it (the short-read heuristic misses this).
+        data = b"A" * 32 + b"xxxxxxxxxxx http://evil.com/path"
+
+        def collect(stream):
+            extractor = StreamingIOCExtractor(chunk_size=32, overlap=8)
+            found: dict[str, set[str]] = defaultdict(set)
+            for grouped in extractor.extract_from_stream(stream, is_text=False):
+                for ioc_type, values in grouped.items():
+                    found[ioc_type].update(values)
+            return found
+
+        non_seekable = collect(UnseekableStream(data))
+        seekable = collect(io.BytesIO(data))
+
+        assert non_seekable["urls"], "URL at final boundary dropped on non-seekable stream"
+        assert non_seekable["urls"] == seekable["urls"]
+
     def test_read_chunks_with_oserror_on_seek(self):
         """
         Test chunk reading when seek raises OSError.

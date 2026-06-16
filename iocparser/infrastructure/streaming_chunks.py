@@ -32,10 +32,22 @@ def read_chunks_with_prefix(
     except (OSError, io.UnsupportedOperation):
         pass
 
-    while True:
-        raw_chunk = file_obj.read(chunk_size)
-        if not raw_chunk:
-            break
+    # Read one chunk ahead so the final chunk can be flagged on any stream -- seekable
+    # or not. A chunk whose body fills chunk_size normally defers an IOC ending at its
+    # boundary to the next chunk; on the final chunk there is no next chunk, so that
+    # deferral would drop the IOC. An empty look-ahead read is the only reliable EOF
+    # signal (short reads do not imply EOF), and it works without a seekable total_size.
+    raw_chunk = file_obj.read(chunk_size)
+    while raw_chunk:
+        # Defer a look-ahead read error until after the current chunk is yielded, so a
+        # stream that fails partway still emits everything read before the failure (and
+        # the unreadable tail makes the current chunk the final one).
+        deferred_error: Exception | None = None
+        try:
+            next_raw_chunk = file_obj.read(chunk_size)
+        except Exception as exc:
+            next_raw_chunk = b"" if isinstance(raw_chunk, bytes) else ""
+            deferred_error = exc
         chunk = decode_chunk(raw_chunk)
         prefix = previous_chunk_tail
         if prefix and not previous_tail_has_leading_context:
@@ -53,13 +65,11 @@ def read_chunks_with_prefix(
         if progress_callback and total_size:
             progress_callback(min(100, int((bytes_read / total_size) * 100)))
 
-        # A chunk whose body fills chunk_size normally defers an IOC ending at its
-        # boundary to the next chunk; on the final chunk there is no next chunk, so
-        # that deferral would drop the IOC. Flag the final chunk for seekable inputs
-        # (a file whose size is an exact multiple of chunk_size still ends on a full
-        # read). Non-seekable streams report total_size 0 and keep the prior behavior.
-        is_final = total_size > 0 and bytes_read >= total_size
+        is_final = not next_raw_chunk
         yield chunk, prefix_length, is_final
+        if deferred_error is not None:
+            raise deferred_error
+        raw_chunk = next_raw_chunk
         if overlap > 0:
             # Keep one extra character so boundary validation can reject truncated suffixes.
             tail_length = overlap + 1

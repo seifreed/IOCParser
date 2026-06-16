@@ -148,7 +148,10 @@ def test_public_facades_stay_thin() -> None:
         # Raised from 340 for boundary input validation (reject negative limit/offset
         # and --keep-latest, validate --severity on export/diff like search) so the CLI
         # matches the programmatic API instead of silently clamping/passing bad input.
-        IOCPARSER_ROOT / "cli_queries.py": 345,
+        # Raised to 365 to translate the query layer's "run not found" ValueError into a
+        # clean ValidationError at the CLI boundary (export-run/diff-runs/diff-latest)
+        # instead of surfacing it as an unexpected-error stack trace.
+        IOCPARSER_ROOT / "cli_queries.py": 365,
         IOCPARSER_ROOT / "cli_processing.py": 80,
         IOCPARSER_ROOT / "cli_processing_urls.py": 560,
         IOCPARSER_ROOT / "cli_processing_single.py": 120,

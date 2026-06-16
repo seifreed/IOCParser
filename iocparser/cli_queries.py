@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import argparse
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from typing import NoReturn
 
 from iocparser import cli_args as _cli_args
@@ -66,6 +67,17 @@ INVALID_KEEP_LATEST_ERROR = "Invalid --keep-latest: {value} (must be >= 0)"
 
 def _query_service_for(config: AppConfig) -> PersistenceQueryService:
     return query_service_for(config, missing_message=PERSISTENCE_QUERY_MESSAGE)
+
+
+@contextmanager
+def _missing_run_as_validation() -> Iterator[None]:
+    # The query layer signals a missing run/diff target with a bare ValueError (a
+    # contract its own tests pin); translate it at the CLI boundary so the user sees a
+    # clean message instead of an "unexpected error" stack trace.
+    try:
+        yield
+    except ValueError as exc:
+        raise ValidationError(str(exc)) from exc
 
 
 def _optional_int_attr(args: argparse.Namespace, field_name: str) -> int | None:
@@ -171,20 +183,23 @@ def _handle_diff_runs(
     current_diff_run_ids = _diff_run_ids(args)
     if current_diff_run_ids is None:
         return False
-    diff = uc_diff_persisted_runs(
-        DiffPersistedRunsInput(
-            left_run_id=current_diff_run_ids[0],
-            right_run_id=current_diff_run_ids[1],
-            only_added=_cli_args.get_optional_str_arg(args, "diff_only") == "added",
-            only_removed=_cli_args.get_optional_str_arg(args, "diff_only") == "removed",
-            only_warnings=_cli_args.get_bool_arg(args, "diff_warnings_only"),
-            only_normal=_cli_args.get_bool_arg(args, "only_normal"),
-            ioc_types=validated_ioc_type_filters(_cli_args.get_optional_str_arg(args, "ioc_type")),
-            severity=validated_severity_filters(_cli_args.namespace_value(args, "severity")),
-            tags=_string_filters_attr(args, "tag"),
-        ),
-        persistence_query_service=_query_service_for(config),
-    )
+    with _missing_run_as_validation():
+        diff = uc_diff_persisted_runs(
+            DiffPersistedRunsInput(
+                left_run_id=current_diff_run_ids[0],
+                right_run_id=current_diff_run_ids[1],
+                only_added=_cli_args.get_optional_str_arg(args, "diff_only") == "added",
+                only_removed=_cli_args.get_optional_str_arg(args, "diff_only") == "removed",
+                only_warnings=_cli_args.get_bool_arg(args, "diff_warnings_only"),
+                only_normal=_cli_args.get_bool_arg(args, "only_normal"),
+                ioc_types=validated_ioc_type_filters(
+                    _cli_args.get_optional_str_arg(args, "ioc_type")
+                ),
+                severity=validated_severity_filters(_cli_args.namespace_value(args, "severity")),
+                tags=_string_filters_attr(args, "tag"),
+            ),
+            persistence_query_service=_query_service_for(config),
+        )
     _cli_output.save_diff_output(args, diff, file_writer=file_writer)
     return True
 
@@ -195,19 +210,22 @@ def _handle_diff_latest(
     diff_latest_run_id = _optional_int_attr(args, "diff_latest")
     if diff_latest_run_id is None:
         return False
-    diff = uc_diff_latest_source_run(
-        DiffLatestSourceRunInput(
-            run_id=diff_latest_run_id,
-            only_added=_cli_args.get_optional_str_arg(args, "diff_only") == "added",
-            only_removed=_cli_args.get_optional_str_arg(args, "diff_only") == "removed",
-            only_warnings=_cli_args.get_bool_arg(args, "diff_warnings_only"),
-            only_normal=_cli_args.get_bool_arg(args, "only_normal"),
-            ioc_types=validated_ioc_type_filters(_cli_args.get_optional_str_arg(args, "ioc_type")),
-            severity=validated_severity_filters(_cli_args.namespace_value(args, "severity")),
-            tags=_string_filters_attr(args, "tag"),
-        ),
-        persistence_query_service=_query_service_for(config),
-    )
+    with _missing_run_as_validation():
+        diff = uc_diff_latest_source_run(
+            DiffLatestSourceRunInput(
+                run_id=diff_latest_run_id,
+                only_added=_cli_args.get_optional_str_arg(args, "diff_only") == "added",
+                only_removed=_cli_args.get_optional_str_arg(args, "diff_only") == "removed",
+                only_warnings=_cli_args.get_bool_arg(args, "diff_warnings_only"),
+                only_normal=_cli_args.get_bool_arg(args, "only_normal"),
+                ioc_types=validated_ioc_type_filters(
+                    _cli_args.get_optional_str_arg(args, "ioc_type")
+                ),
+                severity=validated_severity_filters(_cli_args.namespace_value(args, "severity")),
+                tags=_string_filters_attr(args, "tag"),
+            ),
+            persistence_query_service=_query_service_for(config),
+        )
     _cli_output.save_diff_output(args, diff, file_writer=file_writer)
     return True
 
@@ -218,18 +236,19 @@ def _handle_export_run(
     export_run_id = _optional_int_attr(args, "export_run")
     if export_run_id is None:
         return False
-    export = uc_export_persisted_run(
-        ExportPersistedRunInput(
-            run_id=export_run_id,
-            severity=validated_severity_filters(_cli_args.namespace_value(args, "severity")),
-            tags=_string_filters_attr(args, "tag"),
-            include_normal=not _cli_args.get_bool_arg(args, "only_warnings"),
-            include_warnings=not _cli_args.get_bool_arg(args, "only_normal"),
-            max_evidence=_optional_int_attr(args, "max_evidence"),
-            sort_by=_cli_args.get_optional_str_arg(args, "sort_by") or "type",
-        ),
-        persistence_query_service=_query_service_for(config),
-    )
+    with _missing_run_as_validation():
+        export = uc_export_persisted_run(
+            ExportPersistedRunInput(
+                run_id=export_run_id,
+                severity=validated_severity_filters(_cli_args.namespace_value(args, "severity")),
+                tags=_string_filters_attr(args, "tag"),
+                include_normal=not _cli_args.get_bool_arg(args, "only_warnings"),
+                include_warnings=not _cli_args.get_bool_arg(args, "only_normal"),
+                max_evidence=_optional_int_attr(args, "max_evidence"),
+                sort_by=_cli_args.get_optional_str_arg(args, "sort_by") or "type",
+            ),
+            persistence_query_service=_query_service_for(config),
+        )
     _cli_output.save_exported_run(args, export, file_writer=file_writer)
     return True
 

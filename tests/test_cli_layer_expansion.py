@@ -959,3 +959,16 @@ def test_dispatch_execute_and_use_case_edge_branches() -> None:
         extractor_engine=DefaultIOCExtractionEngine(),
     )
     assert empty_result.iocs[0].evidence
+
+
+def test_missing_run_value_error_becomes_validation_error() -> None:
+    """A missing-run ValueError from the query layer must surface as a clean
+    ValidationError at the CLI boundary (so the user sees a message, not a stack
+    trace), while a successful block passes through unchanged."""
+    with pytest.raises(ValidationError, match="Run not found: 7"):
+        with cli_queries._missing_run_as_validation():
+            raise ValueError("Run not found: 7")
+
+    with cli_queries._missing_run_as_validation():
+        result = 42
+    assert result == 42

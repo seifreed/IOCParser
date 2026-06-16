@@ -116,7 +116,9 @@ def test_grouped_infrastructure_subpackages_stay_small_enough_to_review() -> Non
     limits = {
         IOCPARSER_ROOT / "infrastructure" / "extraction": 60,
         IOCPARSER_ROOT / "infrastructure" / "persistence": 40,
-        IOCPARSER_ROOT / "infrastructure" / "persistence" / "history": 1250,
+        # 1250 -> 1256 for the per-dialect literal origin-id SQL that replaced an
+        # f-string interpolation (bandit B608 hardening, no #nosec).
+        IOCPARSER_ROOT / "infrastructure" / "persistence" / "history": 1256,
         IOCPARSER_ROOT / "infrastructure" / "persistence" / "query": 700,
         IOCPARSER_ROOT / "infrastructure" / "queueing": 30,
         IOCPARSER_ROOT / "infrastructure" / "runtime": 45,

@@ -183,9 +183,13 @@ def _has_legacy_archive_collision(session: Session, *, archive_id: str) -> bool:
 def _history_origin_id(session: Session) -> str:
     dialect_name = session.get_bind().dialect.name
     key = quote_identifier(dialect_name, "key")
-    row = session.execute(
-        text(f"SELECT value FROM history_metadata WHERE {key} = 'origin_id'")  # noqa: S608
-    ).scalar_one_or_none()
+    # Constant per-dialect literals (no interpolation) keep this injection-free.
+    origin_select = (
+        "SELECT value FROM history_metadata WHERE `key` = 'origin_id'"
+        if key == "`key`"
+        else "SELECT value FROM history_metadata WHERE \"key\" = 'origin_id'"
+    )
+    row = session.execute(text(origin_select)).scalar_one_or_none()
     if isinstance(row, str) and row.strip():
         return row.strip()
     origin_id = str(uuid4())

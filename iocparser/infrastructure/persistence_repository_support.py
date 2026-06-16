@@ -101,14 +101,23 @@ def _row_ioc_hash(row: Any) -> str:
 
 
 _DEDUP_BACKFILL_PLAN = (
-    ("sources", "uq_sources_dedup_hash", ("kind", "value"), _row_source_hash),
-    (
-        "iocs",
-        "uq_iocs_dedup_hash",
-        ("ioc_type", "value", "is_warning", "warning_list", "warning_description"),
-        _row_ioc_hash,
-    ),
+    ("sources", "uq_sources_dedup_hash", _row_source_hash),
+    ("iocs", "uq_iocs_dedup_hash", _row_ioc_hash),
 )
+
+# Literal backfill SQL per table. Built from constants (never user input) so the
+# query carries no string interpolation -- safe by construction, no SQL injection.
+_DEDUP_BACKFILL_SQL: dict[str, tuple[str, str]] = {
+    "sources": (
+        "SELECT id, kind, value FROM sources WHERE dedup_hash = ''",
+        "UPDATE sources SET dedup_hash = :h WHERE id = :id",
+    ),
+    "iocs": (
+        "SELECT id, ioc_type, value, is_warning, warning_list, warning_description "
+        "FROM iocs WHERE dedup_hash = ''",
+        "UPDATE iocs SET dedup_hash = :h WHERE id = :id",
+    ),
+}
 
 
 def _has_dedup_column(inspector: Inspector, table: str) -> bool:
@@ -124,21 +133,12 @@ def _has_unique_key(inspector: Inspector, table: str, name: str) -> bool:
 def _backfill_dedup_hash(
     connection: Connection,
     table: str,
-    columns: tuple[str, ...],
     hasher: Callable[[Any], str],
 ) -> None:
-    selected = ", ".join(("id", *columns))
-    rows = cast(
-        "list[Any]",
-        connection.execute(
-            text(f"SELECT {selected} FROM {table} WHERE dedup_hash = ''")  # noqa: S608
-        ).all(),
-    )
+    select_sql, update_sql = _DEDUP_BACKFILL_SQL[table]
+    rows = cast("list[Any]", connection.execute(text(select_sql)).all())
     for row in rows:
-        connection.execute(
-            text(f"UPDATE {table} SET dedup_hash = :h WHERE id = :id"),  # noqa: S608
-            {"h": hasher(row), "id": row.id},
-        )
+        connection.execute(text(update_sql), {"h": hasher(row), "id": row.id})
 
 
 def backfill_dedup_hash_columns(engine: Engine, inspector: Inspector) -> None:
@@ -154,23 +154,22 @@ def backfill_dedup_hash_columns(engine: Engine, inspector: Inspector) -> None:
         (
             table,
             key,
-            columns,
             hasher,
             _has_dedup_column(inspector, table),
             _has_unique_key(inspector, table, key),
         )
-        for table, key, columns, hasher in _DEDUP_BACKFILL_PLAN
+        for table, key, hasher in _DEDUP_BACKFILL_PLAN
         if table in tables
     ]
     with engine.begin() as connection:
-        for table, key, columns, hasher, has_column, has_key in steps:
+        for table, key, hasher, has_column, has_key in steps:
             if not has_column:
                 connection.execute(
                     text(
                         f"ALTER TABLE {table} ADD COLUMN dedup_hash VARCHAR(64) NOT NULL DEFAULT ''"
                     )
                 )
-            _backfill_dedup_hash(connection, table, columns, hasher)
+            _backfill_dedup_hash(connection, table, hasher)
             if not has_key:
                 connection.execute(text(f"CREATE UNIQUE INDEX {key} ON {table}(dedup_hash)"))
 

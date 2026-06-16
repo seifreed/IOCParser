@@ -16,6 +16,9 @@ class RunStatus(StrEnum):
 
 EMPTY_CUSTOM_IOC_TYPE = "Custom IOC type name cannot be empty"
 INVALID_CUSTOM_BASE_TYPE = "Custom IOC types must derive from a built-in base IOC type"
+SHADOWS_BUILTIN_IOC_TYPE = (
+    "Custom IOC type name {name!r} shadows a built-in IOC type or alias and would never resolve"
+)
 
 
 class SourceKind(StrEnum):
@@ -177,6 +180,16 @@ def register_custom_ioc_type(
     normalized = name.strip().lower()
     if not normalized:
         raise ValueError(EMPTY_CUSTOM_IOC_TYPE)
+    # A name equal to a built-in IOC type/alias can never resolve to this custom
+    # type (IOCType.from_name checks built-ins first), so the registration would be
+    # silently inert. Reject it instead of accepting a dead definition.
+    if normalized not in _custom_ioc_types:
+        try:
+            resolved = IOCType.from_name(normalized)
+        except ValueError:
+            resolved = None
+        if isinstance(resolved, IOCType):
+            raise ValueError(SHADOWS_BUILTIN_IOC_TYPE.format(name=name))
     base = base_type if isinstance(base_type, IOCType) else IOCType.from_name(str(base_type))
     if not isinstance(base, IOCType):
         raise TypeError(INVALID_CUSTOM_BASE_TYPE)

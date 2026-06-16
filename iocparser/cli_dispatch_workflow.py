@@ -132,7 +132,9 @@ def persist_batch_results(
         )
         or ()
     )
-    phase_timings = batch_report.get("phase_timings_ms", {})
+    # setdefault, not get: a report reassembled from JSON may lack the key, and
+    # get() would record the persistence timing on a throwaway dict and lose it.
+    phase_timings = batch_report.setdefault("phase_timings_ms", {})
     phase_timings["persistence"] = int((time.perf_counter() - persist_started) * 1000)
     _cli_persistence.persist_batch_job(
         batch_report,

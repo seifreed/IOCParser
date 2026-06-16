@@ -85,6 +85,16 @@ def test_custom_ioc_aliases_use_registered_metadata_for_direct_helpers() -> None
     assert value.canonical() == "https://Example.COM/path"
 
 
+def test_register_custom_ioc_type_rejects_builtin_shadow() -> None:
+    """A custom type named like a built-in/alias can never resolve, so registration
+    must reject it instead of silently storing a dead definition."""
+    import pytest
+
+    for shadow in ("urls", "ip", "md5", "azure"):
+        with pytest.raises(ValueError, match="shadows a built-in"):
+            register_custom_ioc_type(shadow, base_type="urls")
+
+
 def test_malformed_urls_do_not_break_source_normalization() -> None:
     source = Source.from_raw("url", "http://[::1")
 

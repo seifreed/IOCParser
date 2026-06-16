@@ -81,6 +81,11 @@ PREVIOUS_RUN_NOT_FOUND_TEMPLATE = "No previous run found for source of run {run_
 
 FTS_QUERY_REQUIRED = "FTS search requires at least one alphanumeric term"
 SEARCH_QUERY_REQUIRED = "IOC search requires a non-empty value"
+INVALID_COUNT_TYPE_TEMPLATE = "Expected integer count, got {type_name}: {value!r}"
+NON_DIFFABLE_RUN_TEMPLATE = (
+    "Run {run_id} has status '{status}' — diffing a {status} run is misleading because "
+    "missing IOCs reflect extraction failure, not actual absence from the source."
+)
 RunSelect = Select[RunModel]
 SearchSelect = Select[tuple[RunModel, SourceModel, IOCModel, RunIOCModel]]
 
@@ -291,7 +296,7 @@ def _coerce_count(value: object) -> int:
         return int(value)
     if value is None:
         return 0
-    raise TypeError(f"Expected integer count, got {type(value).__name__}: {value!r}")
+    raise TypeError(INVALID_COUNT_TYPE_TEMPLATE.format(type_name=type(value).__name__, value=value))
 
 
 class SQLAlchemyPersistenceService(PersistenceQueryService):
@@ -593,9 +598,7 @@ class SQLAlchemyPersistenceService(PersistenceQueryService):
                 raise ValueError(RUN_NOT_FOUND_TEMPLATE.format(run_id=run_id))
             if run.status in ("failed", "partial"):
                 raise ValueError(
-                    f"Run {run_id} has status '{run.status}' — diffing a {run.status} run is "
-                    "misleading because missing IOCs reflect extraction failure, "
-                    "not actual absence from the source."
+                    NON_DIFFABLE_RUN_TEMPLATE.format(run_id=run_id, status=run.status)
                 )
             stmt = (
                 select(RunModel)

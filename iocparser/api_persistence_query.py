@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
-from typing import TypedDict, TypeVar, Unpack
+from typing import TypedDict, Unpack
 
 from iocparser.application.contracts import (
     DiffLatestSourceRunInput,
@@ -120,7 +120,6 @@ VALID_SEARCH_SORT_VALUES = {"newest", "oldest", "source"}
 VALID_SEARCH_BACKENDS = {"auto", "fts", "like"}
 INVALID_FTS_QUERY_ERROR = "Invalid FTS query: {value}"
 INVALID_EMPTY_SEARCH_QUERY_ERROR = "Invalid search value: {value}"
-T = TypeVar("T")
 
 
 def query_service(db_uri: str) -> SQLAlchemyPersistenceService:
@@ -264,7 +263,7 @@ def validated_non_negative_int(value: object, *, field: str) -> int:
     return parsed
 
 
-def _validated_search_call(value: str, call: Callable[[], T]) -> T:
+def _validated_search_call[T](value: str, call: Callable[[], T]) -> T:
     try:
         return call()
     except ValueError as exc:

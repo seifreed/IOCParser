@@ -49,6 +49,12 @@ def _boto3_module() -> _Boto3Module:
     return cast("_Boto3Module", import_module("boto3"))
 
 
+MISSING_DEAD_LETTER_QUEUE_ERROR = (
+    "SQS dead-letter queue URL not configured; refusing to re-enqueue to the main "
+    "queue which would cause an infinite processing loop. Set dead_letter_queue_url."
+)
+
+
 class SQSQueueAdapter:
     """AWS SQS adapter using boto3 when installed."""
 
@@ -154,10 +160,7 @@ class SQSQueueAdapter:
     def dead_letter(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
         with self._lock:
             if not self.dead_letter_queue_url:
-                raise RuntimeError(
-                    "SQS dead-letter queue URL not configured; refusing to re-enqueue to the main "
-                    "queue which would cause an infinite processing loop. Set dead_letter_queue_url."
-                )
+                raise RuntimeError(MISSING_DEAD_LETTER_QUEUE_ERROR)
             target_queue = self.dead_letter_queue_url
             dead_queue_name = f"{receipt.queue_name}.dead"
             self._queue_urls[dead_queue_name] = target_queue

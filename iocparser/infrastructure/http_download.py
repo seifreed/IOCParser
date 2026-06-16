@@ -32,6 +32,7 @@ from iocparser.interfaces.ports import URLDownloader
 from iocparser.shared_utils import lazy_singleton
 
 MAX_URL_SIZE = 50 * 1024 * 1024
+INVALID_CONTENT_LENGTH_ERROR = "Invalid Content-Length header: {value!r}"
 REQUEST_TIMEOUT = 30
 DEFAULT_CONNECT_TIMEOUT = 10.0
 DEFAULT_READ_TIMEOUT = float(REQUEST_TIMEOUT)
@@ -300,7 +301,7 @@ class RequestsURLDownloader(URLDownloader):
         try:
             length = int(content_length)
         except ValueError as exc:
-            raise ValueError(f"Invalid Content-Length header: {content_length!r}") from exc
+            raise ValueError(INVALID_CONTENT_LENGTH_ERROR.format(value=content_length)) from exc
         if length > MAX_URL_SIZE:
             raise FileSizeError(
                 length / 1024 / 1024,

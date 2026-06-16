@@ -238,6 +238,24 @@ def test_process_next_drops_message_when_dead_letter_archival_fails(tmp_path: Pa
     assert not list((tmp_path / "queue" / "poison" / "processing").glob("*.json"))
 
 
+def test_submit_records_adapter_backend_not_requested_backend(tmp_path: Path) -> None:
+    """Regression: the configured adapter is the source of truth for where a job lives.
+    A requested queue_backend the adapter cannot honor must not be recorded, or the job
+    becomes a phantom under list_jobs(queue_backend=...) and no worker drains it."""
+    db_uri = f"sqlite:///{tmp_path / 'backend.sqlite'}"
+    queue = FilesystemQueueAdapter(tmp_path / "queue")
+    service = DistributedPipelineService(queue_adapter=queue, db_uri=db_uri)
+    request = PipelineJobRequest(
+        input_kind="text", source_value="x", persist=False, check_warnings=False
+    )
+
+    record = service.submit(request, queue_name="q", queue_backend="sqs")
+
+    assert getattr(record, "queue_backend", None) == "filesystem"
+    assert service.list_jobs(queue_backend="sqs") == []
+    assert len(service.list_jobs(queue_backend="filesystem")) == 1
+
+
 def test_redelivered_completed_job_is_not_reprocessed(tmp_path: Path) -> None:
     """Regression: an at-least-once redelivery of an already-completed job (e.g. one
     whose post-completion ack failed) must be acked and skipped, not reset to running

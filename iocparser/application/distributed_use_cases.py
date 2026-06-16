@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-from uuid import uuid4
+from dataclasses import replace
 
-from iocparser.application.distributed_coordinator_support import advance_envelope, phase_metrics
+from iocparser.application.distributed_coordinator_support import (
+    advance_envelope,
+    normalize_submit_request,
+    phase_metrics,
+)
 from iocparser.application.distributed_idempotency import idempotency_key_for
 from iocparser.domain.distributed import (
     DeadLetterRecord,
@@ -51,23 +55,7 @@ class DistributedPipelineCoordinator:
         max_attempts: int = 3,
         idempotency_key: str | None = None,
     ) -> DistributedJobRecord | dict[str, str]:
-        job_id = request.job_id or str(uuid4())
-        correlation_id = request.correlation_id or job_id
-        normalized_request = PipelineJobRequest(
-            input_kind=request.input_kind,
-            source_value=request.source_value,
-            file_type=request.file_type,
-            persist=request.persist,
-            db_uri=request.db_uri,
-            check_warnings=request.check_warnings,
-            force_update=request.force_update,
-            defang=request.defang,
-            only=request.only,
-            exclude=request.exclude,
-            correlation_id=correlation_id,
-            job_id=job_id,
-            emit_only=request.emit_only,
-        )
+        normalized_request = normalize_submit_request(request)
         envelope = QueueEnvelope(
             request=normalized_request,
             queue_backend=queue_backend,
@@ -85,6 +73,12 @@ class DistributedPipelineCoordinator:
                 self._emit("job_deduplicated", envelope, {"existing_job_id": existing.job_id})
                 return existing
         receipt = self.queue_adapter.enqueue(queue_name=queue_name, envelope=envelope)
+        if receipt.queue_backend != envelope.queue_backend:
+            # The configured adapter is the single source of truth for where the job
+            # physically lives; record that, not the requested backend (which the adapter
+            # cannot honor). Otherwise list_jobs(queue_backend=...) surfaces a phantom and
+            # a worker bound to the requested backend never drains the job.
+            envelope = replace(envelope, queue_backend=receipt.queue_backend)
         stored = (
             self.job_service.create_or_get_job(envelope=envelope, receipt_id=receipt.receipt_id)
             if self.job_service
@@ -92,9 +86,9 @@ class DistributedPipelineCoordinator:
         )
         self._emit("job_submitted", envelope, {"receipt_id": receipt.receipt_id})
         return stored or {
-            "job_id": job_id,
-            "correlation_id": correlation_id,
-            "queue_backend": queue_backend,
+            "job_id": str(normalized_request.job_id),
+            "correlation_id": str(normalized_request.correlation_id),
+            "queue_backend": envelope.queue_backend,
             "queue_name": queue_name,
         }
 

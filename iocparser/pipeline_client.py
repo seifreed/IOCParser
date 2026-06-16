@@ -64,15 +64,15 @@ class DistributedPipelineClient:
         request: PipelineJobRequest,
         *,
         queue_name: str = "default",
-        queue_backend: str | None = None,
         max_attempts: int = 3,
         idempotency_key: str | None = None,
     ) -> DistributedJobRecord | dict[str, str]:
-        effective_backend = queue_backend or self.queue_backend
+        # No per-call queue_backend override: the adapter is fixed at construction, so a
+        # per-call backend could not be honored and only mislabeled the recorded job.
         return self._service.submit(
             request,
             queue_name=queue_name,
-            queue_backend=effective_backend,
+            queue_backend=self.queue_backend,
             max_attempts=max_attempts,
             idempotency_key=idempotency_key,
         )

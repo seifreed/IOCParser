@@ -145,6 +145,19 @@ class TestMISPWarningLists:
         assert not warning_lists._check_value_in_list("amazon.com", values, "string")
         assert not warning_lists._check_value_in_list("sub.google.com", values, "string")
 
+    def test_check_value_in_list_hostname(self):
+        """Hostname lists must match like string lists in the diagnostic.
+
+        Regression: preprocessing indexes hostname lists with the string lookups,
+        but the diagnostic returned False for type "hostname", contradicting
+        check_value (which reported a match).
+        """
+        warning_lists = make_warning_lists()
+        values = ["google.com", "facebook.com"]
+        assert warning_lists._check_value_in_list("google.com", values, "hostname")
+        assert warning_lists._check_value_in_list("GOOGLE.COM", values, "hostname")
+        assert not warning_lists._check_value_in_list("amazon.com", values, "hostname")
+
     def test_check_value_in_list_substring(self):
         """Test substring type list checking."""
         warning_lists = make_warning_lists()
@@ -246,6 +259,39 @@ class TestMISPWarningLists:
         is_warning, info = warning_lists.check_value("192.168.1.1", "ips")
         assert not is_warning
         assert info is None
+
+    def test_string_lookup_selection_is_deterministic(self):
+        """A value in several string lists must resolve to a stable list.
+
+        Regression: the matcher iterated the lookup's set of list ids, whose order
+        varies under hash randomization, so the reported warning source was
+        nondeterministic across runs (spurious diff churn). It now iterates the
+        ordered candidate list ids, so the first-defined matching list wins.
+        """
+        warning_lists = make_warning_lists()
+        warning_lists.warning_lists = {
+            "list-a": {
+                "name": "List A",
+                "description": "first",
+                "type": "string",
+                "matching_attributes": ["domain"],
+                "list": ["shared.example"],
+            },
+            "list-b": {
+                "name": "List B",
+                "description": "second",
+                "type": "string",
+                "matching_attributes": ["domain"],
+                "list": ["shared.example"],
+            },
+        }
+        warning_lists._preprocess_lists()
+
+        for _ in range(3):
+            warning_lists._warning_lookup_cache = {}
+            is_warning, info = warning_lists.check_value("shared.example", "domains")
+            assert is_warning
+            assert info["name"] == "List A"
 
     def test_substring_domain_list_matches_url(self):
         """A domain-scoped substring list must flag the domain inside a URL.

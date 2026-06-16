@@ -202,16 +202,18 @@ class WarningListMatchingMixin:
         relevant_list_ids: list[str],
     ) -> dict[str, str] | None:
         string_lookups = self.lookup_data.string_lookups
-        if clean_value_lower in string_lookups:
-            for list_id in string_lookups[clean_value_lower]:
-                if list_id in relevant_list_ids and list_id in self.warning_lists:
+        domain_lower = extracted_domain.lower() if extracted_domain else None
+        for candidate in (clean_value_lower, domain_lower):
+            if candidate is None or candidate not in string_lookups:
+                continue
+            matching = string_lookups[candidate]
+            # Iterate relevant_list_ids (ordered) rather than the lookup's set so the
+            # chosen list is deterministic across runs when a value is in several
+            # lists -- a set's iteration order varies under hash randomization and
+            # produced unstable warning-source output (spurious diff churn).
+            for list_id in relevant_list_ids:
+                if list_id in matching and list_id in self.warning_lists:
                     return self._build_warning_response(self.warning_lists[list_id], list_id)
-        if extracted_domain:
-            domain_lower = extracted_domain.lower()
-            if domain_lower in string_lookups:
-                for list_id in string_lookups[domain_lower]:
-                    if list_id in relevant_list_ids and list_id in self.warning_lists:
-                        return self._build_warning_response(self.warning_lists[list_id], list_id)
         return None
 
     def _check_regex_lookups(

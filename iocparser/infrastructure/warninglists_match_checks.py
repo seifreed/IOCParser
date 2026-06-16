@@ -70,7 +70,9 @@ def check_value_in_list(
 ) -> bool:
     if not values:
         return False
-    if list_type == "string":
+    if list_type in ("string", "hostname"):
+        # Preprocessing indexes "hostname" lists with the string lookups, so the
+        # diagnostic must match them the same way or it contradicts check_value.
         return check_string_type(value, values)
     if list_type == "substring":
         return check_substring_type(value, values)

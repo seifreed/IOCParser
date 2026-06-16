@@ -972,3 +972,21 @@ def test_missing_run_value_error_becomes_validation_error() -> None:
     with cli_queries._missing_run_as_validation():
         result = 42
     assert result == 42
+
+
+def test_local_file_writer_reports_write_failures_cleanly(tmp_path: Path) -> None:
+    """A bad output path must raise an IOCParserError (clean CLI message), not let
+    the raw OSError reach the top-level handler as an unexpected-error traceback."""
+    from iocparser.errors import IOCParserError
+    from iocparser.infrastructure.runtime import LocalFileWriter
+
+    writer = LocalFileWriter()
+    # A path whose parent is an existing *file* cannot be turned into a directory.
+    blocking_file = tmp_path / "blocker"
+    blocking_file.write_text("x", encoding="utf-8")
+    with pytest.raises(IOCParserError, match="Could not write output"):
+        writer.write(str(blocking_file / "child" / "out.json"), "{}")
+
+    ok_path = tmp_path / "nested" / "ok.json"
+    writer.write(str(ok_path), "{}")
+    assert ok_path.read_text(encoding="utf-8") == "{}"

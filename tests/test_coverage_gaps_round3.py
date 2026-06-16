@@ -464,7 +464,7 @@ class TestScatteredGaps:
 
         request = PipelineJobRequest(input_kind="url", source_value="https://x.com")
         key = idempotency_key_for(request, digester=None)
-        assert key == "url:https://x.com:cw=True:fu=False:df=True:o=:e=:eo=False:ft="
+        assert key == "url:https://x.com:cw=True:fu=False:df=True:o=:e=:eo=False:ft=:p=False:db="
 
     def test_domain_sources_normalize_url(self) -> None:
         from iocparser.domain.sources import normalize_url_value

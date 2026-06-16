@@ -115,6 +115,30 @@ def test_idempotency_key_distinguishes_file_type() -> None:
     assert pdf_key != html_key
 
 
+def test_idempotency_key_distinguishes_persist_and_db_uri() -> None:
+    """A persist=True job must not be deduplicated against a prior persist=False job for
+    the same source (the run would silently never be written), nor against the same job
+    targeting a different db_uri."""
+    digester = _FixedDigester()
+    no_persist = idempotency_key_for(
+        PipelineJobRequest(input_kind="text", source_value="x", persist=False),
+        digester=digester,
+    )
+    persist = idempotency_key_for(
+        PipelineJobRequest(input_kind="text", source_value="x", persist=True),
+        digester=digester,
+    )
+    other_db = idempotency_key_for(
+        PipelineJobRequest(
+            input_kind="text", source_value="x", persist=True, db_uri="sqlite:///other.db"
+        ),
+        digester=digester,
+    )
+
+    assert no_persist != persist
+    assert persist != other_db
+
+
 def test_fts_rebuild_indexes_normalized_value_search() -> None:
     """The FTS rebuild on schema upgrade must index value_search, not raw value.
 

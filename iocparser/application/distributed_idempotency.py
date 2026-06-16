@@ -7,6 +7,9 @@ from iocparser.interfaces.ports import ContentDigester
 
 
 def _processing_options_key(request: PipelineJobRequest) -> str:
+    # persist and db_uri are part of the work, not just rendering: omitting them let a
+    # persist=False job dedup a later persist=True job for the same source, so the run
+    # was silently never written (or written to the wrong DB).
     return (
         f"cw={request.check_warnings}"
         f":fu={request.force_update}"
@@ -15,6 +18,8 @@ def _processing_options_key(request: PipelineJobRequest) -> str:
         f":e={request.exclude or ''}"
         f":eo={request.emit_only}"
         f":ft={request.file_type or ''}"
+        f":p={request.persist}"
+        f":db={request.db_uri or ''}"
     )
 
 

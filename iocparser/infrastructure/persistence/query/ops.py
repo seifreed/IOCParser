@@ -265,7 +265,12 @@ def _apply_search_backend(
     normalized_value: str,
     search_backend: str,
 ) -> SearchSelect:
-    use_sqlite_fts = search_backend in {"auto", "fts"} and has_fts_table(unit_of_work.engine)
+    # "auto" must give the same results on every database: FTS does token-PREFIX
+    # matching while LIKE does SUBSTRING matching (e.g. "corp" matches "evilcorp"
+    # under LIKE but not FTS), and FTS cannot reproduce substring semantics, so
+    # selecting FTS only when its table happened to exist silently changed results.
+    # "auto" therefore always uses the substring backend; FTS is opt-in for speed.
+    use_sqlite_fts = search_backend == "fts" and has_fts_table(unit_of_work.engine)
     fts_query = build_fts_query(normalized_value) if use_sqlite_fts else None
     if search_backend == "fts" and not fts_query:
         raise ValueError(FTS_QUERY_REQUIRED)

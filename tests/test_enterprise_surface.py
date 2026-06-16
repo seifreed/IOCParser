@@ -219,6 +219,37 @@ def test_fts_search_finds_ipv4_address(tmp_path: Path) -> None:
         assert [hit.value for hit in page.items] == ["1.2.3.4"], backend
 
 
+def test_auto_search_backend_uses_substring_even_with_fts_table(tmp_path: Path) -> None:
+    """auto must return substring matches deterministically, not token-prefix.
+
+    Regression: auto used FTS (token-prefix) when its table existed and LIKE
+    (substring) otherwise, so the same query returned different results based on
+    schema state. 'corp' is a substring of 'evilcorp.com' but not an FTS token
+    prefix, so auto must find it regardless of the FTS table.
+    """
+    db_uri = f"sqlite:///{tmp_path / 'auto.sqlite'}"
+    service = SQLAlchemyPersistenceService(db_uri)
+    service.persist_multiple_runs(
+        [("file", "f.txt", ExtractionResult.from_grouped_payload({"domains": ["evilcorp.com"]}, {}))],
+        tool_version="1.0.0",
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
+    )
+    uow = SQLAlchemyUnitOfWork(db_uri)
+    try:
+        assert has_fts_table(uow.engine) is True
+    finally:
+        uow.close()
+
+    auto = query_persisted_iocs(db_uri=db_uri, value="corp", search_backend="auto")
+    assert [hit.value for hit in auto.items] == ["evilcorp.com"]
+    # The explicit FTS backend does token-prefix matching, so it does NOT match an
+    # interior substring -- documenting why auto must not silently switch to it.
+    fts = query_persisted_iocs(db_uri=db_uri, value="corp", search_backend="fts")
+    assert not fts.items
+
+
 def test_custom_ioc_types_fts_and_public_batch_api(tmp_path: Path) -> None:
     register_custom_ioc_type(
         "telegram_handles",

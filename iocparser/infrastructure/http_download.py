@@ -6,6 +6,7 @@ import os
 import socket
 import time
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
@@ -14,6 +15,8 @@ from urllib.parse import ParseResult, urljoin, urlparse
 
 import requests
 from requests.exceptions import RequestException, Timeout
+from requests.models import PreparedRequest
+from urllib3.connectionpool import ConnectionPool
 
 from iocparser.domain.sources import normalize_url_value
 from iocparser.errors import (
@@ -56,6 +59,76 @@ def _address_is_blocked(ip_text: str) -> bool:
         or ip.is_multicast
         or ip.is_unspecified
     )
+
+
+def _is_ip_literal(host: str) -> bool:
+    try:
+        ipaddress.ip_address(host.strip("[]"))
+    except ValueError:
+        return False
+    return True
+
+
+def _resolve_pinned_ip(host: str, port: int | None) -> str:
+    """Resolve *host*, refuse if ANY address is blocked, and return one to pin.
+
+    Validating and selecting the address in a single resolution closes the
+    validate-then-reconnect DNS-rebinding window: the caller connects to exactly
+    the address vetted here, so a low-TTL rebind cannot swap in a private target.
+    """
+    infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+    addresses = [str(info[4][0]) for info in infos]
+    if not addresses or any(_address_is_blocked(address) for address in addresses):
+        raise BlockedURLError(host)
+    return addresses[0]
+
+
+class _PinnedIPAdapter(requests.adapters.HTTPAdapter):
+    """Pin each HTTP(S) connection to a pre-validated IP (SSRF DNS-rebind guard).
+
+    The connection pool is built against the validated IP while the request keeps
+    its original hostname (so the Host header is correct) and, for HTTPS, the TLS
+    SNI and certificate hostname are pinned to the original host. The address the
+    socket connects to is therefore identical to the one the guard vetted, closing
+    the validate-then-reconnect rebinding window.
+    """
+
+    def __init__(self, *, allow_private: bool) -> None:
+        self._allow_private = allow_private
+        super().__init__()
+
+    def get_connection_with_tls_context(
+        self,
+        request: PreparedRequest,
+        verify: bool | str | None,
+        proxies: Mapping[str, str] | None = None,
+        cert: tuple[str, str] | str | None = None,
+    ) -> ConnectionPool:
+        if self._allow_private or _env_allows_private_urls() or proxies:
+            return super().get_connection_with_tls_context(request, verify, proxies, cert)
+        host = urlparse(request.url or "").hostname
+        if not host:
+            return super().get_connection_with_tls_context(request, verify, proxies, cert)
+        if _is_ip_literal(host):
+            if _address_is_blocked(host.strip("[]")):
+                raise BlockedURLError(request.url or host)
+            return super().get_connection_with_tls_context(request, verify, proxies, cert)
+        host_params, pool_kwargs = self.build_connection_pool_key_attributes(
+            request, verify if verify is not None else True, cert
+        )
+        pinned_kwargs: dict[str, object] = dict(pool_kwargs)
+        if host_params["scheme"] == "https":
+            pinned_kwargs["server_hostname"] = host
+            pinned_kwargs["assert_hostname"] = host
+        return cast(
+            "ConnectionPool",
+            self.poolmanager.connection_from_host(
+                host=_resolve_pinned_ip(host, host_params["port"]),
+                port=host_params["port"],
+                scheme=host_params["scheme"],
+                pool_kwargs=pinned_kwargs,
+            ),
+        )
 
 
 _DEFAULT_DOWNLOADER_HOLDER: list[RequestsURLDownloader] = []
@@ -325,14 +398,22 @@ class RequestsURLDownloader(URLDownloader):
             if _address_is_blocked(str(info[4][0])):
                 raise BlockedURLError(parsed_url.geturl())
 
+    def _guard_active(self) -> bool:
+        return not (self.allow_private_networks or _env_allows_private_urls())
+
     def _open_validated(
-        self, url: str, request_headers: dict[str, str]
+        self, url: str, request_headers: dict[str, str], session: requests.Session
     ) -> tuple[requests.Response, str]:
         """Open the URL, re-validating each redirect hop against the SSRF guard."""
+        if self._guard_active() and self.proxies:
+            # The guard resolves and pins the IP locally, but a proxy resolves and
+            # connects on its own side, so the pin cannot be enforced through it.
+            # Refuse rather than offer protection we cannot deliver.
+            raise BlockedURLError(url)
         current = url
         for _ in range(MAX_DOWNLOAD_REDIRECTS + 1):
             self._assert_host_allowed(self.validate_url(current))
-            response = requests.get(
+            response = session.get(
                 current,
                 timeout=self.timeout,
                 stream=True,
@@ -353,6 +434,13 @@ class RequestsURLDownloader(URLDownloader):
             return response, str(response.url)
         raise DownloadError(url, "exceeded redirect limit")
 
+    def _build_session(self) -> requests.Session:
+        session = requests.Session()
+        adapter = _PinnedIPAdapter(allow_private=self.allow_private_networks)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        return session
+
     def _download_once(
         self, url: str, parsed_url: ParseResult, temp_dir: Path, attempt_count: int
     ) -> str:
@@ -361,14 +449,18 @@ class RequestsURLDownloader(URLDownloader):
         started_at = time.perf_counter()
         request_headers = dict(self.headers)
         request_headers.setdefault("User-Agent", self.user_agent)
-        response, response_url = self._open_validated(url, request_headers)
-        with response:
-            response.raise_for_status()
-            self.check_content_size(response.headers.get("Content-Length"))
+        session = self._build_session()
+        try:
+            response, response_url = self._open_validated(url, request_headers, session)
+            with response:
+                response.raise_for_status()
+                self.check_content_size(response.headers.get("Content-Length"))
 
-            content_type = str(response.headers.get("Content-Type", "")).lower()
-            temp_file = temp_dir / self.generate_temp_filename(parsed_url, content_type)
-            downloaded_size = self.download_with_size_check(response, temp_file, MAX_URL_SIZE)
+                content_type = str(response.headers.get("Content-Type", "")).lower()
+                temp_file = temp_dir / self.generate_temp_filename(parsed_url, content_type)
+                downloaded_size = self.download_with_size_check(response, temp_file, MAX_URL_SIZE)
+        finally:
+            session.close()
         content_hash = hashlib.sha256(temp_file.read_bytes()).hexdigest()
         self.last_download_metadata = {
             "original_url": url,

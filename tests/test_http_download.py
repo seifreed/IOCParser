@@ -248,10 +248,7 @@ def test_download_url_to_temp_reports_timeout_and_network_errors(monkeypatch) ->
         del args, kwargs
         raise requests.ConnectionError("offline")
 
-    monkeypatch.setattr(
-        "iocparser.infrastructure.http_download.requests.get",
-        raise_connection_error,
-    )
+    monkeypatch.setattr(requests.Session, "get", raise_connection_error)
     with pytest.raises(DownloadError):
         download_url_to_temp("http://127.0.0.1/missing", timeout=1)
 
@@ -271,7 +268,8 @@ def test_download_url_to_temp_uses_manual_path_for_default_timeout(monkeypatch) 
     """Regression: timeout == REQUEST_TIMEOUT must not bypass the manual path."""
     get_calls = []
 
-    def fake_get(url, *, timeout=None, stream=False, **_kwargs):
+    def fake_get(self, url, *, timeout=None, stream=False, **_kwargs):
+        del self
         get_calls.append((url, timeout, stream))
         return type(
             "FakeResponse",
@@ -288,7 +286,7 @@ def test_download_url_to_temp_uses_manual_path_for_default_timeout(monkeypatch) 
             },
         )()
 
-    monkeypatch.setattr("iocparser.infrastructure.http_download.requests.get", fake_get)
+    monkeypatch.setattr(requests.Session, "get", fake_get)
     monkeypatch.setattr(
         "iocparser.infrastructure.http_download.download_with_size_check",
         lambda response, temp_file, max_size: temp_file.write_text("ok"),
@@ -401,10 +399,11 @@ def test_allow_private_networks_opt_out_skips_guard(monkeypatch) -> None:
 def test_redirect_to_private_host_is_revalidated_and_blocked(monkeypatch) -> None:
     monkeypatch.delenv("IOCPARSER_ALLOW_PRIVATE_URLS", raising=False)
 
-    def fake_get(url, **_kwargs):
+    def fake_get(self, url, **_kwargs):
+        del self
         return _FakeRedirectResponse(is_redirect=True, location="http://127.0.0.1/internal", url=url)
 
-    monkeypatch.setattr("iocparser.infrastructure.http_download.requests.get", fake_get)
+    monkeypatch.setattr(requests.Session, "get", fake_get)
     with pytest.raises(BlockedURLError):
         RequestsURLDownloader().download("http://93.184.216.34/start")
 
@@ -412,8 +411,11 @@ def test_redirect_to_private_host_is_revalidated_and_blocked(monkeypatch) -> Non
 def test_redirect_without_location_is_rejected(monkeypatch) -> None:
     monkeypatch.delenv("IOCPARSER_ALLOW_PRIVATE_URLS", raising=False)
     monkeypatch.setattr(
-        "iocparser.infrastructure.http_download.requests.get",
-        lambda url, **_kwargs: _FakeRedirectResponse(is_redirect=True, location=None, url=url),
+        requests.Session,
+        "get",
+        lambda self, url, **_kwargs: _FakeRedirectResponse(
+            is_redirect=True, location=None, url=url
+        ),
     )
     with pytest.raises(DownloadError, match="Location"):
         RequestsURLDownloader().download("http://93.184.216.34/start")
@@ -422,8 +424,9 @@ def test_redirect_without_location_is_rejected(monkeypatch) -> None:
 def test_redirect_limit_is_enforced(monkeypatch) -> None:
     monkeypatch.delenv("IOCPARSER_ALLOW_PRIVATE_URLS", raising=False)
     monkeypatch.setattr(
-        "iocparser.infrastructure.http_download.requests.get",
-        lambda url, **_kwargs: _FakeRedirectResponse(
+        requests.Session,
+        "get",
+        lambda self, url, **_kwargs: _FakeRedirectResponse(
             is_redirect=True, location="http://93.184.216.34/loop", url=url
         ),
     )
@@ -439,8 +442,9 @@ def test_redirect_to_public_host_is_followed(monkeypatch, tmp_path) -> None:
         _FakeRedirectResponse(is_redirect=False, url="http://93.184.216.34/final"),
     ]
     monkeypatch.setattr(
-        "iocparser.infrastructure.http_download.requests.get",
-        lambda url, **_kwargs: responses.pop(0),
+        requests.Session,
+        "get",
+        lambda self, url, **_kwargs: responses.pop(0),
     )
     path = RequestsURLDownloader().download("http://93.184.216.34/start")
     assert Path(path).read_text(encoding="utf-8") == "ok"
@@ -450,3 +454,111 @@ def test_assert_host_allowed_rejects_missing_hostname(monkeypatch) -> None:
     monkeypatch.delenv("IOCPARSER_ALLOW_PRIVATE_URLS", raising=False)
     with pytest.raises(InvalidURLError):
         RequestsURLDownloader()._assert_host_allowed(urlparse("http://@/path"))
+
+
+def test_resolve_pinned_ip_returns_public_and_rejects_blocked(monkeypatch) -> None:
+    """The resolver returns a vetted address and refuses if ANY resolved IP is private."""
+    from iocparser.infrastructure import http_download as hd
+
+    monkeypatch.setattr(
+        hd.socket,
+        "getaddrinfo",
+        lambda *a, **k: [(2, 1, 6, "", ("93.184.216.34", 80))],
+    )
+    assert hd._resolve_pinned_ip("example.com", 80) == "93.184.216.34"
+
+    monkeypatch.setattr(
+        hd.socket,
+        "getaddrinfo",
+        lambda *a, **k: [(2, 1, 6, "", ("93.184.216.34", 80)), (2, 1, 6, "", ("127.0.0.1", 80))],
+    )
+    with pytest.raises(BlockedURLError):
+        hd._resolve_pinned_ip("example.com", 80)
+
+
+def test_pinned_adapter_pins_connection_to_validated_ip(monkeypatch) -> None:
+    """The adapter connects to the validated IP while keeping the hostname for SNI."""
+    from requests.models import PreparedRequest
+
+    from iocparser.infrastructure import http_download as hd
+
+    monkeypatch.delenv("IOCPARSER_ALLOW_PRIVATE_URLS", raising=False)
+    monkeypatch.setattr(hd, "_resolve_pinned_ip", lambda host, port: "93.184.216.34")
+    adapter = hd._PinnedIPAdapter(allow_private=False)
+
+    https_req = PreparedRequest()
+    https_req.prepare(method="GET", url="https://example.com/path")
+    https_pool = adapter.get_connection_with_tls_context(https_req, True)
+    assert https_pool.host == "93.184.216.34"
+    assert https_pool.conn_kw.get("server_hostname") == "example.com"
+
+    http_req = PreparedRequest()
+    http_req.prepare(method="GET", url="http://example.com/path")
+    http_pool = adapter.get_connection_with_tls_context(http_req, True)
+    assert http_pool.host == "93.184.216.34"
+
+
+def test_pinned_adapter_skips_pinning_when_guard_disabled(monkeypatch) -> None:
+    """With the guard off the adapter behaves like the stock one (no pin)."""
+    from requests.models import PreparedRequest
+
+    from iocparser.infrastructure import http_download as hd
+
+    monkeypatch.setenv("IOCPARSER_ALLOW_PRIVATE_URLS", "1")
+    adapter = hd._PinnedIPAdapter(allow_private=False)
+    req = PreparedRequest()
+    req.prepare(method="GET", url="http://example.com/path")
+    pool = adapter.get_connection_with_tls_context(req, True)
+    assert pool.host == "example.com"
+
+
+def test_pinned_adapter_rejects_blocked_ip_literal(monkeypatch) -> None:
+    """A literal private IP target is refused at connection build time."""
+    from requests.models import PreparedRequest
+
+    from iocparser.infrastructure import http_download as hd
+
+    monkeypatch.delenv("IOCPARSER_ALLOW_PRIVATE_URLS", raising=False)
+    adapter = hd._PinnedIPAdapter(allow_private=False)
+    req = PreparedRequest()
+    req.prepare(method="GET", url="http://127.0.0.1/x")
+    with pytest.raises(BlockedURLError):
+        adapter.get_connection_with_tls_context(req, True)
+
+
+def test_pinned_adapter_allows_public_ip_literal(monkeypatch) -> None:
+    """A literal public IP is allowed through (no rebinding risk to pin)."""
+    from requests.models import PreparedRequest
+
+    from iocparser.infrastructure import http_download as hd
+
+    monkeypatch.delenv("IOCPARSER_ALLOW_PRIVATE_URLS", raising=False)
+    adapter = hd._PinnedIPAdapter(allow_private=False)
+    req = PreparedRequest()
+    req.prepare(method="GET", url="http://93.184.216.34/x")
+    pool = adapter.get_connection_with_tls_context(req, True)
+    assert pool.host == "93.184.216.34"
+
+
+def test_download_through_proxy_is_refused_when_guard_active(monkeypatch) -> None:
+    """The guard can't be enforced through a proxy, so a proxied download is refused."""
+    monkeypatch.delenv("IOCPARSER_ALLOW_PRIVATE_URLS", raising=False)
+    downloader = RequestsURLDownloader(proxies={"http": "http://proxy:3128"})
+    with pytest.raises(BlockedURLError):
+        downloader.download("http://93.184.216.34/x")
+
+
+def test_pinned_adapter_delegates_hostless_url(monkeypatch) -> None:
+    """A URL with no hostname is left to the stock adapter (which rejects it)."""
+    from requests.models import PreparedRequest
+    from urllib3.exceptions import LocationValueError
+
+    from iocparser.infrastructure import http_download as hd
+
+    monkeypatch.delenv("IOCPARSER_ALLOW_PRIVATE_URLS", raising=False)
+    adapter = hd._PinnedIPAdapter(allow_private=False)
+    req = PreparedRequest()
+    req.url = "http:///nopath"
+    req.headers = {}
+    with pytest.raises(LocationValueError):
+        adapter.get_connection_with_tls_context(req, True)

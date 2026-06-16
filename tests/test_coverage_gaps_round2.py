@@ -220,6 +220,19 @@ class TestRenderDiffCsv:
         assert "a.com" not in csv_text
         assert "9.9.9.9" in csv_text
 
+    def test_csv_neutralizes_formula_injection(self) -> None:
+        """Regression: the diff CSV exporter must neutralize spreadsheet formula
+        injection in attacker-controlled values, like the main CSV renderer."""
+        from iocparser.cli_output import _render_diff_csv
+
+        csv_text = _render_diff_csv(
+            [{"type": "domains", "raw_value": "=cmd|'/c calc'!A1", "is_warning": False}],
+            [],
+            "all",
+        )
+        assert "'=cmd|" in csv_text
+        assert ",=cmd|" not in csv_text
+
 
 class TestBuildDiffPayload:
     def test_build_diff_payload_all(self) -> None:

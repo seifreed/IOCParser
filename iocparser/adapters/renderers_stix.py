@@ -38,7 +38,10 @@ class STIXOutputRenderer(OutputRenderer):
             # AS prefix must be stripped and the value emitted unquoted. A value
             # with no digits has no valid integer; return "" so the indicator is
             # skipped instead of emitting an invalid pattern that stix2 rejects.
-            digits = "".join(char for char in refang_ioc(value) if char.isdigit())
+            # ASCII digits only -- str.isdigit() also accepts non-ASCII digits (e.g.
+            # Arabic-Indic), which stix2 rejects and which would abort serialization of
+            # the entire bundle, dropping every other valid indicator with it.
+            digits = "".join(char for char in refang_ioc(value) if char in "0123456789")
             if not digits:
                 return ""
             return f"[autonomous-system:number = {digits}]"

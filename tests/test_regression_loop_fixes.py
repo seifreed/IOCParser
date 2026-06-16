@@ -45,6 +45,22 @@ def test_stix_asn_pattern_emits_integer_not_quoted_string() -> None:
     assert indicator.pattern == "[autonomous-system:number = 12345]"
 
 
+def test_stix_render_skips_non_ascii_digit_asn_without_aborting_bundle() -> None:
+    """Regression: an ASN containing non-ASCII digits (str.isdigit() accepts them)
+    must be skipped, not emitted as an invalid integer pattern that aborts
+    serialization of the entire bundle and drops every other valid indicator."""
+    arabic_indic_asn = "AS" + "".join(chr(code) for code in (0x661, 0x662, 0x663))
+    renderer = STIXOutputRenderer()
+    result = ExtractionResult(
+        iocs=(IOC.from_raw("domains", "good.example"), IOC.from_raw("asn", arabic_indic_asn))
+    )
+
+    rendered = renderer.render(result)
+
+    assert "good.example" in rendered
+    assert chr(0x661) not in rendered
+
+
 def test_diff_jsonl_marks_added_and_removed() -> None:
     """JSONL run-diff output must distinguish added from removed records.
 

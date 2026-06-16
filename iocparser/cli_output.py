@@ -163,29 +163,29 @@ def _render_diff_csv(
     import csv
     import io
 
+    from iocparser.adapters.renderers_json import _csv_safe
+
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["change", "type", "value", "is_warning"])
+
+    def _row(change: str, record: dict[str, object]) -> list[str]:
+        # Neutralize spreadsheet formula injection in the attacker-controlled value
+        # (and type) cells, matching CSVOutputRenderer; the diff exporter previously
+        # wrote raw_value straight through, reintroducing the injection it guards.
+        return [
+            change,
+            _csv_safe(str(record.get("type", ""))),
+            _csv_safe(str(record.get("raw_value", ""))),
+            str(record.get("is_warning", "")),
+        ]
+
     if diff_only != "removed":
         for record in added_records:
-            writer.writerow(
-                [
-                    "added",
-                    record.get("type", ""),
-                    record.get("raw_value", ""),
-                    record.get("is_warning", ""),
-                ]
-            )
+            writer.writerow(_row("added", record))
     if diff_only != "added":
         for record in removed_records:
-            writer.writerow(
-                [
-                    "removed",
-                    record.get("type", ""),
-                    record.get("raw_value", ""),
-                    record.get("is_warning", ""),
-                ]
-            )
+            writer.writerow(_row("removed", record))
     return output.getvalue()
 
 

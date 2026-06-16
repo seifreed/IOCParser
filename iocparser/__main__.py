@@ -12,7 +12,7 @@ import sys
 from colorama import init
 
 from iocparser.cli import execute, logger
-from iocparser.errors import IOCParserError, ValidationError
+from iocparser.errors import IOCParserError
 
 
 def main() -> None:
@@ -23,10 +23,13 @@ def main() -> None:
     except KeyboardInterrupt:
         logger.warning("Operation cancelled by user")
         sys.exit(0)
-    except ValidationError as exc:
+    except IOCParserError as exc:
+        # IOCParserError (incl. ValidationError, FileExistenceError, ...) is the app's
+        # intentional signalling for expected, user-facing conditions, so report a
+        # concise message instead of a stack trace that reads like a crash.
         logger.error("%s", exc)
         sys.exit(1)
-    except (IOCParserError, OSError, ValueError, RuntimeError) as exc:
+    except (OSError, ValueError, RuntimeError) as exc:
         logger.error("Unexpected error: %s", exc, exc_info=True)
         sys.exit(1)
 

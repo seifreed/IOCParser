@@ -92,6 +92,52 @@ class TestMainEntryPoint:
         finally:
             main_module.execute = original
 
+    @staticmethod
+    def _run_main_with(raise_exc: Exception) -> list[tuple[tuple[object, ...], dict[str, object]]]:
+        import iocparser.__main__ as main_module
+
+        calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+        class FakeLogger:
+            def error(self, *args: object, **kwargs: object) -> None:
+                calls.append((args, kwargs))
+
+            def warning(self, *args: object, **kwargs: object) -> None:
+                del args, kwargs
+
+        original_execute = main_module.execute
+        original_logger = main_module.logger
+
+        def raise_err() -> None:
+            raise raise_exc
+
+        main_module.execute = raise_err
+        main_module.logger = FakeLogger()  # type: ignore[assignment]
+        try:
+            with pytest.raises(SystemExit) as exc_info:
+                main_module.main()
+            assert exc_info.value.code == 1
+        finally:
+            main_module.execute = original_execute
+            main_module.logger = original_logger
+        return calls
+
+    def test_main_domain_error_reported_without_traceback(self) -> None:
+        # Regression: expected domain errors (e.g. file not found) printed a full
+        # Python traceback that read like a crash; they must log a clean message.
+        from iocparser.errors import FileExistenceError
+
+        calls = self._run_main_with(FileExistenceError("/nope.txt"))
+
+        assert calls
+        assert all("exc_info" not in kwargs for _, kwargs in calls)
+
+    def test_main_unexpected_error_logs_traceback(self) -> None:
+        # Genuinely unexpected errors keep exc_info so the stack trace is available.
+        calls = self._run_main_with(ValueError("boom"))
+
+        assert any(kwargs.get("exc_info") for _, kwargs in calls)
+
 
 # ---------------------------------------------------------------------------
 # 2. api_public.py — verify the facade re-exports

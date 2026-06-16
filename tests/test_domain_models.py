@@ -63,6 +63,25 @@ def test_hashes_category_filter_selects_whole_hash_family() -> None:
     assert "domains" not in grouped
 
 
+def test_grouped_iocs_keeps_case_distinct_urls_but_collapses_domains() -> None:
+    """grouped_iocs must dedup on the canonical value, not a blanket lowercase.
+
+    Regression: lowercasing every value merged case-distinct URLs (paths are
+    case-sensitive per RFC 3986), silently dropping a distinct IOC from the public
+    API and the persistence path, while case-insensitive domains must still merge.
+    """
+    result = ExtractionResult.from_grouped_payload(
+        {
+            "urls": ["http://x.com/AAAA", "http://x.com/aaaa"],
+            "domains": ["Example.com", "example.com"],
+        },
+        {},
+    )
+    grouped = result.grouped_iocs()
+    assert sorted(grouped["urls"]) == ["http://x.com/AAAA", "http://x.com/aaaa"]
+    assert grouped["domains"] == ["Example.com"]
+
+
 def test_value_objects_canonicalize_expected_values() -> None:
     assert DomainValue(" Example[.]COM ").canonical() == "example.com"
     assert UrlValue("hxxps://Example[.]COM/path").canonical() == "https://Example.COM/path"

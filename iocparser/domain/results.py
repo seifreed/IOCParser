@@ -11,7 +11,7 @@ from iocparser.domain.enums import (
     ioc_type_name,
 )
 from iocparser.domain.values import IndicatorValue, indicator_value_for
-from iocparser.shared_utils import deduplicate_iocs, normalize_tokens
+from iocparser.shared_utils import normalize_tokens
 
 INVALID_ANALYST_SORT_BY_ERROR = "Invalid sort_by: {value}"
 VALID_ANALYST_SORT_VALUES = {"severity", "type", "value"}
@@ -184,11 +184,26 @@ class ExtractionResult:
         return cls(iocs=tuple(iocs), warnings=tuple(warnings))
 
     def grouped_iocs(self) -> dict[str, list[str | dict[str, str]]]:
-        """Group normal IOCs by type using the canonical grouped shape."""
+        """Group normal IOCs by type, deduping on the canonical value.
+
+        Dedup keys on the canonical value (not a blanket lowercase) so that
+        case-significant types are handled correctly -- two URLs differing only by
+        path case (case-sensitive per RFC 3986) are kept as distinct IOCs, while
+        case-insensitive types (domains, hashes, emails) still collapse. This
+        matches canonical_by_type(); the previous lowercase dedup silently dropped
+        distinct URLs from the public API and the persistence write path.
+        """
         grouped: dict[str, list[str | dict[str, str]]] = {}
+        seen: dict[str, set[str]] = {}
         for ioc in self.iocs:
-            grouped.setdefault(ioc_type_name(ioc.ioc_type), []).append(ioc.value.raw)
-        return deduplicate_iocs(grouped)
+            group_name = ioc_type_name(ioc.ioc_type)
+            type_seen = seen.setdefault(group_name, set())
+            canonical = ioc.canonical_value()
+            if canonical in type_seen:
+                continue
+            type_seen.add(canonical)
+            grouped.setdefault(group_name, []).append(ioc.value.raw)
+        return grouped
 
     def grouped_warnings(self) -> dict[str, list[dict[str, str]]]:
         """Group warning matches by type using the canonical grouped shape."""

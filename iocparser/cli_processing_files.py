@@ -42,7 +42,6 @@ from iocparser.infrastructure.file_batch_executor import ThreadPoolFileBatchExec
 from iocparser.infrastructure.http_download import RequestsURLDownloader
 from iocparser.infrastructure.logger import get_logger
 from iocparser.interfaces.ports import TextSourceReader, WarningListService
-from iocparser.shared_utils import deduplicate_iocs
 
 BatchResults = BatchResultsCollection
 GroupedRawIocs = dict[str, list[str | dict[str, str]]]
@@ -546,9 +545,11 @@ def process_multiple_files_payload(
             ),
         )
     merged = merge_batch_results(results)
+    # grouped_iocs() already dedups canonically; re-running the lowercase
+    # deduplicate_iocs here would re-merge case-distinct URLs it correctly kept.
     normal_iocs, warning_iocs = merged.grouped_iocs(), merged.grouped_warnings()
     return BatchInputPayload(
-        normal_iocs=deduplicate_iocs(normal_iocs),
+        normal_iocs=normal_iocs,
         warning_iocs=warning_iocs,
         input_display=f"{len(files)} files",
         results=results,

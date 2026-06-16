@@ -133,6 +133,18 @@ def test_check_content_size_rejects_oversized_value() -> None:
         check_content_size(str(MAX_URL_SIZE + 1))
 
 
+def test_configured_max_input_size_tightens_content_check() -> None:
+    """Regression: --max-input-size-mb was ignored on the URL path; check_content_size
+    compared against the hardcoded MAX_URL_SIZE ceiling only. A configured limit must
+    further restrict it (and never raise it above the ceiling)."""
+    downloader = RequestsURLDownloader(max_input_size_bytes=1024 * 1024)
+    downloader.check_content_size(str(512 * 1024))  # under 1MB: allowed
+    with pytest.raises(FileSizeError):
+        downloader.check_content_size(str(2 * 1024 * 1024))  # over 1MB but under 50MB
+    # with_policy carries the limit through clones (used per-URL in batch fan-out).
+    assert downloader.with_policy().max_input_size_bytes == 1024 * 1024
+
+
 def test_generate_temp_filename_appends_pdf_and_html_extensions() -> None:
     parsed_pdf = urlparse("https://example.test/report")
     parsed_html = urlparse("https://example.test/index")

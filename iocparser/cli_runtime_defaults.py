@@ -11,6 +11,11 @@ from iocparser.shared_utils import validated_diff_only
 INVALID_HTTP_MAPPING_ERROR = "Invalid HTTP mapping JSON: {value}"
 
 
+def mb_to_bytes(megabytes: float | None) -> int | None:
+    """Convert a megabyte limit (e.g. --max-input-size-mb) to bytes, preserving None."""
+    return int(megabytes * 1024 * 1024) if megabytes is not None else None
+
+
 def apply_config_defaults(args: argparse.Namespace, config: AppConfig) -> None:
     _apply_filter_defaults(args, config)
     _apply_boolean_defaults(args, config)

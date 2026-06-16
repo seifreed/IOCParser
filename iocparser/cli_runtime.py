@@ -12,6 +12,7 @@ from iocparser.cli_runtime_defaults import (
     _apply_numeric_defaults,
     _apply_output_defaults,
     apply_config_defaults,
+    mb_to_bytes,
 )
 from iocparser.cli_runtime_defaults import (
     parse_http_mapping as _parse_http_mapping,
@@ -140,6 +141,7 @@ def downloader_for_args(args: argparse.Namespace) -> RequestsURLDownloader:
         verify=verify,
         cert=get_optional_str_arg(args, "tls_cert"),
         allow_private_networks=get_bool_arg(args, "allow_private_urls", False),
+        max_input_size_bytes=mb_to_bytes(_optional_float_arg(args, "max_input_size_mb")),
     )
 
 

@@ -158,6 +158,9 @@ class HTTPTransportConfig:
     verify: bool | str = True
     cert: str | None = None
     allow_private_networks: bool = False
+    # User-configured download cap (--max-input-size-mb). Only tightens the hard
+    # MAX_URL_SIZE ceiling; None leaves the default ceiling in place.
+    max_input_size_bytes: int | None = None
 
 
 def _positive_timeout(value: int | float, default: float) -> float:
@@ -195,6 +198,7 @@ class RequestsURLDownloader(URLDownloader):
         verify: bool | str | None = None,
         cert: object = _UNSET,
         allow_private_networks: bool | None = None,
+        max_input_size_bytes: int | None = None,
         **kwargs: object,
     ) -> None:
         cfg = config or HTTPTransportConfig()
@@ -219,6 +223,11 @@ class RequestsURLDownloader(URLDownloader):
             allow_private_networks
             if allow_private_networks is not None
             else cfg.allow_private_networks
+        )
+        self.max_input_size_bytes = (
+            max_input_size_bytes
+            if max_input_size_bytes is not None
+            else cfg.max_input_size_bytes
         )
         self._rate_limit_lock = Lock()
         self._last_request_started = 0.0
@@ -249,6 +258,9 @@ class RequestsURLDownloader(URLDownloader):
             verify=_pick("verify", self.verify),
             cert=_pick("cert", self.cert, allow_none=True),
             allow_private_networks=_pick("allow_private_networks", self.allow_private_networks),
+            max_input_size_bytes=_pick(
+                "max_input_size_bytes", self.max_input_size_bytes, allow_none=True
+            ),
         )
 
     def download_metadata(self) -> dict[str, object]:
@@ -294,6 +306,12 @@ class RequestsURLDownloader(URLDownloader):
             raise InvalidURLError(url)
         return parsed_url
 
+    def _effective_max_size(self) -> int:
+        """Hard MAX_URL_SIZE ceiling, further tightened by --max-input-size-mb."""
+        if self.max_input_size_bytes is None:
+            return MAX_URL_SIZE
+        return min(MAX_URL_SIZE, self.max_input_size_bytes)
+
     def check_content_size(self, content_length: str | None) -> None:
         """Check if content size exceeds limit."""
         if not content_length:
@@ -302,10 +320,11 @@ class RequestsURLDownloader(URLDownloader):
             length = int(content_length)
         except ValueError as exc:
             raise ValueError(INVALID_CONTENT_LENGTH_ERROR.format(value=content_length)) from exc
-        if length > MAX_URL_SIZE:
+        max_size = self._effective_max_size()
+        if length > max_size:
             raise FileSizeError(
                 length / 1024 / 1024,
-                MAX_URL_SIZE / 1024 / 1024,
+                max_size / 1024 / 1024,
                 "URL content",
             )
 
@@ -459,7 +478,9 @@ class RequestsURLDownloader(URLDownloader):
 
                 content_type = str(response.headers.get("Content-Type", "")).lower()
                 temp_file = temp_dir / self.generate_temp_filename(parsed_url, content_type)
-                downloaded_size = self.download_with_size_check(response, temp_file, MAX_URL_SIZE)
+                downloaded_size = self.download_with_size_check(
+                    response, temp_file, self._effective_max_size()
+                )
         finally:
             session.close()
         content_hash = hashlib.sha256(temp_file.read_bytes()).hexdigest()

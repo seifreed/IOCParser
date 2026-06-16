@@ -151,7 +151,9 @@ def test_public_facades_stay_thin() -> None:
         IOCPARSER_ROOT / "client.py": 40,
         IOCPARSER_ROOT / "cli_runtime.py": 180,
         IOCPARSER_ROOT / "distributed_pipeline.py": 145,
-        IOCPARSER_ROOT / "worker_service.py": 145,
+        # Raised from 145 for graceful-shutdown stop_event propagation into the
+        # per-cycle run loop (prompt break on stop instead of draining the batch).
+        IOCPARSER_ROOT / "worker_service.py": 152,
         IOCPARSER_ROOT / "cli_schema.py": 220,
         IOCPARSER_ROOT / "domain" / "models.py": 60,
         IOCPARSER_ROOT / "infrastructure" / "warninglists.py": 180,

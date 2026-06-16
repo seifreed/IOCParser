@@ -11,7 +11,6 @@ from iocparser.application.contracts import ExtractFileInput
 from iocparser.application.use_cases import extract_from_file as app_extract_from_file
 from iocparser.application.use_cases import extract_from_files as app_extract_from_files
 from iocparser.cli_args import (
-    MAX_WORKERS,
     ProcessingOptions,
     get_bool_arg,
     get_int_arg,
@@ -73,7 +72,11 @@ class FileProcessingRequest:
 
 @dataclass(frozen=True)
 class MultiFileProcessingRequest(FileProcessingRequest):
-    max_workers: int = MAX_WORKERS
+    # Multi-file processing is serial unless the caller opts into parallelism via
+    # --parallel; the default mirrors that (the previous MAX_WORKERS default was
+    # dead -- every call site passes the resolved --parallel value, which itself
+    # defaults to 1).
+    max_workers: int = 1
 
 
 class ExtractFromFileFunc(Protocol):

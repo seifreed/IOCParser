@@ -396,3 +396,21 @@ def test_worker_service_propagates_keyboard_interrupt_forever():
     with patch("iocparser.worker_service.ThreadPoolExecutor", _FakeExecutor):
         with pytest.raises(KeyboardInterrupt):
             w.run_forever(max_cycles=1)
+
+
+def test_run_once_breaks_immediately_when_stop_event_is_set():
+    """run_once must honor stop_event mid-cycle instead of draining the batch."""
+    calls = [0]
+
+    def process(**_kwargs):
+        calls[0] += 1
+        return _SimpleNamespace()
+
+    svc = _SimpleNamespace(process_next=process, limits=_SimpleNamespace(max_workers=1))
+    w = DistributedWorkerService(
+        service=svc, queue_name="t", poll_interval_seconds=0.0, max_messages_per_cycle=5
+    )
+    stop = threading.Event()
+    stop.set()
+    assert w.run_once(stop_event=stop) == 0
+    assert calls[0] == 0

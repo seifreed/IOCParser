@@ -89,10 +89,12 @@ class DistributedWorkerService:
     def _process_one(self) -> bool:
         return self.service.process_next(queue_name=self.queue_name) is not None
 
-    def run_once(self) -> int:
+    def run_once(self, *, stop_event: threading.Event | None = None) -> int:
         try:
             processed = 0
             for _ in range(self.max_messages_per_cycle):
+                if stop_event is not None and stop_event.is_set():
+                    break
                 if not self._process_one():
                     break
                 processed += 1
@@ -115,7 +117,7 @@ class DistributedWorkerService:
         cycles = processed = 0
         if workers <= 1:
             while stop_event is None or not stop_event.is_set():
-                current = self.run_once()
+                current = self.run_once(stop_event=stop_event)
                 processed += current
                 cycles += 1
                 if max_cycles is not None and cycles >= max_cycles:
@@ -125,7 +127,10 @@ class DistributedWorkerService:
         else:
             with ThreadPoolExecutor(max_workers=workers) as executor:
                 while stop_event is None or not stop_event.is_set():
-                    futures = [executor.submit(self.run_once) for _ in range(workers)]
+                    futures = [
+                        executor.submit(self.run_once, stop_event=stop_event)
+                        for _ in range(workers)
+                    ]
                     current = 0
                     for f in futures:
                         try:

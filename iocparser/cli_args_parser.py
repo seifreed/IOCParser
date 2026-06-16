@@ -115,7 +115,7 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
         "--parallel",
         type=int,
         default=None,
-        help=f"Number of parallel workers for multiple files (max default flow {MAX_WORKERS})",
+        help=f"Parallel workers for multiple files (default 1 = serial; e.g. {MAX_WORKERS})",
     )
     parser.add_argument(
         "--url-workers",

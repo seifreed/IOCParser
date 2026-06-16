@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TypedDict
+from typing import TypedDict, cast
 
 from dotenv import load_dotenv
 
@@ -17,6 +17,51 @@ from iocparser.runtime_config import find_default_config_paths, load_ini_section
 from iocparser.shared_utils import FALSE_BOOL_VALUES, TRUE_BOOL_VALUES
 
 INVALID_BOOLEAN_ERROR = "Invalid boolean for {option_name}: {value!r}"
+INVALID_INTEGER_ERROR = "Invalid integer for {option_name}: {value!r}"
+INVALID_FLOAT_ERROR = "Invalid number for {option_name}: {value!r}"
+
+# Options resolvable from IOCPARSER_<OPTION> environment variables, grouped by the
+# coercion their value needs. persist/db_uri are handled separately because they
+# also carry a CLI override; everything else only layers env over the INI file.
+_ENV_STR_OPTIONS: tuple[str, ...] = (
+    "only",
+    "exclude",
+    "stix_types",
+    "output_format",
+    "severity",
+    "tag",
+    "diff_only",
+    "user_agent",
+    "headers_json",
+    "cookies_json",
+    "proxy",
+    "tls_cert",
+    "ca_bundle",
+)
+_ENV_BOOL_OPTIONS: tuple[str, ...] = (
+    "with_context",
+    "streaming",
+    "summary",
+    "allow_redirects",
+    "tls_verify",
+    "skip_processed",
+)
+_ENV_INT_OPTIONS: tuple[str, ...] = (
+    "url_workers",
+    "url_retries",
+    "parallel",
+    "chunk_size",
+    "overlap",
+    "max_queue_size",
+)
+_ENV_FLOAT_OPTIONS: tuple[str, ...] = (
+    "url_backoff",
+    "rate_limit",
+    "connect_timeout",
+    "read_timeout",
+    "max_input_size_mb",
+    "max_input_seconds",
+)
 
 
 @dataclass(frozen=True)
@@ -143,6 +188,46 @@ def _parse_bool_value(value: str, *, option_name: str) -> bool:
     raise ValueError(INVALID_BOOLEAN_ERROR.format(option_name=option_name, value=value))
 
 
+def _parse_int_value(value: str, *, option_name: str) -> int:
+    try:
+        return int(value.strip())
+    except ValueError as exc:
+        raise ValueError(INVALID_INTEGER_ERROR.format(option_name=option_name, value=value)) from exc
+
+
+def _parse_float_value(value: str, *, option_name: str) -> float:
+    try:
+        return float(value.strip())
+    except ValueError as exc:
+        raise ValueError(INVALID_FLOAT_ERROR.format(option_name=option_name, value=value)) from exc
+
+
+def _apply_env_overrides(values: ConfigValues) -> None:
+    """Layer IOCPARSER_<OPTION> environment variables over INI values in place.
+
+    This realises the documented CLI > env > INI precedence: the CLI layer is
+    applied downstream, so overriding the INI values here leaves env below CLI and
+    above the file for every option (persist/db_uri are resolved separately).
+    """
+    mutable = cast("dict[str, object]", values)  # dynamic keys; ConfigValues is a dict at runtime
+    for option in _ENV_STR_OPTIONS:
+        raw = os.environ.get(f"IOCPARSER_{option.upper()}")
+        if raw is not None:
+            mutable[option] = raw
+    for option in _ENV_BOOL_OPTIONS:
+        raw = os.environ.get(f"IOCPARSER_{option.upper()}")
+        if raw is not None:
+            mutable[option] = _parse_bool_value(raw, option_name=f"IOCPARSER_{option.upper()}")
+    for option in _ENV_INT_OPTIONS:
+        raw = os.environ.get(f"IOCPARSER_{option.upper()}")
+        if raw is not None:
+            mutable[option] = _parse_int_value(raw, option_name=f"IOCPARSER_{option.upper()}")
+    for option in _ENV_FLOAT_OPTIONS:
+        raw = os.environ.get(f"IOCPARSER_{option.upper()}")
+        if raw is not None:
+            mutable[option] = _parse_float_value(raw, option_name=f"IOCPARSER_{option.upper()}")
+
+
 def _load_ini_config(config_path: Path) -> ConfigValues:
     """Load config values from an INI file."""
     parser = load_ini_sections(config_path)
@@ -215,6 +300,8 @@ def load_config(
                 config_path = path
                 file_values = _load_ini_config(path)
                 break
+
+    _apply_env_overrides(file_values)
 
     env_persist: bool | None = None
     if "IOCPARSER_PERSIST" in os.environ:

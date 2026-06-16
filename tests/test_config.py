@@ -67,6 +67,57 @@ def test_config_env_fallback(tmp_path) -> None:
     assert config.db_uri == "sqlite:///from_env.db"
 
 
+def test_config_env_overrides_all_option_types(tmp_path) -> None:
+    """Documented CLI > env > INI must hold for every option, not just persist/db_uri.
+
+    Regression: only IOCPARSER_PERSIST/IOCPARSER_DB_URI were read; every other
+    option ignored its IOCPARSER_<OPTION> env var, contradicting the documented
+    precedence.
+    """
+    config_path = tmp_path / "iocparser.ini"
+    config_path.write_text(
+        "[defaults]\noutput_format=text\nstreaming=false\nparallel=1\n"
+        "[network]\nurl_backoff=0.0\nproxy=http://ini-proxy\n",
+        encoding="utf-8",
+    )
+
+    with _env(
+        IOCPARSER_OUTPUT_FORMAT="json",  # str
+        IOCPARSER_STREAMING="true",  # bool
+        IOCPARSER_PARALLEL="8",  # int
+        IOCPARSER_URL_BACKOFF="1.5",  # float
+        IOCPARSER_PROXY="http://env-proxy",  # str overriding INI
+    ):
+        config = load_config(None, None, str(config_path))
+
+    assert config.output_format == "json"
+    assert config.streaming is True
+    assert config.parallel == 8
+    assert config.url_backoff == 1.5
+    assert config.proxy == "http://env-proxy"
+
+
+def test_config_rejects_invalid_int_env_value() -> None:
+    with _env(IOCPARSER_PARALLEL="not-an-int"), pytest.raises(
+        ValueError, match=r"IOCPARSER_PARALLEL"
+    ):
+        load_config(None, None, None)
+
+
+def test_config_rejects_invalid_float_env_value() -> None:
+    with _env(IOCPARSER_URL_BACKOFF="fast"), pytest.raises(
+        ValueError, match=r"IOCPARSER_URL_BACKOFF"
+    ):
+        load_config(None, None, None)
+
+
+def test_config_rejects_invalid_bool_env_value() -> None:
+    with _env(IOCPARSER_STREAMING="maybe"), pytest.raises(
+        ValueError, match=r"IOCPARSER_STREAMING"
+    ):
+        load_config(None, None, None)
+
+
 def test_config_rejects_invalid_boolean_values(tmp_path) -> None:
     config_path = tmp_path / "iocparser.ini"
     config_path.write_text("[database]\npersist=definitely\n", encoding="utf-8")

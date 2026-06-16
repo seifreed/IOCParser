@@ -188,7 +188,10 @@ class ReferenceDataPolicy:
 
     def get_data_dir(self, module_name: str) -> Path:
         module: ModuleType | None = sys.modules.get(module_name)
-        module_file = module.__file__ if module is not None else None
+        # A module can exist without __file__ (namespace packages, built-ins, or a
+        # subclass defined in a REPL/frozen __main__). getattr falls back to the
+        # default data dir instead of raising AttributeError out of __init__.
+        module_file = getattr(module, "__file__", None) if module is not None else None
         if isinstance(module_file, str):
             module_path = Path(module_file).parent
             direct_data_dir = module_path / "data"

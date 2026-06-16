@@ -315,6 +315,25 @@ class TestDataDirDirect:
         data = p.build_reference_data("iocparser.infrastructure.extraction")
         assert data.data_dir.exists()
 
+    def test_get_data_dir_module_without_file_falls_back(self) -> None:
+        """Regression: a module present in sys.modules but lacking __file__
+        (REPL/frozen __main__, namespace packages, built-ins) must fall back to
+        the default data dir, not raise AttributeError out of __init__."""
+        import sys
+        import types
+
+        from iocparser.infrastructure.extractor_base_runtime_support import ReferenceDataPolicy
+
+        module_name = "iocparser_fake_module_without_file"
+        sys.modules[module_name] = types.ModuleType(module_name)
+        try:
+            p = ReferenceDataPolicy(
+                default_tlds=frozenset({"com"}), common_file_extensions=frozenset({"exe"})
+            )
+            assert p.get_data_dir(module_name).name == "data"
+        finally:
+            del sys.modules[module_name]
+
 
 # ── 16. extractor_network: IPv6 ValueError ────────────────────────────────
 class TestIPv6Error:

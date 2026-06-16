@@ -192,6 +192,41 @@ def test_update_warning_lists_downloads_from_local_server_and_writes_cache(tmp_p
     assert warning_lists.cache_metadata_file.exists()
 
 
+def test_partial_download_keeps_fallback_but_stamps_cache_stale(tmp_path: Path) -> None:
+    # bad-domains returns 500, so the download is partial. The partial set must be
+    # persisted as an offline fallback, but the metadata must be stamped stale so the
+    # next run retries rather than serving the incomplete set for the whole window.
+    warning_lists = OfflineWarningLists(tmp_path)
+
+    with (
+        WarningListServer(["good-domains", "bad-domains"], GOOD_BAD_DOMAIN_PAYLOADS) as base_url,
+        patched_github_bases(base_url),
+    ):
+        warning_lists._update_warning_lists()
+
+    assert "good-domains" in warning_lists.warning_lists
+    cached = json.loads(warning_lists.cache_file.read_text(encoding="utf-8"))
+    assert "good-domains" in cached
+    metadata = json.loads(warning_lists.cache_metadata_file.read_text(encoding="utf-8"))
+    assert metadata["last_update"] == 0.0
+
+
+def test_full_download_stamps_cache_fresh(tmp_path: Path) -> None:
+    warning_lists = OfflineWarningLists(tmp_path)
+    payloads: dict[str, tuple[int, object]] = {
+        "good-domains": GOOD_BAD_DOMAIN_PAYLOADS["good-domains"],
+    }
+
+    with (
+        WarningListServer(["good-domains"], payloads) as base_url,
+        patched_github_bases(base_url),
+    ):
+        warning_lists._update_warning_lists()
+
+    metadata = json.loads(warning_lists.cache_metadata_file.read_text(encoding="utf-8"))
+    assert metadata["last_update"] > 0.0
+
+
 def test_update_warning_lists_falls_back_to_cache_and_handles_bad_cache(tmp_path: Path) -> None:
     warning_lists = OfflineWarningLists(tmp_path)
     warning_lists.cache_file.write_text("{broken", encoding="utf-8")

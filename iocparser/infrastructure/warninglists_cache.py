@@ -123,10 +123,14 @@ class WarningListCacheMixin:
                     failed_downloads.append(directory)
         return warning_lists, failed_downloads
 
-    def _write_cache(self) -> None:
+    def _write_cache(self, *, complete: bool = True) -> None:
         with self.cache_file.open("w") as handle:
             json.dump(self.warning_lists, handle)
-        cache_data: dict[str, float] = {"last_update": time.time()}
+        # On a partial download keep what we got as an offline fallback, but stamp the
+        # metadata stale so the next run retries the full fetch instead of trusting an
+        # incomplete set for the whole cache window (silent enrichment false-negatives).
+        last_update = time.time() if complete else 0.0
+        cache_data: dict[str, float] = {"last_update": last_update}
         with self.cache_metadata_file.open("w") as handle:
             json.dump(cache_data, handle)
 
@@ -151,7 +155,7 @@ class WarningListCacheMixin:
             current_logger.info("Downloading %s MISP warning lists...", len(list_directories))
             warning_lists, failed_downloads = self._download_warning_lists(list_directories)
             self.warning_lists = warning_lists
-            self._write_cache()
+            self._write_cache(complete=not failed_downloads)
             self._log_failed_downloads(failed_downloads)
             current_logger.info(
                 "Successfully updated %s MISP warning lists", len(self.warning_lists)

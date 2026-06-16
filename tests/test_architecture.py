@@ -145,7 +145,10 @@ def test_public_facades_stay_thin() -> None:
         IOCPARSER_ROOT / "cli.py": 240,
         IOCPARSER_ROOT / "cli_args.py": 60,
         IOCPARSER_ROOT / "cli_dispatch.py": 150,
-        IOCPARSER_ROOT / "cli_queries.py": 340,
+        # Raised from 340 for boundary input validation (reject negative limit/offset
+        # and --keep-latest, validate --severity on export/diff like search) so the CLI
+        # matches the programmatic API instead of silently clamping/passing bad input.
+        IOCPARSER_ROOT / "cli_queries.py": 345,
         IOCPARSER_ROOT / "cli_processing.py": 80,
         IOCPARSER_ROOT / "cli_processing_urls.py": 560,
         IOCPARSER_ROOT / "cli_processing_single.py": 120,

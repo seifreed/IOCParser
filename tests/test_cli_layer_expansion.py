@@ -239,6 +239,42 @@ def test_cli_search_repeated_exclude_tags_are_forwarded(monkeypatch: pytest.Monk
     assert captured["exclude_tags"] == ("benign", "noise", "internal")
 
 
+def test_cli_negative_run_limit_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Regression: the CLI must reject a negative limit like the programmatic API,
+    not silently clamp it to 0 and return an empty result with exit 0."""
+    monkeypatch.setattr(cli_queries, "_query_service_for", lambda _config: StaticQueryService())
+    with pytest.raises(ValidationError, match="limit"):
+        cli_queries.handle_query_commands(
+            _query_args(list_runs=True, run_limit=-1),
+            SimpleNamespace(db_uri="sqlite:///unused"),
+            file_writer=MemoryWriter(),
+        )
+
+
+def test_cli_invalid_severity_on_export_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Regression: --severity must be validated on export/diff like on search, not
+    silently passed through to match nothing (hiding a user's typo)."""
+    monkeypatch.setattr(cli_queries, "_query_service_for", lambda _config: StaticQueryService())
+    with pytest.raises(ValidationError, match="severity"):
+        cli_queries.handle_query_commands(
+            _query_args(export_run=1, severity="critical"),
+            SimpleNamespace(db_uri="sqlite:///unused"),
+            file_writer=MemoryWriter(),
+        )
+
+
+def test_cli_negative_keep_latest_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Regression: a negative --keep-latest folds to "keep none" downstream and would
+    delete every matching run -- it must be rejected, not silently destroy data."""
+    monkeypatch.setattr(cli_queries, "_query_service_for", lambda _config: StaticQueryService())
+    with pytest.raises(ValidationError, match="keep-latest"):
+        cli_queries.handle_query_commands(
+            _query_args(prune_before="2030-01-01", keep_latest=-1),
+            SimpleNamespace(db_uri="sqlite:///unused"),
+            file_writer=MemoryWriter(),
+        )
+
+
 def test_cli_repeated_prune_statuses_are_forwarded(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, tuple[str, ...]] = {}
 

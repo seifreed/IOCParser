@@ -10,6 +10,7 @@ from iocparser.api_persistence_query import (
     validated_ioc_type_filter,
     validated_ioc_type_filters,
     validated_iso_datetime,
+    validated_non_negative_int,
 )
 from iocparser.application.contracts import (
     BatchJobInput,
@@ -60,6 +61,7 @@ from iocparser.shared_utils import validated_severity_filters
 
 PERSISTENCE_QUERY_MESSAGE = "Persistence query commands require --db-uri or configured persistence"
 BATCH_JOB_NOT_FOUND = "Batch job not found"
+INVALID_KEEP_LATEST_ERROR = "Invalid --keep-latest: {value} (must be >= 0)"
 
 
 def _query_service_for(config: AppConfig) -> PersistenceQueryService:
@@ -75,6 +77,11 @@ def _optional_int_attr(args: argparse.Namespace, field_name: str) -> int | None:
 
 def _string_filters_attr(args: argparse.Namespace, field_name: str) -> tuple[str, ...]:
     return _cli_args.parse_string_filters(_cli_args.namespace_value(args, field_name))
+
+
+def _validated_limit(args: argparse.Namespace, name: str, default: int, *, field: str) -> int:
+    # Reject negatives, matching the programmatic API (the CLI used to clamp to 0).
+    return validated_non_negative_int(_cli_args.get_int_arg(args, name, default), field=field)
 
 
 def _diff_run_ids(args: argparse.Namespace) -> tuple[int, int] | None:
@@ -108,8 +115,8 @@ def _handle_list_runs(args: argparse.Namespace, config: AppConfig) -> bool:
         return False
     runs = uc_query_runs(
         QueryRunsInput(
-            limit=_cli_args.get_int_arg(args, "run_limit", 20),
-            offset=_cli_args.get_int_arg(args, "offset", 0),
+            limit=_validated_limit(args, "run_limit", 20, field="limit"),
+            offset=_validated_limit(args, "offset", 0, field="offset"),
             date_from=_cli_args.get_optional_str_arg(args, "date_from"),
             date_to=_cli_args.get_optional_str_arg(args, "date_to"),
             source_kind=_cli_args.get_optional_str_arg(args, "source_kind"),
@@ -133,8 +140,8 @@ def _handle_search_ioc(args: argparse.Namespace, config: AppConfig) -> bool:
     hits = uc_search_persisted_iocs(
         SearchPersistedIOCsInput(
             value=search_value,
-            limit=_cli_args.get_int_arg(args, "query_limit", 50),
-            offset=_cli_args.get_int_arg(args, "offset", 0),
+            limit=_validated_limit(args, "query_limit", 50, field="limit"),
+            offset=_validated_limit(args, "offset", 0, field="offset"),
             date_from=_cli_args.get_optional_str_arg(args, "date_from"),
             date_to=_cli_args.get_optional_str_arg(args, "date_to"),
             source_kind=_cli_args.get_optional_str_arg(args, "source_kind"),
@@ -173,7 +180,7 @@ def _handle_diff_runs(
             only_warnings=_cli_args.get_bool_arg(args, "diff_warnings_only"),
             only_normal=_cli_args.get_bool_arg(args, "only_normal"),
             ioc_types=validated_ioc_type_filters(_cli_args.get_optional_str_arg(args, "ioc_type")),
-            severity=_string_filters_attr(args, "severity"),
+            severity=validated_severity_filters(_cli_args.namespace_value(args, "severity")),
             tags=_string_filters_attr(args, "tag"),
         ),
         persistence_query_service=_query_service_for(config),
@@ -196,7 +203,7 @@ def _handle_diff_latest(
             only_warnings=_cli_args.get_bool_arg(args, "diff_warnings_only"),
             only_normal=_cli_args.get_bool_arg(args, "only_normal"),
             ioc_types=validated_ioc_type_filters(_cli_args.get_optional_str_arg(args, "ioc_type")),
-            severity=_string_filters_attr(args, "severity"),
+            severity=validated_severity_filters(_cli_args.namespace_value(args, "severity")),
             tags=_string_filters_attr(args, "tag"),
         ),
         persistence_query_service=_query_service_for(config),
@@ -214,7 +221,7 @@ def _handle_export_run(
     export = uc_export_persisted_run(
         ExportPersistedRunInput(
             run_id=export_run_id,
-            severity=_string_filters_attr(args, "severity"),
+            severity=validated_severity_filters(_cli_args.namespace_value(args, "severity")),
             tags=_string_filters_attr(args, "tag"),
             include_normal=not _cli_args.get_bool_arg(args, "only_warnings"),
             include_warnings=not _cli_args.get_bool_arg(args, "only_normal"),
@@ -297,10 +304,14 @@ def _handle_prune_runs(args: argparse.Namespace, config: AppConfig) -> bool:
     )
     if prune_before is None:
         return False
+    # A negative keep_latest folds to "keep none" downstream (delete every match).
+    keep_latest = _cli_args.get_int_arg(args, "keep_latest", 0)
+    if keep_latest < 0:
+        raise ValidationError(INVALID_KEEP_LATEST_ERROR.format(value=keep_latest))
     deleted_count = uc_prune_persisted_runs(
         PrunePersistedRunsInput(
             before=prune_before,
-            keep_latest=_cli_args.get_int_arg(args, "keep_latest", 0),
+            keep_latest=keep_latest,
             source_kind=_cli_args.get_optional_str_arg(args, "source_kind"),
             source_value=_cli_args.get_optional_str_arg(args, "source_value"),
             statuses=_string_filters_attr(args, "prune_status"),

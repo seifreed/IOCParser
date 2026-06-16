@@ -152,6 +152,16 @@ class TestNetworkExtractors:
         assert "::ffff:192" not in result
         assert "::ffff:999" not in result
 
+    def test_extract_ipv6_embedded_ipv4_beyond_ffff_prefix(self):
+        """Regression: a NAT64 (64:ff9b::) embedded-IPv4 address must not be
+        truncated at the first dotted octet into a wrong, still-valid address."""
+        text = "NAT64 traffic to 64:ff9b::192.168.1.1 observed"
+
+        result = self.extractor.extract_ipv6(text)
+
+        assert "64:ff9b::192.168.1.1" in result
+        assert "64:ff9b::192" not in result
+
     def test_extract_urls(self):
         """Test URL extraction."""
         text = """
@@ -312,6 +322,11 @@ class TestWindowsArtifacts:
         """
         result = self.extractor.extract_named_pipes(text)
         assert len(result) >= 1
+
+    def test_extract_named_pipes_is_case_insensitive(self):
+        """Regression: Windows pipe paths are case-insensitive; \\.\\PIPE\\ must match."""
+        result = self.extractor.extract_named_pipes(r"connect to \\.\PIPE\AdminPipe now")
+        assert result == [r"\\.\PIPE\AdminPipe"]
 
 
 class TestFileIndicators:

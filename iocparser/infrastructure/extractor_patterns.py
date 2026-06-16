@@ -47,9 +47,11 @@ PATTERNS: dict[str, Pattern[str]] = {
         r"\b\d{1,3}(?:[\[\(\{]?\.[\]\)\}]?\d{1,3}){3}\b",
     ),
     "ipv6": re.compile(
-        # IPv4-mapped must come before generic compressed forms;
-        # otherwise ::ffff:192.168.1.1 is truncated at ::ffff:192.
-        r"(?<![0-9a-zA-Z])::ffff:"
+        # Any embedded-IPv4 tail must come before the generic compressed forms;
+        # otherwise ::ffff:192.168.1.1 or the NAT64 prefix 64:ff9b::192.168.1.1
+        # is truncated at the first dotted octet. ipaddress validation downstream
+        # discards anything this broad prefix over-matches.
+        r"(?<![0-9a-zA-Z])(?:[0-9a-fA-F]{1,4}:|:){2,}"
         r"[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(?![0-9a-zA-Z])|"
         # Full format
         r"(?<![0-9a-zA-Z])(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}(?![0-9a-zA-Z])|"
@@ -108,7 +110,7 @@ PATTERNS: dict[str, Pattern[str]] = {
         r"\b(?:Service|SERVICE):\s*([A-Za-z0-9][A-Za-z0-9_\-]{2,})\b|"
         r"\b([A-Za-z0-9][A-Za-z0-9_\-]{2,}(?:Service|Svc))\b",
     ),
-    "named_pipes": re.compile(r"\\\\\.\\pipe\\[A-Za-z0-9_\-]+"),
+    "named_pipes": re.compile(r"\\\\\.\\pipe\\[A-Za-z0-9_\-]+", re.IGNORECASE),
     # File indicators
     "filenames": re.compile(
         r"\b([A-Za-z0-9][A-Za-z0-9-_\.]{2,}\."

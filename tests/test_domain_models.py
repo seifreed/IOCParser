@@ -28,6 +28,25 @@ def test_source_kind_and_ioc_type_resolve_aliases() -> None:
     assert IOCType.from_name("email") is IOCType.EMAIL
 
 
+def test_yara_rules_extraction_key_resolves_to_yara_type() -> None:
+    """Regression: extract_all emits the key "yara_rules" (from the method name
+    extract_yara_rules), which must resolve to IOCType.YARA. It previously raised
+    ValueError, crashing every extraction of a report containing a YARA rule."""
+    assert IOCType.from_name("yara_rules") is IOCType.YARA
+
+    from iocparser.infrastructure.extraction import IOCExtractor
+
+    yara_rule = (
+        "rule MalwareDetection {\n"
+        '    meta:\n        description = "test"\n'
+        '    strings:\n        $a = "SystemUpdateMutex"\n'
+        "    condition:\n        any of them\n}"
+    )
+    extracted = IOCExtractor().extract_all(yara_rule)
+    assert "yara_rules" in extracted
+    assert all(isinstance(IOCType.from_name(key), IOCType) for key in extracted)
+
+
 def test_hashes_category_filter_selects_whole_hash_family() -> None:
     """--only/--exclude hashes must cover every hash type, not just sha256.
 

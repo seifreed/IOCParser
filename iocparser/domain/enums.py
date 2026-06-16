@@ -129,6 +129,9 @@ class IOCType(StrEnum):
             "suricata": cls.SURICATA_SID,
             "snort": cls.SNORT_RULE,
             "sigma": cls.SIGMA_RULE,
+            # The artifact extractor's method is extract_yara_rules, so extract_all
+            # emits the key "yara_rules" while the canonical enum value is "yara".
+            "yara_rules": cls.YARA,
         }
         normalized = value.lower()
         if normalized in aliases:

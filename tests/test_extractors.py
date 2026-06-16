@@ -191,6 +191,17 @@ class TestNetworkExtractors:
         result = self.extractor.extract_mac_addresses(text)
         assert len(result) >= 2
 
+    def test_extract_mac_addresses_dotted_form_is_lowercased(self):
+        """Dotted (Cisco) MACs must canonicalize to lowercase like dash/colon forms.
+
+        Regression: the dotted branch joined hex without lowercasing, so an
+        uppercase Cisco MAC came out uppercase while the same address in dash or
+        colon notation came out lowercase -- breaking cross-notation dedup and the
+        STIX mac-addr:value lowercase requirement.
+        """
+        result = self.extractor.extract_mac_addresses("Cisco MAC: AABB.CCDD.EEFF")
+        assert result == ["aa:bb:cc:dd:ee:ff"]
+
 
 class TestEmailAndCommunication:
     """Test email and communication IOC extraction."""

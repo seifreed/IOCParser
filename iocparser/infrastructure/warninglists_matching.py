@@ -263,6 +263,11 @@ class WarningListMatchingMixin:
             if warning_list.get("type") != "substring":
                 continue
             misp_types = self._get_misp_types_for_ioc(ioc_type)
+            if extracted_domain:
+                # A URL also carries a domain, so domain-scoped substring lists are
+                # applicable to it -- mirroring _check_against_warning_list (which
+                # tests extracted_domain) and the ungated string/regex/cidr paths.
+                misp_types = misp_types + self._get_misp_types_for_ioc("domains")
             if self._matching_attribute_names(warning_list) and not self._is_list_applicable(
                 warning_list, misp_types, ioc_type
             ):

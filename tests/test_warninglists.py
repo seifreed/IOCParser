@@ -247,6 +247,32 @@ class TestMISPWarningLists:
         assert not is_warning
         assert info is None
 
+    def test_substring_domain_list_matches_url(self):
+        """A domain-scoped substring list must flag the domain inside a URL.
+
+        Regression: the substring path gated applicability on the URL's MISP types
+        only, so a list scoped to domain/hostname was skipped for URLs even though
+        the extracted domain was passed to the matcher -- unlike the string/regex/
+        cidr paths, which already match a URL's extracted domain.
+        """
+        warning_lists = make_warning_lists()
+        warning_lists.warning_lists = {
+            "abuse-domains": {
+                "name": "Abuse Domains",
+                "description": "Substrings of abusive domains",
+                "type": "substring",
+                "matching_attributes": ["domain", "hostname"],
+                "list": ["evil"],
+            },
+        }
+        warning_lists._preprocess_lists()
+
+        is_warning, info = warning_lists.check_value("x.evil.com", "domains")
+        assert is_warning
+        is_warning, info = warning_lists.check_value("http://x.evil.com/path", "urls")
+        assert is_warning
+        assert info["name"] == "Abuse Domains"
+
     def test_email_domain_warning_excluded(self):
         """Email IOCs with warning-listed domains appear in warning list, not dropped."""
         warning_lists = make_warning_lists()

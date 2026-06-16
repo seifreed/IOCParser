@@ -97,8 +97,13 @@ class ArtifactHeuristicPolicy:
             if "." in mac and len(mac.replace(".", "")) == 12:
                 hex_only = mac.replace(".", "")
                 if all(char in "0123456789abcdefABCDEF" for char in hex_only):
+                    # Lowercase to match the dash/colon branches; a MAC's canonical
+                    # form must be case-insensitive-stable (so the same address in
+                    # dotted vs colon notation dedups) and STIX mac-addr:value
+                    # requires lowercase EUI-48.
+                    canonical = hex_only.lower()
                     valid_macs.append(
-                        ":".join(hex_only[index : index + 2] for index in range(0, 12, 2))
+                        ":".join(canonical[index : index + 2] for index in range(0, 12, 2))
                     )
                 continue
             normalized = mac.replace("-", ":").lower()

@@ -97,6 +97,9 @@ DEFANG_REPLACEMENTS: tuple[tuple[str, str], ...] = (
     ("[@ ]", "@"),
     ("(@)", "@"),
     ("{@}", "@"),
+    ("[://]", "://"),
+    ("(://)", "://"),
+    ("{://}", "://"),
     ("[//]", "//"),
     ("{//}", "//"),
     ("[/]", "/"),
@@ -166,8 +169,14 @@ def deduplicate_iocs_with_state(
     return unique_iocs
 
 
+# Bracket/symbol defangs (start with a non-letter, e.g. "[://]") are applied as
+# literal replacements; only the alphabetic scheme spellings (hxxp://, fxp://, ...)
+# are routed through the case-insensitive regex pass below. Filtering on "://"
+# alone wrongly skipped the bracketed "[://]" form, leaving such URLs defanged.
 _NON_SCHEME_REPLACEMENTS: tuple[tuple[str, str], ...] = tuple(
-    (search, replacement) for search, replacement in DEFANG_REPLACEMENTS if "://" not in search
+    (search, replacement)
+    for search, replacement in DEFANG_REPLACEMENTS
+    if not search[:1].isalpha()
 )
 
 _COMPILED_SCHEME_PATTERNS: tuple[tuple[_re.Pattern[str], str], ...] = tuple(

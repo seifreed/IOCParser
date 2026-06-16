@@ -752,3 +752,19 @@ def test_quote_identifier_per_dialect() -> None:
     assert quote_identifier("sqlite", "key") == '"key"'
     assert quote_identifier("mysql", "key") == "`key`"
     assert quote_identifier("mariadb", "key") == "`key`"
+
+
+def test_refang_handles_bracketed_scheme_separator() -> None:
+    """The bracketed scheme defang [://] must refang to ://.
+
+    Regression: refang only handled the alphabetic scheme spellings (hxxp:// ...)
+    and the [:]/[//] pieces, so a fully-defanged http[://]evil.com stayed defanged
+    and deduped separately from its refanged form.
+    """
+    from iocparser.shared_utils import refang_ioc
+
+    assert refang_ioc("http[://]evil.com") == "http://evil.com"
+    assert refang_ioc("hxxps[://]bad[.]com") == "https://bad.com"
+    assert refang_ioc("ftp(://)host[.]net") == "ftp://host.net"
+    # Existing alphabetic scheme refang still works.
+    assert refang_ioc("hxxp://still[.]works") == "http://still.works"

@@ -182,6 +182,18 @@ class TestNetworkExtractors:
         assert result == ["hxxps://malware[.]example/payload"]
         assert defanged_result == ["hxxps://malware[.]example/payload"]
 
+    def test_extract_urls_keeps_case_distinct_paths(self):
+        """URL paths are case-sensitive; distinct-by-path URLs must both survive.
+
+        Regression: _extract_pattern and the URL dedup lowercased the whole URL,
+        dropping http://h.com/file when http://h.com/File was also present, while
+        host-case-only variants must still collapse (the host is case-insensitive).
+        """
+        result = self.extractor.extract_urls(
+            "see http://h.com/File and http://h.com/file and http://H.com/File"
+        )
+        assert sorted(result) == ["http://h.com/File", "http://h.com/file"]
+
     def test_extract_mac_addresses(self):
         """Test MAC address extraction."""
         text = """

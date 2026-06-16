@@ -60,6 +60,22 @@ def test_line_and_tabular_renderers_cover_non_text_formats() -> None:
     assert any("198.51.100.10" in line for line in csv_lines[1:])
 
 
+def test_csv_renderer_neutralizes_formula_injection() -> None:
+    """A leading =/+/-/@ in an IOC value must be neutralized for spreadsheets.
+
+    IOC values come from attacker-controlled documents, so an unguarded cell like
+    =cmd|'/c calc'!A1 would execute as a formula when opened in Excel/Sheets.
+    """
+    result = ExtractionResult(iocs=(IOC.from_raw("mutex", "=cmd|'/c calc'!A1"),))
+    rows = CSVOutputRenderer().render(result).splitlines()
+    value_cell = rows[1].split(",", 3)[2]
+    assert value_cell.startswith("'=")
+
+    # A normal value is untouched.
+    benign = ExtractionResult(iocs=(IOC.from_raw("domains", "evil.com"),))
+    assert "'evil.com" not in CSVOutputRenderer().render(benign)
+
+
 def test_stix_renderer_can_be_written_to_disk(tmp_path: Path) -> None:
     output_file = tmp_path / "rendered" / "bundle.json"
     output_file.parent.mkdir(parents=True, exist_ok=True)

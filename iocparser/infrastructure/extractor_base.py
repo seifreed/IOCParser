@@ -268,6 +268,11 @@ class ExtractorBase:
                         break
             if match_value:
                 clean_matches.append(match_value)
+        if pattern_name == "urls":
+            # URL paths/queries are case-sensitive (RFC 3986); a case-insensitive
+            # dedup here would drop distinct URLs. Dedup exact duplicates only and
+            # let extracted_urls collapse host-case variants on the canonical value.
+            return list(dict.fromkeys(clean_matches))
         return dedup_case_insensitive(clean_matches)
 
     def _is_valid_hash_pattern(self, hash_string: str) -> bool:

@@ -14,8 +14,28 @@ import urllib.parse
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
+from iocparser.domain.sources import normalize_url_value
 from iocparser.infrastructure.extractor_base import ExtractorBase, IPv4_MAX_OCTET, IPv4_PARTS_COUNT
-from iocparser.shared_utils import dedup_case_insensitive
+from iocparser.shared_utils import dedup_case_insensitive, refang_ioc
+
+
+def _dedup_urls(urls: list[str]) -> list[str]:
+    """Dedup URLs host-case-insensitively while preserving path/query case.
+
+    URL paths/queries are case-sensitive (RFC 3986) but the host is not, so a
+    blanket lowercase dedup dropped distinct URLs (differing only by path case)
+    before IOC objects were even built. The key refangs first (so defanged
+    bracketed hosts parse, and a defanged URL dedups against its plain form), then
+    normalize_url_value lowercases the scheme and host while keeping the path.
+    """
+    seen: set[str] = set()
+    result: list[str] = []
+    for url in urls:
+        key = normalize_url_value(refang_ioc(url)) or url
+        if key not in seen:
+            seen.add(key)
+            result.append(url)
+    return result
 
 UNC_HOST_PATTERN = re.compile(r"\\\\([A-Z][A-Z0-9\-]{2,14})(?:\\|\s)", re.IGNORECASE)
 NORMALIZED_DOT_PATTERN = re.compile(r"[\[\(\{]\.[\]\)\}]")
@@ -140,7 +160,7 @@ class NetworkHeuristicPolicy:
                 continue
             if self.should_keep_url(domain, path):
                 clean_urls.append(defang_url(url) if defang else url)
-        return dedup_case_insensitive(clean_urls)
+        return _dedup_urls(clean_urls)
 
     def extracted_emails(self, *, raw_emails: list[str], defang: bool) -> list[str]:
         if defang:

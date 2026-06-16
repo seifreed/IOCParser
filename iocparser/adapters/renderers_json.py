@@ -53,6 +53,22 @@ class JSONLinesOutputRenderer(OutputRenderer):
         )
 
 
+_CSV_FORMULA_PREFIXES = ("=", "+", "-", "@")
+
+
+def _csv_safe(value: str) -> str:
+    """Neutralize spreadsheet formula injection in a CSV cell.
+
+    IOC values come straight from attacker-controlled documents, so a value like
+    ``=cmd|'/c calc'!A1`` would execute as a formula when the CSV is opened in
+    Excel/Sheets. Prefixing a leading =/+/-/@ (after any leading whitespace) with
+    a single quote makes the spreadsheet treat the cell as text.
+    """
+    if value.lstrip("\t\r\n ")[:1] in _CSV_FORMULA_PREFIXES:
+        return "'" + value
+    return value
+
+
 class CSVOutputRenderer(OutputRenderer):
     """Render extraction results as CSV."""
 
@@ -85,14 +101,14 @@ class CSVOutputRenderer(OutputRenderer):
                 {
                     "schema_version": RESULT_SCHEMA_VERSION,
                     "type": str(record.get("type", "")),
-                    "value": str(record.get("value", "")),
-                    "raw_value": str(record.get("raw_value", "")),
+                    "value": _csv_safe(str(record.get("value", ""))),
+                    "raw_value": _csv_safe(str(record.get("raw_value", ""))),
                     "severity": str(record.get("severity", "")),
-                    "tags": ",".join(record_string_list(record, "tags")),
-                    "warning_list": str(record.get("warning_list", "")),
-                    "description": str(record.get("description", "")),
+                    "tags": _csv_safe(",".join(record_string_list(record, "tags"))),
+                    "warning_list": _csv_safe(str(record.get("warning_list", ""))),
+                    "description": _csv_safe(str(record.get("description", ""))),
                     "line_numbers": line_numbers,
-                    "evidence": evidence_text,
+                    "evidence": _csv_safe(evidence_text),
                 }
             )
         return buffer.getvalue()

@@ -18,7 +18,7 @@ def normalize_url_value(value: str | None) -> str | None:
     return urlunsplit(
         (
             parts.scheme.lower(),
-            _normalize_netloc(parts.netloc),
+            normalize_netloc(parts.netloc),
             parts.path or "/",
             parts.query,
             "",
@@ -26,7 +26,7 @@ def normalize_url_value(value: str | None) -> str | None:
     )
 
 
-def _normalize_netloc(netloc: str) -> str:
+def normalize_netloc(netloc: str) -> str:
     """Lowercase the host (and port) while preserving case-sensitive userinfo."""
     if "@" in netloc:
         userinfo, host_port = netloc.rsplit("@", 1)

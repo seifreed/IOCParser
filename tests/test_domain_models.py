@@ -84,7 +84,7 @@ def test_grouped_iocs_keeps_case_distinct_urls_but_collapses_domains() -> None:
 
 def test_value_objects_canonicalize_expected_values() -> None:
     assert DomainValue(" Example[.]COM ").canonical() == "example.com"
-    assert UrlValue("hxxps://Example[.]COM/path").canonical() == "https://Example.COM/path"
+    assert UrlValue("hxxps://Example[.]COM/path").canonical() == "https://example.com/path"
     assert UrlValue("not really a url").canonical() == "not really a url"
     assert UrlValue("http://[::1").canonical() == "http://[::1"
     assert IpValue("2001:0db8::1").canonical() == "2001:db8::1"
@@ -135,7 +135,7 @@ def test_custom_ioc_aliases_use_registered_metadata_for_direct_helpers() -> None
     assert severity == "high"
     assert tags == ("alias_url_type", "custom-tag")
     assert isinstance(value, UrlValue)
-    assert value.canonical() == "https://Example.COM/path"
+    assert value.canonical() == "https://example.com/path"
 
 
 def test_register_custom_ioc_type_rejects_builtin_shadow() -> None:

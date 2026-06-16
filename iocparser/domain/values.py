@@ -5,6 +5,7 @@ from ipaddress import ip_address
 from urllib.parse import urlparse
 
 from iocparser.domain.enums import HASH_IOC_TYPES, IOCType, IOCTypeName, get_custom_ioc_type
+from iocparser.domain.sources import normalize_netloc
 from iocparser.shared_utils import refang_ioc
 
 
@@ -46,10 +47,16 @@ class UrlValue(IndicatorValue):
         except ValueError:
             return normalized
         if parsed.scheme and parsed.netloc:
-            # Default an empty path to "/" and drop the (client-only) fragment so
-            # http://x.com, http://x.com/ and http://x.com/#frag dedup to one IOC,
-            # matching the source-layer normalization. Host casing is left as-is.
-            return parsed._replace(path=parsed.path or "/", fragment="").geturl()
+            # Lowercase the scheme and host (both case-insensitive) while keeping
+            # userinfo and the case-sensitive path/query; default an empty path to
+            # "/" and drop the client-only fragment so http://X.com, http://x.com/
+            # and http://x.com/#frag dedup to one IOC, matching normalize_url_value.
+            return parsed._replace(
+                scheme=parsed.scheme.lower(),
+                netloc=normalize_netloc(parsed.netloc),
+                path=parsed.path or "/",
+                fragment="",
+            ).geturl()
         return normalized
 
 

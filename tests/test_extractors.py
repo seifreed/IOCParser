@@ -339,6 +339,17 @@ class TestWindowsArtifacts:
         result = self.extractor.extract_named_pipes(r"connect to \\.\PIPE\AdminPipe now")
         assert result == [r"\\.\PIPE\AdminPipe"]
 
+    def test_extract_named_pipes_keeps_interior_dots(self):
+        r"""Pipe names with interior dots (e.g. Chromium mojo.5678) must not truncate.
+
+        Regression: the charset excluded '.', so \\.\pipe\mojo.5678 captured only
+        '\\.\pipe\mojo'. A trailing sentence period must still be excluded.
+        """
+        result = self.extractor.extract_named_pipes(r"ipc \\.\pipe\mojo.5678 opened.")
+        assert result == [r"\\.\pipe\mojo.5678"]
+        trailing = self.extractor.extract_named_pipes(r"see \\.\pipe\foo. done")
+        assert trailing == [r"\\.\pipe\foo"]
+
 
 class TestFileIndicators:
     """Test file-related IOC extraction."""

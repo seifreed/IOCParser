@@ -110,7 +110,11 @@ PATTERNS: dict[str, Pattern[str]] = {
         r"\b(?:Service|SERVICE):\s*([A-Za-z0-9][A-Za-z0-9_\-]{2,})\b|"
         r"\b([A-Za-z0-9][A-Za-z0-9_\-]{2,}(?:Service|Svc))\b",
     ),
-    "named_pipes": re.compile(r"\\\\\.\\pipe\\[A-Za-z0-9_\-]+", re.IGNORECASE),
+    # Allow interior dots (e.g. Chromium "mojo.5678") without swallowing a trailing
+    # sentence period: each dot must be followed by more name characters.
+    "named_pipes": re.compile(
+        r"\\\\\.\\pipe\\[A-Za-z0-9_\-]+(?:\.[A-Za-z0-9_\-]+)*", re.IGNORECASE
+    ),
     # File indicators
     "filenames": re.compile(
         r"\b([A-Za-z0-9][A-Za-z0-9-_\.]{2,}\."

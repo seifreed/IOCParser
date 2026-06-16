@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from contextlib import suppress
 from uuid import uuid4
 
 from iocparser.application.distributed_idempotency import idempotency_key_for
@@ -205,8 +204,11 @@ class DistributedPipelineCoordinator:
                     attempts=envelope.attempts + 1,
                     error=classify_pipeline_exception(exc),
                 )
-            with suppress(Exception):
+            try:
                 self.queue_adapter.dead_letter(receipt, envelope=failed_envelope)
+            except Exception:
+                # Already dead-lettered in the DB; drop the message so a no-DLQ backend never redelivers it.
+                self.queue_adapter.ack(receipt)
             self._emit(
                 "job_dead_lettered",
                 envelope,

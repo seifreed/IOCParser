@@ -156,6 +156,12 @@ def apply_transition(model: DistributedJobModel, update: TransitionUpdate) -> No
         model.last_error_category = update.error.category
         model.last_error_message = update.error.message
         model.retryable = update.error.retryable
+    elif update.status == JOB_STATUS_COMPLETED:
+        # A job that succeeded (possibly after a retried failure) must not keep
+        # reporting the prior attempt's error as its current state.
+        model.last_error_code = None
+        model.last_error_category = None
+        model.last_error_message = None
     if update.result_json is not None:
         model.result_json = json.dumps(update.result_json, sort_keys=True)
     if update.metrics is not None:

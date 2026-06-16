@@ -286,6 +286,43 @@ def test_distributed_pipeline_file_and_url_idempotency_keys(tmp_path: Path) -> N
     assert len(service._idempotency_key(url_request)) == 64
 
 
+def test_completed_job_clears_prior_attempt_error(tmp_path: Path) -> None:
+    """A job that succeeds after a retried failure must not report the old error.
+
+    Regression: apply_transition only ever wrote last_error and never cleared it,
+    so mark_completed left the failed attempt's last_error in place and get_job
+    reported a successful job as if it had errored.
+    """
+    db_uri = f"sqlite:///{tmp_path / 'clear-error.sqlite'}"
+    service = SQLAlchemyDistributedJobService(db_uri)
+    service.create_or_get_job(envelope=_envelope("job-clear"), receipt_id="r1")
+    service.mark_running(job_id="job-clear", attempts=1, receipt_id="r1")
+    service.mark_failed(
+        job_id="job-clear",
+        attempts=1,
+        error=PipelineErrorInfo(
+            code="INPUT_TIMEOUT",
+            category="timeout",
+            retryable=True,
+            status="failed",
+            message="timeout",
+        ),
+        will_retry=True,
+        metrics={},
+    )
+    failed_record = service.get_job(job_id="job-clear")
+    assert failed_record is not None
+    assert failed_record.last_error is not None
+
+    service.mark_completed(
+        job_id="job-clear", attempts=2, run_id=None, result_json={"ok": True}, metrics={}
+    )
+    completed_record = service.get_job(job_id="job-clear")
+    assert completed_record is not None
+    assert completed_record.status == "completed"
+    assert completed_record.last_error is None
+
+
 def test_persistence_service_and_public_distributed_wrappers(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'distributed.sqlite'}"
     service = SQLAlchemyDistributedJobService(db_uri)

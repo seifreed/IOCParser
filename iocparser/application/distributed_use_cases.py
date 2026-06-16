@@ -107,9 +107,8 @@ class DistributedPipelineCoordinator:
                 receipt_id=receipt.receipt_id,
             )
             if running is None:
-                # A duplicate from two concurrent submits sharing an idempotency key
-                # but different job ids (an equivalent job already owns the work), or
-                # an untracked message. Re-running it would break idempotency.
+                # A duplicate (an equivalent job already owns the work) or an untracked
+                # message; re-running it would break idempotency, so ack-and-skip.
                 self.queue_adapter.ack(receipt)
                 self._emit("job_skipped", envelope, {"reason": "no_tracked_job"})
                 return False
@@ -123,6 +122,9 @@ class DistributedPipelineCoordinator:
         if item is None:
             return None
         receipt, envelope = item
+        # Set once persisted completed, so the outer handler treats a later ack/emit
+        # failure (e.g. expired SQS receipt) as benign redelivery, not a dead-letter.
+        completed: DistributedJobRecord | PipelineJobResult | None = None
         try:
             if not self._begin_processing(envelope=envelope, receipt=receipt):
                 return None
@@ -139,11 +141,12 @@ class DistributedPipelineCoordinator:
                     if self.job_service
                     else None
                 )
+                completed = stored or result
                 self.queue_adapter.ack(receipt)
                 self._emit(
                     "job_completed", envelope, {"status": result.status, "run_id": result.run_id}
                 )
-                return stored or result
+                return completed
 
             failure_error = error_for_failed_result(result)
             should_retry = bool(
@@ -166,7 +169,6 @@ class DistributedPipelineCoordinator:
                 self._emit("job_requeued", envelope, {"receipt_id": next_receipt.receipt_id})
                 return stored or result
 
-            dead_envelope = advance_envelope(envelope)
             stored = (
                 self.job_service.mark_dead_lettered(
                     job_id=str(envelope.request.job_id),
@@ -176,15 +178,7 @@ class DistributedPipelineCoordinator:
                 if self.job_service
                 else None
             )
-            try:
-                dead_receipt_id = self.queue_adapter.dead_letter(
-                    receipt, envelope=dead_envelope
-                ).receipt_id
-            except Exception:
-                # Job already recorded dead-lettered; drop the message so a backend
-                # that cannot archive it (e.g. SQS with no DLQ) never redelivers it.
-                self.queue_adapter.ack(receipt)
-                dead_receipt_id = receipt.receipt_id
+            dead_receipt_id = self._archive_dead_letter(receipt=receipt, envelope=envelope)
             self._emit(
                 "job_dead_lettered",
                 envelope,
@@ -194,24 +188,33 @@ class DistributedPipelineCoordinator:
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception as exc:
-            failed_envelope = advance_envelope(envelope)
+            if completed is not None:
+                self._emit("job_ack_failed", envelope, {"error": str(exc)})
+                return completed
             if self.job_service is not None:
                 self.job_service.mark_dead_lettered(
                     job_id=str(envelope.request.job_id),
                     attempts=envelope.attempts + 1,
                     error=classify_pipeline_exception(exc),
                 )
-            try:
-                self.queue_adapter.dead_letter(receipt, envelope=failed_envelope)
-            except Exception:
-                # Already dead-lettered in the DB; drop the message so a no-DLQ backend never redelivers it.
-                self.queue_adapter.ack(receipt)
+            self._archive_dead_letter(receipt=receipt, envelope=envelope)
             self._emit(
                 "job_dead_lettered",
                 envelope,
                 {"receipt_id": receipt.receipt_id, "error_code": "unhandled"},
             )
             raise
+
+    def _archive_dead_letter(self, *, receipt: QueueReceipt, envelope: QueueEnvelope) -> str:
+        """Archive the message to the dead-letter sink; if the backend cannot (e.g. SQS
+        with no DLQ), ack to drop it so it never redelivers (already DB dead-lettered)."""
+        try:
+            return self.queue_adapter.dead_letter(
+                receipt, envelope=advance_envelope(envelope)
+            ).receipt_id
+        except Exception:
+            self.queue_adapter.ack(receipt)
+            return receipt.receipt_id
 
     def drain(
         self,

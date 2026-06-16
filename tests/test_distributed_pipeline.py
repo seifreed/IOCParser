@@ -238,6 +238,40 @@ def test_process_next_drops_message_when_dead_letter_archival_fails(tmp_path: Pa
     assert not list((tmp_path / "queue" / "poison" / "processing").glob("*.json"))
 
 
+def test_completed_job_not_dead_lettered_when_ack_fails(tmp_path: Path) -> None:
+    """Regression: an ack failure AFTER mark_completed (e.g. an SQS receipt handle
+    expired past the visibility timeout) must leave the job COMPLETED, not let the
+    failure fall through to the dead-letter handler and flip it to dead-lettered.
+    """
+
+    class AckFailsAdapter(FilesystemQueueAdapter):
+        def ack(self, receipt):  # type: ignore[no-untyped-def]
+            raise RuntimeError("ack failed: receipt handle expired")
+
+    db_uri = f"sqlite:///{tmp_path / 'ack-fail.sqlite'}"
+    queue = AckFailsAdapter(tmp_path / "queue")
+    telemetry = InMemoryTelemetrySink()
+    service = DistributedPipelineService(
+        queue_adapter=queue, db_uri=db_uri, telemetry_sink=telemetry
+    )
+    request = PipelineJobRequest(
+        input_kind="text", source_value="evil.example", persist=False, check_warnings=False
+    )
+    service.submit(request, queue_name="ack", max_attempts=1)
+
+    result = service.process_next(queue_name="ack")
+
+    assert result is not None
+    assert getattr(result, "status", "") == JOB_STATUS_COMPLETED
+    jobs = service.list_jobs(limit=10)
+    assert jobs[0].status == JOB_STATUS_COMPLETED
+    assert jobs[0].status != JOB_STATUS_DEAD_LETTERED
+    event_names = [event["name"] for event in telemetry.events]
+    assert "job_ack_failed" in event_names
+    assert "job_dead_lettered" not in event_names
+    assert "job_completed" not in event_names
+
+
 def test_unexpected_exception_acks_when_dead_letter_archival_fails(tmp_path: Path) -> None:
     """Regression: the unexpected-exception path must ack a poison message when the
     backend cannot archive it, mirroring the failed-result path. Otherwise a backend

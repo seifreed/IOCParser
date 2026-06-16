@@ -398,6 +398,25 @@ def test_worker_service_propagates_keyboard_interrupt_forever():
             w.run_forever(max_cycles=1)
 
 
+def test_run_once_returns_count_processed_before_a_mid_cycle_exception():
+    """Regression: when process_next raises mid-cycle, run_once must report the
+    messages already processed this cycle, not 0 -- otherwise run_forever backs off
+    as if the queue were empty and the throughput total under-counts."""
+    calls = [0]
+
+    def process(**_kwargs):
+        calls[0] += 1
+        if calls[0] == 2:
+            raise RuntimeError("boom on second message")
+        return _SimpleNamespace()
+
+    svc = _SimpleNamespace(process_next=process, limits=_SimpleNamespace(max_workers=1))
+    w = DistributedWorkerService(
+        service=svc, queue_name="t", poll_interval_seconds=0.0, max_messages_per_cycle=5
+    )
+    assert w.run_once() == 1
+
+
 def test_run_once_breaks_immediately_when_stop_event_is_set():
     """run_once must honor stop_event mid-cycle instead of draining the batch."""
     calls = [0]

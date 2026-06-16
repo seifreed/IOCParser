@@ -90,20 +90,22 @@ class DistributedWorkerService:
         return self.service.process_next(queue_name=self.queue_name) is not None
 
     def run_once(self, *, stop_event: threading.Event | None = None) -> int:
+        processed = 0
         try:
-            processed = 0
             for _ in range(self.max_messages_per_cycle):
                 if stop_event is not None and stop_event.is_set():
                     break
                 if not self._process_one():
                     break
                 processed += 1
-            return processed
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception:
+            # Return what was already processed this cycle, not 0. Discarding the count
+            # made run_forever back off as if the queue were empty after a mid-cycle
+            # failure and under-counted the aggregate throughput total.
             logger.exception("Error during worker run_once")
-            return 0
+        return processed
 
     def run_forever(  # noqa: C901
         self,

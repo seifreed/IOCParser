@@ -26,7 +26,41 @@ def test_source_kind_and_ioc_type_resolve_aliases() -> None:
     assert IOCType.from_name("ipv4") is IOCType.IP
     assert IOCType.from_name("url") is IOCType.URL
     assert IOCType.from_name("email") is IOCType.EMAIL
-    assert IOCType.from_name("hashes") is IOCType.SHA256
+
+
+def test_hashes_category_filter_selects_whole_hash_family() -> None:
+    """--only/--exclude hashes must cover every hash type, not just sha256.
+
+    Regression: "hashes" was aliased to IOCType.SHA256, so --only hashes dropped
+    md5/sha1/sha512/ssdeep/imphash and --exclude hashes left them behind.
+    """
+    from iocparser.domain.type_filters import parse_ioc_types
+
+    expanded = {str(ioc_type) for ioc_type in parse_ioc_types("hashes")}
+    assert expanded == {"md5", "sha1", "sha256", "sha512", "ssdeep", "imphash"}
+    # Blank segments are skipped; a single category still expands fully.
+    assert {str(t) for t in parse_ioc_types("hashes, ,domain")} == {
+        "md5",
+        "sha1",
+        "sha256",
+        "sha512",
+        "ssdeep",
+        "imphash",
+        "domains",
+    }
+
+    result = ExtractionResult.from_grouped_payload(
+        {
+            "md5": ["d41d8cd98f00b204e9800998ecf8427e"],
+            "sha256": ["e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"],
+            "domains": ["evil.example.com"],
+        },
+        {},
+    )
+    only_hashes = result.filter_types(include_types=parse_ioc_types("hashes"))
+    grouped = only_hashes.grouped_iocs()
+    assert set(grouped) == {"md5", "sha256"}
+    assert "domains" not in grouped
 
 
 def test_value_objects_canonicalize_expected_values() -> None:

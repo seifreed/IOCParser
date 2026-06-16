@@ -1,16 +1,28 @@
 from __future__ import annotations
 
-from iocparser.domain.enums import IOCType, IOCTypeName, ioc_type_name
+from iocparser.domain.enums import HASH_IOC_TYPES, IOCType, IOCTypeName, ioc_type_name
+
+# Category words that select a whole family of IOC types rather than one type.
+# "hashes" must expand to every hash type; aliasing it to a single type silently
+# dropped md5/sha1/sha512/ssdeep/imphash from --only/--exclude.
+_CATEGORY_ALIASES: dict[str, tuple[IOCType, ...]] = {
+    "hashes": tuple(sorted(HASH_IOC_TYPES, key=lambda ioc_type: ioc_type.value)),
+}
 
 
 def parse_ioc_types(value: str | None) -> tuple[IOCType | IOCTypeName, ...]:
-    """Parse a comma-separated IOC type list."""
+    """Parse a comma-separated IOC type list, expanding category words."""
     if not value:
         return ()
     parsed: list[IOCType | IOCTypeName] = []
     for item in value.split(","):
         stripped = item.strip()
-        if stripped:
+        if not stripped:
+            continue
+        category = _CATEGORY_ALIASES.get(stripped.lower())
+        if category is not None:
+            parsed.extend(category)
+        else:
             parsed.append(IOCType.from_name(stripped))
     return tuple(parsed)
 

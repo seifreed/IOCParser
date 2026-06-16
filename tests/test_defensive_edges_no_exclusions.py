@@ -327,6 +327,54 @@ def test_future_based_executors_propagate_keyboard_interrupts(
         )
 
 
+def test_process_url_plugin_branch_isolates_downloader_per_call() -> None:
+    """The plugin branch must read metadata from a per-call downloader clone.
+
+    Regression: it reused the shared downloader, so concurrent batch URLs raced
+    on last_download_metadata and cross-contaminated each source's metadata. The
+    clone is also what the per-call plugin client must be bound to.
+    """
+    from iocparser import cli_processing_urls_execution as execution
+    from iocparser.domain.options import ExtractionOptions as DomainExtractionOptions
+
+    clones: list[object] = []
+    bound: dict[str, object] = {}
+
+    class FakeDownloader:
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+        def with_policy(self, **_overrides: object) -> FakeDownloader:
+            clone = FakeDownloader(f"{self.name}-clone{len(clones) + 1}")
+            clones.append(clone)
+            return clone
+
+        def download_metadata(self) -> dict[str, object]:
+            return {"downloader": self.name}
+
+    class FakeClient:
+        def with_downloader(self, downloader: object) -> FakeClient:
+            bound["downloader"] = downloader
+            return self
+
+        def extract_result_from_url(self, _url: str, **_kwargs: object) -> ExtractionResult:
+            return ExtractionResult()
+
+    shared = FakeDownloader("shared")
+    _url, _result, metadata, _ms = execution.process_url(
+        "http://example.com",
+        options=DomainExtractionOptions(),
+        reader=SimpleNamespace(),
+        warning_service=None,
+        downloader=shared,
+        configured_plugin_client=FakeClient(),
+    )
+
+    assert len(clones) == 1
+    assert metadata == {"downloader": clones[0].name}  # not "shared"
+    assert bound["downloader"] is clones[0]
+
+
 def test_network_policy_rejects_exact_prefix_and_suffix_fragments() -> None:
     from iocparser.infrastructure.extractor_network import DEFAULT_NETWORK_POLICY
 

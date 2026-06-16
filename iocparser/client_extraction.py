@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from iocparser.application.contracts import ExtractTextInput
 from iocparser.application.use_cases import extract_from_text
@@ -311,6 +311,14 @@ class IOCParserClient:
     enrichers: tuple[str, ...] = ("misp",)
     extractors: tuple[str, ...] = ()
     postprocessors: tuple[str, ...] = ()
+
+    def with_downloader(self, downloader: URLDownloader) -> IOCParserClient:
+        """Return a copy bound to a different downloader.
+
+        Lets concurrent callers each use an isolated downloader so the shared
+        instance's per-download metadata (last_download_metadata) is not raced.
+        """
+        return replace(self, downloader=downloader)
 
     def _plugins(self) -> ClientPluginSettings:
         return plugin_settings(

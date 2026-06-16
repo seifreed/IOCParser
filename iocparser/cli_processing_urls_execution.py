@@ -32,6 +32,8 @@ class PluginClient(Protocol):
         exclude: str | None,
     ) -> ExtractionResult: ...
 
+    def with_downloader(self, downloader: URLDownloader) -> PluginClient: ...
+
 
 _extractor_engine = DefaultIOCExtractionEngine()
 _temporary_resource_cleaner = TemporaryFileCleaner()
@@ -73,11 +75,15 @@ def process_url(
     downloader: URLDownloader,
     configured_plugin_client: PluginClient | None,
 ) -> tuple[str, ExtractionResult, dict[str, object], int]:
-    batch_downloader = downloader
     started_at = time.perf_counter()
+    # Clone the downloader for every call (both branches): URL batches run this
+    # concurrently across a thread pool, and a shared downloader's
+    # last_download_metadata would be raced, cross-contaminating each source's
+    # persisted metadata (original_url, input_size, request attempts).
+    batch_downloader = shared_batch_downloader(downloader)
     if configured_plugin_client is not None:
         only, exclude = joined_type_filters(options)
-        result = configured_plugin_client.extract_result_from_url(
+        result = configured_plugin_client.with_downloader(batch_downloader).extract_result_from_url(
             url,
             check_warnings=options.check_warnings,
             force_update=options.force_update,
@@ -86,7 +92,6 @@ def process_url(
             exclude=exclude,
         )
     else:
-        batch_downloader = shared_batch_downloader(downloader)
         result = app_extract_from_url(
             ExtractURLInput(url=url, options=options),
             downloader=batch_downloader,

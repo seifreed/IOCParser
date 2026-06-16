@@ -113,7 +113,6 @@ class IOCType(StrEnum):
             "urls": cls.URL,
             "email": cls.EMAIL,
             "emails": cls.EMAIL,
-            "hashes": cls.SHA256,
             "cidr": cls.CIDR,
             "onion": cls.ONION_ADDRESS,
             "onion_address": cls.ONION_ADDRESS,

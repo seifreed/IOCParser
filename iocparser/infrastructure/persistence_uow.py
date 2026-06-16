@@ -7,7 +7,7 @@ from typing import ClassVar, Literal
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import NullPool, StaticPool
 
 from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
 from iocparser.infrastructure.persistence_run_repository import SQLAlchemyRunRepository
@@ -20,7 +20,14 @@ _ENGINE_LOCK = threading.Lock()
 
 
 def _engine_kwargs(db_uri: str) -> dict[str, object]:
-    if db_uri.startswith("sqlite:///") and ":memory:" not in db_uri:
+    if db_uri.startswith("sqlite:///"):
+        if ":memory:" in db_uri:
+            # An in-memory database lives inside its connection, so it must be
+            # shared as a single connection across threads -- otherwise the default
+            # pool hands each thread a separate empty database and pysqlite's
+            # check_same_thread blocks cross-thread reuse (breaking --parallel
+            # persist and the worker pool against sqlite:///:memory:).
+            return {"poolclass": StaticPool, "connect_args": {"check_same_thread": False}}
         return {"poolclass": NullPool}
     return {}
 

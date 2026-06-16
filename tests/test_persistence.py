@@ -582,3 +582,35 @@ def test_in_memory_unit_of_work_survives_close_and_reopen() -> None:
     finally:
         second.close()
     assert count == 0
+
+
+def test_in_memory_unit_of_work_is_usable_from_another_thread() -> None:
+    """An in-memory sqlite DB must be shared across threads (StaticPool).
+
+    Regression: the default pool gave each thread a separate empty database and
+    pysqlite's check_same_thread blocked cross-thread reuse, so parallel persist
+    / the worker pool against sqlite:///:memory: failed with 'no such table' or a
+    same-thread ProgrammingError.
+    """
+    import threading
+
+    from sqlalchemy import text
+
+    uri = "sqlite:///:memory:?cross-thread"
+    owner = SQLAlchemyUnitOfWork(uri)
+    counts: list[int | None] = []
+
+    def query_from_thread() -> None:
+        worker = SQLAlchemyUnitOfWork(uri)
+        try:
+            counts.append(worker.session.execute(text("SELECT COUNT(*) FROM runs")).scalar())
+        finally:
+            worker.close()
+
+    thread = threading.Thread(target=query_from_thread)
+    thread.start()
+    thread.join(timeout=5)
+    owner.close()
+
+    # A cross-thread failure (separate DB / check_same_thread) leaves counts empty.
+    assert counts == [0]

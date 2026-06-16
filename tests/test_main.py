@@ -1587,6 +1587,29 @@ class TestDisplayResults:
 
         display_results(normal_iocs, warning_iocs)
 
+    def test_display_results_routes_summary_to_provided_stream(self) -> None:
+        """The human summary must honour the supplied stream and stay off stdout.
+
+        Regression: with `-o -` the rendered JSON/CSV/STIX owns stdout, so the
+        summary is routed to stderr; if it leaked to stdout it corrupted the piped
+        machine output.
+        """
+        normal_iocs = {"domains": ["evil.com"]}
+        warning_iocs = {
+            "domains": [
+                {"value": "g.com", "warning_list": "L", "description": "d"},
+            ],
+        }
+        summary_stream = io.StringIO()
+        stdout_buffer = io.StringIO()
+        with redirect_stdout(stdout_buffer):
+            display_results(normal_iocs, warning_iocs, stream=summary_stream)
+
+        assert "domains: 1" in summary_stream.getvalue()
+        assert "g.com" in summary_stream.getvalue()
+        assert "domains: 1" not in stdout_buffer.getvalue()
+        assert "g.com" not in stdout_buffer.getvalue()
+
 
 class TestHandleMISPInit:
     """Test MISP warning lists initialization."""

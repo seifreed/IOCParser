@@ -62,7 +62,9 @@ def setup_logger(
 
     # Console handler
     if console:
-        output_stream = sys.stdout if stream is None else stream
+        # Diagnostics go to stderr (Unix convention) so they never corrupt machine
+        # output written to stdout (e.g. `--json -o -` piped into another tool).
+        output_stream = sys.stderr if stream is None else stream
         console_handler = logging.StreamHandler(output_stream)
         console_handler.setLevel(level)
 

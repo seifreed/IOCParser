@@ -251,6 +251,23 @@ class TestSetupLogger:
         # Should have StreamHandler
         assert any(isinstance(h, logging.StreamHandler) for h in logger.handlers)
 
+    def test_setup_logger_console_defaults_to_stderr(self) -> None:
+        """The default console handler must write to stderr, not stdout.
+
+        Diagnostics on stdout corrupt machine output piped from stdout (e.g.
+        `--json -o -`); logs belong on stderr per Unix convention.
+        """
+        import sys
+
+        logger = setup_logger(name="test_stderr_default", console=True)
+
+        console_handler = next(
+            handler
+            for handler in logger.handlers
+            if isinstance(handler, logging.StreamHandler)
+        )
+        assert console_handler.stream is sys.stderr
+
     def test_setup_logger_no_console_handler_when_disabled(self) -> None:
         """
         Test setup_logger doesn't add console handler when console=False.

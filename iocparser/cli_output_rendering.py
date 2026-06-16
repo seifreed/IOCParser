@@ -5,6 +5,7 @@ import hashlib
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TextIO
 
 from colorama import Fore, Style
 
@@ -286,36 +287,43 @@ _optional_int_run_metadata_value = optional_int_run_metadata_value
 _optional_str_run_metadata_value = optional_str_run_metadata_value
 
 
-def _write(text: str) -> None:
+def _write(text: str, stream: TextIO | None = None) -> None:
     import sys
 
-    sys.stdout.write(text + "\n")
+    (stream if stream is not None else sys.stdout).write(text + "\n")
 
 
-def print_warning_lists(warnings: dict[str, list[dict[str, str]]]) -> None:
+def print_warning_lists(
+    warnings: dict[str, list[dict[str, str]]], *, stream: TextIO | None = None
+) -> None:
     if not warnings:
         return
     logger.warning("IOCs found that might be false positives according to MISP warning lists:")
     for ioc_type, type_warnings in warnings.items():
-        _write(f"\n{color_yellow}IOCs of type {ioc_type} with warnings:{style_reset}")
+        _write(f"\n{color_yellow}IOCs of type {ioc_type} with warnings:{style_reset}", stream)
         for warning in type_warnings:
             _write(
-                f"  {color_red}- {warning['value']} - List: {warning['warning_list']}{style_reset}"
+                f"  {color_red}- {warning['value']} - List: {warning['warning_list']}{style_reset}",
+                stream,
             )
-            _write(f"    {color_yellow}Description: {warning['description']}{style_reset}")
+            _write(f"    {color_yellow}Description: {warning['description']}{style_reset}", stream)
 
 
 def display_results(
     normal_iocs: dict[str, list[str | dict[str, str]]],
     warning_iocs: dict[str, list[dict[str, str]]],
+    *,
+    stream: TextIO | None = None,
 ) -> None:
+    # When the rendered machine output is itself going to stdout (-o -), the caller
+    # passes stderr here so the human summary does not corrupt the piped JSON/CSV/STIX.
     total_iocs = sum(len(iocs) for iocs in normal_iocs.values())
     logger.info("Found %s indicators of compromise", total_iocs)
     for ioc_type, ioc_list in normal_iocs.items():
         if ioc_list:
-            _write(f"    {color_cyan}- {ioc_type}: {len(ioc_list)}{style_reset}")
+            _write(f"    {color_cyan}- {ioc_type}: {len(ioc_list)}{style_reset}", stream)
     if warning_iocs:
-        print_warning_lists(warning_iocs)
+        print_warning_lists(warning_iocs, stream=stream)
         logger.warning(
             "Found %s potential false positives",
             sum(len(values) for values in warning_iocs.values()),

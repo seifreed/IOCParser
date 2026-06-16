@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -189,7 +190,10 @@ def finalize_cli_run(
     batch_report: URLBatchReport | None,
     save_output: Callable[[argparse.Namespace, GroupedIocs, GroupedWarnings, str], None],
 ) -> None:
-    _cli_output.display_results(normal_iocs, warning_iocs)
+    # -o - sends the rendered machine output to stdout, so the human summary must go
+    # to stderr or it corrupts the piped JSON/CSV/STIX.
+    summary_stream = sys.stderr if _cli_args.get_optional_str_arg(args, "output") == "-" else None
+    _cli_output.display_results(normal_iocs, warning_iocs, stream=summary_stream)
     save_output(args, normal_iocs, warning_iocs, input_display)
 
     persist_options = _cli_persistence.build_persist_options(args)

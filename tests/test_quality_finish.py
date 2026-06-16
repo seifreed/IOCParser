@@ -301,6 +301,20 @@ def test_cli_and_schema_integer_helpers_raise_validation_errors() -> None:
         payload_path.unlink()
 
 
+def test_history_payload_reports_missing_and_unreadable_files_cleanly(tmp_path: Path) -> None:
+    # Regression: --restore-history/--import-history on a missing or malformed archive
+    # raised a raw FileNotFoundError/JSONDecodeError that reached the CLI top-level
+    # handler as an "unexpected error" stack trace instead of a clean message.
+    missing = tmp_path / "nope.json"
+    with pytest.raises(ValidationError, match="History file not found"):
+        _history_payload(str(missing))
+
+    malformed = tmp_path / "bad.json"
+    malformed.write_text("{not json", encoding="utf-8")
+    with pytest.raises(ValidationError, match="Could not read history file"):
+        _history_payload(str(malformed))
+
+
 def test_runtime_and_worker_config_support_helpers_cover_error_branches(tmp_path: Path) -> None:
     os_environ = sys.modules["os"].environ
     previous = {

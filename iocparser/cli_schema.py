@@ -44,6 +44,8 @@ SCHEMA_VERSION_REQUIRED = "schema-version requires persistence configuration"
 MIGRATE_REQUIRED = "migrate requires persistence configuration"
 VALIDATE_REQUIRED = "validate-schema requires persistence configuration"
 HISTORY_IMPORT_OBJECT_REQUIRED = "history import file must contain a JSON object"
+HISTORY_FILE_NOT_FOUND = "History file not found: {path}"
+HISTORY_FILE_UNREADABLE = "Could not read history file {path}: {error}"
 
 
 def _query_service_for(config: AppConfig) -> PersistenceQueryService:
@@ -51,7 +53,16 @@ def _query_service_for(config: AppConfig) -> PersistenceQueryService:
 
 
 def _history_payload(path: str) -> dict[str, object]:
-    loaded: object = json.loads(Path(path).read_text(encoding="utf-8"))
+    # A missing/unreadable archive is user error (typo'd path, bad JSON); report it
+    # cleanly rather than letting the raw OSError/JSONDecodeError reach the top-level
+    # handler as an "unexpected error" stack trace.
+    archive = Path(path)
+    if not archive.is_file():
+        raise ValidationError(HISTORY_FILE_NOT_FOUND.format(path=path))
+    try:
+        loaded: object = json.loads(archive.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValidationError(HISTORY_FILE_UNREADABLE.format(path=path, error=exc)) from exc
     if not isinstance(loaded, dict):
         raise ValidationError(HISTORY_IMPORT_OBJECT_REQUIRED)
     return {str(key): value for key, value in loaded.items()}

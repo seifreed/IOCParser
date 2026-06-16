@@ -20,21 +20,27 @@ def _config_path_from_argv(argv: list[str]) -> str | None:
     return None
 
 
+def _report_startup_failure(exc: Exception) -> int:
+    # Logging lives here (not lexically in the except) so it stays a concise message
+    # rather than a stack trace -- an expected config error is not a crash to debug.
+    logger.error("Worker startup failed: %s", exc)
+    return 1
+
+
 def main() -> int:
     """Entrypoint for the standalone distributed worker service."""
     try:
         config = WorkerServiceConfig.from_sources(_config_path_from_argv(sys.argv))
         service = DistributedWorkerService.from_config(config)
+    except (IOCParserError, ValueError) as exc:
+        # Scope this to setup only: an unknown queue backend, a missing queue_url or a
+        # bad numeric env var surface here. run_forever (below) is outside the catch so a
+        # genuine ValueError during processing still propagates instead of being masked.
+        return _report_startup_failure(exc)
+    try:
         service.run_forever(max_cycles=config.max_cycles)
     except KeyboardInterrupt:
         logger.warning("Worker stopped by user")
-        return 0
-    except (IOCParserError, ValueError) as exc:
-        # Startup/config problems -- unknown queue backend, missing queue_url, a bad
-        # numeric env var -- reach here as ValueError/IOCParserError; report them as a
-        # concise message instead of an unhandled stack trace from the daemon entrypoint.
-        logger.error("Worker startup failed: %s", exc)
-        return 1
     return 0
 
 

@@ -188,6 +188,34 @@ class TestPluginEntryPointLoading:
             }
         )
 
+    def test_load_discovered_entry_points_isolates_failing_plugin(self) -> None:
+        """One entry point whose load() raises must not abort the others.
+
+        Regression: load() was called without per-entry-point error handling, so a
+        single broken third-party plugin propagated out and broke discovery of every
+        other (including built-in) plugin.
+        """
+        from iocparser.plugins import _load_discovered_entry_points, _renderer_registry
+
+        def boom() -> object:
+            raise ImportError("missing dependency")
+
+        good_ep = SimpleNamespace(
+            name="_test_good_r", load=lambda: (lambda wc, st: SimpleNamespace(render=lambda r: "ok"))
+        )
+        bad_ep = SimpleNamespace(name="_test_bad_r", load=boom)
+        fake_discovered = SimpleNamespace(
+            select=lambda group: [bad_ep, good_ep]
+            if group == "iocparser.renderers"
+            else [],
+        )
+
+        _load_discovered_entry_points(fake_discovered)
+
+        assert "_test_good_r" in _renderer_registry
+        assert "_test_bad_r" not in _renderer_registry
+        self._cleanup_registries({"_renderer_registry": ["_test_good_r"]})
+
     def test_register_discovered_ioc_types_with_empty_base_type(self) -> None:
         from iocparser.plugins import (
             _ioc_type_registry,

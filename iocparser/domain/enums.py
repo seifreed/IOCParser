@@ -19,6 +19,13 @@ INVALID_CUSTOM_BASE_TYPE = "Custom IOC types must derive from a built-in base IO
 SHADOWS_BUILTIN_IOC_TYPE = (
     "Custom IOC type name {name!r} shadows a built-in IOC type or alias and would never resolve"
 )
+ALIAS_SHADOWS_BUILTIN_IOC_TYPE = (
+    "Alias {alias!r} for custom IOC type {name!r} shadows a built-in IOC type or alias "
+    "and would never resolve"
+)
+ALIAS_COLLIDES_WITH_CUSTOM_TYPE = (
+    "Alias {alias!r} for custom IOC type {name!r} already maps to custom type {owner!r}"
+)
 
 
 class SourceKind(StrEnum):
@@ -183,20 +190,16 @@ def register_custom_ioc_type(
     # A name equal to a built-in IOC type/alias can never resolve to this custom
     # type (IOCType.from_name checks built-ins first), so the registration would be
     # silently inert. Reject it instead of accepting a dead definition.
-    if normalized not in _custom_ioc_types:
-        try:
-            resolved = IOCType.from_name(normalized)
-        except ValueError:
-            resolved = None
-        if isinstance(resolved, IOCType):
-            raise ValueError(SHADOWS_BUILTIN_IOC_TYPE.format(name=name))
+    if normalized not in _custom_ioc_types and _is_builtin_ioc_type(normalized):
+        raise ValueError(SHADOWS_BUILTIN_IOC_TYPE.format(name=name))
     base = base_type if isinstance(base_type, IOCType) else IOCType.from_name(str(base_type))
     if not isinstance(base, IOCType):
         raise TypeError(INVALID_CUSTOM_BASE_TYPE)
+    normalized_aliases = _validated_custom_aliases(normalize_tokens(aliases), owner=normalized)
     definition = CustomIOCTypeDefinition(
         name=normalized,
         base_type=base,
-        aliases=normalize_tokens(aliases),
+        aliases=normalized_aliases,
         severity=severity.lower().strip() if severity else None,
         tags=normalize_tokens(tags),
         stix_pattern=stix_pattern,
@@ -205,6 +208,35 @@ def register_custom_ioc_type(
     for alias in definition.aliases:
         _custom_ioc_aliases[alias] = normalized
     return IOCTypeName(normalized)
+
+
+def _is_builtin_ioc_type(name: str) -> bool:
+    """Whether a name resolves to a built-in IOCType (not a custom type)."""
+    try:
+        return isinstance(IOCType.from_name(name), IOCType)
+    except ValueError:
+        return False
+
+
+def _validated_custom_aliases(aliases: tuple[str, ...], *, owner: str) -> tuple[str, ...]:
+    """Reject aliases that would be dead or that silently steal another type's alias.
+
+    An alias equal to a built-in type/alias never resolves to the custom type
+    (IOCType.from_name checks built-ins first), and an alias already owned by a
+    different custom type would be silently overwritten -- both are rejected so the
+    registration fails loudly instead of producing an inert or surprising mapping.
+    """
+    for alias in aliases:
+        if alias == owner:
+            continue
+        if _is_builtin_ioc_type(alias):
+            raise ValueError(ALIAS_SHADOWS_BUILTIN_IOC_TYPE.format(alias=alias, name=owner))
+        existing_owner = _custom_ioc_aliases.get(alias)
+        if existing_owner is not None and existing_owner != owner:
+            raise ValueError(
+                ALIAS_COLLIDES_WITH_CUSTOM_TYPE.format(alias=alias, name=owner, owner=existing_owner)
+            )
+    return aliases
 
 
 def resolve_custom_ioc_type(value: str) -> IOCTypeName:

@@ -95,6 +95,32 @@ def test_register_custom_ioc_type_rejects_builtin_shadow() -> None:
             register_custom_ioc_type(shadow, base_type="urls")
 
 
+def test_register_custom_ioc_type_rejects_builtin_shadowing_alias() -> None:
+    """An alias equal to a built-in type/alias never resolves to the custom type
+    (built-ins win in from_name), so it must be rejected rather than stored dead."""
+    import pytest
+
+    with pytest.raises(ValueError, match="shadows a built-in"):
+        register_custom_ioc_type("threatfeed_a", base_type="urls", aliases=("md5",))
+
+
+def test_register_custom_ioc_type_rejects_alias_collision() -> None:
+    """An alias already owned by a different custom type must not be silently stolen."""
+    import pytest
+
+    register_custom_ioc_type("collide_owner", base_type="urls", aliases=("shared_handle",))
+    # Re-registering the same type with its own alias is idempotent, not a collision.
+    register_custom_ioc_type("collide_owner", base_type="urls", aliases=("shared_handle",))
+    with pytest.raises(ValueError, match="already maps to custom type"):
+        register_custom_ioc_type("collide_thief", base_type="urls", aliases=("shared_handle",))
+
+
+def test_register_custom_ioc_type_allows_alias_equal_to_own_name() -> None:
+    """An alias identical to the type's own name is harmless and must be accepted."""
+    name = register_custom_ioc_type("self_named", base_type="urls", aliases=("self_named",))
+    assert str(name) == "self_named"
+
+
 def test_malformed_urls_do_not_break_source_normalization() -> None:
     source = Source.from_raw("url", "http://[::1")
 

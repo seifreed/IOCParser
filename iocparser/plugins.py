@@ -159,23 +159,58 @@ def _string_tuple(value: object) -> tuple[str, ...]:
     return tuple(str(item) for item in value)
 
 
+def _load_group[FactoryT](
+    discovered: EntryPoints,
+    *,
+    group: str,
+    kind: str,
+    register: Callable[[str, FactoryT], None],
+    builtin_names: set[str] | None = None,
+) -> None:
+    for entry_point in discovered.select(group=group):
+        if builtin_names is not None and entry_point.name.lower() in builtin_names:
+            _logger.warning("Plugin %s '%s' overrides built-in %s", kind, entry_point.name, kind)
+        try:
+            # A third-party plugin whose load() raises (bad import, missing
+            # dependency) must not abort discovery of the remaining (including
+            # built-in) plugins, so the failure is logged and the plugin skipped.
+            register(entry_point.name, cast("FactoryT", entry_point.load()))
+        except Exception as exc:
+            _logger.warning(
+                "Skipping %s plugin '%s' that failed to load: %s", kind, entry_point.name, exc
+            )
+
+
 def _load_discovered_entry_points(discovered: EntryPoints) -> None:
-    for entry_point in discovered.select(group="iocparser.renderers"):
-        name_lower = entry_point.name.lower()
-        if name_lower in _BUILTIN_RENDERER_NAMES:
-            _logger.warning("Plugin renderer '%s' overrides built-in renderer", name_lower)
-        register_renderer(entry_point.name, cast("RendererFactory", entry_point.load()))
-    for entry_point in discovered.select(group="iocparser.enrichers"):
-        name_lower = entry_point.name.lower()
-        if name_lower in _BUILTIN_ENRICHER_NAMES:
-            _logger.warning("Plugin enricher '%s' overrides built-in enricher", name_lower)
-        register_enricher(entry_point.name, cast("EnricherFactory", entry_point.load()))
-    for entry_point in discovered.select(group="iocparser.extractors"):
-        register_extractor(entry_point.name, cast("ExtractorFactory", entry_point.load()))
-    for entry_point in discovered.select(group="iocparser.postprocessors"):
-        register_postprocessor(entry_point.name, cast("PostProcessorFactory", entry_point.load()))
-    for entry_point in discovered.select(group="iocparser.ioc_types"):
-        register_ioc_type_plugin(entry_point.name, cast("IOCTypePluginFactory", entry_point.load()))
+    _load_group(
+        discovered,
+        group="iocparser.renderers",
+        kind="renderer",
+        register=register_renderer,
+        builtin_names=_BUILTIN_RENDERER_NAMES,
+    )
+    _load_group(
+        discovered,
+        group="iocparser.enrichers",
+        kind="enricher",
+        register=register_enricher,
+        builtin_names=_BUILTIN_ENRICHER_NAMES,
+    )
+    _load_group(
+        discovered, group="iocparser.extractors", kind="extractor", register=register_extractor
+    )
+    _load_group(
+        discovered,
+        group="iocparser.postprocessors",
+        kind="postprocessor",
+        register=register_postprocessor,
+    )
+    _load_group(
+        discovered,
+        group="iocparser.ioc_types",
+        kind="ioc_type",
+        register=register_ioc_type_plugin,
+    )
 
 
 def _register_ioc_type_plugin(plugin_name: str) -> None:

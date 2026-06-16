@@ -123,9 +123,11 @@ def _handle_history_io(
     imported = uc_import_persisted_history(
         _history_payload(import_path), persistence_query_service=_query_service_for(config)
     )
-    imported_count = int(imported.get("imported", imported.get("runs_imported", 0)))
-    skipped_count = int(imported.get("skipped", imported.get("runs_skipped", 0)))
-    _cli_output.print_json_payload({"imported": imported_count, "skipped": skipped_count})
+    # import_history returns newly-inserted row counts keyed per table (runs, iocs,
+    # sources, ...); report them verbatim. The previous code read "imported"/"skipped"
+    # keys the use case never emits, so it always printed {"imported": 0, "skipped": 0}
+    # even when rows were actually inserted.
+    _cli_output.print_json_payload(dict(imported))
     return True
 
 

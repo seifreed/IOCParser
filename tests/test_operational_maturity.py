@@ -1110,6 +1110,12 @@ def test_cli_schema_commands_and_history_io(tmp_path: Path, capsys) -> None:
     )
     assert handle_schema_commands(restore_args, restore_config, file_writer=writer) is True
     assert query_persisted_runs(db_uri=restore_db, limit=10).total >= 1
+    # Regression: the import summary must reflect the rows actually inserted. The
+    # handler previously read "imported"/"skipped" keys the use case never emits, so
+    # it always printed {"imported": 0, "skipped": 0} despite inserting runs.
+    import_summary = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert import_summary["runs"] >= 1
+    assert import_summary["iocs"] >= 1
     assert handle_schema_commands(
         SimpleNamespace(
             schema_version=False,

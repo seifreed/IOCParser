@@ -345,6 +345,16 @@ class TestProcessingOptions:
         with pytest.raises(ValidationError, match="Invalid IOC type for --exclude"):
             ProcessingOptions.from_args(args)
 
+    def test_validated_stix_types_rejects_unknown_type_cleanly(self) -> None:
+        """An unknown --stix-types value must surface as a clean ValidationError
+        matching --only/--exclude, not a generic "Unexpected error: <type>" crash."""
+        from iocparser.cli_args_values import validated_stix_types
+
+        assert validated_stix_types(None) is None
+        assert validated_stix_types("ip,domains") == "ip,domains"
+        with pytest.raises(ValidationError, match="Invalid IOC type for --stix-types"):
+            validated_stix_types("ipv4-addr")
+
 
 class TestSetupApplication:
     """Test application setup and initialization."""

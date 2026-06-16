@@ -18,6 +18,7 @@ from iocparser.cli_args import (
     int_value,
     parse_string_filters,
 )
+from iocparser.cli_args_values import validated_stix_types
 from iocparser.config import AppConfig
 from iocparser.domain.models import ExtractionResult, PersistOptions, Source
 from iocparser.infrastructure.file_readers import detect_file_type
@@ -228,12 +229,13 @@ def render_summary(result: ExtractionResult) -> str:
 def render_result(args: argparse.Namespace, result: ExtractionResult) -> tuple[str, str, str]:
     include_context = get_bool_arg(args, "with_context")
     result = filter_result_for_output(args, result)
+    stix_types = validated_stix_types(get_optional_str_arg(args, "stix_types"))
     plugin_renderer = get_optional_str_arg(args, "renderer")
     if plugin_renderer:
         renderer = get_renderer(
             plugin_renderer,
             with_context=include_context,
-            stix_types=get_optional_str_arg(args, "stix_types"),
+            stix_types=stix_types,
         )
         return renderer.render(result), plugin_renderer, plugin_renderer
     if get_bool_arg(args, "summary") and not any(
@@ -241,7 +243,7 @@ def render_result(args: argparse.Namespace, result: ExtractionResult) -> tuple[s
     ):
         return render_summary(result), "summary", "text"
     if get_bool_arg(args, "stix"):
-        renderer = get_renderer("stix", stix_types=get_optional_str_arg(args, "stix_types"))
+        renderer = get_renderer("stix", stix_types=stix_types)
         return renderer.render(result), "STIX 2.1", "stix"
     if get_bool_arg(args, "jsonl"):
         renderer = get_renderer("jsonl")

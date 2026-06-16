@@ -27,6 +27,25 @@ INTEGER_VALUE_REQUIRED = "{field_name} requires an integer value"
 INVALID_IOC_TYPE_FILTER = "Invalid IOC type for {flag}: {value}"
 
 
+def validated_stix_types(value: str | None) -> str | None:
+    """Validate a --stix-types value at the CLI boundary, returning it unchanged.
+
+    The STIX renderer parses this string with parse_ioc_types, which raises a bare
+    ValueError on an unknown type; left unguarded it surfaced as a generic
+    "Unexpected error: <type>". Translate it to a ValidationError so the message
+    matches --only/--exclude/--ioc-type instead of looking like a crash.
+    """
+    if value is None:
+        return None
+    try:
+        parse_ioc_types(value)
+    except ValueError as exc:
+        raise ValidationError(
+            INVALID_IOC_TYPE_FILTER.format(flag="--stix-types", value=exc)
+        ) from exc
+    return value
+
+
 def int_arg_value(raw_value: object, field_name: str) -> int:
     """Coerce an argparse value to int, rejecting bools and non-numeric input."""
     if isinstance(raw_value, bool) or not isinstance(raw_value, int | str):

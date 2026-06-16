@@ -123,6 +123,54 @@ def test_distributed_pipeline_filesystem_queue_e2e(tmp_path: Path) -> None:
     ]
 
 
+def test_process_next_skips_message_without_tracked_job(tmp_path: Path) -> None:
+    """A queued message whose job_id has no DB row must be acked and skipped.
+
+    When two concurrent submits share an idempotency key but carry different job
+    ids, both enqueue a message yet only one job row is created (the other is
+    deduplicated). The duplicate's job_id has no row, so mark_running returns
+    None; processing it anyway re-ran the work and defeated idempotency. It must
+    now be acked and skipped instead.
+    """
+    db_uri = f"sqlite:///{tmp_path / 'orphan.sqlite'}"
+    queue = FilesystemQueueAdapter(tmp_path / "queue")
+    telemetry = InMemoryTelemetrySink()
+    service = DistributedPipelineService(
+        queue_adapter=queue,
+        db_uri=db_uri,
+        telemetry_sink=telemetry,
+    )
+    real_request = PipelineJobRequest(
+        input_kind="text",
+        source_value="evil.example",
+        persist=False,
+        check_warnings=False,
+    )
+    service.submit(real_request, queue_name="ingest")
+    assert service.process_next(queue_name="ingest") is not None
+
+    orphan_request = PipelineJobRequest(
+        input_kind="text",
+        source_value="evil.example",
+        persist=False,
+        check_warnings=False,
+        job_id="never-tracked-job-id",
+    )
+    orphan = QueueEnvelope(
+        request=orphan_request,
+        queue_backend="filesystem",
+        queue_name="ingest",
+    )
+    queue.enqueue(queue_name="ingest", envelope=orphan)
+
+    telemetry.events.clear()
+    result = service.process_next(queue_name="ingest")
+
+    assert result is None
+    assert queue.pending_count(queue_name="ingest") == 0
+    assert [event["name"] for event in telemetry.events] == ["job_skipped"]
+
+
 def test_filesystem_queue_dequeue_survives_race_condition(tmp_path: Path) -> None:
     """Regression: FileNotFoundError during rename must not crash dequeue."""
     queue = FilesystemQueueAdapter(tmp_path / "queue")

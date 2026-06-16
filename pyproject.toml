@@ -177,6 +177,7 @@ ignore = [
 "iocparser/infrastructure/persistence/history/ops.py" = ["PLR0913", "SIM105"]
 "iocparser/infrastructure/persistence/query/ops.py" = ["TRY003"]
 "iocparser/infrastructure/queue_sqs.py" = ["TRY003"]
+"iocparser/worker_main.py" = ["TRY400"]  # deliberate: concise startup-error log, no stack trace
 "iocparser/interfaces/ports.py" = ["PLR0913"]
 "iocparser/interfaces/ports_persistence.py" = ["PLR0913"]
 "iocparser/adapters/renderers_stix.py" = ["SLF001"]

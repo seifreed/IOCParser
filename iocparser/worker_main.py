@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import sys
 
+from iocparser.errors import IOCParserError
+from iocparser.infrastructure.logger import get_logger
 from iocparser.worker_config import WorkerServiceConfig
 from iocparser.worker_service import DistributedWorkerService
+
+logger = get_logger("iocparser.worker")
 
 
 def _config_path_from_argv(argv: list[str]) -> str | None:
@@ -18,9 +22,19 @@ def _config_path_from_argv(argv: list[str]) -> str | None:
 
 def main() -> int:
     """Entrypoint for the standalone distributed worker service."""
-    config = WorkerServiceConfig.from_sources(_config_path_from_argv(sys.argv))
-    service = DistributedWorkerService.from_config(config)
-    service.run_forever(max_cycles=config.max_cycles)
+    try:
+        config = WorkerServiceConfig.from_sources(_config_path_from_argv(sys.argv))
+        service = DistributedWorkerService.from_config(config)
+        service.run_forever(max_cycles=config.max_cycles)
+    except KeyboardInterrupt:
+        logger.warning("Worker stopped by user")
+        return 0
+    except (IOCParserError, ValueError) as exc:
+        # Startup/config problems -- unknown queue backend, missing queue_url, a bad
+        # numeric env var -- reach here as ValueError/IOCParserError; report them as a
+        # concise message instead of an unhandled stack trace from the daemon entrypoint.
+        logger.error("Worker startup failed: %s", exc)
+        return 1
     return 0
 
 

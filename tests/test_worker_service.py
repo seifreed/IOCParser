@@ -283,6 +283,31 @@ def test_worker_service_from_config_and_main(tmp_path: Path) -> None:
         os.sys.argv = original_argv
 
 
+def test_worker_main_reports_invalid_backend_without_traceback() -> None:
+    # Regression: an unknown IOCPARSER_WORKER_QUEUE_BACKEND raised a bare ValueError
+    # straight out of the daemon entrypoint as a stack trace. main() must catch the
+    # startup/config error and return a non-zero exit code instead.
+    with _Env(
+        IOCPARSER_WORKER_QUEUE_BACKEND="bogus",
+        IOCPARSER_WORKER_MAX_CYCLES="1",
+        IOCPARSER_WORKER_POLL_INTERVAL_SECONDS="0",
+    ):
+        assert main() == 1
+
+
+def test_worker_main_handles_keyboard_interrupt(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _interrupt(*_args: object, **_kwargs: object) -> int:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(DistributedWorkerService, "run_forever", _interrupt)
+    with _Env(
+        IOCPARSER_WORKER_QUEUE_BACKEND="filesystem",
+        IOCPARSER_WORKER_MAX_CYCLES="1",
+        IOCPARSER_WORKER_POLL_INTERVAL_SECONDS="0",
+    ):
+        assert main() == 0
+
+
 def test_worker_service_survives_thread_exception():
     """Worker loop must not die when a thread raises an exception."""
     calls = [0]

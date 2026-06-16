@@ -337,6 +337,7 @@ def test_labelled_fingerprint_not_duplicated_as_md5(label: str) -> None:
     digest = "deadbeefcafe1234567890abfedc5678"
     result = IOCExtractor(defang=False).extract_all(f"observed {label}={digest} here")
     assert result.get(label) == [digest]
+    assert result.get("md5") is None
 
 
 def test_valid_sha256_with_file_magic_prefix_is_kept() -> None:
@@ -363,7 +364,48 @@ def test_bare_tlsh_digest_lowercase_is_extracted() -> None:
     bare_tlsh = "t1" + "a" * 68
     result = IOCExtractor(defang=False).extract_all(f"Hash value: {bare_tlsh}")
     assert result.get("tlsh") == [bare_tlsh]
-    assert result.get("md5") is None
+
+
+def test_sqs_dequeue_does_not_hold_lock_during_long_poll() -> None:
+    """The SQS long poll must not run under the adapter lock.
+
+    Holding self._lock across receive_message (WaitTimeSeconds=20) blocked
+    ack/enqueue/requeue on every other worker thread for the whole poll and
+    could delay a finished job's ack past the visibility timeout, causing the
+    already-processed message to be redelivered. boto3 clients are thread-safe,
+    so the blocking receive must run lock-free.
+    """
+    from unittest.mock import patch
+
+    from iocparser.infrastructure.queue_sqs import SQSQueueAdapter
+
+    lock_free_during_poll: list[bool] = []
+
+    class _Client:
+        adapter: SQSQueueAdapter
+
+        def receive_message(self, **_kwargs: object) -> dict[str, object]:
+            acquired = self.adapter._lock.acquire(blocking=False)
+            lock_free_during_poll.append(acquired)
+            if acquired:
+                self.adapter._lock.release()
+            return {}
+
+    class _Boto3:
+        def __init__(self) -> None:
+            self._client = _Client()
+
+        def client(self, service_name: str) -> _Client:
+            assert service_name == "sqs"
+            return self._client
+
+    fake = _Boto3()
+    with patch("iocparser.infrastructure.queue_sqs._boto3_module", return_value=fake):
+        adapter = SQSQueueAdapter("https://sqs.example/jobs")
+        fake._client.adapter = adapter
+        assert adapter.dequeue(queue_name="jobs") is None
+
+    assert lock_free_during_poll == [True]
 
 
 def test_unlabelled_md5_still_extracted() -> None:

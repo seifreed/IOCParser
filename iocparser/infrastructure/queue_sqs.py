@@ -88,30 +88,34 @@ class SQSQueueAdapter:
             return QueueReceipt("sqs", queue_name, message_id, message_id)
 
     def dequeue(self, *, queue_name: str) -> tuple[QueueReceipt, QueueEnvelope] | None:
-        with self._lock:
-            resolved_url = self._resolve_queue_url(queue_name)
-            response = self.client.receive_message(
-                QueueUrl=resolved_url,
-                MaxNumberOfMessages=1,
-                WaitTimeSeconds=20,
-                MessageAttributeNames=["All"],
-            )
-            messages = response.get("Messages", [])
-            if not messages:
-                return None
-            message = messages[0]
-            receipt = QueueReceipt(
-                "sqs",
-                queue_name,
-                message["ReceiptHandle"],
-                str(message.get("MessageId", uuid4())),
-            )
-            try:
-                envelope = QueueEnvelope.from_record(load_queue_record(message["Body"]))
-            except (json.JSONDecodeError, TypeError, ValueError) as exc:
-                self._quarantine_invalid_payload(receipt, payload=message["Body"], error=exc)
-                return None
-            return receipt, envelope
+        # boto3 clients are thread-safe, so the blocking long poll must NOT run
+        # under self._lock: holding it would stall ack/enqueue/requeue on every
+        # other worker thread for up to WaitTimeSeconds and could delay a
+        # completed job's ack past the SQS visibility timeout, causing the
+        # already-processed message to be redelivered and reprocessed.
+        resolved_url = self._resolve_queue_url(queue_name)
+        response = self.client.receive_message(
+            QueueUrl=resolved_url,
+            MaxNumberOfMessages=1,
+            WaitTimeSeconds=20,
+            MessageAttributeNames=["All"],
+        )
+        messages = response.get("Messages", [])
+        if not messages:
+            return None
+        message = messages[0]
+        receipt = QueueReceipt(
+            "sqs",
+            queue_name,
+            message["ReceiptHandle"],
+            str(message.get("MessageId", uuid4())),
+        )
+        try:
+            envelope = QueueEnvelope.from_record(load_queue_record(message["Body"]))
+        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+            self._quarantine_invalid_payload(receipt, payload=message["Body"], error=exc)
+            return None
+        return receipt, envelope
 
     def ack(self, receipt: QueueReceipt) -> None:
         with self._lock:

@@ -174,6 +174,36 @@ def test_register_custom_ioc_type_allows_alias_equal_to_own_name() -> None:
     assert str(name) == "self_named"
 
 
+def test_re_registration_purges_dropped_aliases() -> None:
+    """Regression: an alias dropped on re-registration must stop resolving (and free
+    up for another type), instead of lingering in the alias map forever."""
+    import pytest
+
+    from iocparser.domain.enums import resolve_custom_ioc_type
+
+    register_custom_ioc_type("reg_purge", base_type="urls", aliases=("rp_a", "rp_b"))
+    register_custom_ioc_type("reg_purge", base_type="urls", aliases=("rp_a",))
+    assert str(resolve_custom_ioc_type("rp_a")) == "reg_purge"
+    with pytest.raises(ValueError, match="rp_b"):
+        resolve_custom_ioc_type("rp_b")
+    # The freed alias may now be claimed by a different type.
+    register_custom_ioc_type("reg_purge_other", base_type="urls", aliases=("rp_b",))
+    assert str(resolve_custom_ioc_type("rp_b")) == "reg_purge_other"
+
+
+def test_register_custom_ioc_type_rejects_alias_shadowing_another_type_name() -> None:
+    """Regression: an alias equal to another custom type's canonical name would hijack
+    it (alias map is consulted first), making the original unresolvable -- reject it."""
+    import pytest
+
+    from iocparser.domain.enums import resolve_custom_ioc_type
+
+    register_custom_ioc_type("shadow_target", base_type="urls")
+    with pytest.raises(ValueError, match="shadows the canonical name"):
+        register_custom_ioc_type("shadow_thief", base_type="urls", aliases=("shadow_target",))
+    assert str(resolve_custom_ioc_type("shadow_target")) == "shadow_target"
+
+
 def test_malformed_urls_do_not_break_source_normalization() -> None:
     source = Source.from_raw("url", "http://[::1")
 

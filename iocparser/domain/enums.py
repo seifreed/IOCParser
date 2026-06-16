@@ -26,6 +26,10 @@ ALIAS_SHADOWS_BUILTIN_IOC_TYPE = (
 ALIAS_COLLIDES_WITH_CUSTOM_TYPE = (
     "Alias {alias!r} for custom IOC type {name!r} already maps to custom type {owner!r}"
 )
+ALIAS_COLLIDES_WITH_CUSTOM_TYPE_NAME = (
+    "Alias {alias!r} for custom IOC type {name!r} shadows the canonical name of custom "
+    "type {owner!r} and would make it unresolvable"
+)
 
 
 class SourceKind(StrEnum):
@@ -203,6 +207,13 @@ def register_custom_ioc_type(
         tags=normalize_tokens(tags),
         stix_pattern=stix_pattern,
     )
+    # Drop aliases this type owned in a prior registration; otherwise an alias removed
+    # in a re-registration (e.g. a reloaded plugin) keeps resolving and can falsely
+    # block a different type from claiming it.
+    for stale_alias in [
+        alias for alias, owner in _custom_ioc_aliases.items() if owner == normalized
+    ]:
+        del _custom_ioc_aliases[stale_alias]
     _custom_ioc_types[normalized] = definition
     for alias in definition.aliases:
         _custom_ioc_aliases[alias] = normalized
@@ -230,6 +241,12 @@ def _validated_custom_aliases(aliases: tuple[str, ...], *, owner: str) -> tuple[
             continue
         if _is_builtin_ioc_type(alias):
             raise ValueError(ALIAS_SHADOWS_BUILTIN_IOC_TYPE.format(alias=alias, name=owner))
+        if alias in _custom_ioc_types and alias != owner:
+            raise ValueError(
+                ALIAS_COLLIDES_WITH_CUSTOM_TYPE_NAME.format(
+                    alias=alias, name=owner, owner=alias
+                )
+            )
         existing_owner = _custom_ioc_aliases.get(alias)
         if existing_owner is not None and existing_owner != owner:
             raise ValueError(

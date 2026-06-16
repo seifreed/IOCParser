@@ -381,7 +381,9 @@ class TestFileTypeDetection:
         """Test MIME type detection for HTML files."""
         assert detect_file_type_by_mime("text/html") == "html"
         assert detect_file_type_by_mime("application/xhtml+xml") == "html"
-        assert detect_file_type_by_mime("text/xml") == "html"
+        # XML is parsed without HTML noise-stripping, so it routes to "xml".
+        assert detect_file_type_by_mime("text/xml") == "xml"
+        assert detect_file_type_by_mime("application/xml") == "xml"
 
     def test_detect_file_type_by_mime_text(self) -> None:
         """Test MIME type detection for text files."""
@@ -402,7 +404,7 @@ class TestFileTypeDetection:
         """Test extension-based detection for HTML files."""
         assert detect_file_type_by_extension(Path("page.html")) == "html"
         assert detect_file_type_by_extension(Path("index.htm")) == "html"
-        assert detect_file_type_by_extension(Path("data.xml")) == "html"
+        assert detect_file_type_by_extension(Path("data.xml")) == "xml"
 
     def test_detect_file_type_by_extension_text(self) -> None:
         """Test extension-based detection for text files."""
@@ -1026,7 +1028,7 @@ class TestDetectFileTypeErrors:
 
         try:
             file_type = detect_file_type(temp_path)
-            assert file_type in ["html", "text"]
+            assert file_type == "xml"
         finally:
             temp_path.unlink()
 

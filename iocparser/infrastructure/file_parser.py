@@ -7,13 +7,14 @@ Author: Marc Rivero | @seifreed
 """
 
 import codecs
+import html as html_module
 import re
 import urllib.parse
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from contextlib import contextmanager, suppress
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import pdfplumber
 from bs4 import BeautifulSoup
@@ -46,6 +47,14 @@ _BOM_ENCODINGS: tuple[tuple[bytes, str], ...] = (
     (codecs.BOM_UTF16_LE, "utf-16"),
     (codecs.BOM_UTF16_BE, "utf-16"),
 )
+
+
+def detect_bom_encoding(raw: bytes) -> str:
+    """Return the text encoding implied by a leading BOM, or utf-8 if none."""
+    for bom, encoding in _BOM_ENCODINGS:
+        if raw.startswith(bom):
+            return encoding
+    return "utf-8"
 
 
 def decode_file_bytes(raw: bytes) -> str:
@@ -186,7 +195,7 @@ class HTMLParser(FileParser):
         Returns:
             The extracted text content
         """
-        logger.info("Extracting text from HTML: %s", self.file_path)
+        logger.info("Extracting text from %s: %s", self._kind, self.file_path)
 
         try:
             with _local_parse_path(self.file_path) as parse_path:
@@ -201,23 +210,37 @@ class HTMLParser(FileParser):
                 # If the content appears to be just a URL, return the text as is
                 return content.strip()
 
-            # Parse the HTML with BeautifulSoup
-            soup = BeautifulSoup(content, "html.parser")
-
-            # Remove scripts and styles that we're not interested in
-            for tag in soup(["script", "style", "meta", "noscript", "head"]):
-                tag.decompose()
-
-            # Get the text
-            text = soup.get_text(separator=" ", strip=True)
-
-            # Clean multiple whitespaces and return
-            return re.sub(r"\s+", " ", text)
+            return self._text_from_content(content)
 
         except IOCParserError:
             raise
         except Exception as exc:
             raise HTMLProcessingError(str(exc)) from exc
+
+    _kind: ClassVar[str] = "HTML"
+
+    def _text_from_content(self, content: str) -> str:
+        soup = BeautifulSoup(content, "html.parser")
+        # script/style/etc. are HTML rendering noise, not indicators.
+        for tag in soup(["script", "style", "meta", "noscript", "head"]):
+            tag.decompose()
+        text = soup.get_text(separator=" ", strip=True)
+        return re.sub(r"\s+", " ", text)
+
+
+class XMLParser(HTMLParser):
+    """Extract IOC-bearing text from XML.
+
+    HTML parsing is wrong for XML: html.parser special-cases <script>/<style>
+    (dropping their contents) and stripping those elements deletes data, since in
+    XML they are ordinary data-bearing element names. Decode the raw text and
+    unescape entities instead; IOC regexes match across the tag markup.
+    """
+
+    _kind: ClassVar[str] = "XML"
+
+    def _text_from_content(self, content: str) -> str:
+        return html_module.unescape(content)
 
 
 # Extension to parser mapping
@@ -225,6 +248,7 @@ EXTENSION_PARSERS: dict[str, type[FileParser]] = {
     ".pdf": PDFParser,
     ".html": HTMLParser,
     ".htm": HTMLParser,
+    ".xml": XMLParser,
 }
 
 

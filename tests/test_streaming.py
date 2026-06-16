@@ -586,6 +586,22 @@ class TestStreamingIOCExtractor:
 
         assert sha256 in collected["sha256"]
 
+    def test_extract_from_file_honours_utf16_and_bom_encodings(self, tmp_path: Path):
+        """Regression: the streaming path hardcoded UTF-8, so a UTF-16/BOM file
+        decoded to NUL-interleaved garbage and yielded zero IOCs (the non-streaming
+        path handled it). Both extract_from_file and extract_from_mmap must decode."""
+        text = "domain evil.com and ip 10.0.0.1"
+        for encoding in ("utf-16", "utf-32", "utf-8-sig"):
+            sample = tmp_path / f"enc-{encoding}.txt"
+            sample.write_bytes(text.encode(encoding))
+            extractor = StreamingIOCExtractor(chunk_size=8, overlap=64, defang=False)
+            file_result = extractor.extract_from_file(sample)
+            mmap_result = StreamingIOCExtractor(
+                chunk_size=8, overlap=64, defang=False
+            ).extract_from_mmap(sample)
+            assert "evil.com" in file_result.get("domains", []), encoding
+            assert "evil.com" in mmap_result.get("domains", []), encoding
+
     def test_extract_from_file_keeps_ioc_at_eof_on_exact_chunk_multiple(self, tmp_path: Path):
         """Regression: an IOC ending at EOF must not be dropped when the file size
         is an exact multiple of chunk_size.

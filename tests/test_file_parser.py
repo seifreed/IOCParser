@@ -30,6 +30,7 @@ from iocparser.errors import (
 from iocparser.infrastructure.file_parser import (
     HTMLParser,
     PDFParser,
+    XMLParser,
     get_parser,
 )
 from iocparser.infrastructure.http_download import MAX_URL_SIZE
@@ -286,6 +287,31 @@ class TestPDFParser:
             PDFParser._extract_table_text([["ioc", None], ["value", "203.0.113.5"]])
             == "ioc\nvalue 203.0.113.5\n"
         )
+
+
+class TestXMLParser:
+    """Test XML text extraction keeps data the HTML parser would strip."""
+
+    def test_xml_keeps_data_bearing_elements_html_would_strip(self, tmp_path: Path) -> None:
+        """Regression: XML routed through the HTML parser lost IOCs inside
+        script/style/meta/head elements, which in XML carry real data."""
+        xml_path = tmp_path / "report.xml"
+        xml_path.write_text(
+            "<config><script>1.2.3.4</script><meta>http://evil.com</meta>"
+            "<node>5.6.7.8</node></config>",
+            encoding="utf-8",
+        )
+
+        text = XMLParser(str(xml_path)).extract_text()
+
+        assert "1.2.3.4" in text
+        assert "http://evil.com" in text
+        assert "5.6.7.8" in text
+
+    def test_xml_unescapes_entities(self, tmp_path: Path) -> None:
+        xml_path = tmp_path / "entity.xml"
+        xml_path.write_text("<a>&#104;ttp://evil.com</a>", encoding="utf-8")
+        assert "http://evil.com" in XMLParser(str(xml_path)).extract_text()
 
 
 class TestHTMLParser:

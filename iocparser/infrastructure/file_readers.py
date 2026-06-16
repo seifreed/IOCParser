@@ -9,7 +9,12 @@ from typing import Any
 
 from iocparser.domain.models import ExtractionOptions
 from iocparser.errors import FileSizeError, SourceNotFoundError
-from iocparser.infrastructure.file_parser import HTMLParser, PDFParser, decode_file_bytes
+from iocparser.infrastructure.file_parser import (
+    HTMLParser,
+    PDFParser,
+    XMLParser,
+    decode_file_bytes,
+)
 from iocparser.infrastructure.logger import get_logger
 from iocparser.interfaces.ports import TextSourceReader
 from iocparser.shared_utils import lazy_singleton
@@ -64,8 +69,10 @@ class MagicTextSourceReader(TextSourceReader):
         file_type_lower = file_type.lower()
         if "pdf" in file_type_lower:
             return "pdf"
-        if any(value in file_type_lower for value in ["html", "xml"]):
+        if "html" in file_type_lower:
             return "html"
+        if "xml" in file_type_lower:
+            return "xml"
         if "text" in file_type_lower:
             return "text"
         return None
@@ -76,7 +83,7 @@ class MagicTextSourceReader(TextSourceReader):
             ".pdf": "pdf",
             ".html": "html",
             ".htm": "html",
-            ".xml": "html",
+            ".xml": "xml",
             ".txt": "text",
             ".log": "text",
             ".md": "text",
@@ -103,12 +110,9 @@ class MagicTextSourceReader(TextSourceReader):
         try:
             mime = self._magic()
             file_type = str(mime.from_file(str(file_path)))
-            if "text/plain" in file_type.lower() and file_path.suffix.lower() in {
-                ".html",
-                ".htm",
-                ".xml",
-            }:
-                return "html"
+            suffix = file_path.suffix.lower()
+            if "text/plain" in file_type.lower() and suffix in {".html", ".htm", ".xml"}:
+                return "xml" if suffix == ".xml" else "html"
 
             detected = self.detect_file_type_by_mime(file_type)
             if detected:
@@ -129,6 +133,8 @@ class MagicTextSourceReader(TextSourceReader):
             return PDFParser(str(path)).extract_text()
         if file_type == "html":
             return HTMLParser(str(path)).extract_text()
+        if file_type == "xml":
+            return XMLParser(str(path)).extract_text()
         return decode_file_bytes(path.read_bytes())
 
 

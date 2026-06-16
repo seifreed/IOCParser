@@ -10,9 +10,10 @@ import mmap
 from collections import defaultdict
 from collections.abc import Callable, Iterator
 from pathlib import Path
-from typing import BinaryIO, TextIO
+from typing import BinaryIO, TextIO, cast
 
 from iocparser.errors import IOCFileNotFoundError
+from iocparser.infrastructure.file_parser import detect_bom_encoding
 from iocparser.infrastructure.logger import get_logger
 from iocparser.infrastructure.streaming_chunks import decode_chunk, read_chunks_with_prefix
 from iocparser.infrastructure.streaming_matching import should_keep_ioc
@@ -238,7 +239,12 @@ class StreamingIOCExtractor:
 
         def _iter_chunks() -> Iterator[dict[str, list[str]]]:
             try:
-                with file_path.open(encoding="utf-8", errors="ignore") as f:
+                # Honour a UTF-16/UTF-8-BOM/UTF-32 BOM like the non-streaming reader;
+                # opening with the right codec yields correctly decoded text chunks
+                # instead of NUL-interleaved garbage that matches no IOC regex.
+                with file_path.open("rb") as probe:
+                    encoding = detect_bom_encoding(probe.read(4))
+                with file_path.open(encoding=encoding, errors="ignore") as f:
                     for chunk, prefix_length, is_final in read_chunks_with_prefix(
                         file_obj=f,
                         chunk_size=self.chunk_size,
@@ -319,6 +325,14 @@ class StreamingIOCExtractor:
             raise IOCFileNotFoundError(str(file_path))
 
         logger.info("Starting memory-mapped extraction from %s", file_path)
+
+        # The mmap chunker decodes UTF-8 and aligns on UTF-8 boundaries; a UTF-16/
+        # UTF-32 file must go through the encoding-aware reader instead, or it would
+        # decode to garbage and yield no IOCs.
+        with file_path.open("rb") as probe:
+            if detect_bom_encoding(probe.read(4)) != "utf-8":
+                result = self.extract_from_file(file_path, yield_chunks=False)
+                return cast("dict[str, list[str]]", result)
 
         # Reset seen IOCs
         self.seen_iocs.clear()

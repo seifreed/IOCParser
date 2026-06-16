@@ -28,6 +28,19 @@ def test_read_text_content_reads_plain_text(tmp_path: Path) -> None:
     )
 
 
+def test_read_text_content_routes_xml_to_xml_parser(tmp_path: Path) -> None:
+    """An .xml source must be read by XMLParser, keeping data the HTML parser strips."""
+    sample = tmp_path / "report.xml"
+    sample.write_text(
+        "<config><script>1.2.3.4</script><node>5.6.7.8</node></config>", encoding="utf-8"
+    )
+
+    text = read_text_content(str(sample), ExtractionOptions(file_type="xml"))
+
+    assert "1.2.3.4" in text
+    assert "5.6.7.8" in text
+
+
 def test_load_magic_module_skips_windows() -> None:
     assert file_readers_module._load_magic_module("win32", lambda _name: object()) is None
 

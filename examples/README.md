@@ -35,10 +35,10 @@ iocparser -f examples/sample_report.txt --no-defang
 
 ### Python API Usage
 ```python
-from iocparser import extract_iocs_from_file
+from iocparser import extraction
 
 # Extract IOCs from the sample report
-normal_iocs, warning_iocs = extract_iocs_from_file('examples/sample_report.txt')
+normal_iocs, warning_iocs = extraction.extract_iocs_from_file('examples/sample_report.txt')
 
 # Print extracted domains
 for domain in normal_iocs.get('domains', []):
@@ -51,7 +51,7 @@ for ip in normal_iocs.get('ips', []):
 
 ### Streaming Large Files
 ```python
-from iocparser.modules.streaming import stream_iocs_from_file
+from iocparser.infrastructure.streaming_parallel import stream_iocs_from_file
 
 # Stream IOCs from a large file
 for ioc_batch in stream_iocs_from_file('large_report.txt'):
@@ -62,7 +62,7 @@ for ioc_batch in stream_iocs_from_file('large_report.txt'):
 ### Parallel Processing
 ```python
 from pathlib import Path
-from iocparser.modules.streaming import ParallelStreamingExtractor
+from iocparser.infrastructure.streaming_parallel import ParallelStreamingExtractor
 
 # Process multiple files in parallel
 files = list(Path('reports/').glob('*.txt'))

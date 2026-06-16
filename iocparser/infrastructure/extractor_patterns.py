@@ -165,7 +165,9 @@ PATTERNS: dict[str, Pattern[str]] = {
     "hassh_server": re.compile(r"(?:hassh[_-]?server|HASSHServer)[\s:=]+([a-fA-F0-9]{32})\b"),
     "jarm": re.compile(r"(?:jarm|JARM)[\s:=]+([a-fA-F0-9]{62})\b"),
     "aws_arns": re.compile(
-        r"\barn:aws(?:-[a-z]+)?:[a-z0-9-]+:[a-z0-9-]*:[0-9]{0,12}:[a-zA-Z0-9-_/:.]+\b",
+        # Partition may have several hyphen segments: aws, aws-cn, aws-us-gov,
+        # aws-iso, aws-iso-b. A single optional segment dropped GovCloud/ISO ARNs.
+        r"\barn:aws(?:-[a-z]+)*:[a-z0-9-]+:[a-z0-9-]*:[0-9]{0,12}:[a-zA-Z0-9-_/:.]+\b",
     ),
     "gcp_service_accounts": re.compile(
         # Any *.gserviceaccount.com address: user-managed (<id>.iam.…) plus the
@@ -189,7 +191,10 @@ PATTERNS: dict[str, Pattern[str]] = {
         r"(?::[a-zA-Z0-9._-]+)?@sha256:[a-fA-F0-9]{64}\b",
     ),
     "tlsh": re.compile(
-        r"(?:tlsh|TLSH)[\s:=]+T?1?([0-9A-Fa-f]{70,72})\b|"
+        # Keep the optional T1 version prefix INSIDE the capture so a labelled
+        # "tlsh: T1<hash>" canonicalizes identically to a bare "T1<hash>";
+        # otherwise the same digest surfaced as two non-deduping values.
+        r"(?:tlsh|TLSH)[\s:=]+(T?1?[0-9A-Fa-f]{70,72})\b|"
         r"\b([Tt]1[0-9A-Fa-f]{68,70})\b",
     ),
     "sigma_rule_ids": re.compile(

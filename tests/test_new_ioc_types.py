@@ -585,17 +585,29 @@ def test_extract_aws_arns_s3_bucket():
 
 
 def test_extract_aws_arns_china_partition():
-    """AWS China partition ARNs (aws-cn) must be extracted.
-
-    The regex pattern supports one optional hyphenated suffix on 'aws', matching
-    aws-cn but not multi-segment partitions like aws-us-gov.
-    """
+    """AWS China partition ARNs (aws-cn) must be extracted."""
     engine = DefaultIOCExtractionEngine()
     text = "China region: arn:aws-cn:iam::123456789012:user/admin"
     result = engine.extract_all(text)
     arns = result.get("aws_arns", [])
 
     assert "arn:aws-cn:iam::123456789012:user/admin" in arns
+
+
+def test_extract_aws_arns_multi_segment_partitions():
+    """GovCloud and ISO partitions (multi-hyphen) must be extracted.
+
+    Regression: the partition matched only one optional hyphen segment, so
+    arn:aws-us-gov:... and arn:aws-iso-b:... were dropped entirely.
+    """
+    engine = DefaultIOCExtractionEngine()
+    text = (
+        "Gov: arn:aws-us-gov:iam::123456789012:role/Admin "
+        "ISO: arn:aws-iso-b:s3:::secret-bucket"
+    )
+    arns = engine.extract_all(text).get("aws_arns", [])
+    assert "arn:aws-us-gov:iam::123456789012:role/Admin" in arns
+    assert "arn:aws-iso-b:s3:::secret-bucket" in arns
 
 
 def test_extract_aws_arns_multiple():
@@ -784,6 +796,20 @@ def test_extract_tlsh_bare_t1_prefix():
     tlsh_list = result.get("tlsh", [])
 
     assert bare_tlsh in tlsh_list
+
+
+def test_extract_tlsh_labelled_and_bare_canonicalize_identically():
+    """The same T1-prefixed digest must dedup whether labelled or bare.
+
+    Regression: the labelled branch stripped the T1 version prefix while the bare
+    branch kept it, so one digest surfaced as two different, non-deduping values.
+    """
+    engine = DefaultIOCExtractionEngine()
+    digest = "T1" + "A" * 70
+    labelled = engine.extract_all(f"tlsh: {digest} seen").get("tlsh", [])
+    bare = engine.extract_all(f"value {digest} seen").get("tlsh", [])
+    assert labelled == [digest]
+    assert bare == [digest]
 
 
 def test_extract_tlsh_no_match():

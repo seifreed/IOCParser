@@ -24,6 +24,7 @@ __all__ = [
 ]
 
 INTEGER_VALUE_REQUIRED = "{field_name} requires an integer value"
+INVALID_IOC_TYPE_FILTER = "Invalid IOC type for {flag}: {value}"
 
 
 def int_arg_value(raw_value: object, field_name: str) -> int:
@@ -116,9 +117,25 @@ class ProcessingOptions:
             defang=not get_bool_arg(args, "no_defang"),
             check_warnings=not get_bool_arg(args, "no_check_warnings"),
             force_update=get_bool_arg(args, "force_update"),
-            include_types=parse_ioc_types(get_optional_str_arg(args, "only")),
-            exclude_types=parse_ioc_types(get_optional_str_arg(args, "exclude")),
+            include_types=cls._parse_type_filter(get_optional_str_arg(args, "only"), flag="--only"),
+            exclude_types=cls._parse_type_filter(
+                get_optional_str_arg(args, "exclude"), flag="--exclude"
+            ),
         )
+
+    @staticmethod
+    def _parse_type_filter(
+        value: str | None, *, flag: str
+    ) -> tuple[IOCType | IOCTypeName, ...]:
+        # parse_ioc_types raises a bare ValueError on an unknown type; translate it to a
+        # ValidationError so the CLI reports a clean message (like --severity) instead of
+        # dumping a stack trace for what is just bad user input.
+        try:
+            return parse_ioc_types(value)
+        except ValueError as exc:
+            raise ValidationError(
+                INVALID_IOC_TYPE_FILTER.format(flag=flag, value=exc)
+            ) from exc
 
     def to_domain(self) -> ExtractionOptions:
         """Convert CLI options into application/domain options."""

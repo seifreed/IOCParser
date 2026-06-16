@@ -315,6 +315,36 @@ class TestProcessingOptions:
         assert opts.check_warnings is True
         assert opts.force_update is False
 
+    def test_from_args_invalid_only_type_raises_validation_error(self) -> None:
+        """An unknown --only type must surface as a clean ValidationError.
+
+        Regression: parse_ioc_types raised a bare ValueError that reached the CLI
+        top-level handler as an "Unexpected error" with a stack trace, unlike the
+        clean message --severity produces.
+        """
+        args = argparse.Namespace(
+            type="text",
+            no_defang=False,
+            no_check_warnings=False,
+            force_update=False,
+            only="bogus_type",
+        )
+
+        with pytest.raises(ValidationError, match="Invalid IOC type for --only"):
+            ProcessingOptions.from_args(args)
+
+    def test_from_args_invalid_exclude_type_raises_validation_error(self) -> None:
+        args = argparse.Namespace(
+            type="text",
+            no_defang=False,
+            no_check_warnings=False,
+            force_update=False,
+            exclude="nope_type",
+        )
+
+        with pytest.raises(ValidationError, match="Invalid IOC type for --exclude"):
+            ProcessingOptions.from_args(args)
+
 
 class TestSetupApplication:
     """Test application setup and initialization."""

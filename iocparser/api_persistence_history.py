@@ -40,7 +40,10 @@ from iocparser.application.query_use_cases import (
     prune_persisted_runs as _prune_persisted_runs,
 )
 from iocparser.domain.models import BatchJobDetail, BatchJobSummary, PersistedRunSummary
+from iocparser.errors import ValidationError
 from iocparser.shared_utils import parse_string_filters
+
+IMPORT_PAYLOAD_OBJECT_REQUIRED = "history import payload must be a mapping (JSON object)"
 
 
 def list_failed_batch_jobs(*, db_uri: str, limit: int = 20) -> list[BatchJobSummary]:
@@ -106,6 +109,11 @@ def export_persisted_history(*, db_uri: str) -> dict[str, object]:
 
 
 def import_persisted_history(*, db_uri: str, payload: dict[str, object]) -> dict[str, int]:
+    # The use case reads payload like a mapping (payload.get(...)); a non-dict argument
+    # otherwise surfaces a cryptic "'str' object has no attribute 'get'". The CLI already
+    # rejects a non-object import file, so mirror that for direct API callers.
+    if not isinstance(payload, dict):
+        raise ValidationError(IMPORT_PAYLOAD_OBJECT_REQUIRED)
     return _import_persisted_history(payload, persistence_query_service=query_service(db_uri))
 
 

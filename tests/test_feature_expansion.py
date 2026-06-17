@@ -6,6 +6,8 @@ import sys
 from contextlib import redirect_stdout
 from pathlib import Path
 
+import pytest
+
 import iocparser.cli as cli_module
 from iocparser import cli_output, cli_runtime
 from iocparser.adapters.renderers import (
@@ -45,6 +47,7 @@ from iocparser.domain.models import (
     PersistOptions,
     WarningMatch,
 )
+from iocparser.errors import ValidationError
 from iocparser.infrastructure.extraction import DefaultIOCExtractionEngine
 from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
 from tests.http_server_helpers import LocalHTTPTextServer
@@ -206,6 +209,34 @@ def test_cli_supports_stdin_directory_streaming_and_url_file(tmp_path: Path) -> 
         )
     assert display == "1 URLs"
     assert normal_iocs == {"urls": ["https://batch.example/path"]}
+
+
+@pytest.mark.parametrize("forced_type", ["pdf", "html"])
+def test_stdin_rejects_document_type_instead_of_silently_parsing_as_text(
+    forced_type: str,
+) -> None:
+    # Regression: --stdin always reads text, so forcing a document type used to be
+    # silently ignored — e.g. `--stdin -t html` extracted IOCs from inside <script>
+    # tags that the file/URL HTML parser would have stripped. Reject it cleanly.
+    original_stdin = sys.stdin
+    sys.stdin = io.StringIO("<html><script>var ip='8.8.8.8';</script></html>")
+    try:
+        stdin_args = argparse.Namespace(
+            file=None,
+            url=None,
+            url_direct=None,
+            stdin=True,
+            type=forced_type,
+            no_defang=True,
+            no_check_warnings=True,
+            force_update=False,
+            only=None,
+            exclude=None,
+        )
+        with pytest.raises(ValidationError, match=f"--type {forced_type}"):
+            cli_process_single_input(stdin_args)
+    finally:
+        sys.stdin = original_stdin
 
 
 def test_persistence_queries_and_cli_query_paths(tmp_path: Path) -> None:

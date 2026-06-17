@@ -99,6 +99,13 @@ def stdin_stream_error() -> ValidationError:
     return ValidationError("stdin is not a text stream")
 
 
+def stdin_typed_input_error(file_type: str) -> ValidationError:
+    return ValidationError(
+        f"--type {file_type} is not supported with --stdin; stdin is read as text. "
+        "Use --file to parse PDF or HTML documents."
+    )
+
+
 def missing_url_error() -> ValidationError:
     return ValidationError("No URL provided")
 
@@ -169,6 +176,8 @@ def process_stdin_payload(
 ) -> SingleInputPayload:
     if not isinstance(stdin_stream, TextIOBase):
         raise stdin_stream_error()
+    if context.options.file_type in {"pdf", "html"}:
+        raise stdin_typed_input_error(context.options.file_type)
     text_content = stdin_stream.read()
     if context.configured_plugin_client is not None:
         only, exclude = joined_type_filters(context.processing_options)

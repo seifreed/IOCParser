@@ -263,6 +263,15 @@ class TestEmailAndCommunication:
         assert "firstname.lastname+tag@subdomain.example.org" in result
         assert "tag@subdomain.example.org" not in result
 
+    def test_extract_emails_rejects_consecutive_dots(self):
+        """A dot-atom email cannot contain consecutive dots (empty labels are invalid),
+        so user@example..com must not be extracted while a valid sibling still is.
+        """
+        result = self.extractor.extract_emails("bad user@example..com and good a@b.com")
+
+        assert "user@example..com" not in result
+        assert "a@b.com" in result
+
     def test_extract_emails_defanged(self):
         """Test email extraction with defanging."""
         text = "Contact: malware@evil.com"

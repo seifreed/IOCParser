@@ -184,9 +184,13 @@ class NetworkHeuristicPolicy:
         return _dedup_urls(clean_urls)
 
     def extracted_emails(self, *, raw_emails: list[str], defang: bool) -> list[str]:
+        # A dot-atom email cannot contain consecutive dots (RFC 5321 forbids empty
+        # labels); the regex's domain class allows them, so drop e.g. user@example..com,
+        # matching the domain extractor which already rejects "..".
+        valid_emails = [email for email in raw_emails if ".." not in email]
         if defang:
-            raw_emails = [email.replace("@", "[@]").replace(".", "[.]") for email in raw_emails]
-        return dedup_case_insensitive(raw_emails)
+            valid_emails = [email.replace("@", "[@]").replace(".", "[.]") for email in valid_emails]
+        return dedup_case_insensitive(valid_emails)
 
     def extracted_hosts(self, *, domains: list[str], text: str) -> list[str]:
         valid_hosts = [domain for domain in domains if self.is_valid_host_candidate(domain)]

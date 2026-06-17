@@ -1038,6 +1038,59 @@ def test_merge_batch_results_preserves_entries_when_item_key_matches_other_sourc
     assert merged.grouped_iocs()["domains"] == ["alpha.example", "beta.example"]
 
 
+def test_batch_with_context_merges_evidence_across_items() -> None:
+    """Regression: batch --with-context rendered empty evidence because the per-item
+    rich results were dropped at the grouped-dict conversion. merge_batch_results now
+    dedups by canonical value and aggregates evidence from each item's retained result,
+    and resolve_input_payload threads that merged result only when --with-context is set.
+    """
+    from iocparser.cli_dispatch_workflow import resolve_input_payload
+
+    def item(source: str, line: int) -> ExtractionResult:
+        ioc = IOC.from_raw(
+            "domains",
+            "shared.example.com",
+            evidence=(IOCEvidence(excerpt=f"seen in {source}", line_number=line, source=source),),
+        )
+        return ExtractionResult(iocs=(ioc,))
+
+    results = BatchResultsCollection()
+    for source, line in (("a.txt", 1), ("b.txt", 9)):
+        result = item(source, line)
+        results.add(
+            item_key=source,
+            source_value=source,
+            normal_iocs=result.grouped_iocs(),
+            warning_iocs={},
+            result=result,
+        )
+
+    merged = merge_batch_results(results)
+    domain_iocs = [ioc for ioc in merged.iocs if ioc.value.canonical() == "shared.example.com"]
+    assert len(domain_iocs) == 1  # deduped to a single IOC
+    assert len(domain_iocs[0].evidence) == 2  # evidence aggregated across both items
+    assert merged.grouped_iocs()["domains"] == ["shared.example.com"]
+
+    def multi(_args: argparse.Namespace) -> tuple[dict, dict, str, BatchResultsCollection]:
+        return merged.grouped_iocs(), {}, "2 files", results
+
+    base = {"directory": None, "url_file": None, "retry_failed_from": None, "retry_batch_job": None}
+    with_ctx = resolve_input_payload(
+        argparse.Namespace(multiple=["a.txt", "b.txt"], with_context=True, **base),
+        process_multiple_files_input=multi,
+        process_single_input=lambda _a: ({}, {}, "x", None),
+    )
+    assert with_ctx.result is not None
+    assert with_ctx.result.grouped_iocs() == with_ctx.normal_iocs
+
+    without_ctx = resolve_input_payload(
+        argparse.Namespace(multiple=["a.txt", "b.txt"], with_context=False, **base),
+        process_multiple_files_input=multi,
+        process_single_input=lambda _a: ({}, {}, "x", None),
+    )
+    assert without_ctx.result is None
+
+
 def test_public_batch_report_uses_urls_and_hides_internal_batch_maps() -> None:
     report = public_batch_report(
         {

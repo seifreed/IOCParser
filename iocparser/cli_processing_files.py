@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from importlib import import_module
 from pathlib import Path
 from typing import Protocol, cast
@@ -28,7 +28,7 @@ from iocparser.cli_processing_support import (
 from iocparser.cli_processing_support import joined_type_filters as shared_joined_type_filters
 from iocparser.cli_processing_support import plugin_client as shared_plugin_client
 from iocparser.client import IOCParserClient
-from iocparser.domain.enums import IOCType, IOCTypeName
+from iocparser.domain.enums import IOCType, IOCTypeName, ioc_type_name
 from iocparser.domain.models import IOC, ExtractionResult, WarningMatch
 from iocparser.errors import (
     FileExistenceError,
@@ -209,13 +209,29 @@ def merge_results(results: dict[str, ExtractionResult]) -> ExtractionResult:
 
 
 def merge_batch_results(results: BatchResultsCollection) -> ExtractionResult:
-    all_iocs: list[IOC] = []
+    # Dedup IOCs by (type, canonical value) — matching grouped_iocs() — and aggregate
+    # evidence across items so batch --with-context renders one record per IOC with all
+    # of its occurrences (the same shape a single file produces). Prefer each item's rich
+    # result (which carries evidence) and fall back to the grouped dicts when absent.
+    deduped: dict[tuple[str, str], IOC] = {}
+    order: list[tuple[str, str]] = []
     all_warnings: list[WarningMatch] = []
     for entry in results.entries:
-        result = ExtractionResult.from_grouped_payload(entry.normal_iocs, entry.warning_iocs)
-        all_iocs.extend(result.iocs)
-        all_warnings.extend(result.warnings)
-    return ExtractionResult(iocs=tuple(all_iocs), warnings=tuple(all_warnings))
+        source = (
+            entry.result
+            if entry.result is not None
+            else ExtractionResult.from_grouped_payload(entry.normal_iocs, entry.warning_iocs)
+        )
+        for ioc in source.iocs:
+            key = (ioc_type_name(ioc.ioc_type), ioc.canonical_value())
+            existing = deduped.get(key)
+            if existing is None:
+                deduped[key] = ioc
+                order.append(key)
+            elif ioc.evidence:
+                deduped[key] = replace(existing, evidence=existing.evidence + ioc.evidence)
+        all_warnings.extend(source.warnings)
+    return ExtractionResult(iocs=tuple(deduped[key] for key in order), warnings=tuple(all_warnings))
 
 
 def _streaming_result_from_raw_iocs(raw_iocs: GroupedRawIocs) -> ExtractionResult:
@@ -312,6 +328,7 @@ def _add_result(
         source_value=source_value,
         normal_iocs=result.grouped_iocs(),
         warning_iocs=result.grouped_warnings(),
+        result=result,
     )
 
 
@@ -540,6 +557,7 @@ def process_multiple_files_payload(
                 source_value=source_value,
                 normal_iocs=result.grouped_iocs(),
                 warning_iocs=result.grouped_warnings(),
+                result=result,
             )
     else:
         results = process_multiple_files(

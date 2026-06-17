@@ -54,6 +54,19 @@ def plugin_listing_payload() -> Mapping[str, object]:
     }
 
 
+def _batch_result(
+    args: argparse.Namespace, results: BatchResults | None
+) -> ExtractionResult | None:
+    """Merged rich batch result for --with-context rendering (None otherwise).
+
+    Only needed when the flag is set; skip the extra merge on the common path. Its
+    grouped form matches the batch normal_iocs, so it is a safe render source.
+    """
+    if results is None or not _cli_args.get_bool_arg(args, "with_context"):
+        return None
+    return _cli_processing.merge_batch_results(results)
+
+
 def resolve_input_payload(
     args: argparse.Namespace,
     *,
@@ -69,7 +82,9 @@ def resolve_input_payload(
     values = cast("Mapping[str, object]", vars(args))
     if _cli_args.get_list_arg(args, "multiple"):
         multi = process_multiple_files_input(args)
-        return ResolvedInputPayload(multi[0], multi[1], multi[2], results=multi[3])
+        return ResolvedInputPayload(
+            multi[0], multi[1], multi[2], results=multi[3], result=_batch_result(args, multi[3])
+        )
     if _cli_args.get_optional_str_arg(args, "directory"):
         dir_result = _cli_processing.process_directory_input(
             args,
@@ -77,7 +92,11 @@ def resolve_input_payload(
             warning_service=_cli_runtime.warning_service_for_args(args),
         )
         return ResolvedInputPayload(
-            dir_result[0], dir_result[1], dir_result[2], results=dir_result[3]
+            dir_result[0],
+            dir_result[1],
+            dir_result[2],
+            results=dir_result[3],
+            result=_batch_result(args, dir_result[3]),
         )
     if (
         _cli_args.get_optional_str_arg(args, "url_file")
@@ -97,6 +116,7 @@ def resolve_input_payload(
             url_result[2],
             results=url_result[3],
             batch_report=url_result[4],
+            result=_batch_result(args, url_result[3]),
         )
     single = process_single_input(args)
     return ResolvedInputPayload(single[0], single[1], single[2], result=single[3])

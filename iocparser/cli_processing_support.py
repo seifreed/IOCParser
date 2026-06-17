@@ -33,6 +33,9 @@ class BatchResultItem:
     source_value: str
     normal_iocs: GroupedIocs
     warning_iocs: GroupedWarnings
+    # Rich per-item result, retained so batch --with-context can merge per-IOC evidence.
+    # None for items added from grouped dicts only (e.g. failed/empty entries).
+    result: ExtractionResult | None = None
 
 
 @dataclass
@@ -46,6 +49,7 @@ class BatchResultsCollection:
         source_value: str,
         normal_iocs: GroupedIocs,
         warning_iocs: GroupedWarnings,
+        result: ExtractionResult | None = None,
     ) -> None:
         self.entries.append(
             BatchResultItem(
@@ -53,6 +57,7 @@ class BatchResultsCollection:
                 source_value=source_value,
                 normal_iocs=normal_iocs,
                 warning_iocs=warning_iocs,
+                result=result,
             )
         )
 

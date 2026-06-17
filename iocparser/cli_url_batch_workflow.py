@@ -175,6 +175,7 @@ def _collect_url_results(
                 source_value=url,
                 normal_iocs=result.grouped_iocs(),
                 warning_iocs=result.grouped_warnings(),
+                result=result,
             )
             state.item_reports.append(
                 {

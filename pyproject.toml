@@ -53,7 +53,7 @@ pipeline = [
     "celery>=5.5.3",
 ]
 dev = [
-    "pytest>=9.0.2",
+    "pytest>=9.0.3",
     "pytest-cov>=7.0.0",
     "pytest-benchmark>=5.2.3",
     "ruff>=0.14.11",

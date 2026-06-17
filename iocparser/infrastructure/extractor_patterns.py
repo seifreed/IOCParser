@@ -29,7 +29,10 @@ PATTERNS: dict[str, Pattern[str]] = {
         r"(?:SHA-512|SHA512|sha512)\s*:?\s*([a-fA-F0-9]{128})(?![a-fA-F0-9])"
         r"|\b([a-fA-F0-9]{128})\b(?![a-fA-F0-9])",
     ),
-    "ssdeep": re.compile(r"\b\d+:[A-Za-z0-9/+]{3,}:[A-Za-z0-9/+]{3,}\b"),
+    # First hash block requires >=5 chars: a colon-grouped IPv6 hextet is at most 4
+    # hex chars, so this rejects IPv6 addresses (e.g. 2001:0db8:85a3:...) that the old
+    # {3,} bound mis-extracted as ssdeep, while still matching real spamsum signatures.
+    "ssdeep": re.compile(r"\b\d+:[A-Za-z0-9/+]{5,}:[A-Za-z0-9/+]{3,}\b"),
     "imphash": re.compile(
         r"(?:imphash|import\s*hash)[\s:=]+([a-fA-F0-9]{32})\b",
         re.IGNORECASE,

@@ -83,6 +83,20 @@ class TestHashExtractors:
         result = self.extractor.extract_ssdeep(text)
         assert len(result) == 2
 
+    def test_extract_ssdeep_does_not_match_ipv6_segments(self):
+        """Regression: the ssdeep pattern's {3,} hash bound matched colon-grouped
+        IPv6 hextets (e.g. 2001:0db8:85a3), polluting ssdeep output with fragments of
+        an IPv6 address. The first hash block now requires >=5 chars (an IPv6 hextet is
+        at most 4), so IPv6 no longer produces a spurious ssdeep match.
+        """
+        text = "Host IPv6: 2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+
+        result = self.extractor.extract_ssdeep(text)
+
+        assert result == []
+        # A genuine ssdeep with a short second hash block must still be extracted.
+        assert self.extractor.extract_ssdeep("3:abcdefgh:ijk") == ["3:abcdefgh:ijk"]
+
 
 class TestNetworkExtractors:
     """Test network-related IOC extraction."""

@@ -1091,6 +1091,43 @@ def test_batch_with_context_merges_evidence_across_items() -> None:
     assert without_ctx.result is None
 
 
+def test_batch_json_counts_match_deduped_arrays() -> None:
+    """Regression: total_count/counts_by_type counted raw (un-deduped) iocs while the
+    per-type arrays were deduped, so batch JSON reported totals larger than the arrays.
+    merge_batch_results now dedups, so the summary numbers match the array lengths.
+    """
+    from iocparser.adapters.renderers_json import JSONOutputRenderer
+
+    results = BatchResultsCollection()
+    for source in ("a.txt", "b.txt", "c.txt"):
+        result = ExtractionResult(iocs=(IOC.from_raw("domains", "repeated.example.com"),))
+        results.add(
+            item_key=source,
+            source_value=source,
+            normal_iocs=result.grouped_iocs(),
+            warning_iocs={},
+            result=result,
+        )
+
+    merged = merge_batch_results(results)
+    payload = json.loads(JSONOutputRenderer().render(merged))
+
+    reserved = {
+        "schema_version",
+        "format",
+        "records",
+        "counts_by_type",
+        "total_count",
+        "warning_list_matches",
+    }
+    array_total = sum(
+        len(value)
+        for key, value in payload.items()
+        if key not in reserved and isinstance(value, list)
+    )
+    assert payload["total_count"] == len(payload["records"]) == array_total == 1
+
+
 def test_public_batch_report_uses_urls_and_hides_internal_batch_maps() -> None:
     report = public_batch_report(
         {

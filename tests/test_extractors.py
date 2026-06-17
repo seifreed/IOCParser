@@ -361,6 +361,19 @@ class TestWindowsArtifacts:
         result = self.extractor.extract_registry(text)
         assert len(result) >= 2
 
+    def test_extract_registry_keeps_multi_word_components(self):
+        """Registry components with internal spaces (TitleCase) must be captured whole,
+        while trailing lowercase prose after the key must not be swallowed.
+        """
+        result = self.extractor.extract_registry(
+            "key HKCU\\Control Panel\\Desktop here\n"
+            "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Run was modified\n"
+        )
+
+        assert "HKCU\\Control Panel\\Desktop" in result
+        assert "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Run" in result
+        assert not any("modified" in key for key in result)
+
     def test_extract_mutex(self):
         """Test mutex name extraction."""
         text = """

@@ -102,10 +102,17 @@ PATTERNS: dict[str, Pattern[str]] = {
     "cves": re.compile(r"\b(CVE-[0-9]{4}-[0-9]{4,7})\b", re.IGNORECASE),
     "mitre_attack": re.compile(r"\b(T1[0-9]{3}(?:\.[0-9]{1,3})?)\b"),
     # Windows artifacts
+    # A component may contain internal spaces (e.g. "Windows NT", "Internet Settings",
+    # "Control Panel"), but a space only continues the key when the next word starts
+    # with an uppercase letter or digit. Registry key names are TitleCase, while prose
+    # following a key ("...\\Run was modified") is lowercase — so this captures multi-word
+    # components without greedily swallowing the surrounding sentence. (The old lazy
+    # "[...\\s]+?(?=\\s|$)" stopped at the first space, truncating every multi-word key.)
     "registry": re.compile(
         r"\b((?:HKEY_LOCAL_MACHINE|HKLM|HKEY_CURRENT_USER|HKCU|"
         r"HKEY_CLASSES_ROOT|HKCR|HKEY_USERS|HKU|"
-        r"HKEY_CURRENT_CONFIG|HKCC)\\[\\A-Za-z0-9-_\s]+?)(?=\s|$)",
+        r"HKEY_CURRENT_CONFIG|HKCC)"
+        r"(?:\\[A-Za-z0-9\-_]+(?: [A-Z0-9][A-Za-z0-9\-_]*)*)+)",
     ),
     "mutex": re.compile(
         r"\b(?:Global\\|Local\\)?[A-Za-z0-9][A-Za-z0-9_\-]{2,}(?:Mutex|MUTEX)\b|"

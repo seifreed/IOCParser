@@ -12,6 +12,7 @@ from contextlib import contextmanager
 import pytest
 
 from iocparser.config import load_config
+from iocparser.errors import ValidationError
 
 
 @contextmanager
@@ -122,12 +123,35 @@ def test_config_rejects_invalid_boolean_values(tmp_path) -> None:
     config_path = tmp_path / "iocparser.ini"
     config_path.write_text("[database]\npersist=definitely\n", encoding="utf-8")
 
-    with pytest.raises(ValueError, match=r"database\.persist"):
+    # An invalid value inside the INI file is reported as a clean ValidationError
+    # (wrapped with the file path) rather than an "unexpected error" stack trace.
+    with pytest.raises(ValidationError, match=r"database\.persist"):
         load_config(None, None, str(config_path))
 
     with _env(IOCPARSER_PERSIST="definitely"):
         with pytest.raises(ValueError, match="IOCPARSER_PERSIST"):
             load_config(None, None, None)
+
+
+def test_config_reports_structurally_broken_ini_cleanly(tmp_path) -> None:
+    # Regression: a config file with no section headers raised configparser's
+    # MissingSectionHeaderError, which escaped both CLI error handlers as a raw
+    # stack trace. It must surface as a clean ValidationError naming the file.
+    config_path = tmp_path / "broken.ini"
+    config_path.write_text("this is not valid ini [[[\n", encoding="utf-8")
+
+    with pytest.raises(ValidationError, match=r"broken\.ini"):
+        load_config(None, None, str(config_path))
+
+
+def test_config_reports_invalid_numeric_ini_value_cleanly(tmp_path) -> None:
+    # Regression: a non-numeric value for a numeric INI option raised a bare
+    # ValueError reported as an "unexpected error" stack trace.
+    config_path = tmp_path / "iocparser.ini"
+    config_path.write_text("[network]\nmax_input_size_mb = notanumber\n", encoding="utf-8")
+
+    with pytest.raises(ValidationError, match=r"iocparser\.ini"):
+        load_config(None, None, str(config_path))
 
 
 def test_explicit_missing_config_path_is_rejected(tmp_path) -> None:

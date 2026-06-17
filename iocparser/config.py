@@ -6,6 +6,7 @@ Configuration loader for IOCParser.
 
 from __future__ import annotations
 
+import configparser
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,13 +14,14 @@ from typing import TypedDict, cast
 
 from dotenv import load_dotenv
 
-from iocparser.errors import SourceNotFoundError
+from iocparser.errors import SourceNotFoundError, ValidationError
 from iocparser.runtime_config import find_default_config_paths, load_ini_sections
 from iocparser.shared_utils import FALSE_BOOL_VALUES, TRUE_BOOL_VALUES
 
 INVALID_BOOLEAN_ERROR = "Invalid boolean for {option_name}: {value!r}"
 INVALID_INTEGER_ERROR = "Invalid integer for {option_name}: {value!r}"
 INVALID_FLOAT_ERROR = "Invalid number for {option_name}: {value!r}"
+INVALID_CONFIG_FILE_ERROR = "Invalid config file {path}: {detail}"
 
 # Options resolvable from IOCPARSER_<OPTION> environment variables, grouped by the
 # coercion their value needs. persist/db_uri are handled separately because they
@@ -230,7 +232,22 @@ def _apply_env_overrides(values: ConfigValues) -> None:
 
 
 def _load_ini_config(config_path: Path) -> ConfigValues:
-    """Load config values from an INI file."""
+    """Load config values from an INI file, reporting malformed files cleanly.
+
+    A structurally broken INI (no section headers) raises configparser.Error and a
+    bad numeric/boolean value raises ValueError; both are expected user-facing errors,
+    so translate them to a ValidationError instead of an uncaught stack trace.
+    """
+    try:
+        return _read_ini_config(config_path)
+    except (configparser.Error, ValueError) as exc:
+        raise ValidationError(
+            INVALID_CONFIG_FILE_ERROR.format(path=config_path, detail=exc)
+        ) from exc
+
+
+def _read_ini_config(config_path: Path) -> ConfigValues:
+    """Parse an INI file into config values (see _load_ini_config for error handling)."""
     parser = load_ini_sections(config_path)
 
     values = default_config_values()

@@ -3,13 +3,13 @@ from __future__ import annotations
 import json
 import threading
 from collections.abc import Callable
-from importlib import import_module
 from typing import Protocol, cast
 from uuid import uuid4
 
 from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
 from iocparser.infrastructure.queue_records import (
     build_invalid_payload_record,
+    import_optional_backend_module,
     load_queue_record,
     serialize_queue_record,
 )
@@ -64,7 +64,7 @@ class _PikaModule(Protocol):
 
 
 def _pika_module() -> _PikaModule:
-    return cast("_PikaModule", import_module("pika"))
+    return cast("_PikaModule", import_optional_backend_module("pika", backend="rabbitmq"))
 
 
 def _load_queue_record(payload: bytes) -> dict[str, object]:
@@ -101,6 +101,11 @@ class RabbitMQQueueAdapter:
         # adapter is shared across worker threads when concurrency > 1. RLock
         # (not Lock) because requeue/dead_letter call enqueue+ack reentrantly.
         self._lock = threading.RLock()
+        # Validate the optional dependency eagerly so a missing 'pika' fails at worker
+        # setup (reported cleanly by worker_main, like the sqs/celery adapters) instead
+        # of spamming a traceback from the poll loop on every dequeue. The broker
+        # connection itself stays lazy in _channel_for.
+        _pika_module()
 
     def _channel_for(self) -> _RabbitMQChannel:
         channel = self._channel

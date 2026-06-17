@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from importlib import import_module
 from typing import Protocol, cast
 from uuid import uuid4
 
 from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
-from iocparser.infrastructure.queue_records import serialize_queue_record
+from iocparser.infrastructure.queue_records import (
+    import_optional_backend_module,
+    serialize_queue_record,
+)
 
 
 class _CeleryAsyncResult(Protocol):
@@ -32,7 +34,7 @@ class _CeleryModule(Protocol):
 
 
 def _celery_module() -> _CeleryModule:
-    return cast("_CeleryModule", import_module("celery"))
+    return cast("_CeleryModule", import_optional_backend_module("celery", backend="celery"))
 
 
 class CeleryQueueAdapter:

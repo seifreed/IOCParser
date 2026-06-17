@@ -217,13 +217,8 @@ def test_rabbitmq_channel_for_reconnect_on_exception():
 
     from iocparser.infrastructure.queue_rabbitmq import RabbitMQQueueAdapter
 
-    adapter = RabbitMQQueueAdapter("amqp://localhost")
-    adapter._connection = MagicMock()
-    adapter._channel = MagicMock()
-    with patch.object(adapter, "_channel_for", side_effect=adapter._channel_for):
-        # Force a reconnect by simulating an error on first call
-        pass
-    # Test the exception path by mocking pika to raise
+    # Test the exception path by mocking pika to raise. The adapter validates the
+    # 'pika' import eagerly in __init__, so construction happens inside the patch.
     with patch("iocparser.infrastructure.queue_rabbitmq._pika_module") as mock_pika:
         mock_pika.return_value.BlockingConnection.side_effect = RuntimeError("boom")
         adapter2 = RabbitMQQueueAdapter("amqp://localhost")

@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import json
 import threading
-from importlib import import_module
 from typing import NotRequired, Protocol, TypedDict, cast
 from uuid import uuid4
 
 from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
 from iocparser.infrastructure.queue_records import (
     build_invalid_payload_record,
+    import_optional_backend_module,
     load_queue_record,
     serialize_queue_record,
 )
@@ -46,7 +46,7 @@ class _Boto3Module(Protocol):
 
 
 def _boto3_module() -> _Boto3Module:
-    return cast("_Boto3Module", import_module("boto3"))
+    return cast("_Boto3Module", import_optional_backend_module("boto3", backend="sqs"))
 
 
 MISSING_DEAD_LETTER_QUEUE_ERROR = (

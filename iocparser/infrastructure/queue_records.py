@@ -1,10 +1,34 @@
 from __future__ import annotations
 
 import json
+from importlib import import_module
+from types import ModuleType
 from typing import TYPE_CHECKING, cast
+
+from iocparser.errors import IOCParserError
 
 if TYPE_CHECKING:
     from iocparser.domain.distributed import QueueEnvelope
+
+MISSING_BACKEND_DEPENDENCY_ERROR = (
+    "{backend} backend requires the optional '{module_name}' package; "
+    "install it with: pip install iocparser-tool[pipeline]"
+)
+
+
+def import_optional_backend_module(module_name: str, *, backend: str) -> ModuleType:
+    """Import an optional queue-backend dependency, or raise a clean install hint.
+
+    The pipeline backends (boto3/pika/celery) ship in the optional ``pipeline`` extra;
+    a bare ModuleNotFoundError would surface as a stack trace instead of telling the
+    operator which package to install.
+    """
+    try:
+        return import_module(module_name)
+    except ModuleNotFoundError as exc:
+        raise IOCParserError(
+            MISSING_BACKEND_DEPENDENCY_ERROR.format(backend=backend, module_name=module_name)
+        ) from exc
 
 
 def queue_payload_type_error() -> TypeError:

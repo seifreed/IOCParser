@@ -1034,3 +1034,20 @@ def test_celery_queue_falls_back_to_task_id_and_dead_letters_receipt_queue() -> 
 
         assert dead_receipt.queue_name == "priority.dead"
         assert celery.app.sent[-1]["queue"] == "priority.dead"
+
+
+def test_import_optional_backend_module_reports_missing_dependency_cleanly() -> None:
+    """Regression: a missing optional backend dependency (boto3/pika/celery) used to
+    surface as a bare ModuleNotFoundError stack trace from the worker. The shared
+    importer must translate it to a clean IOCParserError naming the install extra.
+    """
+    from iocparser.errors import IOCParserError
+    from iocparser.infrastructure.queue_records import import_optional_backend_module
+
+    with pytest.raises(IOCParserError, match=r"sqs backend requires.*iocparser-tool\[pipeline\]"):
+        import_optional_backend_module("a_module_that_is_not_installed", backend="sqs")
+
+    sentinel = SimpleNamespace(marker="present")
+    with installed_module("a_present_backend_module", sentinel):
+        resolved = import_optional_backend_module("a_present_backend_module", backend="sqs")
+    assert resolved is sentinel

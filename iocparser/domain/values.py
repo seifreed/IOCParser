@@ -69,6 +69,19 @@ class HashValue(IndicatorValue):
 
 
 @dataclass(frozen=True)
+class FuzzyHashValue(IndicatorValue):
+    """Case-sensitive fuzzy-hash value (e.g. ssdeep).
+
+    ssdeep digests are ``blocksize:base64:base64`` and the base64 alphabet is
+    case-sensitive, so lowercasing (as the hex HashValue does) corrupts the hash and
+    would make distinct digests collide. Strip only; preserve case.
+    """
+
+    def canonical(self) -> str:
+        return super().canonical().strip()
+
+
+@dataclass(frozen=True)
 class IpValue(IndicatorValue):
     """IP indicator value."""
 
@@ -100,6 +113,8 @@ def indicator_value_for(ioc_type: IOCType | IOCTypeName | str, raw: str) -> Indi
         return HostValue(raw)
     if canonical_type == IOCType.URL:
         return UrlValue(raw)
+    if canonical_type == IOCType.SSDEEP:
+        return FuzzyHashValue(raw)
     if canonical_type in HASH_IOC_TYPES:
         return HashValue(raw)
     if canonical_type in {IOCType.IP, IOCType.IPV6}:

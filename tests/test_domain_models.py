@@ -109,12 +109,16 @@ def test_value_objects_canonicalize_expected_values() -> None:
     assert IpValue("2001:0db8::1").canonical() == "2001:db8::1"
     assert IpValue("not-an-ip").canonical() == "not-an-ip"
     assert EmailValue(" USER@Example[.]COM ").canonical() == "user@example.com"
+    # ssdeep base64 is case-sensitive: strip only, never lowercase (would corrupt the digest).
+    mixed_ssdeep = "768:C7tsNKI7aU8Y1O5wjNHDwLxQJidNG3qGqDRT:CtsI7aUwjNQidNG3GqDRT"
+    assert indicator_value_for(IOCType.SSDEEP, f"  {mixed_ssdeep}  ").canonical() == mixed_ssdeep
 
 
 def test_indicator_value_for_selects_specialized_types() -> None:
     assert type(indicator_value_for(IOCType.DOMAIN, "example.com")).__name__ == "DomainValue"
     assert type(indicator_value_for(IOCType.URL, "https://example.com")).__name__ == "UrlValue"
     assert type(indicator_value_for(IOCType.SHA256, "ABCD")).__name__ == "HashValue"
+    assert type(indicator_value_for(IOCType.SSDEEP, "3:AbC:dE")).__name__ == "FuzzyHashValue"
     assert type(indicator_value_for(IOCType.IP, "198.51.100.7")).__name__ == "IpValue"
     assert type(indicator_value_for(IOCType.EMAIL, "a@b.test")).__name__ == "EmailValue"
     assert type(indicator_value_for("urls", "hxxps://example[.]com")).__name__ == "UrlValue"

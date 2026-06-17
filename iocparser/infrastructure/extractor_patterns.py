@@ -97,7 +97,9 @@ PATTERNS: dict[str, Pattern[str]] = {
         r"[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,63}\b",
     ),
     # Vulnerabilities and threats
-    "cves": re.compile(r"\b(CVE-[0-9]{4}-[0-9]{1,7})\b", re.IGNORECASE),
+    # The CVE ID sequence number is a minimum of 4 digits (CVE-YYYY-NNNN+); {1,7}
+    # mis-matched short non-IDs like CVE-2021-1. Require {4,7}.
+    "cves": re.compile(r"\b(CVE-[0-9]{4}-[0-9]{4,7})\b", re.IGNORECASE),
     "mitre_attack": re.compile(r"\b(T1[0-9]{3}(?:\.[0-9]{1,3})?)\b"),
     # Windows artifacts
     "registry": re.compile(

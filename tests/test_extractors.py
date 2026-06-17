@@ -303,6 +303,10 @@ class TestVulnerabilities:
         result = self.extractor.extract_cves(text)
         assert "CVE-2021-44228" in result or "cve-2021-44228" in result
         assert len(result) >= 2
+        # The sequence number must be >=4 digits, so a 1-digit "CVE-2021-1" and a
+        # 2-digit year "CVE-21-44228" are not valid CVE IDs and must be excluded.
+        assert not any(cve.upper() == "CVE-2021-1" for cve in result)
+        assert not any(cve.upper().startswith("CVE-21-") for cve in result)
 
     def test_extract_mitre_attack(self):
         """Test MITRE ATT&CK ID extraction."""

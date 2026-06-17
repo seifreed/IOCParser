@@ -439,6 +439,31 @@ class TestHTMLParser:
         assert "margin: 0" not in extracted_text
         assert "Enable JavaScript" not in extracted_text
 
+    def test_extract_text_harvests_url_bearing_attributes(self, tmp_path: Path) -> None:
+        """URLs in href/src/action/data-* attributes must be extracted, not dropped.
+
+        get_text() returns only text nodes, so malicious URLs that live only in link
+        attributes (the common case in phishing/threat-report HTML) were silently lost.
+        """
+        html_path = tmp_path / "attrs.html"
+        html_path.write_text(
+            """
+            <html><body>
+            <a href="https://evil-c2.ru/gate.php">click</a>
+            <img src="https://tracker.bad.io/p.png" data-src="https://lazy.evil.org/x"/>
+            <form action="https://exfil.evil.net/post"></form>
+            </body></html>
+            """,
+            encoding="utf-8",
+        )
+
+        text = HTMLParser(str(html_path)).extract_text()
+
+        assert "https://evil-c2.ru/gate.php" in text
+        assert "https://exfil.evil.net/post" in text
+        assert "https://lazy.evil.org/x" in text
+        assert "tracker.bad.io" in text
+
     def test_extract_text_cleans_multiple_whitespaces(self, tmp_path: Path) -> None:
         """
         Test that multiple whitespaces are normalized.

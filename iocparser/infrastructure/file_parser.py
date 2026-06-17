@@ -219,13 +219,40 @@ class HTMLParser(FileParser):
 
     _kind: ClassVar[str] = "HTML"
 
+    # URLs/IOCs in malware and phishing pages overwhelmingly live in link attributes
+    # (href/src/action/...), which get_text() drops entirely. Harvest these so the IOC
+    # regexes see them; any data-* attribute is included too (lazy-loading puts URLs there).
+    _URL_BEARING_ATTRS: ClassVar[tuple[str, ...]] = (
+        "href",
+        "src",
+        "srcset",
+        "action",
+        "formaction",
+        "cite",
+        "poster",
+        "background",
+        "longdesc",
+    )
+
+    def _attribute_iocs(self, soup: BeautifulSoup) -> list[str]:
+        values: list[str] = []
+        for element in soup.find_all(True):
+            for attr, value in element.attrs.items():
+                if attr not in self._URL_BEARING_ATTRS and not attr.startswith("data-"):
+                    continue
+                text = " ".join(value) if isinstance(value, list) else value
+                if isinstance(text, str) and text.strip():
+                    values.append(text)
+        return values
+
     def _text_from_content(self, content: str) -> str:
         soup = BeautifulSoup(content, "html.parser")
         # script/style/etc. are HTML rendering noise, not indicators.
         for tag in soup(["script", "style", "meta", "noscript", "head"]):
             tag.decompose()
         text = soup.get_text(separator=" ", strip=True)
-        return re.sub(r"\s+", " ", text)
+        combined = " ".join([text, *self._attribute_iocs(soup)])
+        return re.sub(r"\s+", " ", combined)
 
 
 class XMLParser(HTMLParser):

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field, replace
 
 from iocparser.application.contracts import ExtractTextInput
 from iocparser.application.use_cases import extract_from_text
-from iocparser.domain.models import ExtractionOptions, ExtractionResult
+from iocparser.domain.models import ExtractionOptions, ExtractionResult, IOCType, IOCTypeName
 from iocparser.infrastructure.extraction import (
     DefaultIOCExtractionEngine,
     MagicTextSourceReader,
@@ -20,6 +20,8 @@ from iocparser.interfaces.ports import (
     WarningListService,
 )
 from iocparser.plugins import get_enricher, get_extractor, get_postprocessor
+
+_INVALID_TYPE_FILTER = "Invalid IOC type in '{parameter}': {value}"
 
 
 @dataclass(frozen=True)
@@ -56,16 +58,29 @@ def build_extraction_options(
     only: str | None = None,
     exclude: str | None = None,
 ) -> ExtractionOptions:
-    from iocparser.domain.type_filters import parse_ioc_types
-
     return ExtractionOptions(
         file_type=file_type,
         defang=defang,
         check_warnings=check_warnings,
         force_update=force_update,
-        include_types=parse_ioc_types(only),
-        exclude_types=parse_ioc_types(exclude),
+        include_types=_parse_type_filter(only, parameter="only"),
+        exclude_types=_parse_type_filter(exclude, parameter="exclude"),
     )
+
+
+def _parse_type_filter(value: str | None, *, parameter: str) -> tuple[IOCType | IOCTypeName, ...]:
+    """Parse an only/exclude filter, naming the bad value and parameter on failure.
+
+    parse_ioc_types raises a bare ``ValueError(<bad name>)``; surfaced straight from the
+    public API that reads as a cryptic ``ValueError: not_a_type``. Re-raise (still a
+    ValueError, so existing ``except ValueError`` handlers keep working) with context.
+    """
+    from iocparser.domain.type_filters import parse_ioc_types
+
+    try:
+        return parse_ioc_types(value)
+    except ValueError as exc:
+        raise ValueError(_INVALID_TYPE_FILTER.format(parameter=parameter, value=exc)) from exc
 
 
 def merge_extraction_results(base: ExtractionResult, extra: ExtractionResult) -> ExtractionResult:

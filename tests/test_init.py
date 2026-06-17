@@ -378,6 +378,17 @@ Contact Email: badguy@evil.net
         assert isinstance(normal_iocs, dict)
         assert isinstance(_warning_iocs, dict)
 
+    def test_invalid_only_filter_raises_clear_value_error(self) -> None:
+        """An unknown --only/--exclude type used to surface a bare ``ValueError: <name>``
+        from the public API. It must now name the offending parameter and value while
+        staying a ValueError so existing ``except ValueError`` handlers keep working.
+        """
+        with pytest.raises(ValueError, match=r"Invalid IOC type in 'only': not_a_type"):
+            extract_iocs_from_text("evil.com", only="not_a_type")
+
+        with pytest.raises(ValueError, match=r"Invalid IOC type in 'exclude': bogus"):
+            extract_iocs_from_text("evil.com", exclude="bogus")
+
     def test_extract_multiple_ioc_types(self) -> None:
         """
         Test extracting multiple different IOC types from complex text.

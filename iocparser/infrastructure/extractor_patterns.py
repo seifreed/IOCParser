@@ -46,8 +46,9 @@ PATTERNS: dict[str, Pattern[str]] = {
     ),
     "ips": re.compile(
         # Match potential IPs - we'll validate octets later
-        # Handles both normal and defanged formats
-        r"\b\d{1,3}(?:[\[\(\{]?\.[\]\)\}]?\d{1,3}){3}\b",
+        # Handles both normal and defanged formats, including the word-style
+        # "8[dot]8[dot]8[dot]8" separator (case-insensitive) seen in reports.
+        r"\b\d{1,3}(?:(?:[\[\(\{]?\.[\]\)\}]?|(?i:\[dot\]|\(dot\)|\{dot\}))\d{1,3}){3}\b",
     ),
     "ipv6": re.compile(
         # Any embedded-IPv4 tail must come before the generic compressed forms;

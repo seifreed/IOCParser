@@ -1002,6 +1002,12 @@ class TestCoverageMissing:
         # All should be extracted and normalized
         assert len(result) >= 3
 
+    def test_extract_ips_word_dot_defang(self):
+        """Word-style dot defangs in IPs (8[dot]8[dot]8[dot]8, any case) normalize."""
+        result = self.extractor.extract_ips("C2 at 8[dot]8[dot]8[dot]8 and 1(DOT)2(DOT)3(DOT)4")
+        assert "8.8.8.8" in result
+        assert "1.2.3.4" in result
+
     def test_extract_mac_addresses_validation_failure(self):
         """Test extract_mac_addresses filters invalid MAC addresses."""
         text = """

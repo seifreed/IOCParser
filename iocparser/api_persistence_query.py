@@ -506,12 +506,14 @@ def list_distributed_jobs(
     *,
     db_uri: str,
     limit: int = 50,
-    statuses: tuple[str, ...] = (),
+    statuses: str | tuple[str, ...] | None = None,
     queue_backend: str | None = None,
 ) -> list[DistributedJobRecord]:
     return query_service(db_uri).list_distributed_jobs(
         limit=limit,
-        statuses=statuses,
+        # Accept a comma-separated string like the sibling list/retain/prune functions;
+        # a bare string would otherwise reach SQLAlchemy's .in_() and raise ArgumentError.
+        statuses=parse_string_filters(statuses),
         queue_backend=queue_backend,
     )
 

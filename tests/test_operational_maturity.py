@@ -2290,6 +2290,29 @@ def test_import_history_keeps_identical_distributed_jobs_from_distinct_payloads_
     assert [job.job_id for job in jobs] == ["job-1", "job-1"]
 
 
+def test_list_distributed_jobs_accepts_string_statuses(tmp_path: Path) -> None:
+    """Regression: list_distributed_jobs typed statuses as a tuple while its sibling
+    list/retain/prune functions take a comma-separated string, so a bare string reached
+    SQLAlchemy's .in_() and raised a cryptic ArgumentError. A string must now parse.
+    """
+    db_uri = f"sqlite:///{tmp_path / 'dist-status.sqlite'}"
+    service = SQLAlchemyDistributedJobService(db_uri)
+    envelope = QueueEnvelope(
+        request=PipelineJobRequest(input_kind="url", source_value="https://x.example/feed"),
+        queue_backend="filesystem",
+        queue_name="default",
+    )
+    created = service.create_or_get_job(envelope=envelope, receipt_id="receipt-1")
+
+    # A bare string status no longer crashes; filtering still works for both API and client.
+    assert len(list_distributed_jobs(db_uri=db_uri, statuses="does-not-exist")) == 0
+    assert len(list_distributed_jobs(db_uri=db_uri, statuses=created.status)) == 1
+    assert len(list_distributed_jobs(db_uri=db_uri, statuses=(created.status,))) == 1
+    client = PersistenceClient(db_uri)
+    assert len(client.list_distributed_jobs(statuses="does-not-exist")) == 0
+    assert len(client.list_distributed_jobs(statuses=created.status)) == 1
+
+
 def test_import_history_keeps_identical_dead_letter_jobs_from_distinct_payloads_separate(
     tmp_path: Path,
 ) -> None:

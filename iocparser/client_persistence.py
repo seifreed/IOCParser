@@ -185,12 +185,14 @@ class PersistenceClient:
         self,
         *,
         limit: int = 50,
-        statuses: tuple[str, ...] = (),
+        statuses: str | tuple[str, ...] | None = None,
         queue_backend: str | None = None,
     ) -> list[DistributedJobRecord]:
         return self._typed_service.list_distributed_jobs(
             limit=limit,
-            statuses=statuses,
+            # A bare string statuses must parse like the sibling functions, not reach
+            # SQLAlchemy's .in_() as a raw string (cryptic ArgumentError).
+            statuses=parse_string_filters(statuses),
             queue_backend=queue_backend,
         )
 

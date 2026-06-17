@@ -320,4 +320,7 @@ def defang_url(url: str) -> str:
 
 
 def clean_defanged(value: str) -> str:
-    return value.replace("[.]", ".").replace("(.)", ".").replace("{.}", ".")
+    from iocparser.shared_utils import WORD_DOT_PATTERN
+
+    refanged = WORD_DOT_PATTERN.sub(".", value)
+    return refanged.replace("[.]", ".").replace("(.)", ".").replace("{.}", ".")

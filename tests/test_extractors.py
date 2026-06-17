@@ -133,6 +133,24 @@ class TestNetworkExtractors:
         result = self.extractor_defang.extract_domains(text)
         assert "malware[.]com" in result
 
+    def test_extract_domains_word_dot_defang(self):
+        """Word-style dot defangs ([dot]/(dot)/{dot}, any case) refang to a domain.
+
+        Regression: only the symbol forms [.]/(.)/{.} were recognized, so the very
+        common "evil[dot]com" report style yielded no domain at all.
+        """
+        text = "Beacon to evil[dot]com bad(dot)org and host{dot}net plus UP[DOT]CASE.io"
+        result = self.extractor.extract_domains(text)
+        assert "evil.com" in result
+        assert "bad.org" in result
+        assert "host.net" in result
+        assert "UP.CASE.io" in result
+
+    def test_extract_urls_word_dot_defang(self):
+        """URLs with word-style dot defangs in the host are extracted."""
+        text = "Drop from hxxps://evil[dot]com/payload.exe"
+        assert "hxxps://evil[dot]com/payload.exe" in self.extractor.extract_urls(text)
+
     def test_extract_ips(self):
         """Test IPv4 extraction."""
         text = """

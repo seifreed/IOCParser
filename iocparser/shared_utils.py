@@ -174,9 +174,7 @@ def deduplicate_iocs_with_state(
 # are routed through the case-insensitive regex pass below. Filtering on "://"
 # alone wrongly skipped the bracketed "[://]" form, leaving such URLs defanged.
 _NON_SCHEME_REPLACEMENTS: tuple[tuple[str, str], ...] = tuple(
-    (search, replacement)
-    for search, replacement in DEFANG_REPLACEMENTS
-    if not search[:1].isalpha()
+    (search, replacement) for search, replacement in DEFANG_REPLACEMENTS if not search[:1].isalpha()
 )
 
 _COMPILED_SCHEME_PATTERNS: tuple[tuple[_re.Pattern[str], str], ...] = tuple(
@@ -192,9 +190,15 @@ _COMPILED_SCHEME_PATTERNS: tuple[tuple[_re.Pattern[str], str], ...] = tuple(
 )
 
 
+# Word-style dot defangs (evil[dot]com, evil(dot)com) are common in threat reports.
+# Matched case-insensitively since reports mix "[dot]" and "[DOT]"; the symbol forms
+# above stay literal because they have no case to vary.
+WORD_DOT_PATTERN = _re.compile(r"\[dot\]|\(dot\)|\{dot\}", _re.IGNORECASE)
+
+
 def refang_ioc(value: str) -> str:
     """Normalize common defanged IOC variants back to canonical form."""
-    cleaned = value
+    cleaned = WORD_DOT_PATTERN.sub(".", value)
     for search, replacement in _NON_SCHEME_REPLACEMENTS:
         cleaned = cleaned.replace(search, replacement)
     for compiled_pattern, replacement in _COMPILED_SCHEME_PATTERNS:

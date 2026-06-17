@@ -42,7 +42,7 @@ PATTERNS: dict[str, Pattern[str]] = {
         r"\b((?:[a-zA-Z0-9](?:[-a-zA-Z0-9]{0,61}[a-zA-Z0-9])?\.){1,10}"
         r"[a-zA-Z]{2,63})\b|"
         r"\b((?:[a-zA-Z0-9](?:[-a-zA-Z0-9]{0,61}[a-zA-Z0-9])?"
-        r"(?:\[\.\]|\(\.\)|\{\.\}|\.)){1,10}[a-zA-Z]{2,63})\b",
+        r"(?:\[\.\]|\(\.\)|\{\.\}|(?i:\[dot\]|\(dot\)|\{dot\})|\.)){1,10}[a-zA-Z]{2,63})\b",
     ),
     "ips": re.compile(
         # Match potential IPs - we'll validate octets later
@@ -78,7 +78,7 @@ PATTERNS: dict[str, Pattern[str]] = {
         # at the first ':' to http://user and then dropped as host-less.
         r"(?:[a-zA-Z0-9._~%!$&'()*+,;=:-]+@)?"
         r"(?!DOMAIN_NAME|IP:|\*\.|localhost|example\.)"
-        r"[a-zA-Z0-9](?:[-a-zA-Z0-9]|(?:\.|\[\.\]|\(\.\)|\{\.\}))*[a-zA-Z0-9]"
+        r"[a-zA-Z0-9](?:[-a-zA-Z0-9]|(?:\.|\[\.\]|\(\.\)|\{\.\}|\[dot\]|\(dot\)|\{dot\}))*[a-zA-Z0-9]"
         r"(?:\.[a-zA-Z]{2,63})?(?::[0-9]{1,5})?"
         r"(?:/[-a-zA-Z0-9()@:%_\+.~#?&/=]{0,2048})?",
         re.IGNORECASE,

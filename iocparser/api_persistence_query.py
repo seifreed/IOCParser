@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from typing import TypedDict, Unpack
@@ -83,6 +83,29 @@ class PersistedDiffOptions(TypedDict, total=False):
     tag: str | None
 
 
+UNKNOWN_OPTION_ERROR = "Unknown {context} option(s): {names}"
+
+_RUNS_OPTION_KEYS = frozenset(QueryRunsOptions.__annotations__)
+_SEARCH_OPTION_KEYS = frozenset(SearchPersistedIOCOptions.__annotations__)
+_DIFF_OPTION_KEYS = frozenset(PersistedDiffOptions.__annotations__)
+
+
+def _reject_unknown_options(
+    options: Mapping[str, object], allowed: AbstractSet[str], *, context: str
+) -> None:
+    """Fail loudly on an unrecognized keyword option.
+
+    ``**options: Unpack[TypedDict]`` only constrains keys for mypy; at runtime a typo'd
+    keyword (e.g. ``min_severty=``) is silently swallowed and its filter never applies,
+    so the caller gets unfiltered results with no error. Reject unknown keys instead.
+    """
+    unknown = set(options) - allowed
+    if unknown:
+        raise ValidationError(
+            UNKNOWN_OPTION_ERROR.format(context=context, names=", ".join(sorted(unknown)))
+        )
+
+
 @dataclass(frozen=True)
 class PersistedRenderOptions:
     output_format: str = "json"
@@ -144,6 +167,7 @@ def bool_option(value: object | None, default: bool = False) -> bool:
 
 
 def runs_input(options: QueryRunsOptions) -> QueryRunsInput:
+    _reject_unknown_options(options, _RUNS_OPTION_KEYS, context="run query")
     return QueryRunsInput(
         **{  # type: ignore[arg-type]
             **options,
@@ -157,6 +181,7 @@ def runs_input(options: QueryRunsOptions) -> QueryRunsInput:
 
 
 def search_input(value: str, options: SearchPersistedIOCOptions) -> SearchPersistedIOCsInput:
+    _reject_unknown_options(options, _SEARCH_OPTION_KEYS, context="IOC search")
     return SearchPersistedIOCsInput(
         value=value,
         limit=validated_non_negative_int(options.get("limit", 50), field="limit"),
@@ -280,6 +305,7 @@ def persisted_diff_input(
     right_run_id: int,
     options: PersistedDiffOptions,
 ) -> DiffPersistedRunsInput:
+    _reject_unknown_options(options, _DIFF_OPTION_KEYS, context="diff")
     diff_only = validated_diff_only(optional_str(options.get("diff_only")))
     return DiffPersistedRunsInput(
         left_run_id=left_run_id,
@@ -299,6 +325,7 @@ def latest_source_diff_input(
     run_id: int,
     options: PersistedDiffOptions,
 ) -> DiffLatestSourceRunInput:
+    _reject_unknown_options(options, _DIFF_OPTION_KEYS, context="diff")
     diff_only = validated_diff_only(optional_str(options.get("diff_only")))
     return DiffLatestSourceRunInput(
         run_id=run_id,

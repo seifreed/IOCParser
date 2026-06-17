@@ -183,11 +183,17 @@ class NetworkHeuristicPolicy:
                 clean_urls.append(defang_url(url) if defang else url)
         return _dedup_urls(clean_urls)
 
-    def extracted_emails(self, *, raw_emails: list[str], defang: bool) -> list[str]:
+    def extracted_emails(self, *, raw_emails: list[str], defang: bool, text: str) -> list[str]:
         # A dot-atom email cannot contain consecutive dots (RFC 5321 forbids empty
         # labels); the regex's domain class allows them, so drop e.g. user@example..com,
         # matching the domain extractor which already rejects "..".
         valid_emails = [email for email in raw_emails if ".." not in email]
+        # A URL's userinfo (scheme://user:pass@host) makes the password/user + host look
+        # like an email; drop those so credentials in URLs are not reported as email IOCs.
+        # Real emails after a URL are safe: a path/query/whitespace delimiter breaks the run.
+        valid_emails = [
+            email for email in valid_emails if not _is_url_userinfo_email(email, text)
+        ]
         if defang:
             valid_emails = [email.replace("@", "[@]").replace(".", "[.]") for email in valid_emails]
         return dedup_case_insensitive(valid_emails)
@@ -380,9 +386,19 @@ def _extract_urls(self: ExtractorBase, text: str) -> list[str]:
     )
 
 
+def _is_url_userinfo_email(email: str, text: str) -> bool:
+    """True if ``email`` only appears as the userinfo of a URL (scheme://user:pass@host).
+
+    Matches ``://`` followed by userinfo characters (no path/query/whitespace delimiter)
+    immediately preceding the email, so a real email after a URL — separated by ``/``,
+    ``?``, ``#`` or whitespace — is never suppressed.
+    """
+    return re.search(rf"://[^\s/?#]*{re.escape(email)}", text) is not None
+
+
 def _extract_emails(self: ExtractorBase, text: str) -> list[str]:
     return DEFAULT_NETWORK_POLICY.extracted_emails(
-        raw_emails=self._extract_pattern(text, "emails"), defang=self.defang
+        raw_emails=self._extract_pattern(text, "emails"), defang=self.defang, text=text
     )
 
 

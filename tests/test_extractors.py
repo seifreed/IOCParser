@@ -290,6 +290,25 @@ class TestEmailAndCommunication:
         assert "user@example..com" not in result
         assert "a@b.com" in result
 
+    def test_extract_emails_skips_url_userinfo(self):
+        """A URL's userinfo (scheme://user:pass@host) must not be reported as an email,
+        while a genuine email elsewhere in the same text is still extracted.
+        """
+        result = self.extractor.extract_emails(
+            "login http://user:pass@evil.com/path and ftp://bob:secret@files.example.org "
+            "but reach me at analyst@example.org"
+        )
+
+        assert "pass@evil.com" not in result
+        assert "secret@files.example.org" not in result
+        assert "analyst@example.org" in result
+
+    def test_extract_emails_keeps_email_adjacent_to_url(self):
+        """A real email separated from a URL by a delimiter is not mistaken for userinfo."""
+        result = self.extractor.extract_emails("see http://site.com then mail me@example.com")
+
+        assert "me@example.com" in result
+
     def test_extract_emails_defanged(self):
         """Test email extraction with defanging."""
         text = "Contact: malware@evil.com"

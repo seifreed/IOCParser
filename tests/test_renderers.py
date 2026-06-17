@@ -61,6 +61,27 @@ def test_stix_output_renders_ssdeep_and_imphash_as_file_hashes() -> None:
     assert f"[file:hashes.'IMPHASH' = '{'a' * 32}']" in patterns
 
 
+def test_stix_output_renders_cryptocurrency_wallets() -> None:
+    """bitcoin/ethereum/monero must render as STIX x-cryptocurrency objects, not vanish.
+
+    STIX 2.1 has no native crypto SCO, so these wallet IOCs were silently dropped from
+    STIX export; emit a custom x-cryptocurrency object like x-cloud-resource for ARNs.
+    """
+    result = ExtractionResult(
+        iocs=(
+            IOC.from_raw("bitcoin", "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"),
+            IOC.from_raw("ethereum", "0x32Be343B94f860124dC4fEe278FDCBD38C102D88"),
+        ),
+    )
+
+    bundle = json.loads(STIXOutputRenderer().render(result))
+    patterns = {item["pattern"] for item in bundle["objects"]}
+
+    assert "[x-cryptocurrency:value = '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa']" in patterns
+    # EIP-55 checksum case must be preserved (not lowercased).
+    assert "[x-cryptocurrency:value = '0x32Be343B94f860124dC4fEe278FDCBD38C102D88']" in patterns
+
+
 def test_text_output_renderer_renders_golden_output() -> None:
     renderer = TextOutputRenderer()
 

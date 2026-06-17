@@ -83,6 +83,13 @@ class STIXOutputRenderer(OutputRenderer):
             IOCType.AZURE_APP_ID: _builder("[x-cloud-resource:value = '{value}']"),
             IOCType.DOCKER_IMAGE: _builder("[software:name = '{value}']"),
             IOCType.TLSH: _builder("[file:hashes.'TLSH' = '{value}']"),
+            # STIX 2.1 has no native cryptocurrency SCO; use a custom x-cryptocurrency
+            # object (same approach as x-cloud-resource for ARNs) so wallet addresses are
+            # no longer silently dropped from STIX export. The indicator name carries the
+            # specific currency (e.g. "bitcoin indicator").
+            IOCType.BITCOIN: _builder("[x-cryptocurrency:value = '{value}']"),
+            IOCType.ETHEREUM: _builder("[x-cryptocurrency:value = '{value}']"),
+            IOCType.MONERO: _builder("[x-cryptocurrency:value = '{value}']"),
         }
 
     def _build_indicator(

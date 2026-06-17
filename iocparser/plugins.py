@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from importlib.metadata import EntryPoints, entry_points
 from typing import Protocol, cast
 
@@ -66,8 +66,25 @@ class ResultPostProcessor(Protocol):
         """Return a transformed extraction result."""
 
 
+def _warn_on_builtin_override(
+    name: str, builtin_names: set[str], registry: Mapping[str, object], *, kind: str
+) -> None:
+    """Warn when a registration replaces an already-registered built-in plugin.
+
+    Overriding a built-in is allowed, but it should be visible however it happens —
+    the entry-point loader used to warn while a direct register_*() call clobbered a
+    built-in (e.g. "json", "text", "misp") silently. ``name in registry`` is what makes
+    this an override, so the initial built-in registration (registry still empty for the
+    name) does not warn.
+    """
+    key = name.lower()
+    if key in builtin_names and key in registry:
+        _logger.warning("Plugin %s '%s' overrides built-in %s", kind, name, kind)
+
+
 def register_renderer(name: str, factory: RendererFactory) -> None:
     """Register an output renderer plugin."""
+    _warn_on_builtin_override(name, _BUILTIN_RENDERER_NAMES, _renderer_registry, kind="renderer")
     _renderer_registry[name.lower()] = factory
 
 
@@ -97,6 +114,7 @@ def renderer_names() -> tuple[str, ...]:
 
 def register_enricher(name: str, factory: EnricherFactory) -> None:
     """Register an enrichment service plugin."""
+    _warn_on_builtin_override(name, _BUILTIN_ENRICHER_NAMES, _enricher_registry, kind="enricher")
     _enricher_registry[name.lower()] = factory
 
 
@@ -188,11 +206,9 @@ def _load_group[FactoryT](
     group: str,
     kind: str,
     register: Callable[[str, FactoryT], None],
-    builtin_names: set[str] | None = None,
 ) -> None:
+    # register_*() warns when an entry point overrides a built-in, so no check here.
     for entry_point in discovered.select(group=group):
-        if builtin_names is not None and entry_point.name.lower() in builtin_names:
-            _logger.warning("Plugin %s '%s' overrides built-in %s", kind, entry_point.name, kind)
         try:
             # A third-party plugin whose load() raises (bad import, missing
             # dependency) must not abort discovery of the remaining (including
@@ -210,14 +226,12 @@ def _load_discovered_entry_points(discovered: EntryPoints) -> None:
         group="iocparser.renderers",
         kind="renderer",
         register=register_renderer,
-        builtin_names=_BUILTIN_RENDERER_NAMES,
     )
     _load_group(
         discovered,
         group="iocparser.enrichers",
         kind="enricher",
         register=register_enricher,
-        builtin_names=_BUILTIN_ENRICHER_NAMES,
     )
     _load_group(
         discovered, group="iocparser.extractors", kind="extractor", register=register_extractor

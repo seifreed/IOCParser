@@ -260,6 +260,38 @@ class TestPluginEntryPointLoading:
         if original_text is not None:
             _renderer_registry["text"] = original_text
 
+    def test_direct_register_warns_when_overriding_builtin(self, caplog) -> None:
+        """A direct register_renderer/register_enricher call that clobbers a built-in must
+        warn — the entry-point path warned, but the direct API used to overwrite silently.
+        Registering a fresh custom name stays quiet.
+        """
+        import logging
+
+        from iocparser.plugins import (
+            _enricher_registry,
+            _renderer_registry,
+            register_enricher,
+            register_renderer,
+        )
+
+        original_json = _renderer_registry.get("json")
+        original_misp = _enricher_registry.get("misp")
+        try:
+            with caplog.at_level(logging.WARNING, logger="iocparser.plugins"):
+                register_renderer("json", original_json)
+                register_enricher("misp", original_misp)
+                register_renderer("_round3_fresh_name", original_json)
+            messages = [record.getMessage() for record in caplog.records]
+            assert any("overrides built-in renderer" in message for message in messages)
+            assert any("overrides built-in enricher" in message for message in messages)
+            assert not any("_round3_fresh_name" in message for message in messages)
+        finally:
+            if original_json is not None:
+                _renderer_registry["json"] = original_json
+            if original_misp is not None:
+                _enricher_registry["misp"] = original_misp
+            _renderer_registry.pop("_round3_fresh_name", None)
+
 
 # ---------------------------------------------------------------------------
 # 4. worker_service.py:116-117 — concurrent worker sleep on empty queue

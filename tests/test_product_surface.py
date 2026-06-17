@@ -2555,6 +2555,30 @@ def test_delete_and_prune_persisted_runs(tmp_path: Path) -> None:
     assert deleted >= 1
 
 
+def test_prune_persisted_runs_accepts_string_statuses(tmp_path: Path) -> None:
+    """Regression: prune_persisted_runs took statuses as a pre-split tuple, so a bare
+    string (which retain_persisted_history/list_batch_jobs accept) reached SQLAlchemy's
+    .in_() and raised a cryptic ArgumentError. A string must now parse like its siblings.
+    """
+    db_uri = f"sqlite:///{tmp_path / 'prune-status.db'}"
+    service = SQLAlchemyPersistenceService(db_uri)
+    service.persist_multiple_runs(
+        [("file", "s.txt", ExtractionResult.from_grouped_payload({"domains": ["a.example"]}, {}))],
+        tool_version="6.0.0",
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
+    )
+
+    # A non-matching status string deletes nothing (and does not crash).
+    assert (
+        prune_persisted_runs(db_uri=db_uri, before="2999-01-01", statuses="failed,dead-lettered")
+        == 0
+    )
+    # The matching status string deletes the run; a tuple stays accepted for compatibility.
+    assert prune_persisted_runs(db_uri=db_uri, before="2999-01-01", statuses=("success",)) == 1
+
+
 def test_plugin_registry_and_structured_records(tmp_path: Path) -> None:
     parsed = SQLAlchemyPersistenceService._parse_datetime("2026-01-01T00:00:00")
     assert parsed is not None

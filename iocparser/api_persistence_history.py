@@ -90,7 +90,7 @@ def prune_persisted_runs(
     keep_latest: int = 0,
     source_kind: str | None = None,
     source_value: str | None = None,
-    statuses: tuple[str, ...] = (),
+    statuses: str | tuple[str, ...] | None = None,
 ) -> int:
     return _prune_persisted_runs(
         PrunePersistedRunsInput(
@@ -98,7 +98,10 @@ def prune_persisted_runs(
             keep_latest=keep_latest,
             source_kind=source_kind,
             source_value=source_value,
-            statuses=statuses,
+            # Accept a comma-separated string (like retain_persisted_history /
+            # list_batch_jobs) as well as a pre-split tuple; passing a bare string used to
+            # reach SQLAlchemy's .in_() and raise a cryptic ArgumentError.
+            statuses=parse_string_filters(statuses),
         ),
         persistence_query_service=query_service(db_uri),
     )

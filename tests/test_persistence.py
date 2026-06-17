@@ -6,6 +6,7 @@ Tests for SQLite persistence.
 
 from __future__ import annotations
 
+import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -561,6 +562,17 @@ def test_parse_datetime_normalizes_tz_aware_to_naive_utc() -> None:
     assert naive is not None
     assert naive.isoformat() == "2024-01-01T12:00:00"
     assert parse_datetime(None) is None
+
+
+def test_parse_datetime_reports_invalid_input_cleanly() -> None:
+    """A malformed --date-from/--date-to/--prune-before value must surface a clean
+    ValidationError, not a bare ValueError stack trace from datetime.fromisoformat.
+    """
+    from iocparser.errors import ValidationError
+    from iocparser.infrastructure.persistence_support import parse_datetime
+
+    with pytest.raises(ValidationError, match="not-a-date"):
+        parse_datetime("not-a-date")
 
 
 def test_in_memory_unit_of_work_survives_close_and_reopen() -> None:

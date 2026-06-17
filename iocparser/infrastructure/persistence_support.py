@@ -16,7 +16,13 @@ from iocparser.domain.models import (
     classify_ioc,
 )
 from iocparser.domain.sources import normalize_url_value
+from iocparser.errors import ValidationError
 from iocparser.infrastructure.persistence_schema import IOCModel, RunIOCModel, RunModel, SourceModel
+
+INVALID_DATETIME_FILTER = (
+    "Invalid date/datetime value: {value!r} (expected ISO 8601, e.g. 2024-01-31 or "
+    "2024-01-31T12:00:00)"
+)
 
 SEVERITY_ORDER = {
     "informational": 0,
@@ -71,7 +77,13 @@ def parse_datetime(value: str | None) -> datetime | None:
     """
     if not value:
         return None
-    parsed = datetime.fromisoformat(value)
+    # fromisoformat raises a bare ValueError on bad input (e.g. --date-from garbage);
+    # translate it to a ValidationError so the CLI reports a clean message instead of
+    # dumping a stack trace for what is just bad user input.
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise ValidationError(INVALID_DATETIME_FILTER.format(value=value)) from exc
     if parsed.tzinfo is not None:
         parsed = parsed.astimezone(UTC).replace(tzinfo=None)
     return parsed

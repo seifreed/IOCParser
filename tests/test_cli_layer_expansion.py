@@ -591,7 +591,7 @@ def test_cli_dispatch_force_update_with_input_still_processes_file(tmp_path: Pat
         ),
         process_single_input=lambda _args: (
             called.__setitem__("single", called["single"] + 1)
-            or ({"domains": ["force-update.example"]}, {}, str(input_file))
+            or ({"domains": ["force-update.example"]}, {}, str(input_file), None)
         ),
         save_output=lambda *_args: called.__setitem__("saved", called["saved"] + 1),
     )
@@ -676,7 +676,7 @@ def test_cli_dispatch_directory_url_file_and_stdin_paths(tmp_path: Path) -> None
             process_multiple_files_input=lambda _args: (_ for _ in ()).throw(
                 AssertionError("unexpected")
             ),
-            process_single_input=lambda _args: ({}, {}, "stdin"),
+            process_single_input=lambda _args: ({}, {}, "stdin", None),
             save_output=lambda *args: None,
         )
     finally:

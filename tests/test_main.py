@@ -1391,7 +1391,7 @@ class TestProcessSingleInput:
                 force_update=False,
             )
 
-            normal_iocs, _warning_iocs, input_display = process_single_input(args)
+            normal_iocs, _warning_iocs, input_display, _result = process_single_input(args)
 
             assert isinstance(normal_iocs, dict)
             assert str(temp_path) in input_display
@@ -1442,7 +1442,7 @@ class TestProcessSingleInput:
         )
         with LocalDownloadServer(body=b"IOC URL: https://url-arg.example/path\n") as url:
             args.url = url
-            normal_iocs, warning_iocs, input_display = process_single_input(args)
+            normal_iocs, warning_iocs, input_display, _result = process_single_input(args)
 
         assert normal_iocs == {"urls": ["https://url-arg.example/path"]}
         assert warning_iocs == {}
@@ -1461,7 +1461,7 @@ class TestProcessSingleInput:
         )
         with LocalDownloadServer(body=b"IOC URL: https://url-direct.example/path\n") as url:
             args.url_direct = url
-            normal_iocs, warning_iocs, input_display = process_single_input(args)
+            normal_iocs, warning_iocs, input_display, _result = process_single_input(args)
 
         assert normal_iocs == {"urls": ["https://url-direct.example/path"]}
         assert warning_iocs == {}
@@ -1527,7 +1527,7 @@ class TestProcessSingleInput:
             )
 
             # Process the file - should NOT delete it since it's not from URL
-            _normal_iocs, _warning_iocs, _input_display = process_single_input(args)
+            _normal_iocs, _warning_iocs, _input_display, _result = process_single_input(args)
 
             # File should still exist since it wasn't from URL
             assert temp_file.exists()

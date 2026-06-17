@@ -257,6 +257,36 @@ def _directory_multiple_namespace(
     return argparse.Namespace(**cast("Mapping[str, object]", values))
 
 
+def process_file_result(
+    file_path: Path,
+    *,
+    reader: TextSourceReader,
+    warning_service: WarningListService | None,
+    request: FileProcessingRequest,
+) -> ExtractionResult:
+    """Extract a file into a rich ExtractionResult (retains per-IOC evidence)."""
+    options = request.to_processing_options()
+    if request.streaming:
+        return _streaming_result(
+            file_path,
+            options=options,
+            warning_service=warning_service if request.check_warnings else None,
+            chunk_size=request.chunk_size,
+            overlap=request.overlap,
+        )
+    try:
+        return _extract_from_file()(
+            ExtractFileInput(file_path=str(file_path), options=options.to_domain()),
+            reader=reader,
+            extractor_engine=extractor_engine,
+            warning_service=warning_service if request.check_warnings else None,
+        )
+    except SourceNotFoundError as exc:
+        raise FileExistenceError(exc.source_path) from exc
+    except SourceProcessingError as exc:
+        raise FileProcessingError(exc.source_path, exc.reason) from exc
+
+
 def process_file(
     file_path: Path,
     *,
@@ -264,27 +294,9 @@ def process_file(
     warning_service: WarningListService | None,
     request: FileProcessingRequest,
 ) -> tuple[GroupedIocs, GroupedWarnings]:
-    options = request.to_processing_options()
-    if request.streaming:
-        result = _streaming_result(
-            file_path,
-            options=options,
-            warning_service=warning_service if request.check_warnings else None,
-            chunk_size=request.chunk_size,
-            overlap=request.overlap,
-        )
-    else:
-        try:
-            result = _extract_from_file()(
-                ExtractFileInput(file_path=str(file_path), options=options.to_domain()),
-                reader=reader,
-                extractor_engine=extractor_engine,
-                warning_service=warning_service if request.check_warnings else None,
-            )
-        except SourceNotFoundError as exc:
-            raise FileExistenceError(exc.source_path) from exc
-        except SourceProcessingError as exc:
-            raise FileProcessingError(exc.source_path, exc.reason) from exc
+    result = process_file_result(
+        file_path, reader=reader, warning_service=warning_service, request=request
+    )
     return result.grouped_iocs(), result.grouped_warnings()
 
 

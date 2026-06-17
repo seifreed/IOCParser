@@ -18,7 +18,7 @@ from iocparser.cli_processing_support import BatchResultsCollection, GroupedIocs
 from iocparser.cli_processing_urls import BatchReport as URLBatchReport
 from iocparser.cli_processing_urls import public_batch_report as _public_batch_report
 from iocparser.config import AppConfig
-from iocparser.domain.models import PersistOptions
+from iocparser.domain.models import ExtractionResult, PersistOptions
 from iocparser.plugins import (
     custom_ioc_types,
     enricher_names,
@@ -38,6 +38,9 @@ class ResolvedInputPayload:
     input_display: str
     results: BatchResults | None = None
     batch_report: URLBatchReport | None = None
+    # Rich single-input result, retained so --with-context can render per-IOC
+    # evidence. None for batch paths (multi-file/dir/url-file) and plugin listings.
+    result: ExtractionResult | None = None
 
 
 def plugin_listing_payload() -> Mapping[str, object]:
@@ -58,7 +61,10 @@ def resolve_input_payload(
     process_multiple_files_input: Callable[
         [argparse.Namespace], tuple[GroupedIocs, GroupedWarnings, str, BatchResults]
     ],
-    process_single_input: Callable[[argparse.Namespace], tuple[GroupedIocs, GroupedWarnings, str]],
+    process_single_input: Callable[
+        [argparse.Namespace],
+        tuple[GroupedIocs, GroupedWarnings, str, ExtractionResult | None],
+    ],
 ) -> ResolvedInputPayload:
     values = cast("Mapping[str, object]", vars(args))
     if _cli_args.get_list_arg(args, "multiple"):
@@ -93,7 +99,7 @@ def resolve_input_payload(
             batch_report=url_result[4],
         )
     single = process_single_input(args)
-    return ResolvedInputPayload(single[0], single[1], single[2])
+    return ResolvedInputPayload(single[0], single[1], single[2], result=single[3])
 
 
 def persist_batch_results(
@@ -188,13 +194,16 @@ def finalize_cli_run(
     input_display: str,
     results: BatchResults | None,
     batch_report: URLBatchReport | None,
-    save_output: Callable[[argparse.Namespace, GroupedIocs, GroupedWarnings, str], None],
+    result: ExtractionResult | None = None,
+    save_output: Callable[
+        [argparse.Namespace, GroupedIocs, GroupedWarnings, str, ExtractionResult | None], None
+    ],
 ) -> None:
     # -o - sends the rendered machine output to stdout, so the human summary must go
     # to stderr or it corrupts the piped JSON/CSV/STIX.
     summary_stream = sys.stderr if _cli_args.get_optional_str_arg(args, "output") == "-" else None
     _cli_output.display_results(normal_iocs, warning_iocs, stream=summary_stream)
-    save_output(args, normal_iocs, warning_iocs, input_display)
+    save_output(args, normal_iocs, warning_iocs, input_display, result)
 
     persist_options = _cli_persistence.build_persist_options(args)
     if batch_report is not None:

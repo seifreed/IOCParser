@@ -399,7 +399,7 @@ def test_cli_plugin_paths_and_batch_queries(
     try:
         cli_processing.sys.stdin = io.StringIO("Text input with hxxps://stdin.example")
         stdin_args = SimpleNamespace(stdin=True, file=None, url=None, url_direct=None, **common)
-        normal_iocs, _, _ = cli_processing.process_single_input(
+        normal_iocs, _, _, _ = cli_processing.process_single_input(
             stdin_args,
             reader=api_extraction._reader,
             warning_service=None,
@@ -413,7 +413,7 @@ def test_cli_plugin_paths_and_batch_queries(
     file_args = SimpleNamespace(
         stdin=False, file=str(file_path), url=None, url_direct=None, **common
     )
-    normal_iocs, _, _ = cli_processing.process_single_input(
+    normal_iocs, _, _, _ = cli_processing.process_single_input(
         file_args,
         reader=api_extraction._reader,
         warning_service=None,
@@ -430,7 +430,7 @@ def test_cli_plugin_paths_and_batch_queries(
 
     with LocalHTTPFileServer(b"Remote hxxps://remote.example") as url:
         url_args = SimpleNamespace(stdin=False, file=None, url=url, url_direct=None, **common)
-        normal_iocs, _, _ = cli_processing.process_single_input(
+        normal_iocs, _, _, _ = cli_processing.process_single_input(
             url_args,
             reader=api_extraction._reader,
             warning_service=None,

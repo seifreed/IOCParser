@@ -11,6 +11,7 @@ import iocparser.cli_runtime as _cli_runtime
 from iocparser.cli_processing_support import BatchResultsCollection, GroupedIocs, GroupedWarnings
 from iocparser.cli_runtime import logger
 from iocparser.domain.enums import IOCType, IOCTypeName
+from iocparser.domain.models import ExtractionResult
 from iocparser.infrastructure.warninglists import MISPWarningLists
 from iocparser.interfaces.ports import WarningListService
 
@@ -28,6 +29,41 @@ def _active_warning_service(args: argparse.Namespace) -> WarningListService:
     return _cli_runtime.warning_service_for_args(args)
 
 
+def process_file_with_result(
+    file_path: Path,
+    *,
+    request: FileProcessingRequest | None = None,
+    file_type: str | None = None,
+    defang: bool = True,
+    check_warnings: bool = True,
+    force_update: bool = False,
+    include_types: tuple[IOCType | IOCTypeName, ...] = (),
+    exclude_types: tuple[IOCType | IOCTypeName, ...] = (),
+    streaming: bool = False,
+    chunk_size: int = 1024 * 1024,
+    overlap: int = 1024,
+    warning_service: WarningListService | None = None,
+) -> tuple[GroupedIocs, GroupedWarnings, ExtractionResult]:
+    effective_request = request or FileProcessingRequest(
+        file_type=file_type,
+        defang=defang,
+        check_warnings=check_warnings,
+        force_update=force_update,
+        include_types=include_types,
+        exclude_types=exclude_types,
+        streaming=streaming,
+        chunk_size=chunk_size,
+        overlap=overlap,
+    )
+    result = _cli_processing.process_file_result(
+        file_path,
+        reader=_cli_runtime.reader,
+        warning_service=warning_service if effective_request.check_warnings else None,
+        request=effective_request,
+    )
+    return result.grouped_iocs(), result.grouped_warnings(), result
+
+
 def process_file(
     file_path: Path,
     *,
@@ -43,7 +79,9 @@ def process_file(
     overlap: int = 1024,
     warning_service: WarningListService | None = None,
 ) -> tuple[GroupedIocs, GroupedWarnings]:
-    effective_request = request or FileProcessingRequest(
+    normal_iocs, warning_iocs, _result = process_file_with_result(
+        file_path,
+        request=request,
         file_type=file_type,
         defang=defang,
         check_warnings=check_warnings,
@@ -53,13 +91,9 @@ def process_file(
         streaming=streaming,
         chunk_size=chunk_size,
         overlap=overlap,
+        warning_service=warning_service,
     )
-    return _cli_processing.process_file(
-        file_path,
-        reader=_cli_runtime.reader,
-        warning_service=warning_service if effective_request.check_warnings else None,
-        request=effective_request,
-    )
+    return normal_iocs, warning_iocs
 
 
 def process_multiple_files(
@@ -108,14 +142,16 @@ def process_multiple_files_input(
     )
 
 
-def process_single_input(args: argparse.Namespace) -> tuple[GroupedIocs, GroupedWarnings, str]:
+def process_single_input(
+    args: argparse.Namespace,
+) -> tuple[GroupedIocs, GroupedWarnings, str, ExtractionResult | None]:
     active_warning_service = _active_warning_service(args)
     return _cli_processing.process_single_input(
         args,
         reader=_cli_runtime.reader,
         warning_service=active_warning_service,
         downloader=_cli_runtime.downloader_for_args(args),
-        process_file_func=lambda file_path, *, request=None: process_file(
+        process_file_func=lambda file_path, *, request=None: process_file_with_result(
             file_path,
             request=request,
             warning_service=active_warning_service,
@@ -128,12 +164,14 @@ def save_output(
     normal_iocs: GroupedIocs,
     warning_iocs: GroupedWarnings,
     input_display: str,
+    result: ExtractionResult | None = None,
 ) -> None:
     _cli_output.save_output(
         args,
         normal_iocs,
         warning_iocs,
         input_display,
+        result=result,
         file_writer=_cli_runtime.file_writer,
     )
 

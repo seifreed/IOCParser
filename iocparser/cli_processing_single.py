@@ -23,6 +23,7 @@ from iocparser.cli_processing_support import (
     extractor_engine,
     temporary_resource_cleaner,
 )
+from iocparser.domain.models import ExtractionResult
 from iocparser.interfaces.ports import TextSourceReader, URLDownloader, WarningListService
 
 _stdin_stream_error = stdin_stream_error
@@ -38,7 +39,7 @@ def process_single_input(
     warning_service: WarningListService | None,
     downloader: URLDownloader,
     process_file_func: ProcessFileFunc,
-) -> tuple[GroupedIocs, GroupedWarnings, str]:
+) -> tuple[GroupedIocs, GroupedWarnings, str, ExtractionResult | None]:
     file_arg = get_optional_str_arg(args, "file")
     url = get_optional_str_arg(args, "url") or get_optional_str_arg(args, "url_direct")
     context: SingleInputContext = build_single_input_context(

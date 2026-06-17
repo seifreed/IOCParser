@@ -31,7 +31,7 @@ def test_process_single_input_with_real_url_server() -> None:
 
     with LocalHTTPTextServer(b"IOC URL: https://from-server.example/path\n") as url:
         args.url = url
-        normal_iocs, warning_iocs, input_display = process_single_input(args)
+        normal_iocs, warning_iocs, input_display, _result = process_single_input(args)
 
     assert normal_iocs == {"urls": ["https://from-server.example/path"]}
     assert warning_iocs == {}
@@ -240,6 +240,36 @@ def test_save_output_stix_to_stdout() -> None:
     rendered = buffer.getvalue()
     assert '"type": "bundle"' in rendered
     assert "stdout.example" in rendered
+
+
+def test_save_output_with_context_gates_threaded_evidence() -> None:
+    import json
+
+    from iocparser.domain.models import ExtractionResult
+    from iocparser.domain.results import IOC, IOCEvidence
+
+    ioc = IOC.from_raw(
+        "urls",
+        "https://evid.example/path",
+        evidence=(IOCEvidence(excerpt="C2 callout line", line_number=7),),
+    )
+    result = ExtractionResult(iocs=(ioc,))
+    grouped = result.grouped_iocs()
+
+    def render(with_context: bool) -> dict:
+        args = argparse.Namespace(json=True, output="-", with_context=with_context)
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            save_output(args, grouped, {}, "input.txt", result)
+        return json.loads(buffer.getvalue())
+
+    records = render(True)["records"]
+    assert records[0]["evidence"] == [
+        {"excerpt": "C2 callout line", "line_number": 7, "source": ""}
+    ]
+
+    # Without the flag, the threaded result must NOT leak evidence into default output.
+    assert render(False)["records"][0]["evidence"] == []
 
 
 def test_handle_misp_init_with_concrete_replacement() -> None:

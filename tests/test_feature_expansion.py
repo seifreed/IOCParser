@@ -34,8 +34,10 @@ from iocparser.application.use_cases import (
     extract_from_text,
 )
 from iocparser.cli import process_file as cli_process_file
+from iocparser.cli import process_file_with_result as cli_process_file_with_result
 from iocparser.cli import process_single_input as cli_process_single_input
 from iocparser.cli_processing import process_directory_input, process_url_file_input
+from iocparser.cli_processing_files import FileProcessingRequest
 from iocparser.cli_runtime import downloader as cli_downloader
 from iocparser.cli_runtime import reader as cli_reader
 from iocparser.cli_runtime import warning_service as cli_warning_service
@@ -142,7 +144,7 @@ def test_cli_supports_stdin_directory_streaming_and_url_file(tmp_path: Path) -> 
             only=None,
             exclude=None,
         )
-        normal_iocs, _warning_iocs, input_display = cli_process_single_input(stdin_args)
+        normal_iocs, _warning_iocs, input_display, _result = cli_process_single_input(stdin_args)
         assert input_display == "stdin"
         assert normal_iocs == {"urls": ["https://stdin.example/path"]}
     finally:
@@ -209,6 +211,33 @@ def test_cli_supports_stdin_directory_streaming_and_url_file(tmp_path: Path) -> 
         )
     assert display == "1 URLs"
     assert normal_iocs == {"urls": ["https://batch.example/path"]}
+
+
+def test_with_context_threads_evidence_through_file_path(tmp_path: Path) -> None:
+    """Regression: `--with-context` rendered empty evidence via the CLI because the
+    file path flattened the rich ExtractionResult to grouped dicts (dropping evidence)
+    before rendering. The result is now threaded through, so rendered context is
+    populated.
+    """
+    report = tmp_path / "report.txt"
+    report.write_text("Line one\nIOC URL: https://evil.example/path\n", encoding="utf-8")
+
+    normal_iocs, _warnings, result = cli_process_file_with_result(
+        report,
+        request=FileProcessingRequest(defang=False, check_warnings=False),
+    )
+
+    assert result is not None
+    url_ioc = next(ioc for ioc in result.iocs if ioc.ioc_type is IOCType.URL)
+    assert url_ioc.evidence  # the rich result still carries per-IOC evidence
+    assert url_ioc.evidence[0].line_number == 2
+
+    rendered = JSONOutputRenderer(include_context=True).render(result)
+    assert "evil.example" in rendered
+    # The lossy round-trip (what the CLI used to render) loses the evidence entirely.
+    lossy = ExtractionResult.from_grouped_payload(normal_iocs, {})
+    lossy_url = next(ioc for ioc in lossy.iocs if ioc.ioc_type is IOCType.URL)
+    assert lossy_url.evidence == ()
 
 
 @pytest.mark.parametrize("forced_type", ["pdf", "html"])

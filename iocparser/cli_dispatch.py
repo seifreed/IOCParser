@@ -8,6 +8,7 @@ from iocparser import cli_args as _cli_args
 from iocparser import cli_dispatch_workflow as _workflow
 from iocparser import cli_runtime as _cli_runtime
 from iocparser.cli_processing_support import BatchResultsCollection, GroupedIocs, GroupedWarnings
+from iocparser.domain.models import ExtractionResult
 from iocparser.errors import ValidationError
 
 NO_INPUT_MESSAGE = "No input provided. Use -f, -u, -m, -d, --url-file, --stdin, or a query command"
@@ -21,8 +22,13 @@ def run_cli(
     process_multiple_files_input: Callable[
         [argparse.Namespace], tuple[GroupedIocs, GroupedWarnings, str, BatchResults]
     ],
-    process_single_input: Callable[[argparse.Namespace], tuple[GroupedIocs, GroupedWarnings, str]],
-    save_output: Callable[[argparse.Namespace, GroupedIocs, GroupedWarnings, str], None],
+    process_single_input: Callable[
+        [argparse.Namespace],
+        tuple[GroupedIocs, GroupedWarnings, str, ExtractionResult | None],
+    ],
+    save_output: Callable[
+        [argparse.Namespace, GroupedIocs, GroupedWarnings, str, ExtractionResult | None], None
+    ],
 ) -> None:
     """Execute the CLI workflow for parsed arguments."""
     config = _cli_runtime.resolve_persistence(args)
@@ -49,6 +55,7 @@ def run_cli(
         input_display=payload.input_display,
         results=payload.results,
         batch_report=payload.batch_report,
+        result=payload.result,
         save_output=save_output,
     )
 

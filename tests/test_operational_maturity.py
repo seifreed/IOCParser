@@ -1586,7 +1586,7 @@ def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_pa
         workflow.resolve_input_payload(
             SimpleNamespace(multiple=[], directory=None, url_file=None, retry_failed_from=None),
             process_multiple_files_input=lambda _args: None,
-            process_single_input=lambda _args: ({}, {}, "stdin"),
+            process_single_input=lambda _args: ({}, {}, "stdin", None),
         ).results
         is None
     )

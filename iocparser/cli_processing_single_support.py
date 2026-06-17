@@ -37,7 +37,7 @@ class ProcessFileFunc(Protocol):
         file_path: Path,
         *,
         request: FileProcessingRequest | None = None,
-    ) -> tuple[GroupedIocs, GroupedWarnings]: ...
+    ) -> tuple[GroupedIocs, GroupedWarnings, ExtractionResult]: ...
 
 
 class PluginClient(Protocol):
@@ -157,14 +157,14 @@ def process_stdin_input(
     context: SingleInputContext,
     extractor_engine: IOCExtractionEngine,
     warning_service: WarningListService | None,
-) -> tuple[GroupedIocs, GroupedWarnings, str]:
+) -> tuple[GroupedIocs, GroupedWarnings, str, ExtractionResult | None]:
     payload = process_stdin_payload(
         stdin_stream=stdin_stream,
         context=context,
         extractor_engine=extractor_engine,
         warning_service=warning_service,
     )
-    return payload.normal_iocs, payload.warning_iocs, payload.input_display
+    return payload.normal_iocs, payload.warning_iocs, payload.input_display, payload.result
 
 
 def process_stdin_payload(
@@ -199,6 +199,7 @@ def process_stdin_payload(
         normal_iocs=result.grouped_iocs(),
         warning_iocs=result.grouped_warnings(),
         input_display="stdin",
+        result=result,
     )
 
 
@@ -207,13 +208,13 @@ def process_file_input(
     file_arg: str,
     context: SingleInputContext,
     process_file_func: ProcessFileFunc,
-) -> tuple[GroupedIocs, GroupedWarnings, str]:
+) -> tuple[GroupedIocs, GroupedWarnings, str, ExtractionResult | None]:
     payload = process_file_payload(
         file_arg=file_arg,
         context=context,
         process_file_func=process_file_func,
     )
-    return payload.normal_iocs, payload.warning_iocs, payload.input_display
+    return payload.normal_iocs, payload.warning_iocs, payload.input_display, payload.result
 
 
 def process_file_payload(
@@ -237,8 +238,9 @@ def process_file_payload(
             normal_iocs=result.grouped_iocs(),
             warning_iocs=result.grouped_warnings(),
             input_display=file_arg,
+            result=result,
         )
-    normal_iocs, warning_iocs = process_file_func(
+    normal_iocs, warning_iocs, file_result = process_file_func(
         Path(file_arg),
         request=FileProcessingRequest(
             file_type=context.options.file_type,
@@ -256,12 +258,13 @@ def process_file_payload(
         normal_iocs=normal_iocs,
         warning_iocs=warning_iocs,
         input_display=file_arg,
+        result=file_result,
     )
 
 
-def process_url_input(request: UrlProcessingRequest) -> tuple[GroupedIocs, GroupedWarnings, str]:
+def process_url_input(request: UrlProcessingRequest) -> tuple[GroupedIocs, GroupedWarnings, str, ExtractionResult | None]:
     payload = process_url_payload(request)
-    return payload.normal_iocs, payload.warning_iocs, payload.input_display
+    return payload.normal_iocs, payload.warning_iocs, payload.input_display, payload.result
 
 
 def process_url_payload(request: UrlProcessingRequest) -> SingleInputPayload:
@@ -290,4 +293,5 @@ def process_url_payload(request: UrlProcessingRequest) -> SingleInputPayload:
         normal_iocs=result.grouped_iocs(),
         warning_iocs=result.grouped_warnings(),
         input_display=request.url,
+        result=result,
     )

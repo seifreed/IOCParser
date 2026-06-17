@@ -342,10 +342,18 @@ def save_output(
     warning_iocs: dict[str, list[dict[str, str]]],
     input_display: str,
     *,
+    result: ExtractionResult | None = None,
     file_writer: FileWriter,
 ) -> None:
-    result = ExtractionResult.from_grouped_payload(normal_iocs, warning_iocs)
-    rendered_output, output_label, chosen_format = render_result(args, result)
+    # Under --with-context, render from the rich threaded result so per-IOC evidence
+    # survives; rebuilding from grouped dicts would drop it (the bug this fixes). Without
+    # the flag, keep the historical behavior (reconstruct from grouped dicts) so default
+    # output is byte-for-byte unchanged and evidence stays gated behind the flag.
+    if get_bool_arg(args, "with_context") and result is not None:
+        render_target = result
+    else:
+        render_target = ExtractionResult.from_grouped_payload(normal_iocs, warning_iocs)
+    rendered_output, output_label, chosen_format = render_result(args, render_target)
     saved_path = save_rendered_output(
         rendered_output=rendered_output,
         input_display=input_display,

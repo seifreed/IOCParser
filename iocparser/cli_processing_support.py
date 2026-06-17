@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import cast
 
 from iocparser.client import IOCParserClient
+from iocparser.domain.models import ExtractionResult
 from iocparser.domain.options import ExtractionOptions
 from iocparser.domain.type_filters import joined_type_filters as _joined_type_filters
 from iocparser.infrastructure.extraction import DefaultIOCExtractionEngine
@@ -125,16 +126,20 @@ class SingleInputPayload:
     normal_iocs: GroupedIocs
     warning_iocs: GroupedWarnings
     input_display: str
+    # The rich extraction result is retained so the CLI can render per-IOC evidence
+    # under --with-context; grouped dicts alone drop it. None on paths that have no
+    # single result to render from (e.g. multi-file batches).
+    result: ExtractionResult | None = None
 
 
 @dataclass(frozen=True)
 class BatchInputPayload(SingleInputPayload):
-    results: BatchResults
+    results: BatchResults = field(default_factory=BatchResultsCollection)
 
 
 @dataclass(frozen=True)
 class URLBatchInputPayload(BatchInputPayload):
-    batch_report: Mapping[str, object]
+    batch_report: Mapping[str, object] = field(default_factory=dict)
 
 
 def batch_item_keys(source_values: Iterable[str]) -> list[tuple[str, str]]:

@@ -25,7 +25,14 @@ def _processing_options_key(request: PipelineJobRequest) -> str:
 
 def _source_digest(request: PipelineJobRequest, *, digester: ContentDigester) -> str:
     if request.input_kind == "file":
-        return digester.digest_file(request.source_value)
+        try:
+            return digester.digest_file(request.source_value)
+        except OSError:
+            # A missing/unreadable file can't be content-addressed at submit time.
+            # Fall back to a path-based digest so the job still enqueues and the worker
+            # reports the failure through the normal failed/dead-letter path, instead of
+            # crashing the caller mid-submit.
+            return digester.digest_text(request.source_value)
     return digester.digest_text(request.source_value)
 
 

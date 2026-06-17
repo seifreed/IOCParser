@@ -140,6 +140,30 @@ def test_idempotency_key_distinguishes_persist_and_db_uri() -> None:
     assert persist != other_db
 
 
+def test_idempotency_key_for_missing_file_does_not_raise(tmp_path: Path) -> None:
+    """Submitting a file job for a missing file must not crash on the idempotency digest.
+
+    The key is computed eagerly at submit time by reading the file; a missing/unreadable
+    file raised FileNotFoundError out of submit() before the job was even queued, instead
+    of letting the worker dead-letter it. The digest now falls back to a path-based digest.
+    """
+    from iocparser.application.distributed_idempotency import idempotency_key_for
+    from iocparser.infrastructure.content_digests import SHA256ContentDigester
+
+    digester = SHA256ContentDigester()
+    missing = str(tmp_path / "nope.txt")
+    request = PipelineJobRequest(input_kind="file", source_value=missing)
+
+    key = idempotency_key_for(request, digester=digester)
+    assert key  # produced a stable key instead of raising
+
+    # The fallback is the path-based text digest, so the key is stable across calls and
+    # distinct from an unrelated path.
+    assert key == idempotency_key_for(request, digester=digester)
+    other = PipelineJobRequest(input_kind="file", source_value=str(tmp_path / "other.txt"))
+    assert key != idempotency_key_for(other, digester=digester)
+
+
 def test_fts_rebuild_indexes_normalized_value_search() -> None:
     """The FTS rebuild on schema upgrade must index value_search, not raw value.
 

@@ -231,7 +231,7 @@ def finalize_cli_run(
             args, config, persist_options, results or BatchResultsCollection(), batch_report
         )
         public_report = _public_batch_report(batch_report)
-        _cli_output.print_batch_report(public_report)
+        _cli_output.print_batch_report(public_report, stream=summary_stream)
         _cli_output.save_batch_report(
             public_report,
             _cli_args.get_optional_str_arg(args, "batch_report_json"),

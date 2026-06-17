@@ -2200,6 +2200,17 @@ def test_export_run_rehydrates_legacy_warning_tags(tmp_path: Path) -> None:
     ).warnings
 
 
+def test_batch_report_honors_stream_and_keeps_stdout_clean() -> None:
+    """Under -o - the batch summary must go to the given stream (stderr), not stdout,
+    so it does not corrupt machine output (JSONL/JSON/CSV/STIX) piped to stdout."""
+    summary_stream = StringIO()
+    stdout_buffer = StringIO()
+    with redirect_stdout(stdout_buffer):
+        print_batch_report({"total": 2, "successful": 2, "failed": 0}, stream=summary_stream)
+    assert "2/2 successful" in summary_stream.getvalue()
+    assert stdout_buffer.getvalue() == ""  # nothing leaked to stdout
+
+
 def test_batch_report_and_partial_url_failures_are_printed(tmp_path: Path) -> None:
     buffer = StringIO()
     with redirect_stdout(buffer):

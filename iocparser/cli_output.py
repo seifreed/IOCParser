@@ -4,6 +4,7 @@ import argparse
 import json
 import sys
 from collections.abc import Mapping
+from typing import TextIO
 
 from iocparser.cli_args import get_bool_arg, get_optional_str_arg
 from iocparser.cli_output_rendering import (
@@ -94,37 +95,40 @@ def print_batch_job_detail(detail: BatchJobDetail) -> None:
     sys.stdout.write("metrics\t" + json.dumps(detail.metrics, sort_keys=True) + "\n")
 
 
-def print_batch_report(report: Mapping[str, object]) -> None:
+def print_batch_report(report: Mapping[str, object], *, stream: TextIO | None = None) -> None:
+    # The batch report is a human summary; under -o - the caller passes stderr so it does
+    # not corrupt the machine output (JSONL/JSON/CSV/STIX) piped to stdout.
+    out = stream if stream is not None else sys.stdout
     schema_version = str(report.get("schema_version", "")).strip()
     if schema_version:
-        sys.stdout.write(f"Batch report schema\t{schema_version}" + "\n")
+        out.write(f"Batch report schema\t{schema_version}" + "\n")
     total = _int_value(report.get("total", 0))
     successful = _int_value(report.get("successful", 0))
     failed = _int_value(report.get("failed", 0))
-    sys.stdout.write(f"Batch summary\t{successful}/{total} successful\t{failed} failed" + "\n")
+    out.write(f"Batch summary\t{successful}/{total} successful\t{failed} failed" + "\n")
     failures = report.get("failures", {})
     if isinstance(failures, dict) and failures:
         for item, error in sorted((str(key), str(value)) for key, value in failures.items()):
-            sys.stdout.write(f"  FAIL\t{item}\t{error}" + "\n")
+            out.write(f"  FAIL\t{item}\t{error}" + "\n")
     error_groups = report.get("error_groups", {})
     if isinstance(error_groups, dict) and error_groups:
-        sys.stdout.write("Failure groups" + "\n")
+        out.write("Failure groups" + "\n")
         for error_type, count in sorted(
             (str(key), _int_value(value)) for key, value in error_groups.items()
         ):
-            sys.stdout.write(f"  {error_type}\t{count}" + "\n")
+            out.write(f"  {error_type}\t{count}" + "\n")
     phase_timings = report.get("phase_timings_ms", {})
     if isinstance(phase_timings, dict) and phase_timings:
-        sys.stdout.write("Phase timings (ms)" + "\n")
+        out.write("Phase timings (ms)" + "\n")
         for phase, value in sorted(
             (str(key), _int_value(val)) for key, val in phase_timings.items()
         ):
-            sys.stdout.write(f"  {phase}\t{value}" + "\n")
+            out.write(f"  {phase}\t{value}" + "\n")
     metrics = report.get("metrics", {})
     if isinstance(metrics, dict) and metrics:
-        sys.stdout.write("Batch metrics" + "\n")
+        out.write("Batch metrics" + "\n")
         for name, value in sorted(metrics.items()):
-            sys.stdout.write(f"  {name}\t{value}" + "\n")
+            out.write(f"  {name}\t{value}" + "\n")
 
 
 def save_batch_report(

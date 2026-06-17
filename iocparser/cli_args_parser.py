@@ -9,6 +9,24 @@ MAX_WORKERS = 4
 DEFAULT_URL_WORKERS = 4
 
 
+POSITIVE_INT_REQUIRED = "must be a positive integer, got {value}"
+NON_NEGATIVE_INT_REQUIRED = "must be zero or a positive integer, got {value}"
+
+
+def _positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError(POSITIVE_INT_REQUIRED.format(value=parsed))
+    return parsed
+
+
+def _non_negative_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError(NON_NEGATIVE_INT_REQUIRED.format(value=parsed))
+    return parsed
+
+
 def _add_input_arguments(parser: argparse.ArgumentParser) -> None:
     input_group = parser.add_mutually_exclusive_group()
     input_group.add_argument("-f", "--file", help="Path to the file to analyze")
@@ -77,10 +95,16 @@ def _add_processing_arguments(parser: argparse.ArgumentParser) -> None:
         "--streaming", action="store_true", help="Use streaming extraction for file inputs"
     )
     parser.add_argument(
-        "--chunk-size", type=int, default=None, help="Chunk size for streaming extraction"
+        "--chunk-size",
+        type=_positive_int,
+        default=None,
+        help="Chunk size for streaming extraction",
     )
     parser.add_argument(
-        "--overlap", type=int, default=None, help="Chunk overlap for streaming extraction"
+        "--overlap",
+        type=_non_negative_int,
+        default=None,
+        help="Chunk overlap for streaming extraction",
     )
     parser.add_argument(
         "--recursive", action="store_true", help="Recurse into subdirectories in directory mode"

@@ -154,7 +154,7 @@ def test_streaming_extractors_cover_buffer_and_parallel_fallbacks(tmp_path: Path
     assert yielded
 
     progress_values: list[int] = []
-    parallel = ParallelStreamingExtractor(max_workers=1, chunk_size=8, defang=False)
+    parallel = ParallelStreamingExtractor(max_workers=1, chunk_size=64, defang=False)
 
     class BrokenPath:
         def __init__(self) -> None:

@@ -126,6 +126,26 @@ class TestStreamingIOCExtractor:
         assert extractor.extractor.defang is False
         assert extractor.progress_callback is progress_callback
 
+    def test_overlap_clamped_below_chunk_size(self):
+        """Regression: overlap >= chunk_size re-scans whole chunk bodies and double-counts IOCs.
+
+        The chunk/dedup design assumes overlap < chunk_size. An overlap at or above the
+        chunk size must be clamped to chunk_size - 1 so extraction counts stay correct.
+        """
+        extractor = StreamingIOCExtractor(chunk_size=64, overlap=9999, defang=False)
+        assert extractor.overlap == 63
+
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as handle:
+            handle.write("Contact evil.com and also-bad.net for details about evil.com.\n")
+            path = handle.name
+        try:
+            iocs = extractor.extract_from_file(path)
+        finally:
+            Path(path).unlink()
+
+        # evil.com appears twice in the source but must be de-duplicated to one entry.
+        assert sorted(iocs.get("domains", [])) == ["also-bad.net", "evil.com"]
+
     def test_decode_chunk_with_bytes(self):
         """
         Test chunk decoding with bytes input.

@@ -74,7 +74,9 @@ class StreamingIOCExtractor:
             progress_callback: Optional callback for progress updates
         """
         self.chunk_size = max(1, chunk_size)
-        self.overlap = overlap
+        # The chunk/dedup design assumes overlap < chunk_size; a larger overlap re-scans
+        # whole chunk bodies and double-counts IOCs. Clamp to keep the invariant.
+        self.overlap = max(0, min(overlap, self.chunk_size - 1))
         from iocparser.infrastructure.extraction import IOCExtractor
 
         self.extractor = IOCExtractor(defang=defang)

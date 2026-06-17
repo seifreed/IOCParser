@@ -33,6 +33,37 @@ from iocparser.infrastructure.persistence_fts import build_fts_query
 from iocparser.worker_config_support import load_worker_file_values
 
 
+@pytest.mark.parametrize(
+    ("flag", "value"),
+    [
+        ("--chunk-size", "-5"),
+        ("--chunk-size", "0"),
+        ("--overlap", "-1"),
+    ],
+)
+def test_streaming_size_flags_reject_invalid_values(flag: str, value: str) -> None:
+    """Regression: non-positive --chunk-size (and negative --overlap) silently produced
+    garbage streaming output (double-counted or empty IOCs). They must now be rejected at
+    the CLI boundary with argparse's exit code 2.
+    """
+    from iocparser.cli_args_parser import create_argument_parser
+
+    parser = create_argument_parser()
+    with pytest.raises(SystemExit) as excinfo:
+        parser.parse_args([flag, value, "--stdin"])
+    assert excinfo.value.code == 2
+
+
+def test_streaming_size_flags_accept_valid_values() -> None:
+    """The boundary validators pass valid sizes through unchanged."""
+    from iocparser.cli_args_parser import create_argument_parser
+
+    parser = create_argument_parser()
+    args = parser.parse_args(["--chunk-size", "256", "--overlap", "0", "--stdin"])
+    assert args.chunk_size == 256
+    assert args.overlap == 0
+
+
 def test_stix_asn_pattern_emits_integer_not_quoted_string() -> None:
     """autonomous-system:number is an integer property in STIX 2.1.
 

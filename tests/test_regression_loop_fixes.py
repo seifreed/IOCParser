@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import codecs
 import json
+import sys
 import time
 from pathlib import Path
 
@@ -706,6 +707,24 @@ def test_worker_config_path_accepts_equals_form_and_any_position() -> None:
     assert _config_path_from_argv(["worker", "--verbose", "--config=d.ini"]) == "d.ini"
     assert _config_path_from_argv(["worker"]) is None
     assert _config_path_from_argv(["worker", "--config"]) is None
+
+
+def test_worker_main_help_prints_usage_and_exits(capsys: pytest.CaptureFixture[str]) -> None:
+    """`iocparser-worker --help` must print usage and exit, not start a forever poll.
+
+    The worker had no flag handling, so -h/--help was treated as an unknown arg and
+    the service began polling the queue indefinitely instead of showing usage.
+    """
+    from iocparser import worker_main
+
+    original_argv = sys.argv
+    try:
+        for flag in ("--help", "-h"):
+            sys.argv = ["iocparser-worker", flag]
+            assert worker_main.main() == 0
+            assert "usage: iocparser-worker" in capsys.readouterr().out
+    finally:
+        sys.argv = original_argv
 
 
 def test_rev_0009_backfills_dedup_hash_on_legacy_tables() -> None:

@@ -10,6 +10,25 @@ from iocparser.worker_service import DistributedWorkerService
 logger = get_logger("iocparser.worker")
 
 
+_USAGE = """\
+usage: iocparser-worker [--config PATH] [-h|--help]
+
+Standalone distributed worker that pulls jobs from a queue and runs them forever.
+
+Options:
+  --config PATH   INI file with a [worker] section (also accepts --config=PATH).
+
+Configuration comes from that INI plus IOCPARSER_WORKER_* environment variables
+(QUEUE_BACKEND, QUEUE_URL, QUEUE_PATH, DB_URI, POLL_INTERVAL_SECONDS,
+MAX_MESSAGES_PER_CYCLE, MAX_CYCLES, ...). The default backend is the filesystem
+queue. Stop the worker with Ctrl-C.\
+"""
+
+
+def _wants_help(argv: list[str]) -> bool:
+    return "-h" in argv[1:] or "--help" in argv[1:]
+
+
 def _config_path_from_argv(argv: list[str]) -> str | None:
     # Accept both '--config path' (any position) and the GNU '--config=path' form.
     for index, arg in enumerate(argv[1:], start=1):
@@ -29,6 +48,9 @@ def _report_startup_failure(exc: Exception) -> int:
 
 def main() -> int:
     """Entrypoint for the standalone distributed worker service."""
+    if _wants_help(sys.argv):
+        sys.stdout.write(_USAGE + "\n")
+        return 0
     try:
         config = WorkerServiceConfig.from_sources(_config_path_from_argv(sys.argv))
         service = DistributedWorkerService.from_config(config)

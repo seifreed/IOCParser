@@ -168,6 +168,7 @@ class DistributedPipelineCoordinator:
                     job_id=str(envelope.request.job_id),
                     attempts=envelope.attempts + 1,
                     error=failure_error,
+                    metrics=phase_metrics(result),
                 )
                 if self.job_service
                 else None

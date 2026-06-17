@@ -191,7 +191,11 @@ def commit_new_job_or_fetch(
 
 
 def dead_letter_model(
-    model: DistributedJobModel, *, attempts: int, error: PipelineErrorInfo
+    model: DistributedJobModel,
+    *,
+    attempts: int,
+    error: PipelineErrorInfo,
+    metrics: dict[str, object] | None = None,
 ) -> DeadLetterJobModel:
     timestamp = datetime.now(UTC)
     model.status = JOB_STATUS_DEAD_LETTERED
@@ -201,6 +205,10 @@ def dead_letter_model(
     model.last_error_category = error.category
     model.last_error_message = error.message
     model.dead_lettered_at = timestamp
+    # Retain the final attempt's phase timings (like mark_failed) so a job that
+    # exhausts its retries does not lose its telemetry.
+    if metrics is not None:
+        model.metrics_json = json.dumps(metrics, sort_keys=True)
     return DeadLetterJobModel(
         job_id=model.job_id,
         correlation_id=model.correlation_id,

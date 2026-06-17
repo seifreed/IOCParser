@@ -89,8 +89,9 @@ class DistributedJobService(Protocol):
         job_id: str,
         attempts: int,
         error: PipelineErrorInfo,
+        metrics: dict[str, object] | None = None,
     ) -> DistributedJobRecord | None:
-        """Transition a job to dead-lettered."""
+        """Transition a job to dead-lettered, retaining final phase metrics if known."""
 
     def get_job(self, *, job_id: str) -> DistributedJobRecord | None:
         """Load a job lifecycle record."""

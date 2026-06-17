@@ -1051,3 +1051,30 @@ def test_import_optional_backend_module_reports_missing_dependency_cleanly() -> 
     with installed_module("a_present_backend_module", sentinel):
         resolved = import_optional_backend_module("a_present_backend_module", backend="sqs")
     assert resolved is sentinel
+
+
+def test_mark_dead_lettered_retains_phase_metrics(tmp_path: Path) -> None:
+    """Regression: a job that exhausts its retries and is dead-lettered used to lose
+    its phase timings (mark_dead_lettered ignored metrics, unlike mark_failed). The
+    metrics are now persisted and readable back from the job record.
+    """
+    service = SQLAlchemyDistributedJobService(f"sqlite:///{tmp_path / 'dl-metrics.sqlite'}")
+    envelope = _envelope("dl-metrics-job")
+    service.create_or_get_job(envelope=envelope, receipt_id="r1")
+
+    service.mark_dead_lettered(
+        job_id="dl-metrics-job",
+        attempts=3,
+        error=PipelineErrorInfo(
+            code="INPUT_TIMEOUT",
+            category="timeout",
+            retryable=False,
+            status="failed",
+            message="timeout",
+        ),
+        metrics={"download_ms": 12, "extract_ms": 34},
+    )
+
+    record = service.get_job(job_id="dl-metrics-job")
+    assert record is not None
+    assert record.phase_timings_ms == {"download_ms": 12, "extract_ms": 34}

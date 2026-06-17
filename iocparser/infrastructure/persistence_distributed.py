@@ -220,6 +220,7 @@ class SQLAlchemyDistributedJobService:
         job_id: str,
         attempts: int,
         error: PipelineErrorInfo,
+        metrics: dict[str, object] | None = None,
     ) -> DistributedJobRecord | None:
         unit = SQLAlchemyUnitOfWork(self.db_uri)
         try:
@@ -227,7 +228,9 @@ class SQLAlchemyDistributedJobService:
             model = unit.session.execute(stmt).scalar_one_or_none()
             if model is None:
                 return None
-            unit.session.add(dead_letter_model(model, attempts=attempts, error=error))
+            unit.session.add(
+                dead_letter_model(model, attempts=attempts, error=error, metrics=metrics)
+            )
             unit.commit()
             return model_record(model)
         finally:

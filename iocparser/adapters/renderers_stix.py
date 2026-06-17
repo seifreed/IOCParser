@@ -4,7 +4,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, ClassVar, cast
 
-from stix2 import Indicator
+from stix2 import Indicator, Vulnerability
 
 from iocparser.domain.enums import IOCTypeName, get_custom_ioc_type
 from iocparser.domain.models import IOC, ExtractionResult, IOCType, WarningMatch, ioc_type_name
@@ -71,7 +71,8 @@ class STIXOutputRenderer(OutputRenderer):
             IOCType.IMPHASH: _builder("[file:hashes.'IMPHASH' = '{value}']"),
             IOCType.FILENAME: _builder("[file:name = '{value}']"),
             IOCType.FILEPATH: _builder("[file:path = '{value}']"),
-            # CVE omitted: STIX 2.1 models vulnerabilities as SDOs, not indicator patterns
+            # CVE is not here: it renders as a Vulnerability SDO (see _build_cve_vulnerability),
+            # not an indicator pattern, per the STIX 2.1 vulnerability model.
             IOCType.REGISTRY: _builder("[windows-registry-key:key = '{value}']"),
             IOCType.MUTEX: _builder("[mutex:name = '{value}']"),
             IOCType.MAC_ADDRESS: _builder("[mac-addr:value = '{value}']"),
@@ -92,9 +93,30 @@ class STIXOutputRenderer(OutputRenderer):
             IOCType.MONERO: _builder("[x-cryptocurrency:value = '{value}']"),
         }
 
+    def _warning_custom_props(self, warning: WarningMatch | None) -> dict[str, Any]:
+        custom_props: dict[str, Any] = {}
+        if warning:
+            custom_props["x_warning_list"] = warning.warning_list
+            if warning.description:
+                custom_props["x_warning_description"] = warning.description
+        return custom_props
+
+    def _build_cve_vulnerability(self, value: str, warning: WarningMatch | None) -> Vulnerability:
+        # STIX 2.1 models CVEs as Vulnerability SDOs (not indicator patterns), with the CVE
+        # id in an external_reference. Uppercase canonicalizes the id so case variants dedup.
+        cve_id = refang_ioc(value).strip().upper()
+        return Vulnerability(
+            name=cve_id,
+            created=self.now,
+            modified=self.now,
+            external_references=[{"source_name": "cve", "external_id": cve_id}],
+            allow_custom=True,
+            **self._warning_custom_props(warning),
+        )
+
     def _build_indicator(
         self, ioc_type: IOCType | str, value: str, warning: WarningMatch | None
-    ) -> Indicator | None:
+    ) -> Indicator | Vulnerability | None:
         if self.allowed_types is not None and ioc_type not in self.allowed_types:
             return None
         lookup_type = get_custom_ioc_type(ioc_type) if isinstance(ioc_type, str) else None
@@ -105,6 +127,8 @@ class STIXOutputRenderer(OutputRenderer):
             if isinstance(ioc_type, IOCType)
             else None
         )
+        if base_lookup_type == IOCType.CVE:
+            return self._build_cve_vulnerability(value, warning)
         # An explicit custom stix_pattern is an override and must win over the
         # base type's built-in builder; otherwise a custom type registered with
         # only a stix_pattern (base_type defaults to URL, which has a builder)
@@ -125,11 +149,6 @@ class STIXOutputRenderer(OutputRenderer):
         pattern = builder(value)
         if not pattern:
             return None
-        custom_props: dict[str, Any] = {}
-        if warning:
-            custom_props["x_warning_list"] = warning.warning_list
-            if warning.description:
-                custom_props["x_warning_description"] = warning.description
         return Indicator(
             name=f"{ioc_type_name(ioc_type)} indicator",
             pattern=pattern,
@@ -139,7 +158,7 @@ class STIXOutputRenderer(OutputRenderer):
             description=None,
             indicator_types=["malicious-activity"],
             allow_custom=True,
-            **custom_props,
+            **self._warning_custom_props(warning),
         )
 
     def render(self, result: ExtractionResult) -> str:
@@ -155,7 +174,7 @@ class STIXOutputRenderer(OutputRenderer):
 
 def build_entry_indicator(
     renderer: STIXOutputRenderer, entry: tuple[str, object]
-) -> Indicator | None:
+) -> Indicator | Vulnerability | None:
     entry_kind, payload = entry
     if entry_kind == "ioc" and hasattr(payload, "ioc_type") and hasattr(payload, "canonical_value"):
         return renderer._build_indicator(

@@ -1,5 +1,8 @@
 
 class Indicator:
+    id: str
+    type: str
+    name: str
     pattern: str
 
     def __init__(
@@ -18,7 +21,27 @@ class Indicator:
     ) -> None: ...
 
 
+class Vulnerability:
+    id: str
+    type: str
+    name: str
+
+    def __init__(
+        self,
+        *,
+        name: str,
+        created: object = ...,
+        modified: object = ...,
+        external_references: list[dict[str, str]] | None = ...,
+        description: str | None = ...,
+        allow_custom: bool = ...,
+        **kwargs: object,
+    ) -> None: ...
+
+
 class Bundle:
-    def __init__(self, *, objects: list[Indicator], allow_custom: bool = ...) -> None: ...
+    def __init__(
+        self, *, objects: list[Indicator | Vulnerability], allow_custom: bool = ...
+    ) -> None: ...
 
     def serialize(self, pretty: bool = ...) -> str: ...

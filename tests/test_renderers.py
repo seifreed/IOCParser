@@ -82,6 +82,33 @@ def test_stix_output_renders_cryptocurrency_wallets() -> None:
     assert "[x-cryptocurrency:value = '0x32Be343B94f860124dC4fEe278FDCBD38C102D88']" in patterns
 
 
+def test_stix_output_renders_cve_as_vulnerability_sdo() -> None:
+    """CVEs must render as STIX Vulnerability SDOs (not dropped), and case variants dedup.
+
+    STIX 2.1 models vulnerabilities as SDOs, not indicator patterns, so CVEs previously
+    vanished from STIX export. They now emit a vulnerability object with a cve
+    external_reference; the bundle dedup spans patternless SDOs by type+name.
+    """
+    result = ExtractionResult(
+        iocs=(
+            IOC.from_raw("cves", "CVE-2021-44228"),
+            IOC.from_raw("cves", "cve-2021-44228"),
+            IOC.from_raw("domains", "evil.com"),
+        ),
+    )
+
+    bundle = json.loads(STIXOutputRenderer().render(result))
+    vulns = [o for o in bundle["objects"] if o["type"] == "vulnerability"]
+
+    assert len(vulns) == 1  # case variants dedup to one
+    assert vulns[0]["name"] == "CVE-2021-44228"
+    assert vulns[0]["external_references"] == [
+        {"source_name": "cve", "external_id": "CVE-2021-44228"}
+    ]
+    # The domain still renders as an indicator alongside the vulnerability.
+    assert any(o["type"] == "indicator" for o in bundle["objects"])
+
+
 def test_text_output_renderer_renders_golden_output() -> None:
     renderer = TextOutputRenderer()
 

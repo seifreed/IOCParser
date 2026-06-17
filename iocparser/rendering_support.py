@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Iterable, Mapping, Sequence
 
-from stix2 import Bundle, Indicator
+from stix2 import Bundle, Indicator, Vulnerability
 
 from iocparser.domain.models import ExtractionResult, ioc_type_name
 
@@ -224,20 +224,32 @@ def serialize_pretty_json(payload: Mapping[str, object]) -> str:
     return json.dumps(payload, indent=4, sort_keys=True)
 
 
+def _stix_object_dedup_key(obj: Indicator | Vulnerability) -> tuple[str, str]:
+    """Dedup key spanning object types: indicators collapse by pattern, other SDOs
+    (e.g. vulnerability) by type+name, since they carry no pattern."""
+    pattern = getattr(obj, "pattern", None)
+    if pattern is not None:
+        return ("pattern", str(pattern))
+    return (str(obj.type), str(getattr(obj, "name", obj.id)))
+
+
 def build_stix_bundle[T](
     entries: Iterable[T],
     *,
-    build_indicator: Callable[[T], Indicator | None],
+    build_indicator: Callable[[T], Indicator | Vulnerability | None],
     bundle_mutator: Callable[[dict[str, object]], dict[str, object]] | None = None,
 ) -> str:
-    indicators: list[Indicator] = []
-    seen_patterns: set[str] = set()
+    objects: list[Indicator | Vulnerability] = []
+    seen_keys: set[tuple[str, str]] = set()
     for entry in entries:
-        indicator = build_indicator(entry)
-        if indicator and indicator.pattern not in seen_patterns:
-            indicators.append(indicator)
-            seen_patterns.add(indicator.pattern)
-    payload = json.loads(Bundle(objects=indicators, allow_custom=True).serialize(pretty=True))
+        stix_object = build_indicator(entry)
+        if stix_object is None:
+            continue
+        key = _stix_object_dedup_key(stix_object)
+        if key not in seen_keys:
+            objects.append(stix_object)
+            seen_keys.add(key)
+    payload = json.loads(Bundle(objects=objects, allow_custom=True).serialize(pretty=True))
     if not isinstance(payload, dict):
         payload = {}
     mutated = bundle_mutator(payload) if bundle_mutator else payload

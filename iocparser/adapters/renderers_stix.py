@@ -64,6 +64,11 @@ class STIXOutputRenderer(OutputRenderer):
             IOCType.SHA1: _builder("[file:hashes.'SHA-1' = '{value}']"),
             IOCType.SHA256: _builder("[file:hashes.'SHA-256' = '{value}']"),
             IOCType.SHA512: _builder("[file:hashes.'SHA-512' = '{value}']"),
+            # ssdeep/imphash are file hashes like md5/sha*/tlsh; SSDEEP is a STIX-registered
+            # hash-algorithm name and IMPHASH is a widely-used custom one. Omitting them
+            # silently dropped those IOCs from STIX export while tlsh was kept.
+            IOCType.SSDEEP: _builder("[file:hashes.'SSDEEP' = '{value}']"),
+            IOCType.IMPHASH: _builder("[file:hashes.'IMPHASH' = '{value}']"),
             IOCType.FILENAME: _builder("[file:name = '{value}']"),
             IOCType.FILEPATH: _builder("[file:path = '{value}']"),
             # CVE omitted: STIX 2.1 models vulnerabilities as SDOs, not indicator patterns

@@ -40,6 +40,27 @@ def build_result() -> ExtractionResult:
     )
 
 
+def test_stix_output_renders_ssdeep_and_imphash_as_file_hashes() -> None:
+    """ssdeep/imphash are file hashes and must render as STIX file:hashes patterns.
+
+    They were missing from PATTERN_BUILDERS while tlsh/md5/sha* were present, so those
+    IOCs vanished silently from STIX export. SSDEEP is a STIX-registered hash-algorithm
+    name; IMPHASH is the conventional custom name.
+    """
+    result = ExtractionResult(
+        iocs=(
+            IOC.from_raw("ssdeep", "3:abcdef:ghi"),
+            IOC.from_raw("imphash", "a" * 32),
+        ),
+    )
+
+    bundle = json.loads(STIXOutputRenderer().render(result))
+    patterns = {item["pattern"] for item in bundle["objects"]}
+
+    assert "[file:hashes.'SSDEEP' = '3:abcdef:ghi']" in patterns
+    assert f"[file:hashes.'IMPHASH' = '{'a' * 32}']" in patterns
+
+
 def test_text_output_renderer_renders_golden_output() -> None:
     renderer = TextOutputRenderer()
 

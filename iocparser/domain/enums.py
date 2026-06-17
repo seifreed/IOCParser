@@ -26,6 +26,24 @@ ALIAS_SHADOWS_BUILTIN_IOC_TYPE = (
 ALIAS_COLLIDES_WITH_CUSTOM_TYPE = (
     "Alias {alias!r} for custom IOC type {name!r} already maps to custom type {owner!r}"
 )
+RESERVES_JSON_OUTPUT_KEY = (
+    "Custom IOC type name {name!r} collides with a reserved JSON output key and would "
+    "corrupt the rendered document"
+)
+# Structural keys the JSON renderer puts at the top level of its document. A custom IOC
+# type whose name equals one of these would, when grouped into the payload, overwrite the
+# metadata key with a flat list and corrupt the output. Keep in sync with
+# adapters/renderers_json.py (a test asserts the renderer's metadata keys stay a subset).
+RESERVED_JSON_OUTPUT_KEYS: frozenset[str] = frozenset(
+    {
+        "schema_version",
+        "format",
+        "records",
+        "counts_by_type",
+        "total_count",
+        "warning_list_matches",
+    }
+)
 ALIAS_COLLIDES_WITH_CUSTOM_TYPE_NAME = (
     "Alias {alias!r} for custom IOC type {name!r} shadows the canonical name of custom "
     "type {owner!r} and would make it unresolvable"
@@ -198,6 +216,10 @@ def register_custom_ioc_type(
     # silently inert. Reject it instead of accepting a dead definition.
     if normalized not in _custom_ioc_types and _is_builtin_ioc_type(normalized):
         raise ValueError(SHADOWS_BUILTIN_IOC_TYPE.format(name=name))
+    # A name equal to a reserved JSON output key would clobber that metadata field with the
+    # type's value list when rendered, silently corrupting the document. Reject up front.
+    if normalized in RESERVED_JSON_OUTPUT_KEYS:
+        raise ValueError(RESERVES_JSON_OUTPUT_KEY.format(name=name))
     base = base_type if isinstance(base_type, IOCType) else IOCType.from_name(str(base_type))
     if not isinstance(base, IOCType):
         raise TypeError(INVALID_CUSTOM_BASE_TYPE)
@@ -246,14 +268,14 @@ def _validated_custom_aliases(aliases: tuple[str, ...], *, owner: str) -> tuple[
             raise ValueError(ALIAS_SHADOWS_BUILTIN_IOC_TYPE.format(alias=alias, name=owner))
         if alias in _custom_ioc_types and alias != owner:
             raise ValueError(
-                ALIAS_COLLIDES_WITH_CUSTOM_TYPE_NAME.format(
-                    alias=alias, name=owner, owner=alias
-                )
+                ALIAS_COLLIDES_WITH_CUSTOM_TYPE_NAME.format(alias=alias, name=owner, owner=alias)
             )
         existing_owner = _custom_ioc_aliases.get(alias)
         if existing_owner is not None and existing_owner != owner:
             raise ValueError(
-                ALIAS_COLLIDES_WITH_CUSTOM_TYPE.format(alias=alias, name=owner, owner=existing_owner)
+                ALIAS_COLLIDES_WITH_CUSTOM_TYPE.format(
+                    alias=alias, name=owner, owner=existing_owner
+                )
             )
     return aliases
 

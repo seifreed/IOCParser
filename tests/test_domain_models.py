@@ -171,6 +171,43 @@ def test_register_custom_ioc_type_rejects_builtin_shadow() -> None:
             register_custom_ioc_type(shadow, base_type="urls")
 
 
+def test_register_custom_ioc_type_rejects_reserved_json_output_key() -> None:
+    """A custom type named like a reserved JSON output key would clobber that metadata
+    field with its value list when rendered, corrupting the document. Reject it."""
+    import pytest
+
+    from iocparser.domain.enums import RESERVED_JSON_OUTPUT_KEYS
+
+    for reserved in RESERVED_JSON_OUTPUT_KEYS:
+        with pytest.raises(ValueError, match="reserved JSON output key"):
+            register_custom_ioc_type(reserved, base_type="urls")
+
+
+def test_json_renderer_metadata_keys_stay_within_reserved_set() -> None:
+    """Drift guard: every top-level metadata key the JSON renderer emits must be declared
+    in RESERVED_JSON_OUTPUT_KEYS, so the registration guard can never fall out of sync."""
+    import json
+
+    from iocparser.adapters.renderers_json import JSONOutputRenderer
+    from iocparser.domain.enums import RESERVED_JSON_OUTPUT_KEYS
+    from iocparser.domain.models import WarningMatch
+
+    # A result with one IOC and one warning so every metadata key (incl. warning_list_matches)
+    # is present; the single domain group key ("domains") is not a metadata key.
+    result = ExtractionResult(
+        iocs=(IOC.from_raw("domains", "evil.com"),),
+        warnings=(
+            WarningMatch(ioc=IOC.from_raw("ips", "8.8.8.8"), warning_list="L", description="d"),
+        ),
+    )
+    rendered = json.loads(JSONOutputRenderer().render(result))
+    metadata_keys = set(rendered) - {"domains", "ips"}
+    assert metadata_keys <= RESERVED_JSON_OUTPUT_KEYS, (
+        f"JSON renderer emits metadata keys not declared reserved: "
+        f"{metadata_keys - RESERVED_JSON_OUTPUT_KEYS}"
+    )
+
+
 def test_register_custom_ioc_type_rejects_builtin_shadowing_alias() -> None:
     """An alias equal to a built-in type/alias never resolves to the custom type
     (built-ins win in from_name), so it must be rejected rather than stored dead."""

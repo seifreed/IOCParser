@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Protocol, cast
 from uuid import uuid4
 
+from iocparser._version import resolve_version
 from iocparser.application.contracts import PersistRunInput
 from iocparser.application.use_cases import persist_run
 from iocparser.domain.models import ExtractionResult, PersistOptions, Source
@@ -383,7 +384,7 @@ def persist_result(
                     fingerprint=prepared.fingerprint,
                 ),
                 result=result,
-                tool_version="5.0.0",
+                tool_version=resolve_version(),
                 options=PersistOptions(
                     defang=request.defang,
                     check_warnings=request.check_warnings,

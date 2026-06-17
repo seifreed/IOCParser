@@ -2200,6 +2200,31 @@ def test_export_run_rehydrates_legacy_warning_tags(tmp_path: Path) -> None:
     ).warnings
 
 
+def test_version_is_single_sourced_and_consistent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """__version__, the CLI --version string, and the distribution metadata must agree.
+
+    Regression: pyproject was bumped to 6.0.0 but iocparser.__version__ (5.0.2) and
+    cli_args_parser.VERSION (5.0.0) drifted; now all derive from the installed metadata.
+    """
+    from importlib.metadata import PackageNotFoundError, version
+
+    import iocparser
+    from iocparser import _version
+    from iocparser.cli_args_parser import VERSION
+
+    expected = version("iocparser-tool")
+    assert iocparser.__version__ == expected
+    assert expected == VERSION
+    assert _version.resolve_version() == expected
+
+    # Running from a source tree with no installed distribution falls back, never crashes.
+    def _raise(_name: str) -> str:
+        raise PackageNotFoundError(_name)
+
+    monkeypatch.setattr(_version, "version", _raise)
+    assert _version.resolve_version() == "0.0.0+unknown"
+
+
 def test_batch_report_honors_stream_and_keeps_stdout_clean() -> None:
     """Under -o - the batch summary must go to the given stream (stderr), not stdout,
     so it does not corrupt machine output (JSONL/JSON/CSV/STIX) piped to stdout."""

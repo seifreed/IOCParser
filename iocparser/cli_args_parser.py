@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 
-VERSION = "5.0.0"
+from iocparser._version import resolve_version
+
+VERSION = resolve_version()
 MAX_WORKERS = 4
 DEFAULT_URL_WORKERS = 4
 

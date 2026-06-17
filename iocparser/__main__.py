@@ -4,7 +4,6 @@
 IOCParser - A tool for extracting Indicators of Compromise from security reports
 
 Author: Marc Rivero | @seifreed
-Version: 5.0.0
 """
 
 import sys

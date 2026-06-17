@@ -9,8 +9,9 @@ import iocparser.api_persistence as persistence
 import iocparser.api_pipeline as pipeline
 import iocparser.plugins as integrations
 from iocparser import renderers
+from iocparser._version import resolve_version
 
-__version__ = "5.0.2"
+__version__ = resolve_version()
 __all__ = [
     "extraction",
     "integrations",

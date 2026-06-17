@@ -193,6 +193,9 @@ def test_public_root_facade_only_reexports_public_api_and_boundary_symbols() -> 
     imports = _imports_for(path)
     allowed_prefixes = (
         "__future__",
+        # __version__ is sourced from this tiny internal helper (single source of truth:
+        # the installed distribution metadata) so it can't drift from pyproject.
+        "iocparser._version",
         "iocparser.api_",
         "iocparser.cli",
         "iocparser.client",

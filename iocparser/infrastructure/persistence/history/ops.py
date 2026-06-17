@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
-from sqlalchemy import or_, select, text
+from sqlalchemy import inspect, or_, select, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 
@@ -1147,9 +1147,21 @@ def restore_history(db_uri: str, archive_path: str) -> dict[str, int]:
     return import_history(db_uri, _string_key_mapping(payload))
 
 
+def _history_compaction_sql(dialect_name: str, table_names: tuple[str, ...]) -> list[str]:
+    """Per-dialect space reclamation: SQLite VACUUM, MySQL/MariaDB OPTIMIZE TABLE, else no-op."""
+    if dialect_name == "sqlite":
+        return ["VACUUM"]
+    if dialect_name in ("mysql", "mariadb") and table_names:
+        return ["OPTIMIZE TABLE " + ", ".join(f"`{name}`" for name in table_names)]
+    return []
+
+
 def compact_history(db_uri: str) -> None:
     with _managed_connection(db_uri) as connection:
-        connection.exec_driver_sql("VACUUM")
+        table_names = tuple(inspect(connection).get_table_names())
+        dialect_name = connection.engine.dialect.name
+        for statement in _history_compaction_sql(dialect_name, table_names):
+            connection.exec_driver_sql(statement)
 
 
 def retain_history(db_uri: str, *, days: int, statuses: tuple[str, ...] = ()) -> int:

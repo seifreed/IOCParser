@@ -118,7 +118,9 @@ def test_grouped_infrastructure_subpackages_stay_small_enough_to_review() -> Non
         IOCPARSER_ROOT / "infrastructure" / "persistence": 40,
         # 1250 -> 1256 for the per-dialect literal origin-id SQL that replaced an
         # f-string interpolation (bandit B608 hardening, no #nosec).
-        IOCPARSER_ROOT / "infrastructure" / "persistence" / "history": 1256,
+        # 1256 -> 1267 for dialect-aware compact_history (SQLite VACUUM vs MySQL/MariaDB
+        # OPTIMIZE TABLE); VACUUM is a syntax error on MariaDB.
+        IOCPARSER_ROOT / "infrastructure" / "persistence" / "history": 1267,
         IOCPARSER_ROOT / "infrastructure" / "persistence" / "query": 700,
         IOCPARSER_ROOT / "infrastructure" / "queueing": 30,
         IOCPARSER_ROOT / "infrastructure" / "runtime": 45,

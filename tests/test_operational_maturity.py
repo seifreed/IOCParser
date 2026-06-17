@@ -252,9 +252,7 @@ def test_rebuild_tags_search_handles_legacy_and_malformed_rows(tmp_path: Path) -
             )
         rebuild_tags_search(engine, inspect(engine))
         with engine.connect() as connection:
-            rows = dict(
-                connection.execute(text("SELECT ioc_id, tags_search FROM run_iocs")).all()
-            )
+            rows = dict(connection.execute(text("SELECT ioc_id, tags_search FROM run_iocs")).all())
     finally:
         engine.dispose()
 
@@ -785,6 +783,22 @@ def test_history_export_import_compact_and_retain(tmp_path: Path) -> None:
     invalid_archive.write_text(json.dumps([]), encoding="utf-8")
     with pytest.raises(TypeError):
         restore_history(restored_db, str(invalid_archive))
+
+
+def test_history_compaction_sql_is_dialect_aware() -> None:
+    """compact_history must not emit SQLite VACUUM on MySQL/MariaDB (a syntax error there).
+
+    Regression: a real MariaDB run raised a 1064 syntax error on `VACUUM`. SQLite uses
+    VACUUM; MySQL/MariaDB use OPTIMIZE TABLE; other dialects have no portable compaction.
+    """
+    from iocparser.infrastructure.persistence.history.ops import _history_compaction_sql
+
+    tables = ("runs", "iocs")
+    assert _history_compaction_sql("sqlite", tables) == ["VACUUM"]
+    assert _history_compaction_sql("mysql", tables) == ["OPTIMIZE TABLE `runs`, `iocs`"]
+    assert _history_compaction_sql("mariadb", tables) == ["OPTIMIZE TABLE `runs`, `iocs`"]
+    assert _history_compaction_sql("mysql", ()) == []  # nothing to optimize
+    assert _history_compaction_sql("postgresql", tables) == []  # no portable compaction
 
 
 def test_batch_job_persistence_and_failed_batch_listing(tmp_path: Path) -> None:

@@ -1,4 +1,5 @@
-from typing import Generic, Iterator, TypeVar, overload
+from collections.abc import Iterator
+from typing import Generic, TypeVar, overload
 
 T = TypeVar("T")
 T1 = TypeVar("T1")
@@ -15,6 +16,7 @@ class Engine:
 
 
 class Connection:
+    engine: Engine
     def __enter__(self) -> Connection: ...
     def __exit__(self, exc_type: object, exc: object, tb: object) -> None: ...
     def execute(self, statement: ClauseElement, parameters: object = ...) -> Result[object]: ...

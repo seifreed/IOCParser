@@ -54,6 +54,32 @@ def test_streaming_size_flags_reject_invalid_values(flag: str, value: str) -> No
     assert excinfo.value.code == 2
 
 
+def test_unknown_renderer_fails_before_processing() -> None:
+    """Regression: an unknown --renderer used to run the whole extraction and print
+    results, then error at render time. It must now fail fast at the CLI boundary (like
+    --enricher/--extractor) without invoking the processing callbacks.
+    """
+    from iocparser import cli_dispatch
+    from iocparser.cli_args_parser import create_argument_parser
+    from iocparser.errors import ValidationError
+
+    args = create_argument_parser().parse_args(
+        ["--stdin", "--renderer", "definitely-not-a-renderer", "--no-check-warnings"]
+    )
+
+    def _boom(_args: object) -> object:
+        raise AssertionError("processing must not run when the renderer is invalid")
+
+    with pytest.raises(ValidationError, match="Unknown renderer"):
+        cli_dispatch.run_cli(
+            args,
+            handle_misp_init=lambda: None,
+            process_multiple_files_input=_boom,
+            process_single_input=_boom,
+            save_output=lambda *_args: None,
+        )
+
+
 def test_streaming_size_flags_accept_valid_values() -> None:
     """The boundary validators pass valid sizes through unchanged."""
     from iocparser.cli_args_parser import create_argument_parser

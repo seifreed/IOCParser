@@ -10,6 +10,7 @@ from iocparser import cli_runtime as _cli_runtime
 from iocparser.cli_processing_support import BatchResultsCollection, GroupedIocs, GroupedWarnings
 from iocparser.domain.models import ExtractionResult
 from iocparser.errors import ValidationError
+from iocparser.plugins import require_renderer
 
 NO_INPUT_MESSAGE = "No input provided. Use -f, -u, -m, -d, --url-file, --stdin, or a query command"
 BatchResults = BatchResultsCollection
@@ -39,6 +40,11 @@ def run_cli(
         args, config=config, handle_misp_init=handle_misp_init
     ):
         return
+
+    # Validate the output renderer before any extraction/download so an unknown
+    # --renderer fails fast like --enricher/--extractor, instead of after the work.
+    if renderer_name := getattr(args, "renderer", None):
+        require_renderer(str(renderer_name))
 
     payload = _workflow.resolve_input_payload(
         args,

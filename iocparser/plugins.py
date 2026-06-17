@@ -79,6 +79,16 @@ def get_renderer(
     return _resolve_plugin(_renderer_registry, name, kind="renderer")(with_context, stix_types)
 
 
+def require_renderer(name: str) -> None:
+    """Validate a renderer name at the CLI boundary without constructing it.
+
+    Lets an unknown --renderer fail fast (before any extraction/download work) with the
+    same error the late get_renderer() call would raise, matching --enricher/--extractor.
+    """
+    _load_entry_point_plugins()
+    _resolve_plugin(_renderer_registry, name, kind="renderer")
+
+
 def renderer_names() -> tuple[str, ...]:
     """List registered renderer names."""
     _load_entry_point_plugins()

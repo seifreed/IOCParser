@@ -326,6 +326,10 @@ def test_custom_ioc_types_fts_and_public_batch_api(tmp_path: Path) -> None:
         register_custom_ioc_type("", base_type="urls")
     with pytest.raises(TypeError):
         register_custom_ioc_type("bad-base", base_type="telegram_handles")
+    # An unknown base_type string used to leak a bare ValueError(<name>) from from_name;
+    # it must now raise the same clear TypeError as the custom-type-name base case above.
+    with pytest.raises(TypeError, match="must derive from a built-in base IOC type"):
+        register_custom_ioc_type("bad-base-unknown", base_type="not_a_real_base_type")
     with pytest.raises(ValueError, match="not-registered"):
         IOCType.from_name("not-registered")
     assert ioc_type_name("raw-string") == "raw-string"

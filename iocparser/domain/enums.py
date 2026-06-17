@@ -220,7 +220,16 @@ def register_custom_ioc_type(
     # type's value list when rendered, silently corrupting the document. Reject up front.
     if normalized in RESERVED_JSON_OUTPUT_KEYS:
         raise ValueError(RESERVES_JSON_OUTPUT_KEY.format(name=name))
-    base = base_type if isinstance(base_type, IOCType) else IOCType.from_name(str(base_type))
+    if isinstance(base_type, IOCType):
+        base: IOCType | IOCTypeName = base_type
+    else:
+        try:
+            base = IOCType.from_name(str(base_type))
+        except ValueError as exc:
+            # from_name raises a bare ValueError(<name>) for an unknown type; surface the
+            # same clear "must derive from a built-in base IOC type" message the custom-type
+            # base case already raises, instead of a cryptic bare value.
+            raise TypeError(INVALID_CUSTOM_BASE_TYPE) from exc
     if not isinstance(base, IOCType):
         raise TypeError(INVALID_CUSTOM_BASE_TYPE)
     normalized_aliases = _validated_custom_aliases(normalize_tokens(aliases), owner=normalized)

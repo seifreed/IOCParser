@@ -19,6 +19,26 @@ from iocparser.infrastructure.extractor_base import ExtractorBase, IPv4_MAX_OCTE
 from iocparser.shared_utils import dedup_case_insensitive, refang_ioc
 
 
+def _strip_trailing_url_noise(url: str) -> str:
+    """Drop trailing prose punctuation a URL picks up when it ends a sentence.
+
+    The path char class legitimately allows '.', '(' and ')' mid-path, so they cannot
+    be removed from the regex; instead trim them here. Sentence punctuation
+    (.,;:!?'") is always trailing noise, while a closing ')' is kept when balanced by
+    an opener inside the URL (e.g. wiki '..._(disambiguation)').
+    """
+    while url:
+        last = url[-1]
+        if last in ".,;:!?'\"":
+            url = url[:-1]
+            continue
+        if last == ")" and url.count(")") > url.count("("):
+            url = url[:-1]
+            continue
+        break
+    return url
+
+
 def _dedup_urls(urls: list[str]) -> list[str]:
     """Dedup URLs host-case-insensitively while preserving path/query case.
 
@@ -150,7 +170,8 @@ class NetworkHeuristicPolicy:
         defang: bool,
     ) -> list[str]:
         clean_urls: list[str] = []
-        for url in raw_urls:
+        for raw_url in raw_urls:
+            url = _strip_trailing_url_noise(raw_url)
             parsed = self.parse_url_candidate(url, clean_defanged=clean_defanged)
             if parsed is None:
                 clean_urls.append(defang_url(url) if defang else url)

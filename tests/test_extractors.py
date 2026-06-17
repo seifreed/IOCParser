@@ -186,6 +186,20 @@ class TestNetworkExtractors:
         result = self.extractor.extract_urls(text)
         assert len(result) >= 2
 
+    def test_extract_urls_strips_trailing_prose_punctuation(self):
+        """A URL ending a sentence or wrapped in parens must not absorb the trailing
+        '.'/','/ ')' as part of the URL, while a balanced ')' inside the path is kept.
+        """
+        assert self.extractor.extract_urls("Visit http://evil.example.com/path.") == [
+            "http://evil.example.com/path"
+        ]
+        assert self.extractor.extract_urls("see (http://evil.example.com/a) ok") == [
+            "http://evil.example.com/a"
+        ]
+        assert self.extractor.extract_urls("ref http://en.wikipedia.org/wiki/X_(y) end") == [
+            "http://en.wikipedia.org/wiki/X_(y)"
+        ]
+
     def test_extract_urls_with_defanged_host_separators(self):
         """Test URL extraction handles defanged host separators."""
         text = "Callback: hxxps://malware[.]example/payload"

@@ -6,17 +6,34 @@ from typing import ClassVar, Literal
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import ArgumentError
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool, StaticPool
 
+from iocparser.errors import ValidationError
 from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
 from iocparser.infrastructure.persistence_run_repository import SQLAlchemyRunRepository
 from iocparser.infrastructure.persistence_source_repository import SQLAlchemySourceRepository
+
+INVALID_DB_URI_ERROR = "Invalid database URI {db_uri!r}: {detail}"
 
 # Module-level engine cache: db_uri -> Engine
 # Engines are expensive to create and should be reused across units of work.
 _ENGINE_CACHE: dict[str, Engine] = {}
 _ENGINE_LOCK = threading.Lock()
+
+
+def create_engine_for_uri(db_uri: str, **kwargs: object) -> Engine:
+    """create_engine that reports a malformed or unsupported db_uri cleanly.
+
+    A bad URL or an unknown/uninstalled SQLAlchemy dialect raises
+    ArgumentError/NoSuchModuleError; translate it to a ValidationError so the CLI
+    reports a concise message instead of an uncaught stack trace.
+    """
+    try:
+        return create_engine(db_uri, future=True, **kwargs)
+    except ArgumentError as exc:
+        raise ValidationError(INVALID_DB_URI_ERROR.format(db_uri=db_uri, detail=exc)) from exc
 
 
 def _engine_kwargs(db_uri: str) -> dict[str, object]:
@@ -41,7 +58,7 @@ def _get_or_create_engine(db_uri: str) -> Engine:
         engine = _ENGINE_CACHE.get(db_uri)
         if engine is not None:
             return engine
-        new_engine = create_engine(db_uri, future=True, **_engine_kwargs(db_uri))
+        new_engine = create_engine_for_uri(db_uri, **_engine_kwargs(db_uri))
         _ENGINE_CACHE[db_uri] = new_engine
         return new_engine
 

@@ -26,9 +26,9 @@ from iocparser.infrastructure.persistence_migration_steps import (
 
 def migrate_db_uri(db_uri: str) -> int:
     """Upgrade a database URI and return the resulting schema version."""
-    from sqlalchemy import create_engine
+    from iocparser.infrastructure.persistence_uow import create_engine_for_uri
 
-    engine = create_engine(db_uri, future=True)
+    engine = create_engine_for_uri(db_uri)
     try:
         migrate_engine(engine)
         return schema_version(engine)

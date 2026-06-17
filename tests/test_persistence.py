@@ -575,6 +575,20 @@ def test_parse_datetime_reports_invalid_input_cleanly() -> None:
         parse_datetime("not-a-date")
 
 
+def test_create_engine_for_uri_reports_bad_db_uri_cleanly() -> None:
+    """A malformed or unsupported --db-uri must surface a clean ValidationError rather
+    than an uncaught SQLAlchemy ArgumentError/NoSuchModuleError stack trace.
+    """
+    from iocparser.errors import ValidationError
+    from iocparser.infrastructure.persistence_uow import create_engine_for_uri
+
+    with pytest.raises(ValidationError, match="Invalid database URI"):
+        create_engine_for_uri("mysql+nonexistentdriver://host/db")
+
+    with pytest.raises(ValidationError, match="Invalid database URI"):
+        create_engine_for_uri("::::not a uri::::")
+
+
 def test_in_memory_unit_of_work_survives_close_and_reopen() -> None:
     """An in-memory sqlite UoW must keep its schema after close() + reopen.
 

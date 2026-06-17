@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
-from sqlalchemy import create_engine, or_, select, text
+from sqlalchemy import or_, select, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 
@@ -45,6 +45,7 @@ from iocparser.infrastructure.persistence_schema import (
     SourceModel,
 )
 from iocparser.infrastructure.persistence_support import build_summary, prune_runs
+from iocparser.infrastructure.persistence_uow import create_engine_for_uri
 
 _typed_row = typed_row
 
@@ -52,7 +53,7 @@ _typed_row = typed_row
 @contextmanager
 def _managed_session(db_uri: str) -> Iterator[Session]:
     """Create, migrate, and safely dispose a SQLAlchemy engine, yielding a Session."""
-    engine = create_engine(db_uri, future=True)
+    engine = create_engine_for_uri(db_uri)
     try:
         migrate_engine(engine)
         with Session(engine) as session:
@@ -64,7 +65,7 @@ def _managed_session(db_uri: str) -> Iterator[Session]:
 @contextmanager
 def _managed_connection(db_uri: str) -> Iterator[Connection]:
     """Create, migrate, and safely dispose a SQLAlchemy engine, yielding a Connection."""
-    engine = create_engine(db_uri, future=True)
+    engine = create_engine_for_uri(db_uri)
     try:
         migrate_engine(engine)
         with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as connection:

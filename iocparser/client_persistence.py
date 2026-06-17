@@ -5,6 +5,7 @@ from typing import TypedDict, Unpack
 
 from iocparser.api_persistence_query import (
     optional_str,
+    reject_unknown_options,
     validated_ioc_type_filter,
     validated_iso_datetime,
     validated_min_severity,
@@ -57,6 +58,10 @@ class SearchIOCsOptions(TypedDict, total=False):
     search_backend: str | None
 
 
+_RUNS_OPTION_KEYS = frozenset(QueryRunsOptions.__annotations__)
+_SEARCH_OPTION_KEYS = frozenset(SearchIOCsOptions.__annotations__)
+
+
 def validated_severity_values(values: tuple[str, ...]) -> tuple[str, ...]:
     normalized: list[str] = []
     for value in values:
@@ -81,6 +86,7 @@ class PersistenceClient:
         return self._service
 
     def query_runs(self, **options: Unpack[QueryRunsOptions]) -> PersistedRunsPage:
+        reject_unknown_options(options, _RUNS_OPTION_KEYS, context="run query")
         query = QueryRunsInput(
             limit=validated_non_negative_int(options.get("limit", 50), field="limit"),
             offset=validated_non_negative_int(options.get("offset", 0), field="offset"),
@@ -103,6 +109,7 @@ class PersistenceClient:
     def search_iocs(
         self, *, value: str, **options: Unpack[SearchIOCsOptions]
     ) -> PersistedIOCSearchPage:
+        reject_unknown_options(options, _SEARCH_OPTION_KEYS, context="IOC search")
         query = SearchPersistedIOCsInput(
             value=value,
             limit=validated_non_negative_int(options.get("limit", 50), field="limit"),

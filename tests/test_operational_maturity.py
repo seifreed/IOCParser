@@ -475,6 +475,14 @@ def test_public_query_api_rejects_unknown_keyword_options(tmp_path: Path) -> Non
     # A valid keyword set is unaffected.
     assert query_persisted_iocs(db_uri=db_uri, value="alpha", min_severity="low").total == 1
 
+    # The PersistenceClient class wraps its own **options and must reject typos too.
+    client = PersistenceClient(db_uri)
+    with pytest.raises(ValidationError, match="Unknown IOC search option"):
+        client.search_iocs(value="alpha", min_severty="high")
+    with pytest.raises(ValidationError, match="Unknown run query option"):
+        client.query_runs(limitt=5)
+    assert client.search_iocs(value="alpha", min_severity="low").total == 1
+
 
 def test_direct_persistence_services_do_not_treat_negative_limits_as_unbounded(
     tmp_path: Path,

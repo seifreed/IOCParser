@@ -90,7 +90,7 @@ _SEARCH_OPTION_KEYS = frozenset(SearchPersistedIOCOptions.__annotations__)
 _DIFF_OPTION_KEYS = frozenset(PersistedDiffOptions.__annotations__)
 
 
-def _reject_unknown_options(
+def reject_unknown_options(
     options: Mapping[str, object], allowed: AbstractSet[str], *, context: str
 ) -> None:
     """Fail loudly on an unrecognized keyword option.
@@ -167,7 +167,7 @@ def bool_option(value: object | None, default: bool = False) -> bool:
 
 
 def runs_input(options: QueryRunsOptions) -> QueryRunsInput:
-    _reject_unknown_options(options, _RUNS_OPTION_KEYS, context="run query")
+    reject_unknown_options(options, _RUNS_OPTION_KEYS, context="run query")
     return QueryRunsInput(
         **{  # type: ignore[arg-type]
             **options,
@@ -181,7 +181,7 @@ def runs_input(options: QueryRunsOptions) -> QueryRunsInput:
 
 
 def search_input(value: str, options: SearchPersistedIOCOptions) -> SearchPersistedIOCsInput:
-    _reject_unknown_options(options, _SEARCH_OPTION_KEYS, context="IOC search")
+    reject_unknown_options(options, _SEARCH_OPTION_KEYS, context="IOC search")
     return SearchPersistedIOCsInput(
         value=value,
         limit=validated_non_negative_int(options.get("limit", 50), field="limit"),
@@ -305,7 +305,7 @@ def persisted_diff_input(
     right_run_id: int,
     options: PersistedDiffOptions,
 ) -> DiffPersistedRunsInput:
-    _reject_unknown_options(options, _DIFF_OPTION_KEYS, context="diff")
+    reject_unknown_options(options, _DIFF_OPTION_KEYS, context="diff")
     diff_only = validated_diff_only(optional_str(options.get("diff_only")))
     return DiffPersistedRunsInput(
         left_run_id=left_run_id,
@@ -325,7 +325,7 @@ def latest_source_diff_input(
     run_id: int,
     options: PersistedDiffOptions,
 ) -> DiffLatestSourceRunInput:
-    _reject_unknown_options(options, _DIFF_OPTION_KEYS, context="diff")
+    reject_unknown_options(options, _DIFF_OPTION_KEYS, context="diff")
     diff_only = validated_diff_only(optional_str(options.get("diff_only")))
     return DiffLatestSourceRunInput(
         run_id=run_id,

@@ -277,7 +277,10 @@ def _apply_search_backend(
     # "auto" therefore always uses the substring backend; FTS is opt-in for speed.
     use_sqlite_fts = search_backend == "fts" and has_fts_table(unit_of_work.engine)
     fts_query = build_fts_query(normalized_value) if use_sqlite_fts else None
-    if search_backend == "fts" and not fts_query:
+    # Only error on an empty FTS query when FTS is actually in use. FTS requested on a
+    # backend with no FTS table (MySQL/MariaDB) falls through to LIKE below instead of
+    # raising a misleading error -- FTS is a SQLite-only speed option.
+    if use_sqlite_fts and not fts_query:
         raise ValueError(FTS_QUERY_REQUIRED)
     if fts_query:
         filter_clause: ClauseElement = text(
@@ -597,9 +600,7 @@ class SQLAlchemyPersistenceService(PersistenceQueryService):
             if run is None:
                 raise ValueError(RUN_NOT_FOUND_TEMPLATE.format(run_id=run_id))
             if run.status in ("failed", "partial"):
-                raise ValueError(
-                    NON_DIFFABLE_RUN_TEMPLATE.format(run_id=run_id, status=run.status)
-                )
+                raise ValueError(NON_DIFFABLE_RUN_TEMPLATE.format(run_id=run_id, status=run.status))
             stmt = (
                 select(RunModel)
                 .where(

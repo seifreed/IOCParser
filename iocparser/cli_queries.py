@@ -149,26 +149,29 @@ def _handle_search_ioc(args: argparse.Namespace, config: AppConfig) -> bool:
     search_value = _cli_args.get_optional_str_arg(args, "search_ioc")
     if not search_value:
         return False
-    hits = uc_search_persisted_iocs(
-        SearchPersistedIOCsInput(
-            value=search_value,
-            limit=_validated_limit(args, "query_limit", 50, field="limit"),
-            offset=_validated_limit(args, "offset", 0, field="offset"),
-            date_from=_cli_args.get_optional_str_arg(args, "date_from"),
-            date_to=_cli_args.get_optional_str_arg(args, "date_to"),
-            source_kind=_cli_args.get_optional_str_arg(args, "source_kind"),
-            source_value=_cli_args.get_optional_str_arg(args, "source_value"),
-            ioc_type=validated_ioc_type_filter(_cli_args.get_optional_str_arg(args, "ioc_type")),
-            severity=validated_severity_filters(_cli_args.get_optional_str_arg(args, "severity")),
-            tags=_string_filters_attr(args, "tag"),
-            exclude_tags=_string_filters_attr(args, "exclude_tag"),
-            min_severity=_cli_args.get_optional_str_arg(args, "min_severity"),
-            tag_mode=_cli_args.get_optional_str_arg(args, "tag_mode") or "all",
-            sort_by=_cli_args.get_optional_str_arg(args, "query_sort") or "newest",
-            search_backend=_cli_args.get_optional_str_arg(args, "search_backend") or "auto",
-        ),
-        persistence_query_service=_query_service_for(config),
+    search_input = SearchPersistedIOCsInput(
+        value=search_value,
+        limit=_validated_limit(args, "query_limit", 50, field="limit"),
+        offset=_validated_limit(args, "offset", 0, field="offset"),
+        date_from=_cli_args.get_optional_str_arg(args, "date_from"),
+        date_to=_cli_args.get_optional_str_arg(args, "date_to"),
+        source_kind=_cli_args.get_optional_str_arg(args, "source_kind"),
+        source_value=_cli_args.get_optional_str_arg(args, "source_value"),
+        ioc_type=validated_ioc_type_filter(_cli_args.get_optional_str_arg(args, "ioc_type")),
+        severity=validated_severity_filters(_cli_args.get_optional_str_arg(args, "severity")),
+        tags=_string_filters_attr(args, "tag"),
+        exclude_tags=_string_filters_attr(args, "exclude_tag"),
+        min_severity=_cli_args.get_optional_str_arg(args, "min_severity"),
+        tag_mode=_cli_args.get_optional_str_arg(args, "tag_mode") or "all",
+        sort_by=_cli_args.get_optional_str_arg(args, "query_sort") or "newest",
+        search_backend=_cli_args.get_optional_str_arg(args, "search_backend") or "auto",
     )
+    # A bad query (e.g. an empty FTS query) raises a bare ValueError; translate it at the
+    # CLI boundary so the user sees a clean message, not a stack trace.
+    with _missing_run_as_validation():
+        hits = uc_search_persisted_iocs(
+            search_input, persistence_query_service=_query_service_for(config)
+        )
     _emit_query_result(
         args,
         json_payload={"items": [hit.to_record() for hit in hits]},
@@ -318,9 +321,7 @@ def _handle_delete_run(args: argparse.Namespace, config: AppConfig) -> bool:
 
 
 def _handle_prune_runs(args: argparse.Namespace, config: AppConfig) -> bool:
-    prune_before = validated_iso_datetime(
-        _cli_args.get_optional_str_arg(args, "prune_before")
-    )
+    prune_before = validated_iso_datetime(_cli_args.get_optional_str_arg(args, "prune_before"))
     if prune_before is None:
         return False
     # A negative keep_latest folds to "keep none" downstream (delete every match).

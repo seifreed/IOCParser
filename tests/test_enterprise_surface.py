@@ -230,7 +230,13 @@ def test_auto_search_backend_uses_substring_even_with_fts_table(tmp_path: Path) 
     db_uri = f"sqlite:///{tmp_path / 'auto.sqlite'}"
     service = SQLAlchemyPersistenceService(db_uri)
     service.persist_multiple_runs(
-        [("file", "f.txt", ExtractionResult.from_grouped_payload({"domains": ["evilcorp.com"]}, {}))],
+        [
+            (
+                "file",
+                "f.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["evilcorp.com"]}, {}),
+            )
+        ],
         tool_version="1.0.0",
         options=PersistOptions(
             defang=False, check_warnings=False, force_update=False, output_format="json"
@@ -248,6 +254,40 @@ def test_auto_search_backend_uses_substring_even_with_fts_table(tmp_path: Path) 
     # interior substring -- documenting why auto must not silently switch to it.
     fts = query_persisted_iocs(db_uri=db_uri, value="corp", search_backend="fts")
     assert not fts.items
+
+
+def test_fts_backend_falls_back_to_substring_without_fts_table(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """FTS requested on a backend with no FTS table (MySQL/MariaDB) must fall back to
+    substring search, not raise the misleading 'requires an alphanumeric term' error.
+
+    Regression: the guard raised whenever fts was requested and no fts_query was built,
+    conflating "empty query" (a real error on SQLite) with "FTS unavailable on this backend".
+    """
+    from iocparser.infrastructure.persistence.query import ops
+
+    db_uri = f"sqlite:///{tmp_path / 'nofts-fallback.sqlite'}"
+    service = SQLAlchemyPersistenceService(db_uri)
+    service.persist_multiple_runs(
+        [
+            (
+                "file",
+                "f.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["evilcorp.com"]}, {}),
+            )
+        ],
+        tool_version="1.0.0",
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
+    )
+    # Simulate a non-SQLite backend: no FTS virtual table exists.
+    monkeypatch.setattr(ops, "has_fts_table", lambda _engine: False)
+    # "corp" is an interior substring (LIKE-only), so a successful match proves the fallback
+    # to substring rather than a raised error or an empty FTS token-prefix result.
+    page = query_persisted_iocs(db_uri=db_uri, value="corp", search_backend="fts")
+    assert [hit.value for hit in page.items] == ["evilcorp.com"]
 
 
 def test_custom_ioc_types_fts_and_public_batch_api(tmp_path: Path) -> None:

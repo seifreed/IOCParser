@@ -1614,6 +1614,31 @@ def test_cli_boolean_network_flags_override_false_config() -> None:
     assert args.tls_verify is True
 
 
+def test_config_output_format_is_case_insensitive() -> None:
+    """An INI/env output_format must be honored regardless of case.
+
+    The valid set and CLI flags are lowercase, so a config "output_format = JSON" (or
+    "  Stix ") was silently ignored and output fell back to text. It is now normalized.
+    """
+    args = create_argument_parser().parse_args([])
+    apply_config_defaults(
+        args, AppConfig(persist=False, db_uri=None, config_path=None, output_format="JSON")
+    )
+    assert args.json is True
+
+    stix_args = create_argument_parser().parse_args([])
+    apply_config_defaults(
+        stix_args, AppConfig(persist=False, db_uri=None, config_path=None, output_format="  Stix ")
+    )
+    assert stix_args.stix is True
+
+    invalid_args = create_argument_parser().parse_args([])
+    apply_config_defaults(
+        invalid_args, AppConfig(persist=False, db_uri=None, config_path=None, output_format="yaml")
+    )
+    assert not any(getattr(invalid_args, fmt) for fmt in ("json", "jsonl", "csv", "stix"))
+
+
 def test_cli_numeric_defaults_override_config_when_explicit() -> None:
     config = AppConfig(
         persist=False,

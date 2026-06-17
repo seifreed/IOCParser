@@ -77,10 +77,13 @@ def _apply_boolean_defaults(args: argparse.Namespace, config: AppConfig) -> None
 
 
 def _apply_output_defaults(args: argparse.Namespace, config: AppConfig) -> None:
+    # Normalize case/whitespace so an INI/env "output_format = JSON" is honored rather than
+    # silently falling back to text; the CLI flags and the valid set are lowercase.
+    output_format = (config.output_format or "").strip().lower()
     if not any(
         get_bool_arg(args, name) for name in ("json", "jsonl", "csv", "stix")
-    ) and config.output_format in {"json", "jsonl", "csv", "stix"}:
-        setattr(args, config.output_format, True)
+    ) and output_format in {"json", "jsonl", "csv", "stix"}:
+        setattr(args, output_format, True)
 
 
 def _apply_numeric_defaults(args: argparse.Namespace, config: AppConfig) -> None:

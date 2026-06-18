@@ -149,6 +149,7 @@ def extract_from_url(
 ) -> ExtractionResult:
     """Extract IOCs from a downloaded URL."""
     temp_file = downloader.download(request.url)
+    primary_exc: BaseException | None = None
     try:
         return extract_from_file(
             ExtractFileInput(file_path=temp_file, options=request.options),
@@ -156,8 +157,16 @@ def extract_from_url(
             extractor_engine=extractor_engine,
             warning_service=warning_service,
         )
+    except BaseException as exc:
+        primary_exc = exc
+        raise
     finally:
-        temporary_resource_cleaner.cleanup(temp_file)
+        try:
+            temporary_resource_cleaner.cleanup(temp_file)
+        except Exception:
+            if primary_exc is None:
+                raise
+            logger.warning("Cleanup failed after URL extraction error", exc_info=True)
 
 
 def extract_from_files(

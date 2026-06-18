@@ -78,6 +78,12 @@ class LenientReader:
         return "IOC URL: https://kept.example/path"
 
 
+class FailingCleaner:
+    def cleanup(self, resource_path: str) -> None:
+        del resource_path
+        raise RuntimeError("cleanup failed")
+
+
 class RecordingSourceRepository:
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []
@@ -235,6 +241,25 @@ def test_extract_from_url_ignores_cleanup_errors_for_directories(tmp_path: Path)
 
     assert result.grouped_iocs() == {"urls": ["https://kept.example/path"]}
     assert temp_dir.exists()
+
+
+def test_extract_from_url_raises_cleanup_errors_after_success(tmp_path: Path) -> None:
+    temp_file = tmp_path / "downloaded.txt"
+    temp_file.write_text("IOC URL: https://cleanup.example/path", encoding="utf-8")
+    downloader = PassThroughDownloader(str(temp_file))
+    reader = MappingReader({str(temp_file): temp_file.read_text(encoding="utf-8")})
+
+    with pytest.raises(RuntimeError, match="cleanup failed"):
+        extract_from_url(
+            ExtractURLInput(
+                url="https://source.example/doc",
+                options=ExtractionOptions(file_type="text", defang=False, check_warnings=False),
+            ),
+            downloader=downloader,
+            reader=reader,
+            extractor_engine=DefaultIOCExtractionEngine(),
+            temporary_resource_cleaner=FailingCleaner(),
+        )
 
 
 def test_extract_from_files_returns_empty_result_for_partial_failures(tmp_path: Path) -> None:

@@ -50,7 +50,7 @@ from iocparser.cli_schema import _history_payload
 from iocparser.client_persistence import _parse_string_filters
 from iocparser.domain.distributed import _int_from_payload
 from iocparser.domain.enums import IOCType, register_custom_ioc_type
-from iocparser.domain.models import IOC, ExtractionOptions, ExtractionResult
+from iocparser.domain.models import IOC, ExtractionOptions, ExtractionResult, PersistedRun
 from iocparser.domain.pipeline import PipelineJobRequest
 from iocparser.errors import DownloadError, ValidationError
 from iocparser.infrastructure.file_readers import MagicTextSourceReader
@@ -618,6 +618,31 @@ def test_persist_result_preserves_original_error_when_close_fails(monkeypatch) -
     result = ExtractionResult(iocs=())
 
     with pytest.raises(RuntimeError, match="db down"):
+        persist_result(request=request, prepared=prepared, result=result, started=time.time())
+
+
+def test_persist_result_raises_close_failure_after_success(monkeypatch) -> None:
+    """persist_result must surface close failures after a successful persist."""
+    from unittest.mock import MagicMock
+
+    mock_persist_run = MagicMock(return_value=PersistedRun(run_id=123))
+    monkeypatch.setattr("iocparser.pipeline_worker_support.persist_run", mock_persist_run)
+    monkeypatch.setattr(
+        "iocparser.pipeline_worker_support.PipelineUnitOfWork.close",
+        MagicMock(side_effect=RuntimeError("close failed")),
+    )
+
+    request = PipelineJobRequest(
+        input_kind="text",
+        source_value="test",
+        persist=True,
+        db_uri="sqlite:///:memory:",
+        emit_only=False,
+    )
+    prepared = PreparedInput(fingerprint="fp", content_hash="hash", metadata={"input_size": 4})
+    result = ExtractionResult(iocs=())
+
+    with pytest.raises(RuntimeError, match="close failed"):
         persist_result(request=request, prepared=prepared, result=result, started=time.time())
 
 

@@ -368,6 +368,7 @@ def persist_result(
     normalized_url = prepared.metadata.get("normalized_url")
     mime_type = prepared.metadata.get("mime_type")
     unit = PipelineUnitOfWork(request.db_uri)
+    primary_exc: BaseException | None = None
     try:
         return persist_run(
             PersistRunInput(
@@ -398,16 +399,22 @@ def persist_result(
             ),
             unit_of_work=unit,
         ).run_id
-    except Exception:
-        rollback_and_log(
-            unit,
-            logger=logger,
-            message="Rollback failed while persisting pipeline result",
-        )
+    except BaseException as exc:
+        primary_exc = exc
+        if not isinstance(exc, (KeyboardInterrupt, SystemExit)):
+            rollback_and_log(
+                unit,
+                logger=logger,
+                message="Rollback failed while persisting pipeline result",
+            )
         raise
     finally:
-        with suppress(Exception):
+        try:
             unit.close()
+        except Exception:
+            if primary_exc is None:
+                raise
+            logger.warning("Close failed after persisting pipeline result error", exc_info=True)
 
 
 def extract_result(

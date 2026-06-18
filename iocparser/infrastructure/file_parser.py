@@ -12,7 +12,7 @@ import re
 import urllib.parse
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from contextlib import contextmanager, suppress
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -94,8 +94,10 @@ def _local_parse_path(file_path: str) -> Iterator[str]:
     try:
         yield str(temp_path)
     finally:
-        with suppress(OSError):
+        try:
             temp_path.unlink(missing_ok=True)
+        except OSError:
+            logger.warning("Failed to remove temporary parse file", exc_info=True)
 
 
 class FileParser(ABC):

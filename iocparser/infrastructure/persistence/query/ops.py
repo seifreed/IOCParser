@@ -224,16 +224,16 @@ def _run_filter_clauses(
     source_value: str | None,
 ) -> tuple[ClauseElement, ...]:
     clauses: list[ClauseElement] = []
-    if date_from:
-        clauses.append(RunModel.started_at >= parse_datetime(date_from))
-    if date_to:
-        clauses.append(RunModel.started_at <= parse_datetime(date_to))
-    if source_kind and (normalized_kind := source_kind.strip().lower()):
-        clauses.append(SourceModel.kind == normalized_kind)
-    if source_value:
-        clauses.append(source_value_clause(source_kind=source_kind, source_value=source_value))
+    normalized_kind = source_kind.strip().lower() if source_kind else ""
+    clauses.extend([RunModel.started_at >= parse_datetime(date_from)] if date_from else [])
+    clauses.extend([RunModel.started_at <= parse_datetime(date_to)] if date_to else [])
+    clauses.extend([SourceModel.kind == normalized_kind] if normalized_kind else [])
+    clauses.extend(
+        [source_value_clause(source_kind=normalized_kind or source_kind, source_value=source_value)]
+        if source_value
+        else []
+    )
     return tuple(clauses)
-
 
 def _order_run_query_stmt[SelectT: (RunSelect, SearchSelect)](
     stmt: SelectT, *, sort_by: str

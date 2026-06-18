@@ -409,6 +409,35 @@ def test_query_service_trims_source_kind_filters(tmp_path) -> None:
     assert service.search_iocs_page(value="example.com", source_kind=" file ").total == 1
 
 
+def test_query_service_trims_source_kind_and_preserves_url_value_matching(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-source-kind-url-filter.db"
+    service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
+    service.persist_multiple_runs(
+        [
+            (
+                "url",
+                "HTTPS://Example.TEST/report#frag",
+                ExtractionResult.from_grouped_payload({"domains": ["example.com"]}, {}),
+            )
+        ],
+        tool_version="5.0.0",
+        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+    )
+
+    assert (
+        service.query_runs_page(
+            limit=10, source_kind=" url ", source_value="https://example.test/report"
+        ).total
+        == 1
+    )
+    assert (
+        service.search_iocs_page(
+            value="example.com", source_kind=" url ", source_value="https://example.test/report"
+        ).total
+        == 1
+    )
+
+
 def test_unit_of_work_rollback_discards_uncommitted_changes(tmp_path) -> None:
     db_path = tmp_path / "iocparser-rollback.db"
     unit_of_work = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")

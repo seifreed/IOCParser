@@ -30,8 +30,8 @@ from iocparser.infrastructure.file_parser import decode_file_bytes
 from iocparser.infrastructure.file_readers import MagicTextSourceReader
 from iocparser.infrastructure.migration_revisions import rev_0005_fts_metrics
 from iocparser.infrastructure.persistence.history.row_values import typed_row
-from iocparser.infrastructure.streaming_chunks import read_chunks_with_prefix
 from iocparser.infrastructure.persistence_fts import build_fts_query
+from iocparser.infrastructure.streaming_chunks import read_chunks_with_prefix
 from iocparser.worker_config_support import load_worker_file_values
 
 
@@ -96,7 +96,7 @@ def test_binary_chunk_reader_preserves_split_utf8_character() -> None:
     """Binary streaming must not drop UTF-8 characters split across chunk reads."""
     chunks = list(
         read_chunks_with_prefix(
-            file_obj=io.BytesIO("éexample.com".encode("utf-8")),
+            file_obj=io.BytesIO("éexample.com".encode()),
             chunk_size=1,
             overlap=0,
             progress_callback=None,

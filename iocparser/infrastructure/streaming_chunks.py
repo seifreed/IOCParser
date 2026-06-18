@@ -10,6 +10,31 @@ def decode_chunk(data: bytes | str) -> str:
     return data.decode("utf-8", errors="ignore") if isinstance(data, bytes) else data
 
 
+def decoded_stream_chunk(
+    data: bytes | str,
+    decoder: codecs.IncrementalDecoder,
+    *,
+    final: bool,
+) -> str:
+    return decoder.decode(data, final=final) if isinstance(data, bytes) else data
+
+
+def chunk_size_bytes(data: bytes | str) -> int:
+    return len(data) if isinstance(data, bytes) else len(data.encode("utf-8", errors="ignore"))
+
+
+def chunk_with_prefix(
+    chunk: str,
+    previous_chunk_tail: str,
+    previous_tail_has_leading_context: bool,
+) -> tuple[str, int]:
+    prefix = previous_chunk_tail
+    if prefix and not previous_tail_has_leading_context:
+        # Preserve a known left boundary when the overlap starts at the stream origin.
+        prefix = f" {prefix}"
+    return (prefix + chunk, len(prefix)) if prefix else (chunk, 0)
+
+
 def read_chunks_with_prefix(
     *,
     file_obj: BinaryIO | TextIO,
@@ -51,31 +76,21 @@ def read_chunks_with_prefix(
         except Exception as exc:
             next_raw_chunk = b"" if isinstance(raw_chunk, bytes) else ""
             deferred_error = exc
-        bytes_read += (
-            len(raw_chunk)
-            if isinstance(raw_chunk, bytes)
-            else len(raw_chunk.encode("utf-8", errors="ignore"))
-        )
+        bytes_read += chunk_size_bytes(raw_chunk)
         if progress_callback and total_size:
             progress_callback(min(100, int((bytes_read / total_size) * 100)))
 
-        chunk = (
-            utf8_decoder.decode(raw_chunk, final=not next_raw_chunk)
-            if isinstance(raw_chunk, bytes)
-            else raw_chunk
-        )
+        chunk = decoded_stream_chunk(raw_chunk, utf8_decoder, final=not next_raw_chunk)
         if not chunk:
             if deferred_error is not None:
                 raise deferred_error
             raw_chunk = next_raw_chunk
             continue
-        prefix = previous_chunk_tail
-        if prefix and not previous_tail_has_leading_context:
-            # Preserve a known left boundary when the overlap starts at the stream origin.
-            prefix = f" {prefix}"
-        prefix_length = len(prefix)
-        if prefix:
-            chunk = prefix + chunk
+        chunk, prefix_length = chunk_with_prefix(
+            chunk,
+            previous_chunk_tail,
+            previous_tail_has_leading_context,
+        )
 
         is_final = not next_raw_chunk
         yield chunk, prefix_length, is_final

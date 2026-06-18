@@ -609,6 +609,10 @@ def _import_batch_jobs(
     batch_map: dict[int, int] = {}
     for row in rows:
         typed = typed_row(row)
+        if not isinstance(typed.get("source_kind"), str) or not all(
+            isinstance(typed.get(key), datetime) for key in ("started_at", "finished_at")
+        ):
+            continue
         original_id = typed.get("id")
         import_marker = {
             "archive_id": archive_id,
@@ -666,7 +670,6 @@ def _import_batch_jobs(
         if isinstance(original_id, int):
             batch_map[original_id] = existing.id
     return inserted, batch_map
-
 
 def _import_runs(
     session: Session,
@@ -753,7 +756,6 @@ def _import_runs(
             run_map[original_id] = existing.id
     return inserted, run_map
 
-
 def _import_run_iocs(
     session: Session,
     rows: list[dict[str, object]],
@@ -784,7 +786,6 @@ def _import_run_iocs(
         )
         inserted += 1
     return inserted
-
 
 def _import_failed_batch_items(
     session: Session,
@@ -836,7 +837,6 @@ def _import_failed_batch_items(
         seen_signatures[signature] = seen_count + 1
         inserted += 1
     return inserted
-
 
 def _import_distributed_jobs(
     session: Session,

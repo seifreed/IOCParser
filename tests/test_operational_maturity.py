@@ -2479,6 +2479,41 @@ def test_import_history_keeps_identical_batch_jobs_from_distinct_payloads_separa
     assert len(imported_jobs) == 2
 
 
+def test_import_history_normalizes_replayed_batch_job_identity_fields(
+    tmp_path: Path,
+) -> None:
+    source_db_uri = f"sqlite:///{tmp_path / 'history-batch-normalized-source.sqlite'}"
+    target_db_uri = f"sqlite:///{tmp_path / 'history-batch-normalized-target.sqlite'}"
+    config = load_config(True, source_db_uri, None)
+    report = {
+        "total": 1,
+        "successful": 0,
+        "failed": 1,
+        "status": "failed",
+        "duration_ms": 10,
+        "phase_timestamps": {
+            "started_at": "2026-01-02T03:04:05+00:00",
+            "finished_at": "2026-01-02T03:04:05.010000+00:00",
+        },
+        "items": [
+            {
+                "url": "https://dup.example",
+                "status": "failed",
+                "error": "boom",
+                "error_type": "Timeout",
+                "retry_attempt": 1,
+            },
+        ],
+    }
+    persist_batch_job(report, config=config, source_kind="url", run_ids=(), effective_config={})
+    payload = export_persisted_history(db_uri=source_db_uri)
+    payload["batch_jobs"][0]["source_kind"] = " URL "
+
+    assert import_history_raw(target_db_uri, payload)["batch_jobs"] == 1
+    assert import_history_raw(target_db_uri, payload)["batch_jobs"] == 0
+    assert len(list_failed_batch_jobs(db_uri=target_db_uri, limit=10)) == 1
+
+
 def test_import_history_keeps_identical_runs_from_distinct_payloads_separate(
     tmp_path: Path,
 ) -> None:
@@ -2765,6 +2800,45 @@ def test_import_history_keeps_identical_dead_letter_jobs_from_distinct_payloads_
     dead_letters = PersistenceClient(target_db_uri).list_dead_letters(limit=10)
     assert len(dead_letters) == 2
     assert [item.job_id for item in dead_letters] == ["job-1", "job-1"]
+
+
+def test_import_history_normalizes_replayed_dead_letter_identity_fields(
+    tmp_path: Path,
+) -> None:
+    source_db_uri = f"sqlite:///{tmp_path / 'history-dead-normalized-source.sqlite'}"
+    target_db_uri = f"sqlite:///{tmp_path / 'history-dead-normalized-target.sqlite'}"
+
+    service = SQLAlchemyDistributedJobService(source_db_uri)
+    envelope = QueueEnvelope(
+        request=PipelineJobRequest(
+            input_kind="url",
+            source_value="https://same.example/feed",
+            job_id="job-1",
+            correlation_id="corr-1",
+        ),
+        queue_backend="filesystem",
+        queue_name="default",
+    )
+    service.create_or_get_job(envelope=envelope, receipt_id="receipt-1")
+    service.mark_dead_lettered(
+        job_id="job-1",
+        attempts=2,
+        error=PipelineErrorInfo(
+            code="INPUT_TIMEOUT",
+            category="timeout",
+            retryable=True,
+            status="failed",
+            message="timeout",
+        ),
+    )
+
+    payload = export_persisted_history(db_uri=source_db_uri)
+    payload["dead_letter_jobs"][0]["queue_backend"] = " filesystem "
+    payload["dead_letter_jobs"][0]["source_value"] = " https://same.example/feed "
+
+    assert import_history_raw(target_db_uri, payload)["dead_letter_jobs"] == 1
+    assert import_history_raw(target_db_uri, payload)["dead_letter_jobs"] == 0
+    assert len(PersistenceClient(target_db_uri).list_dead_letters(limit=10)) == 1
 
 
 def test_import_history_keeps_distinct_dead_letter_jobs_with_same_short_signature(

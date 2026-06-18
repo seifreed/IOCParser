@@ -1038,7 +1038,6 @@ def test_history_private_edges_with_real_models(tmp_path) -> None:
                 "error_summary_json": '{"RuntimeError": 1}',
                 "metrics_json": '{"duration_ms": 5}',
             }
-            assert ops._existing_batch_job(session, batch_row) == batch
             assert ops._batch_job_signature(batch_row)[0] == "url"
 
             failed = FailedBatchItemModel(
@@ -1051,20 +1050,7 @@ def test_history_private_edges_with_real_models(tmp_path) -> None:
             )
             session.add(failed)
             session.flush()
-            assert (
-                ops._existing_failed_batch_item(
-                    session,
-                    {
-                        "source_value": "https://failed.example",
-                        "error_type": "RuntimeError",
-                        "error_message": "failed",
-                        "retry_attempt": 2,
-                        "created_at": now,
-                    },
-                    batch_job_id=batch.id,
-                )
-                == failed
-            )
+            assert failed.source_value == "https://failed.example"
 
             source = SourceModel(
                 kind="file",

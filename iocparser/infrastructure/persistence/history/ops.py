@@ -26,6 +26,7 @@ from iocparser.infrastructure.persistence_batch import (
     load_failed_batch_items,
 )
 from iocparser.infrastructure.persistence_distributed_records import HISTORY_IMPORT_MARKER_KEY
+from iocparser.infrastructure.persistence_distributed_support import normalized_queue_backend
 from iocparser.infrastructure.persistence_migrations import migrate_engine
 from iocparser.infrastructure.persistence_repository_support import (
     build_tags_search,
@@ -44,7 +45,7 @@ from iocparser.infrastructure.persistence_schema import (
     RunModel,
     SourceModel,
 )
-from iocparser.infrastructure.persistence_support import build_summary, prune_runs
+from iocparser.infrastructure.persistence_support import build_summary, normalized_source_filter, prune_runs
 from iocparser.infrastructure.persistence_uow import create_engine_for_uri
 
 _typed_row = typed_row
@@ -270,24 +271,6 @@ def _existing_ioc(session: Session, row: dict[str, object]) -> IOCModel | None:
     ).scalar_one_or_none()
 
 
-def _existing_batch_job(session: Session, row: dict[str, object]) -> BatchJobModel | None:
-    return session.execute(
-        select(BatchJobModel).where(
-            BatchJobModel.source_kind == str(row.get("source_kind", "")),
-            BatchJobModel.started_at == row.get("started_at"),
-            BatchJobModel.finished_at == row.get("finished_at"),
-            BatchJobModel.total_inputs == int(row.get("total_inputs", 0)),  # type: ignore[call-overload]
-            BatchJobModel.successful_inputs == int(row.get("successful_inputs", 0)),  # type: ignore[call-overload]
-            BatchJobModel.failed_inputs == int(row.get("failed_inputs", 0)),  # type: ignore[call-overload]
-            BatchJobModel.retry_attempt == int(row.get("retry_attempt", 0)),  # type: ignore[call-overload]
-            BatchJobModel.status == str(row.get("status", "")),
-            BatchJobModel.config_json == str(row.get("config_json", "{}")),
-            BatchJobModel.error_summary_json == str(row.get("error_summary_json", "{}")),
-            BatchJobModel.metrics_json == str(row.get("metrics_json", "{}")),
-        )
-    ).scalar_one_or_none()
-
-
 def _same_origin_archive(session: Session, payload: dict[str, object]) -> bool:
     raw_origin_id = payload.get(HISTORY_ORIGIN_ID_KEY)
     if not isinstance(raw_origin_id, str) or not raw_origin_id.strip():
@@ -440,24 +423,6 @@ def _existing_run_ioc(session: Session, *, run_id: int, ioc_id: int) -> RunIOCMo
     ).scalar_one_or_none()
 
 
-def _existing_failed_batch_item(
-    session: Session,
-    row: dict[str, object],
-    *,
-    batch_job_id: int,
-) -> FailedBatchItemModel | None:
-    return session.execute(
-        select(FailedBatchItemModel).where(
-            FailedBatchItemModel.batch_job_id == batch_job_id,
-            FailedBatchItemModel.source_value == str(row.get("source_value", "")),
-            FailedBatchItemModel.error_type == str(row.get("error_type", "")),
-            FailedBatchItemModel.error_message == str(row.get("error_message", "")),
-            FailedBatchItemModel.retry_attempt == int(row.get("retry_attempt", 0)),  # type: ignore[call-overload]
-            FailedBatchItemModel.created_at == row.get("created_at"),
-        )
-    ).scalar_one_or_none()
-
-
 def _existing_distributed_job(
     session: Session,
     row: dict[str, object],
@@ -499,6 +464,8 @@ def _existing_dead_letter_job(
 ) -> DeadLetterJobModel | None:
     original_id = row.get("id")
     public_job_id = str(row.get("job_id", ""))
+    queue_backend = normalized_queue_backend(str(row.get("queue_backend", "")))
+    source_value = str(row.get("source_value", "")).strip()
     candidates = (
         session.execute(
             select(DeadLetterJobModel).where(
@@ -510,9 +477,9 @@ def _existing_dead_letter_job(
                 ),
                 DeadLetterJobModel.dead_lettered_at == row.get("dead_lettered_at"),
                 DeadLetterJobModel.correlation_id == str(row.get("correlation_id", "")),
-                DeadLetterJobModel.queue_backend == str(row.get("queue_backend", "")),
+                DeadLetterJobModel.queue_backend == queue_backend,
                 DeadLetterJobModel.queue_name == str(row.get("queue_name", "")),
-                DeadLetterJobModel.source_value == str(row.get("source_value", "")),
+                DeadLetterJobModel.source_value == source_value,
                 DeadLetterJobModel.attempts == int(row.get("attempts", 0)),  # type: ignore[call-overload]
                 DeadLetterJobModel.max_attempts == int(row.get("max_attempts", 0)),  # type: ignore[call-overload]
                 DeadLetterJobModel.error_code == str(row.get("error_code", "")),
@@ -616,6 +583,7 @@ def _import_batch_jobs(
             isinstance(typed.get(key), datetime) for key in ("started_at", "finished_at")
         ):
             continue
+        typed["source_kind"] = normalized_source_filter(str(typed.get("source_kind", "")))
         original_id = typed.get("id")
         import_marker = {
             "archive_id": archive_id,
@@ -625,7 +593,7 @@ def _import_batch_jobs(
             session.execute(
                 select(BatchJobModel.id)
                 .where(
-                    BatchJobModel.source_kind == str(typed.get("source_kind", "")),
+                    BatchJobModel.source_kind == typed["source_kind"],
                     BatchJobModel.started_at == typed.get("started_at"),
                     BatchJobModel.finished_at == typed.get("finished_at"),
                     BatchJobModel.total_inputs == int(typed.get("total_inputs", 0)),  # type: ignore[call-overload]
@@ -809,9 +777,10 @@ def _import_failed_batch_items(
             continue
         if not isinstance(typed.get("source_value"), str) or not isinstance(typed.get("created_at"), datetime):
             continue
+        typed["source_value"] = str(typed.get("source_value", "")).strip()
         signature = (
             batch_job_id,
-            str(typed.get("source_value", "")),
+            typed["source_value"],
             str(typed.get("error_type", "")),
             str(typed.get("error_message", "")),
             int_from_row(typed.get("retry_attempt"), default=0) or 0,
@@ -910,6 +879,8 @@ def _import_dead_letter_jobs(
             or not isinstance(typed.get("dead_lettered_at"), datetime)
         ):
             continue
+        typed["queue_backend"] = normalized_queue_backend(str(typed.get("queue_backend", "")))
+        typed["source_value"] = str(typed.get("source_value", "")).strip()
         if (
             _existing_dead_letter_job(
                 session, typed, archive_id=archive_id, same_origin=same_origin

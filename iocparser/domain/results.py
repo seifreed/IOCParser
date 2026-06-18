@@ -65,6 +65,12 @@ def classify_ioc(
     return severity, tuple(tags)
 
 
+def _require_str(value: object, *, field: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"Expected {field} to be string-like, got {type(value).__name__}")
+    return value
+
+
 @dataclass(frozen=True)
 class IOCEvidence:
     """Context snippet showing where an IOC was found."""
@@ -95,11 +101,12 @@ class IOC:
         tags: tuple[str, ...] = (),
     ) -> IOC:
         """Build a domain IOC from raw string inputs."""
-        canonical_type = IOCType.from_name(ioc_type)
+        canonical_type = IOCType.from_name(_require_str(ioc_type, field="ioc_type"))
+        raw_value = _require_str(value, field="value")
         derived_severity, derived_tags = classify_ioc(canonical_type)
         return cls(
             ioc_type=canonical_type,
-            value=indicator_value_for(canonical_type, value),
+            value=indicator_value_for(canonical_type, raw_value),
             evidence=evidence,
             severity=severity or derived_severity,
             tags=tags or derived_tags,

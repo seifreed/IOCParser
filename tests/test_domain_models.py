@@ -180,6 +180,19 @@ def test_ioc_and_source_build_from_raw_inputs() -> None:
     assert ioc.canonical_value() == "example.com"
 
 
+def test_source_and_ioc_from_raw_reject_non_string_values() -> None:
+    import pytest
+
+    with pytest.raises(TypeError, match="source_kind|kind"):
+        Source.from_raw(1, "sample")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="value"):
+        Source.from_raw("file", 1)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="ioc_type|kind"):
+        IOC.from_raw(1, "sample")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="value"):
+        IOC.from_raw("domains", 1)  # type: ignore[arg-type]
+
+
 def test_classify_ioc_normalizes_string_type_names() -> None:
     severity, tags = classify_ioc("urls")
 

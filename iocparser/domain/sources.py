@@ -34,6 +34,12 @@ def normalize_netloc(netloc: str) -> str:
     return netloc.lower()
 
 
+def _require_str(value: object, *, field: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"Expected {field} to be string-like, got {type(value).__name__}")
+    return value
+
+
 @dataclass(frozen=True)
 class Source:
     """Input source metadata."""
@@ -61,15 +67,16 @@ class Source:
         fingerprint: str | None = None,
     ) -> Source:
         """Build a Source from wire values."""
-        source_kind = SourceKind.from_name(kind)
+        source_kind = SourceKind.from_name(_require_str(kind, field="kind"))
+        raw_value = _require_str(value, field="value")
         original = original_url
         normalized = normalized_url
         if source_kind is SourceKind.URL:
-            original = original or value
-            normalized = normalize_url_value(normalized) or normalize_url_value(value)
+            original = original or raw_value
+            normalized = normalize_url_value(normalized) or normalize_url_value(raw_value)
         return cls(
             kind=source_kind,
-            value=value,
+            value=raw_value,
             original_url=original,
             normalized_url=normalized,
             mime_type=mime_type,

@@ -1686,6 +1686,7 @@ def test_batch_report_and_filter_helpers(capsys) -> None:
 
 def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'entry.sqlite'}"
+    timestamp = "2026-01-01T00:00:00"
     assert import_history_raw(db_uri, {"sources": "bad"})["sources"] == 0
     assert import_history_raw(db_uri, {"sources": [1]})["sources"] == 0
     assert import_history_raw(db_uri, {"sources": [{"id": 1, "kind": None, "value": None}]})[
@@ -1703,6 +1704,49 @@ def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_pa
     assert import_history_raw(
         db_uri, {"batch_jobs": [{"id": 1, "source_kind": None, "started_at": None, "finished_at": None}]}
     )["batch_jobs"] == 0
+    valid_source = {
+        "id": 1,
+        "kind": "text",
+        "value": "x",
+        "first_seen": timestamp,
+        "last_seen": timestamp,
+    }
+    assert (
+        import_history_raw(
+            db_uri,
+            {
+                "sources": [valid_source],
+                "runs": [
+                    {
+                        "id": 1,
+                        "source_id": 1,
+                        "started_at": None,
+                        "finished_at": None,
+                        "tool_version": "1",
+                    }
+                ],
+            },
+        )["runs"]
+        == 0
+    )
+    assert (
+        import_history_raw(
+            db_uri,
+            {
+                "sources": [valid_source],
+                "runs": [
+                    {
+                        "id": 1,
+                        "source_id": 1,
+                        "started_at": timestamp,
+                        "finished_at": timestamp,
+                        "tool_version": None,
+                    }
+                ],
+            },
+        )["runs"]
+        == 0
+    )
     invalid_fk_counts = import_history_raw(
         db_uri,
         {

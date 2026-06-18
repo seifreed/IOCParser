@@ -708,6 +708,10 @@ def _import_runs(
         source_id = source_map.get(int_from_row(typed.get("source_id"), default=0) or 0)
         if source_id is None:
             continue
+        if not isinstance(typed.get("tool_version"), str) or not all(
+            isinstance(typed.get(key), datetime) for key in ("started_at", "finished_at")
+        ):
+            continue
         original_batch_id = typed.get("batch_job_id")
         batch_job_id = (
             batch_map.get(int(original_batch_id)) if isinstance(original_batch_id, int) else None
@@ -919,7 +923,6 @@ def _import_dead_letter_jobs(
         inserted += 1
     return inserted
 
-
 def _row_dict(model: HistoryModel) -> dict[str, object]:
     if isinstance(model, SourceModel):
         return {
@@ -1048,7 +1051,6 @@ def _row_dict(model: HistoryModel) -> dict[str, object]:
         "dead_lettered_at": model.dead_lettered_at.isoformat(),
     }
 
-
 def export_history(db_uri: str) -> dict[str, object]:
     with _managed_session(db_uri) as session:
         origin_id = _history_origin_id(session)
@@ -1139,7 +1141,6 @@ def archive_history(db_uri: str, output_path: str) -> str:
     path.write_text(json.dumps(export_history(db_uri), indent=2, sort_keys=True), encoding="utf-8")
     return str(path)
 
-
 def restore_history(db_uri: str, archive_path: str) -> dict[str, int]:
     payload: object = json.loads(Path(archive_path).read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
@@ -1154,7 +1155,6 @@ def _history_compaction_sql(dialect_name: str, table_names: tuple[str, ...]) -> 
     if dialect_name in ("mysql", "mariadb") and table_names:
         return ["OPTIMIZE TABLE " + ", ".join(f"`{name}`" for name in table_names)]
     return []
-
 
 def compact_history(db_uri: str) -> None:
     with _managed_connection(db_uri) as connection:

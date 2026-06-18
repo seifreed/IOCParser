@@ -64,6 +64,7 @@ from iocparser.cli_runtime import (
     _parse_http_mapping,
     apply_config_defaults,
     downloader_for_args,
+    mb_to_bytes,
     warning_service_for_args,
 )
 from iocparser.config import AppConfig, load_config
@@ -2728,6 +2729,9 @@ def test_internal_http_mapping_and_static_timeout_helpers() -> None:
     assert RequestsURLDownloader.default_timeout() == 30
     assert RequestsURLDownloader.default_connect_timeout() == 10.0
     assert RequestsURLDownloader.default_read_timeout() == 30.0
+    assert mb_to_bytes(1.5) == 1572864
+    with pytest.raises(ValidationError, match="Invalid max_input_size_mb"):
+        mb_to_bytes(-1)
 
 
 def test_matches_advanced_filters_rejects_missing_tags() -> None:

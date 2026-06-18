@@ -11,12 +11,17 @@ from iocparser.shared_utils import validated_diff_only
 
 INVALID_HTTP_MAPPING_ERROR = "Invalid HTTP mapping JSON: {value}"
 INVALID_HTTP_MAPPING_ITEM_ERROR = "Invalid HTTP mapping item: {value}"
+INVALID_MAX_INPUT_SIZE_MB = "Invalid max_input_size_mb: {value}"
 TLS_FILE_NOT_FOUND = "{flag} file does not exist: {path}"
 
 
 def mb_to_bytes(megabytes: float | None) -> int | None:
     """Convert a megabyte limit (e.g. --max-input-size-mb) to bytes, preserving None."""
-    return int(megabytes * 1024 * 1024) if megabytes is not None else None
+    if megabytes is None:
+        return None
+    if megabytes < 0:
+        raise ValidationError(INVALID_MAX_INPUT_SIZE_MB.format(value=megabytes))
+    return int(megabytes * 1024 * 1024)
 
 
 def _validated_tls_file(value: str | None, *, flag: str) -> str | None:

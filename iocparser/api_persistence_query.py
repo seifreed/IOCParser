@@ -65,7 +65,7 @@ class SearchPersistedIOCOptions(TypedDict, total=False):
     date_to: str | None
     source_kind: str | None
     source_value: str | None
-    ioc_type: str | None
+    ioc_type: str | tuple[str, ...] | None
     severity: str | None
     tag: str | None
     exclude_tag: str | None
@@ -79,7 +79,7 @@ class PersistedDiffOptions(TypedDict, total=False):
     diff_only: str
     only_warnings: bool
     only_normal: bool
-    ioc_type: str | None
+    ioc_type: str | tuple[str, ...] | None
     severity: str | None
     tag: str | None
 
@@ -125,7 +125,7 @@ class PersistedExportFilters:
 @dataclass(frozen=True)
 class PersistedDiffFilters(PersistedExportFilters):
     diff_only: str = "all"
-    ioc_type: str | None = None
+    ioc_type: str | tuple[str, ...] | None = None
 
 
 MISSING_DIFF_TARGET_ERROR = "Missing diff target"
@@ -157,6 +157,14 @@ def optional_str(value: object | None) -> str | None:
         return None
     stripped = str(value).strip()
     return stripped or None
+
+
+def _ioc_type_filter_value(value: object | None) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, tuple):
+        return ",".join(str(ioc_type).strip() for ioc_type in value if str(ioc_type).strip())
+    return optional_str(value)
 
 
 def bool_option(value: object | None, default: bool = False) -> bool:
@@ -196,7 +204,7 @@ def search_input(value: str, options: SearchPersistedIOCOptions) -> SearchPersis
         date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
         source_kind=optional_str(options.get("source_kind")),
         source_value=options.get("source_value"),
-        ioc_type=validated_ioc_type_filters(optional_str(options.get("ioc_type"))) or None,
+        ioc_type=validated_ioc_type_filters(_ioc_type_filter_value(options.get("ioc_type"))) or None,
         severity=validated_severity_filters(options.get("severity")),
         tags=parse_string_filters(options.get("tag")),
         exclude_tags=parse_string_filters(options.get("exclude_tag")),
@@ -354,7 +362,7 @@ def persisted_diff_input(
         only_removed=diff_only == "removed",
         only_warnings=bool_option(options.get("only_warnings")),
         only_normal=bool_option(options.get("only_normal")),
-        ioc_types=validated_ioc_type_filters(options.get("ioc_type")),
+        ioc_types=validated_ioc_type_filters(_ioc_type_filter_value(options.get("ioc_type"))),
         severity=validated_severity_filters(options.get("severity")),
         tags=parse_string_filters(options.get("tag")),
     )
@@ -373,7 +381,7 @@ def latest_source_diff_input(
         only_removed=diff_only == "removed",
         only_warnings=bool_option(options.get("only_warnings")),
         only_normal=bool_option(options.get("only_normal")),
-        ioc_types=validated_ioc_type_filters(options.get("ioc_type")),
+        ioc_types=validated_ioc_type_filters(_ioc_type_filter_value(options.get("ioc_type"))),
         severity=validated_severity_filters(options.get("severity")),
         tags=parse_string_filters(options.get("tag")),
     )
@@ -431,7 +439,7 @@ def coerce_diff_filters(
         only_warnings=bool_option(option_overrides.pop("only_warnings", False)),
         only_normal=bool_option(option_overrides.pop("only_normal", False)),
         diff_only=validated_diff_only(optional_str(option_overrides.pop("diff_only", None))),
-        ioc_type=optional_str(option_overrides.pop("ioc_type", None)),
+        ioc_type=_ioc_type_filter_value(option_overrides.pop("ioc_type", None)),
     )
 
 

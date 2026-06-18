@@ -194,6 +194,10 @@ class WarningListDiagnosticsMixin(ABC):
             self._log_list_check_result(clean_value, warning_list, list_id, values)
 
         in_warning_list, warning_info = self.check_value(value, normalized_ioc_type)
+        if not (in_warning_list and warning_info) and normalized_ioc_type == "emails":
+            email_domain_check = getattr(self, "_email_domain_in_warning_list", None)
+            if callable(email_domain_check):
+                in_warning_list, warning_info = email_domain_check(value)
         if in_warning_list and warning_info:
             logger.info(
                 "\n✓ FINAL RESULT: Value IS in warning list: %s",

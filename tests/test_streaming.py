@@ -713,6 +713,36 @@ class TestStreamingIOCExtractor:
 
         assert "https://evil.example/path" in combined.get("urls", [])
 
+    def test_extract_from_stream_binary_utf16_bom_non_seekable(self):
+        """Non-seekable binary streams with BOMs must be decoded too."""
+
+        class NonSeekableRaw(io.RawIOBase):
+            def __init__(self, data: bytes) -> None:
+                self._buffer = io.BytesIO(data)
+
+            def readable(self) -> bool:
+                return True
+
+            def seekable(self) -> bool:
+                return False
+
+            def readinto(self, b: bytearray) -> int:
+                data = self._buffer.read(len(b))
+                n = len(data)
+                b[:n] = data
+                return n
+
+        extractor = StreamingIOCExtractor(chunk_size=200, defang=False)
+        stream = io.BufferedReader(NonSeekableRaw("https://evil.example/path".encode("utf-16")))
+
+        chunks = list(extractor.extract_from_stream(stream, is_text=False))
+        combined: dict[str, list[str]] = defaultdict(list)
+        for chunk in chunks:
+            for key, values in chunk.items():
+                combined[key].extend(values)
+
+        assert "https://evil.example/path" in combined.get("urls", [])
+
     def test_extract_from_stream_clears_state(self):
         """
         Test that seen_iocs state is cleared for new streams.

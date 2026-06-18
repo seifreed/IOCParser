@@ -56,8 +56,11 @@ def typed_row(row: dict[str, object]) -> dict[str, object]:
     row_dict = dict(row)
     for key, value in list(row_dict.items()):
         if isinstance(value, str) and key.endswith(("_at", "_seen")) and value:
+            stripped = value.strip()
+            if not stripped:
+                continue
             with suppress(ValueError, TypeError):
-                row_dict[key] = datetime.fromisoformat(value)
+                row_dict[key] = datetime.fromisoformat(stripped)
         if key in INT_FIELD_DEFAULTS:
             parsed = int_from_row(value, default=INT_FIELD_DEFAULTS[key])
             if parsed is None:

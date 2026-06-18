@@ -524,6 +524,11 @@ def test_typed_row_preserves_nullable_retryable() -> None:
     assert typed_row({"is_warning": None})["is_warning"] is False
 
 
+def test_typed_row_trims_padded_datetimes() -> None:
+    row = typed_row({"started_at": " 2024-01-01T12:00:00 "})
+    assert row["started_at"].isoformat() == "2024-01-01T12:00:00"
+
+
 @pytest.mark.parametrize("label", ["ja3", "ja3s", "hassh", "hassh_server", "imphash"])
 def test_labelled_fingerprint_not_duplicated_as_md5(label: str) -> None:
     """A context-labelled 32-hex fingerprint must not also surface as an md5 hash.

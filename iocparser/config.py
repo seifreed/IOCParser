@@ -205,6 +205,40 @@ def _parse_float_value(value: str, *, option_name: str) -> float:
         raise ValueError(INVALID_FLOAT_ERROR.format(option_name=option_name, value=value)) from exc
 
 
+def _ini_has_value(parser: configparser.ConfigParser, section: str, option: str) -> bool:
+    return bool(parser.get(section, option, fallback="").strip())
+
+
+def _ini_bool(
+    parser: configparser.ConfigParser, section: str, option: str, *, fallback: bool
+) -> bool:
+    if not _ini_has_value(parser, section, option):
+        return fallback
+    return _parse_bool_value(parser.get(section, option), option_name=f"{section}.{option}")
+
+
+def _ini_int(parser: configparser.ConfigParser, section: str, option: str, *, fallback: int) -> int:
+    if not _ini_has_value(parser, section, option):
+        return fallback
+    return _parse_int_value(parser.get(section, option), option_name=f"{section}.{option}")
+
+
+def _ini_float(
+    parser: configparser.ConfigParser, section: str, option: str, *, fallback: float
+) -> float:
+    if not _ini_has_value(parser, section, option):
+        return fallback
+    return _parse_float_value(parser.get(section, option), option_name=f"{section}.{option}")
+
+
+def _ini_optional_float(
+    parser: configparser.ConfigParser, section: str, option: str
+) -> float | None:
+    if not _ini_has_value(parser, section, option):
+        return None
+    return _parse_float_value(parser.get(section, option), option_name=f"{section}.{option}")
+
+
 def _apply_env_overrides(values: ConfigValues) -> None:
     """Layer IOCPARSER_<OPTION> environment variables over INI values in place.
 
@@ -265,33 +299,35 @@ def _read_ini_config(config_path: Path) -> ConfigValues:
         values["output_format"] = parser.get("defaults", "output_format", fallback=None)
         values["severity"] = parser.get("defaults", "severity", fallback=None)
         values["tag"] = parser.get("defaults", "tag", fallback=None)
-        values["with_context"] = parser.getboolean("defaults", "with_context", fallback=False)
-        values["streaming"] = parser.getboolean("defaults", "streaming", fallback=False)
-        values["summary"] = parser.getboolean("defaults", "summary", fallback=False)
-        values["parallel"] = parser.getint("defaults", "parallel", fallback=1)
-        values["chunk_size"] = parser.getint("defaults", "chunk_size", fallback=1024 * 1024)
-        values["overlap"] = parser.getint("defaults", "overlap", fallback=1024)
+        values["with_context"] = _ini_bool(parser, "defaults", "with_context", fallback=False)
+        values["streaming"] = _ini_bool(parser, "defaults", "streaming", fallback=False)
+        values["summary"] = _ini_bool(parser, "defaults", "summary", fallback=False)
+        values["parallel"] = _ini_int(parser, "defaults", "parallel", fallback=1)
+        values["chunk_size"] = _ini_int(parser, "defaults", "chunk_size", fallback=1024 * 1024)
+        values["overlap"] = _ini_int(parser, "defaults", "overlap", fallback=1024)
         values["diff_only"] = parser.get("defaults", "diff_only", fallback="all")
 
     if parser.has_section("network"):
-        values["url_workers"] = parser.getint("network", "url_workers", fallback=4)
-        values["url_retries"] = parser.getint("network", "url_retries", fallback=0)
-        values["url_backoff"] = parser.getfloat("network", "url_backoff", fallback=0.0)
-        values["rate_limit"] = parser.getfloat("network", "rate_limit", fallback=0.0)
+        values["url_workers"] = _ini_int(parser, "network", "url_workers", fallback=4)
+        values["url_retries"] = _ini_int(parser, "network", "url_retries", fallback=0)
+        values["url_backoff"] = _ini_float(parser, "network", "url_backoff", fallback=0.0)
+        values["rate_limit"] = _ini_float(parser, "network", "rate_limit", fallback=0.0)
         values["user_agent"] = parser.get("network", "user_agent", fallback=None)
         values["headers_json"] = parser.get("network", "headers_json", fallback=None)
         values["cookies_json"] = parser.get("network", "cookies_json", fallback=None)
         values["proxy"] = parser.get("network", "proxy", fallback=None)
-        values["allow_redirects"] = parser.getboolean("network", "allow_redirects", fallback=True)
-        values["tls_verify"] = parser.getboolean("network", "tls_verify", fallback=True)
+        values["allow_redirects"] = _ini_bool(parser, "network", "allow_redirects", fallback=True)
+        values["tls_verify"] = _ini_bool(parser, "network", "tls_verify", fallback=True)
         values["tls_cert"] = parser.get("network", "tls_cert", fallback=None)
         values["ca_bundle"] = parser.get("network", "ca_bundle", fallback=None)
-        values["connect_timeout"] = parser.getfloat("network", "connect_timeout", fallback=None)
-        values["read_timeout"] = parser.getfloat("network", "read_timeout", fallback=None)
-        values["max_input_size_mb"] = parser.getfloat("network", "max_input_size_mb", fallback=None)
-        values["max_input_seconds"] = parser.getfloat("network", "max_input_seconds", fallback=None)
-        values["max_queue_size"] = parser.getint("network", "max_queue_size", fallback=64)
-        values["skip_processed"] = parser.getboolean("network", "skip_processed", fallback=False)
+        values["connect_timeout"] = _ini_optional_float(parser, "network", "connect_timeout")
+        values["read_timeout"] = _ini_optional_float(parser, "network", "read_timeout")
+        values["max_input_size_mb"] = _ini_optional_float(parser, "network", "max_input_size_mb")
+        values["max_input_seconds"] = _ini_optional_float(
+            parser, "network", "max_input_seconds"
+        )
+        values["max_queue_size"] = _ini_int(parser, "network", "max_queue_size", fallback=64)
+        values["skip_processed"] = _ini_bool(parser, "network", "skip_processed", fallback=False)
 
     return values
 

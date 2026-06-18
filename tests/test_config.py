@@ -154,6 +154,34 @@ def test_config_reports_invalid_numeric_ini_value_cleanly(tmp_path) -> None:
         load_config(None, None, str(config_path))
 
 
+def test_config_empty_numeric_and_boolean_ini_values_use_defaults(tmp_path) -> None:
+    config_path = tmp_path / "iocparser.ini"
+    config_path.write_text(
+        (
+            "[defaults]\n"
+            "streaming =\n"
+            "parallel =\n"
+            "chunk_size =\n"
+            "[network]\n"
+            "url_workers =\n"
+            "url_backoff =\n"
+            "allow_redirects =\n"
+            "connect_timeout =\n"
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_config(None, None, str(config_path))
+
+    assert config.streaming is False
+    assert config.parallel == 1
+    assert config.chunk_size == 1024 * 1024
+    assert config.url_workers == 4
+    assert config.url_backoff == 0.0
+    assert config.allow_redirects is True
+    assert config.connect_timeout is None
+
+
 def test_explicit_missing_config_path_is_rejected(tmp_path) -> None:
     missing_config = tmp_path / "missing.ini"
 

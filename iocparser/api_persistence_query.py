@@ -261,11 +261,14 @@ def validated_ioc_type_filters(value: str | None) -> tuple[str, ...]:
 def validated_stix_types(value: str | None) -> str | None:
     if value is None:
         return None
+    stripped = value.strip()
+    if not stripped:
+        return None
     try:
-        parse_ioc_types(value)
+        parse_ioc_types(stripped)
     except ValueError as exc:
         raise ValidationError(INVALID_IOC_TYPE_ERROR.format(value=value)) from exc
-    return value
+    return stripped
 
 
 def validated_tag_mode(value: str) -> str:

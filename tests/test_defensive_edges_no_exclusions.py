@@ -711,6 +711,43 @@ def test_rabbitmq_close_clears_state_and_surfaces_primary_error(
     assert adapter._connection is None
 
 
+def test_distributed_job_create_or_get_surfaces_close_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import iocparser.infrastructure.persistence_distributed as distributed
+
+    class _Unit:
+        def __init__(self) -> None:
+            self.closed = False
+
+        def close(self) -> None:
+            self.closed = True
+            raise RuntimeError("close failed")
+
+    unit = _Unit()
+    monkeypatch.setattr(distributed, "SQLAlchemyUnitOfWork", lambda _uri: unit)
+
+    service = distributed.SQLAlchemyDistributedJobService("sqlite:///unused.db")
+    monkeypatch.setattr(
+        service,
+        "_create_or_get_job_inner",
+        lambda **_kwargs: object(),
+    )
+
+    with pytest.raises(RuntimeError, match="close failed"):
+        service.create_or_get_job(
+            envelope=QueueEnvelope(
+                request=PipelineJobRequest(
+                    input_kind="text", source_value="payload", job_id="job"
+                ),
+                queue_backend="memory",
+                queue_name="default",
+            ),
+            receipt_id="receipt",
+        )
+    assert unit.closed is True
+
+
 def test_streaming_mmap_boundary_and_interruptions(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

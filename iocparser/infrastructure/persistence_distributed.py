@@ -35,7 +35,7 @@ from iocparser.infrastructure.persistence_schema import (
     DistributedJobModel,
     SQLAlchemyUnitOfWork,
 )
-from iocparser.shared_utils import rollback_and_log
+from iocparser.shared_utils import close_and_log, rollback_and_log
 
 AMBIGUOUS_DISTRIBUTED_JOB_ID = "ambiguous distributed job id"
 logger = logging.getLogger(__name__)
@@ -70,7 +70,11 @@ class SQLAlchemyDistributedJobService:
             )
             raise
         finally:
-            unit.close()
+            close_and_log(
+                unit,
+                logger=logger,
+                message="Close failed while creating distributed job",
+            )
 
     def _create_or_get_job_inner(
         self, *, envelope: QueueEnvelope, receipt_id: str, unit: SQLAlchemyUnitOfWork

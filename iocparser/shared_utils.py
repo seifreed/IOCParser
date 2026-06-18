@@ -1,5 +1,6 @@
 import logging
 import re as _re
+import sys
 from collections.abc import Callable, Iterable, Mapping
 from threading import Lock
 from typing import Protocol
@@ -20,10 +21,24 @@ class _RollbackUnit(Protocol):
     def rollback(self) -> None: ...
 
 
+class _CloseUnit(Protocol):
+    def close(self) -> None: ...
+
+
 def rollback_and_log(unit: _RollbackUnit, *, logger: logging.Logger, message: str) -> None:
     try:
         unit.rollback()
     except Exception:
+        logger.exception(message)
+
+
+def close_and_log(unit: _CloseUnit, *, logger: logging.Logger, message: str) -> None:
+    primary_exc = sys.exc_info()[1]
+    try:
+        unit.close()
+    except Exception:
+        if primary_exc is None:
+            raise
         logger.exception(message)
 
 

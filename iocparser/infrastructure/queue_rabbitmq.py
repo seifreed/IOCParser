@@ -134,77 +134,123 @@ class RabbitMQQueueAdapter:
         self._channel = channel
         return channel
 
+    def _reset_connection(self) -> None:
+        self._channel = None
+        self._connection = None
+
     def enqueue(self, *, queue_name: str, envelope: QueueEnvelope) -> QueueReceipt:
         with self._lock:
-            pika = _pika_module()
-            channel = self._channel_for()
-            channel.queue_declare(queue=queue_name, durable=True)
-            message_id = envelope.request.job_id or str(uuid4())
-            channel.basic_publish(
-                exchange="",
-                routing_key=queue_name,
-                body=serialize_queue_record(envelope).encode("utf-8"),
-                properties=pika.BasicProperties(delivery_mode=2, message_id=message_id),
-            )
-            return QueueReceipt("rabbitmq", queue_name, message_id, message_id)
+            try:
+                pika = _pika_module()
+                channel = self._channel_for()
+                channel.queue_declare(queue=queue_name, durable=True)
+                message_id = envelope.request.job_id or str(uuid4())
+                channel.basic_publish(
+                    exchange="",
+                    routing_key=queue_name,
+                    body=serialize_queue_record(envelope).encode("utf-8"),
+                    properties=pika.BasicProperties(delivery_mode=2, message_id=message_id),
+                )
+                return QueueReceipt("rabbitmq", queue_name, message_id, message_id)
+            except (KeyboardInterrupt, SystemExit):
+                raise
+            except Exception:
+                self._reset_connection()
+                raise
 
     def dequeue(self, *, queue_name: str) -> tuple[QueueReceipt, QueueEnvelope] | None:
         with self._lock:
-            channel = self._channel_for()
-            channel.queue_declare(queue=queue_name, durable=True)
-            method, properties, body = channel.basic_get(queue=queue_name, auto_ack=False)
-            if method is None or properties is None or body is None:
-                return None
-            receipt = QueueReceipt(
-                "rabbitmq",
-                queue_name,
-                str(method.delivery_tag),
-                str(properties.message_id or uuid4()),
-            )
+            receipt: QueueReceipt | None = None
+            payload: bytes | None = None
             try:
-                envelope = QueueEnvelope.from_record(_load_queue_record(body))
+                channel = self._channel_for()
+                channel.queue_declare(queue=queue_name, durable=True)
+                method, properties, body = channel.basic_get(queue=queue_name, auto_ack=False)
+                if method is None or properties is None or body is None:
+                    return None
+                payload = body
+                receipt = QueueReceipt(
+                    "rabbitmq",
+                    queue_name,
+                    str(method.delivery_tag),
+                    str(properties.message_id or uuid4()),
+                )
+                envelope = QueueEnvelope.from_record(_load_queue_record(payload))
             except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError) as exc:
-                self._quarantine_invalid_payload(receipt, payload=body, error=exc)
+                if receipt is None or payload is None:
+                    self._reset_connection()
+                    raise
+                self._quarantine_invalid_payload(receipt, payload=payload, error=exc)
                 return None
+            except (KeyboardInterrupt, SystemExit):
+                raise
+            except Exception:
+                self._reset_connection()
+                raise
             return receipt, envelope
 
     def ack(self, receipt: QueueReceipt) -> None:
         with self._lock:
-            self._basic_ack(receipt, receipt.queue_name)
+            try:
+                self._basic_ack(receipt, receipt.queue_name)
+            except (KeyboardInterrupt, SystemExit):
+                raise
+            except Exception:
+                self._reset_connection()
+                raise
 
     def requeue(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
         with self._lock:
-            new_receipt = self.enqueue(queue_name=receipt.queue_name, envelope=envelope)
-            self.ack(receipt)
-            return new_receipt
+            try:
+                new_receipt = self.enqueue(queue_name=receipt.queue_name, envelope=envelope)
+                self.ack(receipt)
+                return new_receipt
+            except (KeyboardInterrupt, SystemExit):
+                raise
+            except Exception:
+                self._reset_connection()
+                raise
 
     def dead_letter(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
         with self._lock:
-            new_receipt = self.enqueue(
-                queue_name=f"{receipt.queue_name}{self.dead_letter_suffix}", envelope=envelope
-            )
-            self.ack(receipt)
-            return new_receipt
+            try:
+                new_receipt = self.enqueue(
+                    queue_name=f"{receipt.queue_name}{self.dead_letter_suffix}",
+                    envelope=envelope,
+                )
+                self.ack(receipt)
+                return new_receipt
+            except (KeyboardInterrupt, SystemExit):
+                raise
+            except Exception:
+                self._reset_connection()
+                raise
 
     def _quarantine_invalid_payload(
         self, receipt: QueueReceipt, *, payload: bytes, error: Exception
     ) -> None:
-        pika = _pika_module()
-        channel = self._channel_for()
-        dead_queue_name = f"{receipt.queue_name}{self.dead_letter_suffix}"
-        channel.queue_declare(queue=dead_queue_name, durable=True)
-        channel.basic_publish(
-            exchange="",
-            routing_key=dead_queue_name,
-            body=_invalid_payload_body(
-                payload=payload,
-                queue_name=receipt.queue_name,
-                message_id=receipt.message_id,
-                error=error,
-            ),
-            properties=pika.BasicProperties(delivery_mode=2, message_id=receipt.message_id),
-        )
-        self._basic_ack(receipt, receipt.queue_name)
+        try:
+            pika = _pika_module()
+            channel = self._channel_for()
+            dead_queue_name = f"{receipt.queue_name}{self.dead_letter_suffix}"
+            channel.queue_declare(queue=dead_queue_name, durable=True)
+            channel.basic_publish(
+                exchange="",
+                routing_key=dead_queue_name,
+                body=_invalid_payload_body(
+                    payload=payload,
+                    queue_name=receipt.queue_name,
+                    message_id=receipt.message_id,
+                    error=error,
+                ),
+                properties=pika.BasicProperties(delivery_mode=2, message_id=receipt.message_id),
+            )
+            self._basic_ack(receipt, receipt.queue_name)
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception:
+            self._reset_connection()
+            raise
 
     def _basic_ack(self, receipt: QueueReceipt, queue_name: str) -> None:
         channel = self._channel_for()

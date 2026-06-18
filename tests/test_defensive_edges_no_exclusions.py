@@ -583,6 +583,56 @@ def test_queue_adapters_close_and_preserve_interruptions(monkeypatch: pytest.Mon
     assert closed == [True]
 
 
+def test_rabbitmq_adapter_resets_cache_when_publish_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    import iocparser.infrastructure.queue_rabbitmq as rabbitmq
+
+    connection_calls = [0]
+
+    class _Channel:
+        def queue_declare(self, *, queue: str, durable: bool) -> object:
+            assert durable is True
+            assert queue == "ingest"
+            return None
+
+        def basic_publish(self, **_kwargs: object) -> bool:
+            raise RuntimeError("publish failed")
+
+    class _Connection:
+        def channel(self) -> _Channel:
+            return _Channel()
+
+        def close(self) -> object:
+            return None
+
+    def _blocking_connection(_params: object) -> _Connection:
+        connection_calls[0] += 1
+        return _Connection()
+
+    monkeypatch.setattr(
+        rabbitmq,
+        "_pika_module",
+        lambda: SimpleNamespace(
+            URLParameters=lambda url: url,
+            BlockingConnection=_blocking_connection,
+            BasicProperties=lambda **kwargs: kwargs,
+        ),
+    )
+    adapter = rabbitmq.RabbitMQQueueAdapter("amqp://localhost")
+    request = PipelineJobRequest(input_kind="text", source_value="ioc", persist=False)
+    envelope = QueueEnvelope(request=request, queue_backend="rabbitmq", queue_name="ingest")
+
+    with pytest.raises(RuntimeError, match="publish failed"):
+        adapter.enqueue(queue_name="ingest", envelope=envelope)
+    assert adapter._channel is None
+    assert adapter._connection is None
+
+    with pytest.raises(RuntimeError, match="publish failed"):
+        adapter.enqueue(queue_name="ingest", envelope=envelope)
+    assert connection_calls == [2]
+    assert adapter._channel is None
+    assert adapter._connection is None
+
+
 def test_streaming_mmap_boundary_and_interruptions(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

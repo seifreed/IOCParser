@@ -184,11 +184,24 @@ def test_config_empty_numeric_and_boolean_ini_values_use_defaults(tmp_path) -> N
 
 def test_config_blank_diff_only_uses_default(tmp_path) -> None:
     config_path = tmp_path / "iocparser.ini"
-    config_path.write_text("[defaults]\ndiff_only =   \n", encoding="utf-8")
+    config_path.write_text(
+        (
+            "[defaults]\n"
+            "diff_only =   \n"
+            "stix_types =   \n"
+            "[network]\n"
+            "user_agent =   \n"
+            "proxy =   \n"
+        ),
+        encoding="utf-8",
+    )
 
     config = load_config(None, None, str(config_path))
 
     assert config.diff_only == "all"
+    assert config.stix_types is None
+    assert config.user_agent is None
+    assert config.proxy is None
 
 
 def test_explicit_missing_config_path_is_rejected(tmp_path) -> None:

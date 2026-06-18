@@ -250,7 +250,7 @@ def _apply_env_overrides(values: ConfigValues) -> None:
     for option in _ENV_STR_OPTIONS:
         raw = os.environ.get(f"IOCPARSER_{option.upper()}")
         if raw is not None:
-            mutable[option] = raw
+            mutable[option] = raw.strip() or None
     for option in _ENV_BOOL_OPTIONS:
         raw = os.environ.get(f"IOCPARSER_{option.upper()}")
         if raw is not None:
@@ -280,6 +280,14 @@ def _load_ini_config(config_path: Path) -> ConfigValues:
         ) from exc
 
 
+def _optional_str(parser: configparser.ConfigParser, section: str, option: str) -> str | None:
+    raw_value = parser.get(section, option, fallback=None)
+    if raw_value is None:
+        return None
+    stripped = raw_value.strip()
+    return stripped or None
+
+
 def _read_ini_config(config_path: Path) -> ConfigValues:
     """Parse an INI file into config values (see _load_ini_config for error handling)."""
     parser = load_ini_sections(config_path)
@@ -290,15 +298,15 @@ def _read_ini_config(config_path: Path) -> ConfigValues:
         if parser.has_option("database", "persist"):
             raw_persist = parser.get("database", "persist")
             values["persist"] = _parse_bool_value(raw_persist, option_name="database.persist")
-        values["db_uri"] = parser.get("database", "uri", fallback=None)
+        values["db_uri"] = _optional_str(parser, "database", "uri")
 
     if parser.has_section("defaults"):
-        values["only"] = parser.get("defaults", "only", fallback=None)
-        values["exclude"] = parser.get("defaults", "exclude", fallback=None)
-        values["stix_types"] = parser.get("defaults", "stix_types", fallback=None)
-        values["output_format"] = parser.get("defaults", "output_format", fallback=None)
-        values["severity"] = parser.get("defaults", "severity", fallback=None)
-        values["tag"] = parser.get("defaults", "tag", fallback=None)
+        values["only"] = _optional_str(parser, "defaults", "only")
+        values["exclude"] = _optional_str(parser, "defaults", "exclude")
+        values["stix_types"] = _optional_str(parser, "defaults", "stix_types")
+        values["output_format"] = _optional_str(parser, "defaults", "output_format")
+        values["severity"] = _optional_str(parser, "defaults", "severity")
+        values["tag"] = _optional_str(parser, "defaults", "tag")
         values["with_context"] = _ini_bool(parser, "defaults", "with_context", fallback=False)
         values["streaming"] = _ini_bool(parser, "defaults", "streaming", fallback=False)
         values["summary"] = _ini_bool(parser, "defaults", "summary", fallback=False)
@@ -313,14 +321,14 @@ def _read_ini_config(config_path: Path) -> ConfigValues:
         values["url_retries"] = _ini_int(parser, "network", "url_retries", fallback=0)
         values["url_backoff"] = _ini_float(parser, "network", "url_backoff", fallback=0.0)
         values["rate_limit"] = _ini_float(parser, "network", "rate_limit", fallback=0.0)
-        values["user_agent"] = parser.get("network", "user_agent", fallback=None)
-        values["headers_json"] = parser.get("network", "headers_json", fallback=None)
-        values["cookies_json"] = parser.get("network", "cookies_json", fallback=None)
-        values["proxy"] = parser.get("network", "proxy", fallback=None)
+        values["user_agent"] = _optional_str(parser, "network", "user_agent")
+        values["headers_json"] = _optional_str(parser, "network", "headers_json")
+        values["cookies_json"] = _optional_str(parser, "network", "cookies_json")
+        values["proxy"] = _optional_str(parser, "network", "proxy")
         values["allow_redirects"] = _ini_bool(parser, "network", "allow_redirects", fallback=True)
         values["tls_verify"] = _ini_bool(parser, "network", "tls_verify", fallback=True)
-        values["tls_cert"] = parser.get("network", "tls_cert", fallback=None)
-        values["ca_bundle"] = parser.get("network", "ca_bundle", fallback=None)
+        values["tls_cert"] = _optional_str(parser, "network", "tls_cert")
+        values["ca_bundle"] = _optional_str(parser, "network", "ca_bundle")
         values["connect_timeout"] = _ini_optional_float(parser, "network", "connect_timeout")
         values["read_timeout"] = _ini_optional_float(parser, "network", "read_timeout")
         values["max_input_size_mb"] = _ini_optional_float(parser, "network", "max_input_size_mb")

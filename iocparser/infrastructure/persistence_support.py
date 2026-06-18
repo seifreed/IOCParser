@@ -109,6 +109,8 @@ def _url_filter_variants(value: str) -> tuple[str, ...]:
         return ()
     variants.append(normalized)
     parsed = urlsplit(normalized)
+    if parsed.query or parsed.fragment:
+        return tuple(dict.fromkeys(variant for variant in variants if variant))
     if parsed.path.endswith("/") and parsed.path != "/":
         variants.append(urlunsplit(parsed._replace(path=parsed.path.rstrip("/"))))
     elif parsed.path == "/":

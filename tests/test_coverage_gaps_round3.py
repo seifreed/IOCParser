@@ -346,7 +346,7 @@ class TestPersistenceSupportHelpers:
 
         variants = _url_filter_variants("https://example.com/?q=1")
 
-        assert variants == ("https://example.com/?q=1", "https://example.com?q=1")
+        assert variants == ("https://example.com/?q=1",)
 
     def test_select_deletable_with_keep_latest(self) -> None:
         from iocparser.infrastructure.persistence_support import _select_deletable

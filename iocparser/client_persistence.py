@@ -54,7 +54,7 @@ class SearchIOCsOptions(TypedDict, total=False):
     date_to: str | None
     source_kind: str | None
     source_value: str | None
-    ioc_type: str | None
+    ioc_type: str | tuple[str, ...] | None
     severity: str | tuple[str, ...]
     tags: str | tuple[str, ...]
     exclude_tags: str | tuple[str, ...]
@@ -75,6 +75,15 @@ def validated_severity_values(values: tuple[str, ...]) -> tuple[str, ...]:
         if severity is not None:
             normalized.append(severity)
     return tuple(normalized)
+
+
+def _ioc_type_filter_value(value: object) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, tuple):
+        joined = ",".join(str(item) for item in value if str(item).strip())
+        return joined or None
+    return optional_str(value)
 
 
 @dataclass(frozen=True)
@@ -148,7 +157,8 @@ class PersistenceClient:
             date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
             source_kind=optional_str(options.get("source_kind")),
             source_value=options.get("source_value"),
-            ioc_type=validated_ioc_type_filters(optional_str(options.get("ioc_type"))) or None,
+            ioc_type=validated_ioc_type_filters(_ioc_type_filter_value(options.get("ioc_type")))
+            or None,
             # parse_string_filters accepts a comma-separated string as well as a pre-split
             # tuple; a bare string like severity="high"/tags="foo" otherwise became
             # tuple("high")=('h','i','g','h'), corrupting the filter into single characters.
@@ -192,7 +202,8 @@ class PersistenceClient:
             date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
             source_kind=optional_str(options.get("source_kind")),
             source_value=options.get("source_value"),
-            ioc_type=validated_ioc_type_filters(optional_str(options.get("ioc_type"))) or None,
+            ioc_type=validated_ioc_type_filters(_ioc_type_filter_value(options.get("ioc_type")))
+            or None,
             severity=validated_severity_values(parse_string_filters(options.get("severity"))),
             tags=parse_string_filters(options.get("tags")),
             exclude_tags=parse_string_filters(options.get("exclude_tags")),

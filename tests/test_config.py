@@ -182,6 +182,15 @@ def test_config_empty_numeric_and_boolean_ini_values_use_defaults(tmp_path) -> N
     assert config.connect_timeout is None
 
 
+def test_config_blank_diff_only_uses_default(tmp_path) -> None:
+    config_path = tmp_path / "iocparser.ini"
+    config_path.write_text("[defaults]\ndiff_only =   \n", encoding="utf-8")
+
+    config = load_config(None, None, str(config_path))
+
+    assert config.diff_only == "all"
+
+
 def test_explicit_missing_config_path_is_rejected(tmp_path) -> None:
     missing_config = tmp_path / "missing.ini"
 

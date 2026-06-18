@@ -305,7 +305,8 @@ def _read_ini_config(config_path: Path) -> ConfigValues:
         values["parallel"] = _ini_int(parser, "defaults", "parallel", fallback=1)
         values["chunk_size"] = _ini_int(parser, "defaults", "chunk_size", fallback=1024 * 1024)
         values["overlap"] = _ini_int(parser, "defaults", "overlap", fallback=1024)
-        values["diff_only"] = parser.get("defaults", "diff_only", fallback="all")
+        raw_diff_only = parser.get("defaults", "diff_only", fallback="all")
+        values["diff_only"] = raw_diff_only if raw_diff_only.strip() else "all"
 
     if parser.has_section("network"):
         values["url_workers"] = _ini_int(parser, "network", "url_workers", fallback=4)

@@ -111,6 +111,8 @@ def validated_diff_only(value: str | None) -> str:
     if value is None:
         return "all"
     normalized = value.strip().lower()
+    if not normalized:
+        return "all"
     if normalized not in VALID_DIFF_ONLY_VALUES:
         raise ValidationError(INVALID_DIFF_ONLY_ERROR.format(value=value))
     return normalized

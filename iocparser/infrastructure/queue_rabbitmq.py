@@ -269,11 +269,23 @@ class RabbitMQQueueAdapter:
 
     def close(self) -> None:
         with self._lock:
+            close_error: Exception | None = None
             channel = self._channel
             if channel is not None:
-                channel.close()
-                self._channel = None
+                try:
+                    channel.close()
+                except Exception as exc:
+                    close_error = exc
             connection = self._connection
             if connection is not None:
-                connection.close()
-                self._connection = None
+                try:
+                    connection.close()
+                except Exception as exc:
+                    if close_error is None:
+                        close_error = exc
+                    else:
+                        close_error.add_note(f"connection.close() also failed: {exc!r}")
+            self._channel = None
+            self._connection = None
+            if close_error is not None:
+                raise close_error

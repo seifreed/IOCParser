@@ -674,6 +674,43 @@ def test_rabbitmq_channel_for_preserves_channel_error_when_close_fails(
     assert adapter._channel is None
 
 
+def test_rabbitmq_close_clears_state_and_surfaces_primary_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import iocparser.infrastructure.queue_rabbitmq as rabbitmq
+
+    closed: list[str] = []
+
+    class _Channel:
+        def close(self) -> object:
+            closed.append("channel")
+            raise RuntimeError("channel close failed")
+
+    class _Connection:
+        def close(self) -> object:
+            closed.append("connection")
+            raise RuntimeError("connection close failed")
+
+    monkeypatch.setattr(
+        rabbitmq,
+        "_pika_module",
+        lambda: SimpleNamespace(
+            URLParameters=lambda url: url,
+            BlockingConnection=lambda _params: _Connection(),
+        ),
+    )
+    adapter = rabbitmq.RabbitMQQueueAdapter("amqp://localhost")
+    adapter._channel = _Channel()
+    adapter._connection = _Connection()
+
+    with pytest.raises(RuntimeError, match="channel close failed"):
+        adapter.close()
+
+    assert closed == ["channel", "connection"]
+    assert adapter._channel is None
+    assert adapter._connection is None
+
+
 def test_streaming_mmap_boundary_and_interruptions(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

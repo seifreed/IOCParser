@@ -178,6 +178,19 @@ def test_worker_config_rejects_invalid_boolean_env() -> None:
             WorkerServiceConfig.from_sources()
 
 
+def test_worker_config_whitespace_env_values_use_defaults() -> None:
+    with _Env(
+        IOCPARSER_WORKER_POLL_INTERVAL_SECONDS="   ",
+        IOCPARSER_WORKER_MAX_MESSAGES_PER_CYCLE="   ",
+        IOCPARSER_WORKER_SKIP_PROCESSED="   ",
+    ):
+        config = WorkerServiceConfig.from_sources()
+
+    assert config.poll_interval_seconds == 1.0
+    assert config.max_messages_per_cycle == 1
+    assert config.skip_processed is False
+
+
 def test_worker_config_uses_default_ini_path(tmp_path: Path) -> None:
     config_path = tmp_path / "iocparser.ini"
     config_path.write_text(

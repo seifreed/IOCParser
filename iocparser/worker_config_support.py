@@ -72,29 +72,37 @@ def _float_type_error(value: object) -> TypeError:
 
 def int_env(name: str, default: int | None = None) -> int | None:
     raw = os.environ.get(name)
-    if raw is None or raw == "":
+    if raw is None:
+        return default
+    stripped = raw.strip()
+    if not stripped:
         return default
     try:
-        return int(raw)
+        return int(stripped)
     except ValueError as exc:
         raise ValueError(INVALID_INT_ENV_ERROR.format(name=name, value=raw)) from exc
 
 
 def float_env(name: str, default: float | None = None) -> float | None:
     raw = os.environ.get(name)
-    if raw is None or raw == "":
+    if raw is None:
+        return default
+    stripped = raw.strip()
+    if not stripped:
         return default
     try:
-        return float(raw)
+        return float(stripped)
     except ValueError as exc:
         raise ValueError(INVALID_FLOAT_ENV_ERROR.format(name=name, value=raw)) from exc
 
 
 def bool_env(name: str, default: bool = False) -> bool:
     raw = os.environ.get(name)
-    if raw is None or raw == "":
+    if raw is None:
         return default
     normalized = raw.strip().lower()
+    if not normalized:
+        return default
     if normalized in TRUE_BOOL_VALUES:
         return True
     if normalized in FALSE_BOOL_VALUES:

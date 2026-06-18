@@ -1454,6 +1454,35 @@ class TestStreamingExceptionHandling:
             with contextlib.suppress(Exception):
                 temp_path.unlink()
 
+    def test_extract_from_stream_clears_state_after_exception(self):
+        """
+        Test that a failed stream extraction does not leave stale dedup state behind.
+        """
+        extractor = StreamingIOCExtractor(chunk_size=32, overlap=0, defang=False)
+
+        class ErrorStream:
+            def __init__(self):
+                self.call_count = 0
+
+            def read(self, size):
+                self.call_count += 1
+                if self.call_count == 1:
+                    return "https://stale.example "
+                raise OSError("Simulated read error")
+
+            def seek(self, pos, whence=0):
+                raise io.UnsupportedOperation("seek not supported")
+
+            def tell(self):
+                raise io.UnsupportedOperation("tell not supported")
+
+        with pytest.raises(OSError, match="Simulated read error"):
+            list(extractor.extract_from_stream(ErrorStream(), is_text=True))
+
+        chunks = list(extractor.extract_from_stream(io.StringIO("https://stale.example"), is_text=True))
+        collected = [value for chunk in chunks for values in chunk.values() for value in values]
+        assert "https://stale.example" in collected
+
     def test_parallel_extractor_exception_handling(self, monkeypatch):
         """
         Test parallel extraction handles exceptions gracefully.

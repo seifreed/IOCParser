@@ -267,6 +267,8 @@ class StreamingIOCExtractor:
             except Exception:
                 logger.exception("Error processing file %s", file_path)
                 raise
+            finally:
+                self.seen_iocs.clear()
 
         if yield_chunks:
             return _iter_chunks()
@@ -294,16 +296,19 @@ class StreamingIOCExtractor:
         # Reset seen IOCs for new stream
         self.seen_iocs.clear()
 
-        for chunk, prefix_length, is_final in read_chunks_with_prefix(
-            file_obj=stream,
-            chunk_size=self.chunk_size,
-            overlap=self.overlap,
-            progress_callback=self.progress_callback,
-            is_text=is_text,
-        ):
-            unique_iocs = self._extract_unique_from_chunk(chunk, prefix_length, is_final)
-            if unique_iocs:
-                yield unique_iocs
+        try:
+            for chunk, prefix_length, is_final in read_chunks_with_prefix(
+                file_obj=stream,
+                chunk_size=self.chunk_size,
+                overlap=self.overlap,
+                progress_callback=self.progress_callback,
+                is_text=is_text,
+            ):
+                unique_iocs = self._extract_unique_from_chunk(chunk, prefix_length, is_final)
+                if unique_iocs:
+                    yield unique_iocs
+        finally:
+            self.seen_iocs.clear()
 
     def extract_from_mmap(
         self,
@@ -397,6 +402,8 @@ class StreamingIOCExtractor:
         except Exception:
             logger.exception("Error in memory-mapped extraction")
             raise
+        finally:
+            self.seen_iocs.clear()
 
         return dict(all_iocs)
 

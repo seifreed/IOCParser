@@ -117,7 +117,6 @@ def _json_object(raw_value: str) -> dict[str, object]:
         return {}
     return _string_key_mapping(decoded)
 
-
 def _is_int_like(value: object) -> bool:
     if isinstance(value, bool):
         return False
@@ -265,10 +264,11 @@ def _existing_source(session: Session, row: dict[str, object]) -> SourceModel | 
 
 def _existing_ioc(session: Session, row: dict[str, object]) -> IOCModel | None:
     ioc_type = _normalized_ioc_type(str(row.get("ioc_type", "")))
+    value = str(row.get("value", "")).strip()
     return session.execute(
         select(IOCModel).where(
             IOCModel.ioc_type == ioc_type,
-            IOCModel.value == str(row.get("value", "")),
+            IOCModel.value == value,
             IOCModel.is_warning == bool_from_row(row.get("is_warning")),
             IOCModel.warning_list == str(row.get("warning_list", "")).strip(),
             IOCModel.warning_description == str(row.get("warning_description", "")).strip(),
@@ -558,13 +558,14 @@ def _import_iocs(session: Session, rows: list[dict[str, object]]) -> tuple[int, 
             continue
         ioc_type = _normalized_ioc_type(str(typed.get("ioc_type", "")))
         typed["ioc_type"] = ioc_type
+        typed["value"] = str(typed.get("value", "")).strip()
         typed["warning_list"] = str(typed.get("warning_list", "")).strip()
         typed["warning_description"] = str(typed.get("warning_description", "")).strip()
         search_value = normalize_ioc_search(str(typed.get("value", "")))
         typed["value_search"] = search_value
         typed["dedup_hash"] = ioc_dedup_hash(
             ioc_type,
-            str(typed.get("value", "")),
+            typed["value"],
             bool(typed.get("is_warning")),
             str(typed.get("warning_list", "")),
             str(typed.get("warning_description", "")),

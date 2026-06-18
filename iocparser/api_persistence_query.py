@@ -153,7 +153,10 @@ def query_service(db_uri: str) -> SQLAlchemyPersistenceService:
 
 
 def optional_str(value: object | None) -> str | None:
-    return None if value is None else str(value)
+    if value is None:
+        return None
+    stripped = str(value).strip()
+    return stripped or None
 
 
 def bool_option(value: object | None, default: bool = False) -> bool:
@@ -209,13 +212,16 @@ def search_input(value: str, options: SearchPersistedIOCOptions) -> SearchPersis
 def validated_iso_datetime(value: str | None) -> str | None:
     if value is None:
         return None
+    stripped = value.strip()
+    if not stripped:
+        return None
     from datetime import datetime
 
     try:
-        datetime.fromisoformat(value)
+        datetime.fromisoformat(stripped)
     except ValueError as exc:
         raise ValidationError(INVALID_DATE_ERROR.format(value=value)) from exc
-    return value
+    return stripped
 
 
 def _validated_choice(value: str, *, valid: AbstractSet[str], error: str) -> str:

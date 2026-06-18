@@ -54,6 +54,15 @@ def test_api_validated_non_negative_int_string():
     assert validated_non_negative_int("42", field="test") == 42
 
 
+def test_api_optional_str_and_datetime_trim_whitespace() -> None:
+    from iocparser.api_persistence_query import optional_str, validated_iso_datetime
+
+    assert optional_str("  value  ") == "value"
+    assert optional_str("   ") is None
+    assert validated_iso_datetime(" 2024-01-01T12:00:00 ") == "2024-01-01T12:00:00"
+    assert validated_iso_datetime("   ") is None
+
+
 def test_api_search_iocs_reraises_generic_error(tmp_path):
     from iocparser.api_persistence_query import search_persisted_iocs
 

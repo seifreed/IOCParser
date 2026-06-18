@@ -11,6 +11,7 @@ from iocparser.api_persistence_query import (
     validated_min_severity,
     validated_non_negative_days,
     validated_non_negative_int,
+    validated_required_id,
     validated_run_sort,
     validated_search_backend,
     validated_search_sort,
@@ -155,10 +156,15 @@ class PersistenceClient:
         )
 
     def export_run(self, *, run_id: int) -> PersistedRunExport:
-        return self._typed_service.export_run(run_id=run_id)
+        return self._typed_service.export_run(
+            run_id=validated_required_id(run_id, field="run_id")
+        )
 
     def diff_runs(self, *, left_run_id: int, right_run_id: int) -> PersistedRunDiff:
-        return self._typed_service.diff_runs(left_run_id=left_run_id, right_run_id=right_run_id)
+        return self._typed_service.diff_runs(
+            left_run_id=validated_required_id(left_run_id, field="left_run_id"),
+            right_run_id=validated_required_id(right_run_id, field="right_run_id"),
+        )
 
     def export_history(self) -> dict[str, object]:
         return self._typed_service.export_history()
@@ -182,10 +188,14 @@ class PersistenceClient:
         )
 
     def get_batch_job(self, *, batch_job_id: int) -> BatchJobDetail | None:
-        return self._typed_service.get_batch_job(batch_job_id=batch_job_id)
+        return self._typed_service.get_batch_job(
+            batch_job_id=validated_required_id(batch_job_id, field="batch_job_id")
+        )
 
     def list_batch_runs(self, *, batch_job_id: int) -> list[PersistedRunSummary]:
-        return self._typed_service.list_batch_runs(batch_job_id=batch_job_id)
+        return self._typed_service.list_batch_runs(
+            batch_job_id=validated_required_id(batch_job_id, field="batch_job_id")
+        )
 
     def retain_history(self, *, days: int, statuses: str | None = None) -> int:
         return self._typed_service.retain_history(

@@ -138,6 +138,7 @@ INVALID_SEARCH_BACKEND_ERROR = "Invalid search_backend: {value}"
 INVALID_LIMIT_ERROR = "Invalid limit: {value}"
 INVALID_OFFSET_ERROR = "Invalid offset: {value}"
 INVALID_DAYS_ERROR = "Invalid days: {value}"
+INVALID_ID_ERROR = "Invalid {field}: {value}"
 INVALID_BOOLEAN_ERROR = "Invalid boolean option: {value}"
 VALID_TAG_MODES = {"all", "any"}
 VALID_RUN_SORT_VALUES = {"newest", "oldest", "source"}
@@ -307,6 +308,13 @@ def validated_non_negative_days(value: object) -> int:
         raise ValidationError(INVALID_DAYS_ERROR.format(value=value)) from exc
 
 
+def validated_required_id(value: object, *, field: str) -> int:
+    try:
+        return validated_non_negative_int(value, field="limit")
+    except ValidationError as exc:
+        raise ValidationError(INVALID_ID_ERROR.format(field=field, value=value)) from exc
+
+
 def _validated_search_call[T](value: str, call: Callable[[], T]) -> T:
     try:
         return call()
@@ -327,8 +335,8 @@ def persisted_diff_input(
     reject_unknown_options(options, _DIFF_OPTION_KEYS, context="diff")
     diff_only = validated_diff_only(optional_str(options.get("diff_only")))
     return DiffPersistedRunsInput(
-        left_run_id=left_run_id,
-        right_run_id=right_run_id,
+        left_run_id=validated_required_id(left_run_id, field="left_run_id"),
+        right_run_id=validated_required_id(right_run_id, field="right_run_id"),
         only_added=diff_only == "added",
         only_removed=diff_only == "removed",
         only_warnings=bool_option(options.get("only_warnings")),
@@ -347,7 +355,7 @@ def latest_source_diff_input(
     reject_unknown_options(options, _DIFF_OPTION_KEYS, context="diff")
     diff_only = validated_diff_only(optional_str(options.get("diff_only")))
     return DiffLatestSourceRunInput(
-        run_id=run_id,
+        run_id=validated_required_id(run_id, field="run_id"),
         only_added=diff_only == "added",
         only_removed=diff_only == "removed",
         only_warnings=bool_option(options.get("only_warnings")),
@@ -432,7 +440,7 @@ def reject_unused_render_overrides(option_overrides: Mapping[str, object]) -> No
 
 def export_persisted_run(*, db_uri: str, run_id: int) -> PersistedRunExport:
     return _export_persisted_run(
-        ExportPersistedRunInput(run_id=run_id),
+        ExportPersistedRunInput(run_id=validated_required_id(run_id, field="run_id")),
         persistence_query_service=query_service(db_uri),
     )
 

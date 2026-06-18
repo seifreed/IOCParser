@@ -4,6 +4,7 @@ from iocparser.api_persistence_query import (
     query_service,
     validated_non_negative_days,
     validated_non_negative_int,
+    validated_required_id,
 )
 from iocparser.application.contracts import (
     BatchJobInput,
@@ -71,21 +72,21 @@ def list_batch_jobs(
 
 def get_batch_job(*, db_uri: str, batch_job_id: int) -> BatchJobDetail | None:
     return _get_batch_job(
-        BatchJobInput(batch_job_id=batch_job_id),
+        BatchJobInput(batch_job_id=validated_required_id(batch_job_id, field="batch_job_id")),
         persistence_query_service=query_service(db_uri),
     )
 
 
 def list_batch_runs(*, db_uri: str, batch_job_id: int) -> list[PersistedRunSummary]:
     return _list_batch_runs(
-        BatchJobInput(batch_job_id=batch_job_id),
+        BatchJobInput(batch_job_id=validated_required_id(batch_job_id, field="batch_job_id")),
         persistence_query_service=query_service(db_uri),
     )
 
 
 def delete_persisted_run(*, db_uri: str, run_id: int) -> bool:
     return _delete_persisted_run(
-        DeletePersistedRunInput(run_id=run_id),
+        DeletePersistedRunInput(run_id=validated_required_id(run_id, field="run_id")),
         persistence_query_service=query_service(db_uri),
     )
 

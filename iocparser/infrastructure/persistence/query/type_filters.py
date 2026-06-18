@@ -8,4 +8,7 @@ def normalize_ioc_type_filter(value: tuple[str, ...] | str | None) -> tuple[str,
         return ()
     if isinstance(value, str):
         return tuple(dict.fromkeys(str(ioc_type) for ioc_type in parse_ioc_types(value)))
-    return tuple(dict.fromkeys(str(ioc_type).strip() for ioc_type in value if str(ioc_type).strip()))
+    normalized: list[str] = []
+    for ioc_type in value:
+        normalized.extend(str(parsed) for parsed in parse_ioc_types(str(ioc_type)))
+    return tuple(dict.fromkeys(normalized))

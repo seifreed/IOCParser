@@ -90,7 +90,11 @@ class FilesystemQueueAdapter:
         message_name = _safe_filename_component(envelope.request.job_id or uuid4())
         new_path = queue_dir / f"{message_name}-{uuid4().hex}.json"
         self._atomic_write_record(new_path, envelope)
-        processing_path.unlink(missing_ok=True)
+        try:
+            processing_path.unlink(missing_ok=True)
+        except OSError:
+            new_path.unlink(missing_ok=True)
+            raise
         return QueueReceipt(
             queue_backend="filesystem",
             queue_name=receipt.queue_name,
@@ -105,7 +109,11 @@ class FilesystemQueueAdapter:
         if target.exists():
             target = dead_dir / f"{processing_path.stem}-{uuid4().hex}{processing_path.suffix}"
         self._atomic_write_record(target, envelope)
-        processing_path.unlink(missing_ok=True)
+        try:
+            processing_path.unlink(missing_ok=True)
+        except OSError:
+            target.unlink(missing_ok=True)
+            raise
         return QueueReceipt(
             queue_backend="filesystem",
             queue_name=receipt.queue_name,

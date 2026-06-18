@@ -280,6 +280,58 @@ def test_filesystem_queue_quarantines_invalid_payload_and_continues(tmp_path: Pa
     assert not list((tmp_path / "queue" / "bad-payload" / "processing").glob("*.json"))
 
 
+def test_filesystem_queue_requeue_rolls_back_new_record_on_unlink_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    adapter = FilesystemQueueAdapter(tmp_path / "queue")
+    receipt = adapter.enqueue(queue_name="jobs", envelope=_envelope("requeue-job"))
+    dequeued = adapter.dequeue(queue_name="jobs")
+    assert dequeued is not None
+    processing_receipt, envelope = dequeued
+    processing_path = Path(processing_receipt.receipt_id)
+    original_unlink = Path.unlink
+
+    def flaky_unlink(self: Path, *args: object, **kwargs: object) -> object:
+        if self == processing_path:
+            raise OSError("permission denied")
+        return original_unlink(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", flaky_unlink)
+
+    with pytest.raises(OSError, match="permission denied"):
+        adapter.requeue(processing_receipt, envelope=envelope)
+
+    assert processing_path.exists()
+    assert not list((tmp_path / "queue" / "jobs" / "pending").glob("*.json"))
+    assert receipt.message_id == "requeue-job"
+
+
+def test_filesystem_queue_dead_letter_rolls_back_new_record_on_unlink_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    adapter = FilesystemQueueAdapter(tmp_path / "queue")
+    receipt = adapter.enqueue(queue_name="jobs", envelope=_envelope("dead-job"))
+    dequeued = adapter.dequeue(queue_name="jobs")
+    assert dequeued is not None
+    processing_receipt, envelope = dequeued
+    processing_path = Path(processing_receipt.receipt_id)
+    original_unlink = Path.unlink
+
+    def flaky_unlink(self: Path, *args: object, **kwargs: object) -> object:
+        if self == processing_path:
+            raise OSError("permission denied")
+        return original_unlink(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", flaky_unlink)
+
+    with pytest.raises(OSError, match="permission denied"):
+        adapter.dead_letter(processing_receipt, envelope=envelope)
+
+    assert processing_path.exists()
+    assert not list((tmp_path / "queue" / "jobs" / "dead").glob("*.json"))
+    assert receipt.message_id == "dead-job"
+
+
 def test_distributed_pipeline_without_database_covers_empty_and_retry_paths(tmp_path: Path) -> None:
     queue = FilesystemQueueAdapter(tmp_path / "queue")
     service = DistributedPipelineService(queue_adapter=queue)

@@ -2662,6 +2662,17 @@ def test_prune_persisted_runs_accepts_string_statuses(tmp_path: Path) -> None:
     assert prune_persisted_runs(db_uri=db_uri, before="2999-01-01", statuses=("success",)) == 1
 
 
+def test_prune_persisted_runs_rejects_invalid_keep_latest_type(tmp_path: Path) -> None:
+    db_uri = f"sqlite:///{tmp_path / 'prune-keep-latest.db'}"
+
+    with pytest.raises(ValidationError, match="Invalid keep_latest"):
+        prune_persisted_runs(
+            db_uri=db_uri,
+            before="2999-01-01T00:00:00",
+            keep_latest="bad",  # type: ignore[arg-type]
+        )
+
+
 def test_plugin_registry_and_structured_records(tmp_path: Path) -> None:
     parsed = SQLAlchemyPersistenceService._parse_datetime("2026-01-01T00:00:00")
     assert parsed is not None

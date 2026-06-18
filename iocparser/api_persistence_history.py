@@ -49,6 +49,7 @@ from iocparser.errors import ValidationError
 from iocparser.shared_utils import parse_string_filters
 
 IMPORT_PAYLOAD_OBJECT_REQUIRED = "history import payload must be a mapping (JSON object)"
+INVALID_KEEP_LATEST_ERROR = "Invalid keep_latest: {value}"
 
 
 def list_failed_batch_jobs(*, db_uri: str, limit: int = 20) -> list[BatchJobSummary]:
@@ -103,7 +104,7 @@ def prune_persisted_runs(
     return _prune_persisted_runs(
         PrunePersistedRunsInput(
             before=before,
-            keep_latest=keep_latest,
+            keep_latest=_validated_keep_latest(keep_latest),
             source_kind=source_kind,
             source_value=source_value,
             # Accept a comma-separated string (like retain_persisted_history /
@@ -113,6 +114,13 @@ def prune_persisted_runs(
         ),
         persistence_query_service=query_service(db_uri),
     )
+
+
+def _validated_keep_latest(value: object) -> int:
+    try:
+        return validated_non_negative_int(value, field="offset")
+    except ValidationError as exc:
+        raise ValidationError(INVALID_KEEP_LATEST_ERROR.format(value=value)) from exc
 
 
 def export_persisted_history(*, db_uri: str) -> dict[str, object]:

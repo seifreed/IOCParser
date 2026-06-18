@@ -484,6 +484,28 @@ def test_public_query_api_rejects_unknown_keyword_options(tmp_path: Path) -> Non
     assert client.search_iocs(value="alpha", min_severity="low").total == 1
 
 
+def test_persistence_client_search_accepts_string_severity_and_tags(tmp_path: Path) -> None:
+    """Regression: PersistenceClient.search_iocs typed severity/tags/exclude_tags as tuples,
+    so a bare string became tuple('high')=('h','i','g','h') — a confusing severity error and,
+    for tags, SILENTLY wrong results. A string must now parse like a comma-separated filter.
+    """
+    db_uri = f"sqlite:///{tmp_path / 'client-filters.sqlite'}"
+    _persist_result(
+        db_uri, source_value="s.txt", ioc_value="alpha.example", severity="high", tags=("c2",)
+    )
+    client = PersistenceClient(db_uri)
+
+    # String severity parses to one value (not characters): matching hits, non-matching 0.
+    assert client.search_iocs(value="alpha", severity="high").total == 1
+    assert client.search_iocs(value="alpha", severity="low").total == 0
+    # String tags filter on the whole tag, not its letters.
+    assert client.search_iocs(value="alpha", tags="c2").total == 1
+    assert client.search_iocs(value="alpha", tags="nope").total == 0
+    assert client.search_iocs(value="alpha", exclude_tags="c2").total == 0
+    # Pre-split tuples stay accepted.
+    assert client.search_iocs(value="alpha", severity=("high",), tags=("c2",)).total == 1
+
+
 def test_direct_persistence_services_do_not_treat_negative_limits_as_unbounded(
     tmp_path: Path,
 ) -> None:

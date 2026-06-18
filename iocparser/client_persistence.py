@@ -49,9 +49,9 @@ class SearchIOCsOptions(TypedDict, total=False):
     source_kind: str | None
     source_value: str | None
     ioc_type: str | None
-    severity: tuple[str, ...]
-    tags: tuple[str, ...]
-    exclude_tags: tuple[str, ...]
+    severity: str | tuple[str, ...]
+    tags: str | tuple[str, ...]
+    exclude_tags: str | tuple[str, ...]
     min_severity: str | None
     tag_mode: str | None
     sort_by: str | None
@@ -119,9 +119,12 @@ class PersistenceClient:
             source_kind=options.get("source_kind"),
             source_value=options.get("source_value"),
             ioc_type=validated_ioc_type_filter(optional_str(options.get("ioc_type"))),
-            severity=validated_severity_values(tuple(options.get("severity", ()))),
-            tags=tuple(options.get("tags", ())),
-            exclude_tags=tuple(options.get("exclude_tags", ())),
+            # parse_string_filters accepts a comma-separated string as well as a pre-split
+            # tuple; a bare string like severity="high"/tags="foo" otherwise became
+            # tuple("high")=('h','i','g','h'), corrupting the filter into single characters.
+            severity=validated_severity_values(parse_string_filters(options.get("severity"))),
+            tags=parse_string_filters(options.get("tags")),
+            exclude_tags=parse_string_filters(options.get("exclude_tags")),
             min_severity=validated_min_severity(optional_str(options.get("min_severity"))),
             tag_mode=validated_tag_mode(optional_str(options.get("tag_mode")) or "all"),
             sort_by=validated_search_sort(optional_str(options.get("sort_by")) or "newest"),

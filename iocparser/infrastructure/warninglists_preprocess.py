@@ -92,7 +92,7 @@ class WarningListPreprocessMixin:
         closing = pattern.rfind("/")
         body = pattern[1:closing]
         flags_text = pattern[closing + 1 :]
-        if not body or not flags_text.isalpha():
+        if not body or (flags_text and not flags_text.isalpha()):
             return pattern, re.IGNORECASE
 
         flags = re.IGNORECASE

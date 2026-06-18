@@ -619,6 +619,25 @@ class TestWarningListsPreprocessing:
         assert "phone_numbers" in warning_lists.compiled_regex
         assert warning_lists.check_value("1900654321", "unknown-type")[0]
 
+    def test_preprocess_lists_supports_slash_delimited_regex_without_flags(self):
+        """Test preprocessing handles slash-delimited regexes with no flags."""
+        warning_lists = make_warning_lists()
+
+        warning_lists.warning_lists = {
+            "simple-regex-list": {
+                "name": "Simple Regex List",
+                "description": "Regex-delimited list without flags",
+                "type": "regex",
+                "matching_attributes": ["domain"],
+                "list": [r"/^example\.com$/"],
+            }
+        }
+
+        warning_lists._preprocess_lists()
+
+        assert "simple-regex-list" in warning_lists.compiled_regex
+        assert warning_lists.check_value("example.com", "domains")[0]
+
     def test_scoped_list_with_unmapped_attribute_is_still_checked(self):
         """A scoped list whose matching_attributes map to no known IOC type must
         not be dead — its values should still be checked.

@@ -112,6 +112,8 @@ def bool_env(name: str, default: bool = False) -> bool:
 
 def resolve_config_path(config_path: str | None) -> Path | None:
     chosen = config_path or os.environ.get("IOCPARSER_CONFIG")
+    if isinstance(chosen, str):
+        chosen = chosen.strip()
     if chosen:
         candidate = Path(chosen)
         return candidate if candidate.exists() else None

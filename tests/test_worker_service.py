@@ -213,6 +213,20 @@ queue_name = default-path
     assert config.queue_name == "default-path"
 
 
+def test_worker_config_ignores_blank_config_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_path = tmp_path / "iocparser.ini"
+    config_path.write_text("[worker]\nqueue_name = from-file\n", encoding="utf-8")
+
+    with _Env(IOCPARSER_CONFIG="   "):
+        monkeypatch.chdir(tmp_path)
+        config = WorkerServiceConfig.from_sources()
+
+    assert config.config_path == config_path
+    assert config.queue_name == "from-file"
+
+
 def test_worker_service_run_once_and_forever(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'runtime.sqlite'}"
     queue = FilesystemQueueAdapter(tmp_path / "queue")

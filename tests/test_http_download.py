@@ -150,6 +150,11 @@ def test_configured_max_input_size_tightens_content_check() -> None:
     assert downloader.with_policy().max_input_size_bytes == 1024 * 1024
 
 
+def test_negative_max_input_size_is_rejected() -> None:
+    with pytest.raises(ValueError, match="max_input_size_bytes"):
+        RequestsURLDownloader(max_input_size_bytes=-1)
+
+
 def test_generate_temp_filename_appends_pdf_and_html_extensions() -> None:
     parsed_pdf = urlparse("https://example.test/report")
     parsed_html = urlparse("https://example.test/index")

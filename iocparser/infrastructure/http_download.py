@@ -33,6 +33,7 @@ from iocparser.shared_utils import lazy_singleton
 
 MAX_URL_SIZE = 50 * 1024 * 1024
 INVALID_CONTENT_LENGTH_ERROR = "Invalid Content-Length header: {value!r}"
+INVALID_MAX_INPUT_SIZE_ERROR = "Invalid max_input_size_bytes: {value!r}"
 REQUEST_TIMEOUT = 30
 DEFAULT_CONNECT_TIMEOUT = 10.0
 DEFAULT_READ_TIMEOUT = float(REQUEST_TIMEOUT)
@@ -224,11 +225,14 @@ class RequestsURLDownloader(URLDownloader):
             if allow_private_networks is not None
             else cfg.allow_private_networks
         )
-        self.max_input_size_bytes = (
+        configured_max_input_size = (
             max_input_size_bytes
             if max_input_size_bytes is not None
             else cfg.max_input_size_bytes
         )
+        if configured_max_input_size is not None and configured_max_input_size < 0:
+            raise ValueError(INVALID_MAX_INPUT_SIZE_ERROR.format(value=configured_max_input_size))
+        self.max_input_size_bytes = configured_max_input_size
         self._rate_limit_lock = Lock()
         self._last_request_started = 0.0
         self.last_download_metadata: dict[str, object] | None = None

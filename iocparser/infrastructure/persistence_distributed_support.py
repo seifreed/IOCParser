@@ -32,6 +32,10 @@ from iocparser.infrastructure.queue_records import serialize_queue_record
 ACTIVE_JOB_STATUSES = (JOB_STATUS_QUEUED, JOB_STATUS_RUNNING, JOB_STATUS_COMPLETED)
 
 
+def normalized_queue_backend(value: str) -> str:
+    return value.strip().lower()
+
+
 class RunningTransition(TypedDict):
     job_id: str
     status: str
@@ -104,7 +108,7 @@ def list_jobs_stmt(
     if statuses:
         stmt = stmt.where(DistributedJobModel.status.in_(statuses))
     if queue_backend:
-        stmt = stmt.where(DistributedJobModel.queue_backend == queue_backend)
+        stmt = stmt.where(DistributedJobModel.queue_backend == normalized_queue_backend(queue_backend))
     return stmt
 
 
@@ -115,7 +119,9 @@ def list_dead_letters_stmt(*, limit: int, queue_backend: str | None) -> Select[D
         .limit(max(0, limit))
     )
     if queue_backend:
-        stmt = stmt.where(DeadLetterJobModel.queue_backend == queue_backend)
+        stmt = stmt.where(
+            DeadLetterJobModel.queue_backend == normalized_queue_backend(queue_backend)
+        )
     return stmt
 
 

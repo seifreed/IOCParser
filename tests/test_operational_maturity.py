@@ -582,10 +582,11 @@ def test_public_persistence_run_ids_reject_non_integer_values(tmp_path: Path) ->
 
     for call in (
         lambda: client.export_run(run_id=[]),  # type: ignore[arg-type]
+        lambda: client.delete_run(run_id=[]),  # type: ignore[arg-type]
         lambda: client.diff_runs(left_run_id=[], right_run_id=1),  # type: ignore[arg-type]
         lambda: export_persisted_run(db_uri=db_uri, run_id=[]),  # type: ignore[arg-type]
-        lambda: diff_persisted_runs(db_uri=db_uri, left_run_id=[], right_run_id=1),  # type: ignore[arg-type]
         lambda: delete_persisted_run(db_uri=db_uri, run_id=[]),  # type: ignore[arg-type]
+        lambda: diff_persisted_runs(db_uri=db_uri, left_run_id=[], right_run_id=1),  # type: ignore[arg-type]
     ):
         with pytest.raises(ValidationError, match=r"Invalid .*run_id"):
             call()
@@ -597,6 +598,9 @@ def test_public_persistence_run_ids_reject_non_integer_values(tmp_path: Path) ->
     ):
         with pytest.raises(ValidationError, match=r"Invalid .*batch_job_id"):
             call()
+
+    with pytest.raises(ValidationError, match="Invalid keep_latest"):
+        client.prune_runs(before="2999-01-01", keep_latest="bad")  # type: ignore[arg-type]
 
 
 def test_direct_persistence_services_do_not_treat_negative_limits_as_unbounded(

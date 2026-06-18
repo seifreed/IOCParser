@@ -160,6 +160,11 @@ class PersistenceClient:
             run_id=validated_required_id(run_id, field="run_id")
         )
 
+    def delete_run(self, *, run_id: int) -> bool:
+        return self._typed_service.delete_run(
+            run_id=validated_required_id(run_id, field="run_id")
+        )
+
     def diff_runs(self, *, left_run_id: int, right_run_id: int) -> PersistedRunDiff:
         return self._typed_service.diff_runs(
             left_run_id=validated_required_id(left_run_id, field="left_run_id"),
@@ -202,6 +207,23 @@ class PersistenceClient:
             days=validated_non_negative_days(days), statuses=parse_string_filters(statuses)
         )
 
+    def prune_runs(
+        self,
+        *,
+        before: str | None = None,
+        keep_latest: int = 0,
+        source_kind: str | None = None,
+        source_value: str | None = None,
+        statuses: str | tuple[str, ...] | None = None,
+    ) -> int:
+        return self._typed_service.prune_runs(
+            before=before,
+            keep_latest=_validated_keep_latest(keep_latest),
+            source_kind=source_kind,
+            source_value=source_value,
+            statuses=parse_string_filters(statuses),
+        )
+
     def get_distributed_job(self, *, job_id: str) -> DistributedJobRecord | None:
         return self._typed_service.get_distributed_job(job_id=job_id)
 
@@ -230,3 +252,14 @@ class PersistenceClient:
 
 def _parse_string_filters(value: str | None) -> tuple[str, ...]:
     return parse_string_filters(value)
+
+
+def _validated_keep_latest(value: object) -> int:
+    try:
+        return validated_non_negative_int(value, field="offset")
+    except ValidationError as exc:
+        raise _invalid_keep_latest(value) from exc
+
+
+def _invalid_keep_latest(value: object) -> ValidationError:
+    return ValidationError(f"Invalid keep_latest: {value}")

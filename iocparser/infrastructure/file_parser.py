@@ -98,7 +98,13 @@ def wrap_binary_stream_for_bom(
                 if encoding != "utf-8":
                     return io.TextIOWrapper(cast("BinaryIO", stream), encoding=encoding, errors="ignore"), True
             except (AttributeError, OSError, io.UnsupportedOperation, TypeError, ValueError):
-                pass
+                try:
+                    buffered = io.BufferedReader(cast("io.RawIOBase", stream))
+                    encoding = detect_bom_encoding(buffered.peek(4))
+                    if encoding != "utf-8":
+                        return io.TextIOWrapper(buffered, encoding=encoding, errors="ignore"), True
+                except (AttributeError, OSError, io.UnsupportedOperation, TypeError, ValueError):
+                    pass
         return stream, is_text
 
 

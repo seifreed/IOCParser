@@ -26,7 +26,7 @@ from iocparser.domain.models import (
 )
 from iocparser.domain.pipeline import PipelineJobRequest
 from iocparser.infrastructure.extraction import IOCExtractor
-from iocparser.infrastructure.file_parser import decode_file_bytes
+from iocparser.infrastructure.file_parser import decode_file_bytes, wrap_binary_stream_for_bom
 from iocparser.infrastructure.file_readers import MagicTextSourceReader
 from iocparser.infrastructure.migration_revisions import rev_0005_fts_metrics
 from iocparser.infrastructure.persistence.history.row_values import typed_row
@@ -423,6 +423,33 @@ def test_decode_file_bytes_honors_bom(encoding_bytes: bytes) -> None:
 
     assert "203.0.113.5" in decoded
     assert "evil.example.com" in decoded
+
+
+def test_wrap_binary_stream_for_bom_recovers_when_peek_fails() -> None:
+    class PeekFailStream(io.RawIOBase):
+        def __init__(self, data: bytes) -> None:
+            self._buffer = io.BytesIO(data)
+
+        def readable(self) -> bool:
+            return True
+
+        def seekable(self) -> bool:
+            return False
+
+        def readinto(self, target: bytearray) -> int:
+            data = self._buffer.read(len(target))
+            target[: len(data)] = data
+            return len(data)
+
+        def peek(self, _size: int) -> bytes:
+            raise OSError("peek failed")
+
+    wrapped, is_text = wrap_binary_stream_for_bom(
+        PeekFailStream("hello 203.0.113.5".encode("utf-16")), is_text=False
+    )
+
+    assert is_text is True
+    assert "203.0.113.5" in wrapped.read()
 
 
 def test_reader_extracts_iocs_from_utf16_file(tmp_path: Path) -> None:

@@ -2568,6 +2568,7 @@ def test_import_history_trims_replayed_run_identity_fields(tmp_path: Path) -> No
     payload = export_persisted_history(db_uri=source_db_uri)
     payload["runs"][0]["tool_version"] = " 5.0.0 "
     payload["runs"][0]["status"] = " completed "
+    payload["runs"][0]["error_message"] = " "
 
     assert import_history_raw(target_db_uri, payload)["runs"] == 1
     assert import_history_raw(target_db_uri, payload)["runs"] == 0
@@ -2865,6 +2866,7 @@ def test_import_history_normalizes_replayed_dead_letter_identity_fields(
     payload["dead_letter_jobs"][0]["queue_backend"] = " filesystem "
     payload["dead_letter_jobs"][0]["queue_name"] = " default "
     payload["dead_letter_jobs"][0]["source_value"] = " https://same.example/feed "
+    payload["dead_letter_jobs"][0]["error_message"] = " timeout "
 
     assert import_history_raw(target_db_uri, payload)["dead_letter_jobs"] == 1
     assert import_history_raw(target_db_uri, payload)["dead_letter_jobs"] == 0

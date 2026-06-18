@@ -394,6 +394,7 @@ def _existing_run(
 ) -> RunModel | None:
     tool_version = str(row.get("tool_version", "")).strip()
     status = str(row.get("status", "")).strip()
+    error_message = str(row.get("error_message", "")).strip()
     candidates = (
         session.execute(
             select(RunModel).where(
@@ -410,7 +411,7 @@ def _existing_run(
                 RunModel.partial_error_count == int(row.get("partial_error_count", 0)),  # type: ignore[call-overload]
                 RunModel.duration_ms == int(row.get("duration_ms", 0)),  # type: ignore[call-overload]
                 RunModel.status == status,
-                RunModel.error_message == str(row.get("error_message", "")),
+                RunModel.error_message == error_message,
             )
         )
         .scalars()
@@ -483,6 +484,7 @@ def _existing_dead_letter_job(
     queue_backend = normalized_queue_backend(str(row.get("queue_backend", "")))
     queue_name = str(row.get("queue_name", "")).strip()
     source_value = str(row.get("source_value", "")).strip()
+    error_message = str(row.get("error_message", "")).strip()
     candidates = (
         session.execute(
             select(DeadLetterJobModel).where(
@@ -501,7 +503,7 @@ def _existing_dead_letter_job(
                 DeadLetterJobModel.max_attempts == int(row.get("max_attempts", 0)),  # type: ignore[call-overload]
                 DeadLetterJobModel.error_code == str(row.get("error_code", "")),
                 DeadLetterJobModel.error_category == str(row.get("error_category", "")),
-                DeadLetterJobModel.error_message == str(row.get("error_message", "")),
+                DeadLetterJobModel.error_message == error_message,
                 DeadLetterJobModel.retryable == bool_from_row(row.get("retryable")),
             )
         )
@@ -707,6 +709,7 @@ def _import_runs(
             continue
         typed["tool_version"] = str(typed.get("tool_version", "")).strip()
         typed["status"] = str(typed.get("status", "")).strip()
+        typed["error_message"] = str(typed.get("error_message", "")).strip()
         original_batch_id = typed.get("batch_job_id")
         batch_job_id = (
             batch_map.get(int(original_batch_id)) if isinstance(original_batch_id, int) else None
@@ -906,6 +909,7 @@ def _import_dead_letter_jobs(
         typed["queue_backend"] = normalized_queue_backend(str(typed.get("queue_backend", "")))
         typed["queue_name"] = str(typed.get("queue_name", "")).strip()
         typed["source_value"] = str(typed.get("source_value", "")).strip()
+        typed["error_message"] = str(typed.get("error_message", "")).strip()
         if (
             _existing_dead_letter_job(
                 session, typed, archive_id=archive_id, same_origin=same_origin

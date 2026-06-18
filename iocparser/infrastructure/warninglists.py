@@ -79,8 +79,8 @@ class MISPWarningLists(
     # Keywords for relevance checking by IOC type
     TYPE_KEYWORDS: ClassVar[dict[str, list[str]]] = {
         "ips": ["ip", "address", "ipv4", "ipv6", "cidr"],
-        "domains": ["domain", "hostname", "fqdn", "dns"],
-        "hosts": ["domain", "hostname", "fqdn", "dns"],
+        "domains": ["domain", "host", "hostname", "fqdn", "dns"],
+        "hosts": ["domain", "host", "hostname", "fqdn", "dns"],
         "urls": ["url", "uri", "link"],
         "emails": ["email", "mail"],
         "cves": ["cve", "vulnerability"],

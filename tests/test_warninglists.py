@@ -1465,6 +1465,38 @@ class TestWarningListsDiagnostic:
 
         logger.removeHandler(handler)
 
+    def test_diagnose_with_host_keyword_only_list_name(self):
+        """Host diagnostics should not miss host-oriented list names."""
+        import io
+        import logging
+
+        warning_lists = make_warning_lists()
+
+        warning_lists.warning_lists = {
+            "check-host-net": {
+                "name": "List of known check-host.net IP address ranges",
+                "description": "check-host IP addresses",
+                "type": "cidr",
+                "matching_attributes": ["ip-src"],
+                "list": ["192.0.2.0/24"],
+            }
+        }
+        warning_lists._preprocess_lists()
+
+        log_capture = io.StringIO()
+        handler = logging.StreamHandler(log_capture)
+        logger = logging.getLogger("iocparser.infrastructure.warninglists")
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+
+        warning_lists.diagnose_value_detection("192.0.2.10", "hosts")
+
+        log_output = log_capture.getvalue()
+
+        assert "List of known check-host.net IP address ranges" in log_output
+
+        logger.removeHandler(handler)
+
     def test_is_list_relevant_for_expected(self):
         """Test expected list relevance checking."""
         warning_lists = make_warning_lists()

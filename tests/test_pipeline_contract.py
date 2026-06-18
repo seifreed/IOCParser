@@ -445,6 +445,25 @@ def test_apply_config_defaults_sets_pipeline_limit_values(tmp_path: Path) -> Non
     assert args.max_queue_size == 9
 
 
+@pytest.mark.parametrize(
+    ("config_text", "message"),
+    [
+        ("[defaults]\nchunk_size = 0\n", "chunk_size"),
+        ("[defaults]\noverlap = -1\n", "overlap"),
+    ],
+)
+def test_apply_config_defaults_rejects_invalid_streaming_sizes_from_config(
+    tmp_path: Path, config_text: str, message: str
+) -> None:
+    config_path = tmp_path / "iocparser.ini"
+    config_path.write_text(config_text, encoding="utf-8")
+    config = load_config(None, None, str(config_path))
+    args = SimpleNamespace(chunk_size=None, overlap=None)
+
+    with pytest.raises(ValidationError, match=message):
+        apply_config_defaults(args, config)
+
+
 def test_apply_config_defaults_rejects_invalid_diff_only_config(tmp_path: Path) -> None:
     config_path = tmp_path / "iocparser.ini"
     config_path.write_text("[defaults]\ndiff_only = bogus\n", encoding="utf-8")

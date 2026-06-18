@@ -11,6 +11,8 @@ from iocparser.shared_utils import validated_diff_only
 
 INVALID_HTTP_MAPPING_ERROR = "Invalid HTTP mapping JSON: {value}"
 INVALID_HTTP_MAPPING_ITEM_ERROR = "Invalid HTTP mapping item: {value}"
+INVALID_CHUNK_SIZE = "Invalid chunk_size: {value}"
+INVALID_OVERLAP = "Invalid overlap: {value}"
 INVALID_MAX_INPUT_SIZE_MB = "Invalid max_input_size_mb: {value}"
 TLS_FILE_NOT_FOUND = "{flag} file does not exist: {path}"
 
@@ -93,6 +95,10 @@ def _apply_output_defaults(args: argparse.Namespace, config: AppConfig) -> None:
 
 
 def _apply_numeric_defaults(args: argparse.Namespace, config: AppConfig) -> None:
+    if config.chunk_size < 1:
+        raise ValidationError(INVALID_CHUNK_SIZE.format(value=config.chunk_size))
+    if config.overlap < 0:
+        raise ValidationError(INVALID_OVERLAP.format(value=config.overlap))
     numeric_defaults: dict[str, int | float] = {
         "url_workers": config.url_workers,
         "url_retries": config.url_retries,

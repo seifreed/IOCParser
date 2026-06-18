@@ -161,6 +161,8 @@ class StreamingIOCExtractor:
     def _deduplicate_iocs(
         self,
         new_iocs: dict[str, list[str]],
+        *,
+        seen_iocs: dict[str, set[str]] | None = None,
     ) -> dict[str, list[str]]:
         """
         Remove duplicate IOCs that have been seen before.
@@ -171,7 +173,9 @@ class StreamingIOCExtractor:
         Returns:
             Deduplicated IOCs
         """
-        result: dict[str, list[str]] = deduplicate_iocs_with_state(new_iocs, self.seen_iocs)
+        result: dict[str, list[str]] = deduplicate_iocs_with_state(
+            new_iocs, seen_iocs if seen_iocs is not None else self.seen_iocs
+        )
         return result
 
     def _filter_overlap_artifacts(
@@ -204,12 +208,17 @@ class StreamingIOCExtractor:
         return filtered
 
     def _extract_unique_from_chunk(
-        self, chunk: str, prefix_length: int, is_final: bool = False
+        self,
+        chunk: str,
+        prefix_length: int,
+        is_final: bool = False,
+        *,
+        seen_iocs: dict[str, set[str]] | None = None,
     ) -> dict[str, list[str]]:
         """Extract, drop overlap artifacts, and deduplicate IOCs from one chunk."""
         chunk_iocs = self.extractor.extract_all(chunk)
         chunk_iocs = self._filter_overlap_artifacts(chunk, chunk_iocs, prefix_length, is_final)
-        return self._deduplicate_iocs(chunk_iocs)
+        return self._deduplicate_iocs(chunk_iocs, seen_iocs=seen_iocs)
 
     def extract_from_file(
         self,
@@ -236,6 +245,7 @@ class StreamingIOCExtractor:
 
         # Reset seen IOCs for new file
         self.seen_iocs.clear()
+        seen_iocs: dict[str, set[str]] = defaultdict(set)
 
         all_iocs: dict[str, list[str]] = defaultdict(list)
 
@@ -255,7 +265,7 @@ class StreamingIOCExtractor:
                         is_text=True,
                     ):
                         unique_iocs = self._extract_unique_from_chunk(
-                            chunk, prefix_length, is_final
+                            chunk, prefix_length, is_final, seen_iocs=seen_iocs
                         )
                         if unique_iocs:
                             if yield_chunks:
@@ -295,6 +305,7 @@ class StreamingIOCExtractor:
 
         # Reset seen IOCs for new stream
         self.seen_iocs.clear()
+        seen_iocs: dict[str, set[str]] = defaultdict(set)
 
         try:
             for chunk, prefix_length, is_final in read_chunks_with_prefix(
@@ -304,7 +315,9 @@ class StreamingIOCExtractor:
                 progress_callback=self.progress_callback,
                 is_text=is_text,
             ):
-                unique_iocs = self._extract_unique_from_chunk(chunk, prefix_length, is_final)
+                unique_iocs = self._extract_unique_from_chunk(
+                    chunk, prefix_length, is_final, seen_iocs=seen_iocs
+                )
                 if unique_iocs:
                     yield unique_iocs
         finally:
@@ -343,6 +356,7 @@ class StreamingIOCExtractor:
 
         # Reset seen IOCs
         self.seen_iocs.clear()
+        seen_iocs: dict[str, set[str]] = defaultdict(set)
         all_iocs: dict[str, list[str]] = defaultdict(list)
 
         if file_path.stat().st_size == 0:
@@ -385,7 +399,10 @@ class StreamingIOCExtractor:
 
                     # Extract and accumulate IOCs
                     unique_iocs = self._extract_unique_from_chunk(
-                        chunk, prefix_length, chunk_end >= file_size
+                        chunk,
+                        prefix_length,
+                        chunk_end >= file_size,
+                        seen_iocs=seen_iocs,
                     )
                     self._accumulate_iocs(all_iocs, unique_iocs)
 

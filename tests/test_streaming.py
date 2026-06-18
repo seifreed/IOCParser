@@ -472,6 +472,43 @@ class TestStreamingIOCExtractor:
         finally:
             temp_path.unlink()
 
+    def test_extract_from_file_yield_chunks_isolated_from_other_extractions(self):
+        """
+        Test that a partially consumed chunk iterator does not share dedup state
+        with a later extraction on the same extractor instance.
+        """
+        extractor = StreamingIOCExtractor(chunk_size=8, overlap=0, defang=False)
+
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
+            f.write("x" * 48)
+            first_path = Path(f.name)
+
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
+            f.write("other.example")
+            second_path = Path(f.name)
+
+        try:
+            monkeypatch = pytest.MonkeyPatch()
+            monkeypatch.setattr(
+                extractor.extractor,
+                "extract_all",
+                lambda *_args, **_kwargs: {"domains": ["repeat.example"]},
+            )
+            chunks = extractor.extract_from_file(first_path, yield_chunks=True)
+            first_chunk = next(chunks)
+            extractor.extract_from_file(second_path)
+            remaining_chunks = list(chunks)
+            monkeypatch.undo()
+
+            collected = []
+            for chunk in [first_chunk, *remaining_chunks]:
+                collected.extend(chunk.get("domains", []))
+
+            assert collected.count("repeat.example") == 1
+        finally:
+            first_path.unlink()
+            second_path.unlink()
+
     def test_extract_from_file_empty_file(self):
         """
         Test extraction from empty file.

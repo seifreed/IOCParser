@@ -561,6 +561,7 @@ def test_parse_datetime_normalizes_tz_aware_to_naive_utc() -> None:
     naive = parse_datetime("2024-01-01T12:00:00")
     assert naive is not None
     assert naive.isoformat() == "2024-01-01T12:00:00"
+    assert parse_datetime("   ") is None
     assert parse_datetime(None) is None
 
 

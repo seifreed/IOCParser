@@ -79,13 +79,16 @@ def parse_datetime(value: str | None) -> datetime | None:
     or ...Z) must be converted to UTC and made naive before comparison;
     otherwise its wall-clock numbers are compared directly, off by the offset.
     """
-    if not value:
+    if value is None:
+        return None
+    stripped = value.strip()
+    if not stripped:
         return None
     # fromisoformat raises a bare ValueError on bad input (e.g. --date-from garbage);
     # translate it to a ValidationError so the CLI reports a clean message instead of
     # dumping a stack trace for what is just bad user input.
     try:
-        parsed = datetime.fromisoformat(value)
+        parsed = datetime.fromisoformat(stripped)
     except ValueError as exc:
         raise ValidationError(INVALID_DATETIME_FILTER.format(value=value)) from exc
     if parsed.tzinfo is not None:

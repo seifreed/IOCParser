@@ -11,6 +11,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import ClassVar
 
+from iocparser.domain.enums import IOCType, ioc_type_name
 from iocparser.infrastructure.logger import get_logger
 
 # Type aliases for diagnostics
@@ -145,18 +146,22 @@ class WarningListDiagnosticsMixin(ABC):
             expected_lists: Optional list of expected warning list names
         """
         logger.info("Diagnosing detection for %s (type: %s)", value, ioc_type)
+        try:
+            normalized_ioc_type = ioc_type_name(IOCType.from_name(ioc_type))
+        except ValueError:
+            normalized_ioc_type = ioc_type.strip().lower()
 
         clean_value = self._clean_defanged_value(value)
         logger.info("Cleaned value: %s", clean_value)
 
-        relevant_lists = self._get_relevant_lists(ioc_type, expected_lists)
+        relevant_lists = self._get_relevant_lists(normalized_ioc_type, expected_lists)
         logger.info("Found %s potentially relevant lists", len(relevant_lists))
 
         for list_id, warning_list in relevant_lists:
             values = self._get_warning_list_values(warning_list)
             self._log_list_check_result(clean_value, warning_list, list_id, values)
 
-        in_warning_list, warning_info = self.check_value(value, ioc_type)
+        in_warning_list, warning_info = self.check_value(value, normalized_ioc_type)
         if in_warning_list and warning_info:
             logger.info(
                 "\n✓ FINAL RESULT: Value IS in warning list: %s",

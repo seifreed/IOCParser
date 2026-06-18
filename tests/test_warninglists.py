@@ -1465,6 +1465,39 @@ class TestWarningListsDiagnostic:
 
         logger.removeHandler(handler)
 
+    def test_diagnose_with_host_alias(self):
+        """Singular host aliases should normalize before diagnostics filtering."""
+        import io
+        import logging
+
+        warning_lists = make_warning_lists()
+
+        warning_lists.warning_lists = {
+            "blocked-hosts": {
+                "name": "Blocked Hosts",
+                "description": "Domain-scoped blocklist",
+                "type": "string",
+                "matching_attributes": ["domain"],
+                "list": ["blocked.example"],
+            }
+        }
+        warning_lists._preprocess_lists()
+
+        log_capture = io.StringIO()
+        handler = logging.StreamHandler(log_capture)
+        logger = logging.getLogger("iocparser.infrastructure.warninglists")
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+
+        warning_lists.diagnose_value_detection("blocked.example", "host")
+
+        log_output = log_capture.getvalue()
+
+        assert "Found 1 potentially relevant lists" in log_output
+        assert "Blocked Hosts" in log_output
+
+        logger.removeHandler(handler)
+
     def test_diagnose_with_host_keyword_only_list_name(self):
         """Host diagnostics should not miss host-oriented list names."""
         import io

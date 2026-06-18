@@ -6,7 +6,7 @@ from logging import Logger
 from typing import ClassVar
 from urllib.parse import urlparse
 
-from iocparser.domain.enums import IOCType
+from iocparser.domain.enums import IOCType, ioc_type_name
 from iocparser.infrastructure.logger import get_logger
 from iocparser.infrastructure.warninglists_match_checks import (
     check_cidr as _check_cidr_value,
@@ -177,6 +177,10 @@ class WarningListMatchingMixin:
         return ioc_type in known_types
 
     def _get_candidate_list_ids(self, ioc_type: str) -> list[str]:
+        try:
+            ioc_type = ioc_type_name(IOCType.from_name(ioc_type))
+        except ValueError:
+            ioc_type = ioc_type.strip().lower()
         related_types = [ioc_type]
         if ioc_type == "hosts":
             related_types.append("domains")
@@ -284,6 +288,10 @@ class WarningListMatchingMixin:
         return None
 
     def check_value(self, value: str, ioc_type: str) -> tuple[bool, dict[str, str] | None]:
+        try:
+            ioc_type = ioc_type_name(IOCType.from_name(ioc_type))
+        except ValueError:
+            ioc_type = ioc_type.strip().lower()
         cache_key = (value, ioc_type)
         cached = self._ensure_warning_lookup_cache().get(cache_key)
         if cached is not None:

@@ -8,13 +8,14 @@ Author: Marc Rivero | @seifreed
 
 import codecs
 import html as html_module
+import io
 import re
 import urllib.parse
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, BinaryIO, ClassVar, TextIO, cast
 
 import pdfplumber
 from bs4 import BeautifulSoup
@@ -69,6 +70,28 @@ def decode_file_bytes(raw: bytes) -> str:
         if raw.startswith(bom):
             return raw.decode(encoding, errors="ignore")
     return raw.decode("utf-8", errors="ignore")
+
+
+def wrap_binary_stream_for_bom(
+    stream: BinaryIO | TextIO,
+    *,
+    is_text: bool,
+) -> tuple[BinaryIO | TextIO, bool]:
+    if is_text or isinstance(stream, io.TextIOBase):
+        return stream, is_text
+    try:
+        binary_stream = cast("BinaryIO", stream)
+        current_pos = binary_stream.tell()
+        if current_pos != 0:
+            binary_stream.seek(current_pos)
+            return stream, is_text
+        encoding = detect_bom_encoding(binary_stream.read(4))
+        binary_stream.seek(0)
+        if encoding == "utf-8":
+            return stream, is_text
+        return io.TextIOWrapper(binary_stream, encoding=encoding, errors="ignore"), True
+    except (AttributeError, OSError, io.UnsupportedOperation):
+        return stream, is_text
 
 
 def _is_remote_source(file_path: str) -> bool:

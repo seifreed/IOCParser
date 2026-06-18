@@ -699,6 +699,20 @@ class TestStreamingIOCExtractor:
         # May be 0 if no IOCs, but structure should be correct
         assert all(isinstance(chunk, dict) for chunk in chunks)
 
+    def test_extract_from_stream_binary_utf16_bom(self):
+        """Binary stream extraction must honor BOMs just like file extraction."""
+        extractor = StreamingIOCExtractor(chunk_size=200, defang=False)
+
+        stream = io.BytesIO("https://evil.example/path".encode("utf-16"))
+
+        chunks = list(extractor.extract_from_stream(stream, is_text=False))
+        combined: dict[str, list[str]] = defaultdict(list)
+        for chunk in chunks:
+            for key, values in chunk.items():
+                combined[key].extend(values)
+
+        assert "https://evil.example/path" in combined.get("urls", [])
+
     def test_extract_from_stream_clears_state(self):
         """
         Test that seen_iocs state is cleared for new streams.

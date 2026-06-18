@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import BinaryIO, TextIO, cast
 
 from iocparser.errors import IOCFileNotFoundError
-from iocparser.infrastructure.file_parser import detect_bom_encoding
+from iocparser.infrastructure.file_parser import detect_bom_encoding, wrap_binary_stream_for_bom
 from iocparser.infrastructure.logger import get_logger
 from iocparser.infrastructure.streaming_chunks import decode_chunk, read_chunks_with_prefix
 from iocparser.infrastructure.streaming_matching import should_keep_ioc
@@ -302,6 +302,8 @@ class StreamingIOCExtractor:
             Dictionaries of extracted IOCs as they're found
         """
         logger.info("Starting streaming extraction from stream")
+        stream_obj: BinaryIO | TextIO = stream
+        stream_obj, is_text = wrap_binary_stream_for_bom(stream_obj, is_text=is_text)
 
         # Reset seen IOCs for new stream
         self.seen_iocs.clear()
@@ -309,7 +311,7 @@ class StreamingIOCExtractor:
 
         try:
             for chunk, prefix_length, is_final in read_chunks_with_prefix(
-                file_obj=stream,
+                file_obj=stream_obj,
                 chunk_size=self.chunk_size,
                 overlap=self.overlap,
                 progress_callback=self.progress_callback,

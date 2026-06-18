@@ -596,6 +596,31 @@ def test_persist_result_rolls_back_and_closes_on_exception(monkeypatch) -> None:
         persist_result(request=request, prepared=prepared, result=result, started=time.time())
 
 
+def test_persist_result_preserves_original_error_when_close_fails(monkeypatch) -> None:
+    """persist_result must not replace the persistence error with a close failure."""
+    from unittest.mock import MagicMock
+
+    mock_persist_run = MagicMock(side_effect=RuntimeError("db down"))
+    monkeypatch.setattr("iocparser.pipeline_worker_support.persist_run", mock_persist_run)
+    monkeypatch.setattr(
+        "iocparser.pipeline_worker_support.PipelineUnitOfWork.close",
+        MagicMock(side_effect=RuntimeError("close failed")),
+    )
+
+    request = PipelineJobRequest(
+        input_kind="text",
+        source_value="test",
+        persist=True,
+        db_uri="sqlite:///:memory:",
+        emit_only=False,
+    )
+    prepared = PreparedInput(fingerprint="fp", content_hash="hash", metadata={"input_size": 4})
+    result = ExtractionResult(iocs=())
+
+    with pytest.raises(RuntimeError, match="db down"):
+        persist_result(request=request, prepared=prepared, result=result, started=time.time())
+
+
 def test_renderers_cover_custom_stix_and_record_helpers() -> None:
     custom_name = register_custom_ioc_type(
         "quality-finish-custom",

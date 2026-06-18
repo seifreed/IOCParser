@@ -406,7 +406,8 @@ def persist_result(
         )
         raise
     finally:
-        unit.close()
+        with suppress(Exception):
+            unit.close()
 
 
 def extract_result(

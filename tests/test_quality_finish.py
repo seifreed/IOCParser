@@ -92,7 +92,7 @@ from iocparser.pipeline_worker import (
     _PreparedInput,
     _RunRepositoryAdapter,
 )
-from iocparser.pipeline_worker_support import PreparedInput, persist_result
+from iocparser.pipeline_worker_support import PreparedInput, cleanup_prepared_input, persist_result
 from iocparser.worker_config_support import (
     bool_env,
     float_env,
@@ -644,6 +644,22 @@ def test_persist_result_raises_close_failure_after_success(monkeypatch) -> None:
 
     with pytest.raises(RuntimeError, match="close failed"):
         persist_result(request=request, prepared=prepared, result=result, started=time.time())
+
+
+def test_cleanup_prepared_input_ignores_missing_temp_file(tmp_path: Path) -> None:
+    request = PipelineJobRequest(input_kind="url", source_value="https://example.com")
+    temp_file = tmp_path / "download.tmp"
+    temp_file.write_text("payload", encoding="utf-8")
+    prepared = PreparedInput(
+        fingerprint="fp",
+        content_hash="hash",
+        metadata={"input_size": 7, "temp_file": str(temp_file)},
+    )
+
+    temp_file.unlink()
+    cleanup_prepared_input(request=request, prepared=prepared)
+
+    assert not temp_file.exists()
 
 
 def test_renderers_cover_custom_stix_and_record_helpers() -> None:

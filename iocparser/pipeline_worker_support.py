@@ -185,7 +185,7 @@ def cleanup_prepared_input(*, request: PipelineJobRequest, prepared: PreparedInp
         return
     raw_value = prepared.metadata.get("temp_file")
     if isinstance(raw_value, str) and raw_value:
-        Path(raw_value).unlink()
+        Path(raw_value).unlink(missing_ok=True)
 
 
 def enforce_size_limit(*, limits: ResourceLimits, input_size_bytes: int) -> None:

@@ -55,7 +55,6 @@ from iocparser.infrastructure.persistence_uow import create_engine_for_uri
 
 _typed_row = typed_row
 
-
 @contextmanager
 def _managed_session(db_uri: str) -> Iterator[Session]:
     """Create, migrate, and safely dispose a SQLAlchemy engine, yielding a Session."""
@@ -279,8 +278,8 @@ def _existing_ioc(session: Session, row: dict[str, object]) -> IOCModel | None:
             IOCModel.ioc_type == ioc_type,
             IOCModel.value == str(row.get("value", "")),
             IOCModel.is_warning == bool_from_row(row.get("is_warning")),
-            IOCModel.warning_list == str(row.get("warning_list", "")),
-            IOCModel.warning_description == str(row.get("warning_description", "")),
+            IOCModel.warning_list == str(row.get("warning_list", "")).strip(),
+            IOCModel.warning_description == str(row.get("warning_description", "")).strip(),
         )
     ).scalar_one_or_none()
 
@@ -565,6 +564,8 @@ def _import_iocs(session: Session, rows: list[dict[str, object]]) -> tuple[int, 
             continue
         ioc_type = _normalized_ioc_type(str(typed.get("ioc_type", "")))
         typed["ioc_type"] = ioc_type
+        typed["warning_list"] = str(typed.get("warning_list", "")).strip()
+        typed["warning_description"] = str(typed.get("warning_description", "")).strip()
         search_value = normalize_ioc_search(str(typed.get("value", "")))
         typed["value_search"] = search_value
         typed["dedup_hash"] = ioc_dedup_hash(

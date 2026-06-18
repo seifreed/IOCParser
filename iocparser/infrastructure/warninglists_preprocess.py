@@ -53,7 +53,7 @@ class WarningListPreprocessMixin:
         for value in values_val:
             if value is None:
                 continue
-            value_lower = str(value).lower()
+            value_lower = str(value).strip().lower()
             if value_lower not in self.lookup_data.string_lookups:
                 self.lookup_data.string_lookups[value_lower] = set()
             self.lookup_data.string_lookups[value_lower].add(list_id)

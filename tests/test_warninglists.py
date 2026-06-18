@@ -250,6 +250,12 @@ class TestMISPWarningLists:
         assert is_warning
         assert info["name"] == "Alexa Top 1000"
 
+        warning_lists.warning_lists["alexa-top1000"]["list"][0] = " google.com "
+        warning_lists._preprocess_lists()
+        is_warning, info = warning_lists.check_value("google.com", "domains")
+        assert is_warning
+        assert info["name"] == "Alexa Top 1000"
+
         # Test domain with substring match
         is_warning, info = warning_lists.check_value("virustotal.com", "domains")
         assert is_warning

@@ -1498,6 +1498,39 @@ class TestWarningListsDiagnostic:
 
         logger.removeHandler(handler)
 
+    def test_diagnose_uses_matching_attributes_for_relevance(self):
+        """Diagnostics should show domain lists even when names omit domain keywords."""
+        import io
+        import logging
+
+        warning_lists = make_warning_lists()
+
+        warning_lists.warning_lists = {
+            "public-ipfs-gateways": {
+                "name": "List of known public IPFS gateways",
+                "description": "Event contains one or more entries of known public IPFS gateways",
+                "type": "string",
+                "matching_attributes": ["domain", "hostname", "domain|ip", "url", "uri"],
+                "list": ["4everland.io"],
+            }
+        }
+        warning_lists._preprocess_lists()
+
+        log_capture = io.StringIO()
+        handler = logging.StreamHandler(log_capture)
+        logger = logging.getLogger("iocparser.infrastructure.warninglists")
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+
+        warning_lists.diagnose_value_detection("4everland.io", "domains")
+
+        log_output = log_capture.getvalue()
+
+        assert "Found 1 potentially relevant lists" in log_output
+        assert "List of known public IPFS gateways" in log_output
+
+        logger.removeHandler(handler)
+
     def test_diagnose_with_host_keyword_only_list_name(self):
         """Host diagnostics should not miss host-oriented list names."""
         import io

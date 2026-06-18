@@ -13,6 +13,7 @@ from typing import ClassVar
 
 from iocparser.domain.enums import IOCType, ioc_type_name
 from iocparser.infrastructure.logger import get_logger
+from iocparser.infrastructure.warninglists_types import matching_attribute_name
 
 # Type aliases for diagnostics
 WarningListEntry = str | dict[str, str] | int | bool | None
@@ -57,6 +58,7 @@ class WarningListDiagnosticsMixin(ABC):
         name: str,
         description: str,
         ioc_type: str,
+        matching_attributes: list[WarningListEntry] | None = None,
     ) -> bool:
         """Check if list is relevant based on IOC type."""
         if ioc_type not in self.TYPE_KEYWORDS:
@@ -64,10 +66,17 @@ class WarningListDiagnosticsMixin(ABC):
 
         name_lower = name.lower()
         desc_lower = description.lower()
-        return any(
+        if any(
             keyword in name_lower or keyword in desc_lower
             for keyword in self.TYPE_KEYWORDS[ioc_type]
+        ):
+            return True
+        if not matching_attributes:
+            return False
+        attrs_lower = " ".join(
+            matching_attribute_name(attr).lower() for attr in matching_attributes
         )
+        return any(keyword in attrs_lower for keyword in self.TYPE_KEYWORDS[ioc_type])
 
     def _log_matched_value(self, clean_val: str, vals: list[IOCValue]) -> None:
         """Log which specific entry matched."""
@@ -118,7 +127,14 @@ class WarningListDiagnosticsMixin(ABC):
 
             is_relevant = self._is_list_relevant_for_expected(
                 name, description, expected_lists
-            ) or self._is_list_relevant_for_type(name, description, ioc_type)
+            ) or self._is_list_relevant_for_type(
+                name,
+                description,
+                ioc_type,
+                warning_list.get("matching_attributes")
+                if isinstance(warning_list.get("matching_attributes"), list)
+                else None,
+            )
 
             if is_relevant:
                 relevant_lists.append((list_id, warning_list))

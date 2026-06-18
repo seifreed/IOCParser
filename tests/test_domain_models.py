@@ -145,6 +145,14 @@ def test_value_objects_canonicalize_expected_values() -> None:
     # ssdeep base64 is case-sensitive: strip only, never lowercase (would corrupt the digest).
     mixed_ssdeep = "768:C7tsNKI7aU8Y1O5wjNHDwLxQJidNG3qGqDRT:CtsI7aUwjNQidNG3GqDRT"
     assert indicator_value_for(IOCType.SSDEEP, f"  {mixed_ssdeep}  ").canonical() == mixed_ssdeep
+    assert indicator_value_for(IOCType.ASN, "  AS123  ").canonical() == "AS123"
+    assert (
+        indicator_value_for(
+            IOCType.YARA,
+            "  rule Example { meta: author = \"me\" condition: true }  ",
+        ).canonical()
+        == 'rule Example { meta: author = "me" condition: true }'
+    )
 
 
 def test_indicator_value_for_selects_specialized_types() -> None:

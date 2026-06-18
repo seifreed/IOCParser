@@ -17,7 +17,7 @@ class IndicatorValue:
 
     def canonical(self) -> str:
         """Return the normalized wire value."""
-        return refang_ioc(self.raw)
+        return refang_ioc(self.raw).strip()
 
 
 @dataclass(frozen=True)

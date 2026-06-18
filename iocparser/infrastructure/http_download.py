@@ -509,8 +509,9 @@ class RequestsURLDownloader(URLDownloader):
                 session.close()
             except Exception:
                 if primary_exc is None:
-                    raise
-                logger.warning("Failed to close download session after error", exc_info=True)
+                    logger.warning("Failed to close download session after success", exc_info=True)
+                else:
+                    logger.warning("Failed to close download session after error", exc_info=True)
         content_hash = hashlib.sha256(temp_file.read_bytes()).hexdigest()
         self.last_download_metadata = {
             "original_url": url,

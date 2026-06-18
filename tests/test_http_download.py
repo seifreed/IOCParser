@@ -282,8 +282,50 @@ def test_download_with_size_check_logs_cleanup_failure_for_oversized_download(
     assert "Failed to remove oversized download" in caplog.text
 
 
-def test_download_once_raises_when_session_close_fails(
+def test_download_once_preserves_original_error_when_session_close_fails(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    downloader = RequestsURLDownloader()
+
+    class _Session:
+        def close(self) -> None:
+            raise RuntimeError("session close failed")
+
+    class _Response:
+        url = "https://example.test/file"
+        headers = {"Content-Length": "3", "Content-Type": "text/plain"}
+
+        def __enter__(self) -> _Response:
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> bool:
+            del exc_type, exc, tb
+            return False
+
+        def raise_for_status(self) -> None:
+            raise RuntimeError("download failed")
+
+        def iter_content(self, chunk_size: int = 8192):
+            del chunk_size
+            yield b"abc"
+
+    monkeypatch.setattr(
+        RequestsURLDownloader,
+        "_build_session",
+        lambda self: _Session(),
+    )
+    monkeypatch.setattr(
+        RequestsURLDownloader,
+        "_open_validated",
+        lambda self, url, request_headers, session: (_Response(), url),
+    )
+
+    with pytest.raises(RuntimeError, match="download failed"):
+        downloader._download_once("https://example.test/file", urlparse("https://example.test/file"), tmp_path, 1)
+
+
+def test_download_once_keeps_successful_download_when_session_close_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     downloader = RequestsURLDownloader()
 
@@ -320,8 +362,11 @@ def test_download_once_raises_when_session_close_fails(
         lambda self, url, request_headers, session: (_Response(), url),
     )
 
-    with pytest.raises(RuntimeError, match="session close failed"):
-        downloader._download_once("https://example.test/file", urlparse("https://example.test/file"), tmp_path, 1)
+    caplog.clear()
+    path = downloader._download_once("https://example.test/file", urlparse("https://example.test/file"), tmp_path, 1)
+    assert Path(path).read_bytes() == b"abc"
+    assert downloader.download_metadata()["input_size"] == 3
+    assert "Failed to close download session after success" in caplog.text
 
 
 def test_requests_url_downloader_downloads_pdf_and_html_files() -> None:

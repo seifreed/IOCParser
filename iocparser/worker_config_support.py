@@ -15,6 +15,14 @@ def _ini_has_value(parser: ConfigParser, section: str, option: str) -> bool:
     return bool(parser.get(section, option, fallback="").strip())
 
 
+def _ini_optional_str(parser: ConfigParser, section: str, option: str) -> str | None:
+    raw_value = parser.get(section, option, fallback=None)
+    if raw_value is None:
+        return None
+    stripped = raw_value.strip()
+    return stripped or None
+
+
 def _ini_int[T](parser: ConfigParser, section: str, option: str, *, fallback: T) -> int | T:
     return parser.getint(section, option) if _ini_has_value(parser, section, option) else fallback
 
@@ -111,7 +119,7 @@ def load_worker_file_values(config_path: Path | None) -> dict[str, object]:
     parser = load_ini_sections(config_path)
     values = dict(WORKER_DEFAULTS)
     if parser.has_section("database"):
-        values["db_uri"] = parser.get("database", "uri", fallback=None)
+        values["db_uri"] = _ini_optional_str(parser, "database", "uri")
     if parser.has_section("network"):
         values["max_input_seconds"] = _ini_float(
             parser, "network", "max_input_seconds", fallback=None
@@ -119,12 +127,14 @@ def load_worker_file_values(config_path: Path | None) -> dict[str, object]:
         values["max_queue_size"] = _ini_int(parser, "network", "max_queue_size", fallback=64)
         values["skip_processed"] = _ini_bool(parser, "network", "skip_processed", fallback=False)
     if parser.has_section("worker"):
-        values["queue_backend"] = parser.get("worker", "queue_backend", fallback="filesystem")
-        values["queue_name"] = parser.get("worker", "queue_name", fallback="default")
-        values["queue_url"] = parser.get("worker", "queue_url", fallback=None)
-        values["queue_path"] = parser.get("worker", "queue_path", fallback=".iocparser-queue")
-        values["dead_letter_queue_url"] = parser.get(
-            "worker", "dead_letter_queue_url", fallback=None
+        values["queue_backend"] = (
+            _ini_optional_str(parser, "worker", "queue_backend") or "filesystem"
+        )
+        values["queue_name"] = _ini_optional_str(parser, "worker", "queue_name") or "default"
+        values["queue_url"] = _ini_optional_str(parser, "worker", "queue_url")
+        values["queue_path"] = _ini_optional_str(parser, "worker", "queue_path") or ".iocparser-queue"
+        values["dead_letter_queue_url"] = _ini_optional_str(
+            parser, "worker", "dead_letter_queue_url"
         )
         values["poll_interval_seconds"] = _ini_float(
             parser, "worker", "poll_interval_seconds", fallback=1.0
@@ -134,7 +144,7 @@ def load_worker_file_values(config_path: Path | None) -> dict[str, object]:
         )
         values["max_cycles"] = _ini_int(parser, "worker", "max_cycles", fallback=None)
         values["concurrency"] = _ini_int(parser, "worker", "concurrency", fallback=1)
-        values["telemetry_mode"] = parser.get("worker", "telemetry_mode", fallback="logging")
+        values["telemetry_mode"] = _ini_optional_str(parser, "worker", "telemetry_mode") or "logging"
     if parser.has_section("runtime"):
         values["max_input_size_bytes"] = _ini_int(
             parser, "runtime", "max_input_size_bytes", fallback=None

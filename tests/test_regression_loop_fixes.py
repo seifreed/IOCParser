@@ -365,6 +365,37 @@ def test_worker_config_populated_ini_values_are_parsed(tmp_path: Path) -> None:
     assert values["concurrency"] == 3
 
 
+def test_worker_config_blank_optional_strings_use_defaults(tmp_path: Path) -> None:
+    """Blank worker config strings should behave like absent values.
+
+    The worker config loader previously preserved empty strings for optional
+    text fields, which leaked invalid sentinels into the runtime config object.
+    """
+    config_file = tmp_path / "worker.ini"
+    config_file.write_text(
+        "[database]\n"
+        "uri =   \n"
+        "[worker]\n"
+        "queue_backend =   \n"
+        "queue_name =   \n"
+        "queue_url =   \n"
+        "queue_path =   \n"
+        "dead_letter_queue_url =   \n"
+        "telemetry_mode =   \n",
+        encoding="utf-8",
+    )
+
+    values = load_worker_file_values(config_file)
+
+    assert values["db_uri"] is None
+    assert values["queue_backend"] == "filesystem"
+    assert values["queue_name"] == "default"
+    assert values["queue_url"] is None
+    assert values["queue_path"] == ".iocparser-queue"
+    assert values["dead_letter_queue_url"] is None
+    assert values["telemetry_mode"] == "logging"
+
+
 @pytest.mark.parametrize(
     "encoding_bytes",
     [

@@ -357,7 +357,7 @@ def renderer_for_format(
     stix_types: str | None = None,
 ) -> OutputRenderer:
     return get_renderer(
-        output_format,
+        str(output_format).strip(),
         with_context=with_context,
         stix_types=validated_stix_types(stix_types),
     )

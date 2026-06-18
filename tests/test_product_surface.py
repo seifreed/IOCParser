@@ -1907,6 +1907,13 @@ def test_public_render_api_and_semantic_diff_filters(tmp_path: Path) -> None:
     assert "Known Benign" in rendered_run
     assert "alpha.example" not in rendered_run
     assert "line_number" in rendered_run
+    assert "Known Benign" in render_persisted_run(
+        db_uri=db_uri,
+        run_id=run_ids[0],
+        output_format=" JSON ",
+        severity="informational",
+        only_warnings=True,
+    )
 
     rendered_jsonl = render_persisted_run(
         db_uri=db_uri,

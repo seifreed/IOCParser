@@ -568,12 +568,13 @@ def _import_sources(session: Session, rows: list[dict[str, object]]) -> tuple[in
             source_map[original_id] = existing.id
     return inserted, source_map
 
-
 def _import_iocs(session: Session, rows: list[dict[str, object]]) -> tuple[int, dict[int, int]]:
     inserted = 0
     ioc_map: dict[int, int] = {}
     for row in rows:
         typed = typed_row(row)
+        if not isinstance(typed.get("ioc_type"), str) or not isinstance(typed.get("value"), str):
+            continue
         search_value = normalize_ioc_search(str(typed.get("value", "")))
         typed["value_search"] = search_value
         typed["dedup_hash"] = ioc_dedup_hash(
@@ -596,7 +597,6 @@ def _import_iocs(session: Session, rows: list[dict[str, object]]) -> tuple[int, 
         if isinstance(original_id, int):
             ioc_map[original_id] = existing.id
     return inserted, ioc_map
-
 
 def _import_batch_jobs(
     session: Session,

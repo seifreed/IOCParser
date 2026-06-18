@@ -1694,6 +1694,12 @@ def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_pa
     assert import_history_raw(db_uri, {"sources": [{"id": 1, "kind": "text", "value": "x"}]})[
         "sources"
     ] == 0
+    assert import_history_raw(
+        db_uri, {"iocs": [{"id": 1, "ioc_type": None, "value": "x", "is_warning": False}]}
+    )["iocs"] == 0
+    assert import_history_raw(
+        db_uri, {"iocs": [{"id": 1, "ioc_type": "domain", "value": None, "is_warning": False}]}
+    )["iocs"] == 0
     invalid_fk_counts = import_history_raw(
         db_uri,
         {

@@ -25,9 +25,12 @@ def test_source_kind_and_ioc_type_resolve_aliases() -> None:
     assert SourceKind.from_name(" URL ") is SourceKind.URL
     assert IOCType.from_name("domain") is IOCType.DOMAIN
     assert IOCType.from_name("host") is IOCType.HOST
+    assert IOCType.from_name("hostname") is IOCType.HOST
+    assert IOCType.from_name("hostnames") is IOCType.HOST
     assert IOCType.from_name("ip") is IOCType.IP
     assert IOCType.from_name("ipv4") is IOCType.IP
     assert IOCType.from_name("url") is IOCType.URL
+    assert IOCType.from_name("uri") is IOCType.URL
     assert IOCType.from_name("email") is IOCType.EMAIL
     assert IOCType.from_name(" domains ") is IOCType.DOMAIN
 

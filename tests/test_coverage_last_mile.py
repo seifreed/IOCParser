@@ -55,11 +55,18 @@ def test_api_validated_non_negative_int_string():
 
 
 def test_api_optional_str_and_datetime_trim_whitespace() -> None:
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
     from iocparser.api_persistence_query import (
         optional_str,
+        query_persisted_iocs,
         validated_iso_datetime,
         validated_stix_types,
     )
+    from iocparser.domain.models import IOC, ExtractionResult
+    from iocparser.domain.options import PersistOptions
+    from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
 
     assert optional_str("  value  ") == "value"
     assert optional_str("   ") is None
@@ -67,6 +74,27 @@ def test_api_optional_str_and_datetime_trim_whitespace() -> None:
     assert validated_iso_datetime("   ") is None
     assert validated_stix_types(" urls, domains ") == "urls, domains"
     assert validated_stix_types("   ") is None
+
+    with TemporaryDirectory() as d:
+        db_uri = f"sqlite:///{Path(d) / 't.db'}"
+        service = SQLAlchemyPersistenceService(db_uri)
+        service.persist_multiple_runs(
+            [
+                (
+                    "file",
+                    "sample.txt",
+                    ExtractionResult(iocs=(IOC.from_raw("domains", "example.com"),)),
+                )
+            ],
+            tool_version="1.0",
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
+        )
+        exact = query_persisted_iocs(db_uri=db_uri, value="example.com", source_kind="file")
+        padded = query_persisted_iocs(db_uri=db_uri, value="example.com", source_kind=" file ")
+        assert exact.total == 1
+        assert padded.total == 1
 
 
 def test_api_search_iocs_reraises_generic_error(tmp_path):

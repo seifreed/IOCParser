@@ -98,7 +98,7 @@ class PersistenceClient:
             offset=validated_non_negative_int(options.get("offset", 0), field="offset"),
             date_from=validated_iso_datetime(optional_str(options.get("date_from"))),
             date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
-            source_kind=options.get("source_kind"),
+            source_kind=optional_str(options.get("source_kind")),
             source_value=options.get("source_value"),
             sort_by=validated_run_sort(optional_str(options.get("sort_by")) or "newest"),
         )
@@ -146,7 +146,7 @@ class PersistenceClient:
             offset=validated_non_negative_int(options.get("offset", 0), field="offset"),
             date_from=validated_iso_datetime(optional_str(options.get("date_from"))),
             date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
-            source_kind=options.get("source_kind"),
+            source_kind=optional_str(options.get("source_kind")),
             source_value=options.get("source_value"),
             ioc_type=validated_ioc_type_filter(optional_str(options.get("ioc_type"))),
             # parse_string_filters accepts a comma-separated string as well as a pre-split
@@ -190,7 +190,7 @@ class PersistenceClient:
             offset=validated_non_negative_int(options.get("offset", 0), field="offset"),
             date_from=validated_iso_datetime(optional_str(options.get("date_from"))),
             date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
-            source_kind=options.get("source_kind"),
+            source_kind=optional_str(options.get("source_kind")),
             source_value=options.get("source_value"),
             ioc_type=validated_ioc_type_filter(optional_str(options.get("ioc_type"))),
             severity=validated_severity_values(parse_string_filters(options.get("severity"))),

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from collections.abc import Callable, Iterable
 from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
@@ -20,6 +21,7 @@ SOURCE_MODEL: type[SourceModel] = SourceModel
 IOC_MODEL: type[IOCModel] = IOCModel
 RUN_MODEL: type[RunModel] = RunModel
 RUN_IOC_MODEL: type[RunIOCModel] = RunIOCModel
+logger = logging.getLogger(__name__)
 
 
 def insert_or_refetch[RowT](
@@ -40,12 +42,13 @@ def insert_or_refetch[RowT](
     try:
         session.add(entity)
         session.flush()
-    except IntegrityError:
+    except IntegrityError as exc:
         try:
             savepoint.rollback()
-        except Exception:
+        except Exception as rollback_error:
             session.rollback()
-            raise
+            logger.exception("Savepoint rollback failed while retrying insert")
+            raise exc from rollback_error
         with getattr(session, "no_autoflush", nullcontext()):
             rows = session.execute(refetch_stmt).scalars().all()
         if not rows:

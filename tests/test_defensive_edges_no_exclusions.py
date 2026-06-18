@@ -408,7 +408,7 @@ def test_ioc_repository_integrity_retry_and_reraise_paths() -> None:
 
     rollback_error = RuntimeError("savepoint rollback failed")
     rollback_session = _IntegritySession([], rollback_error=rollback_error)
-    with pytest.raises(RuntimeError) as raised:
+    with pytest.raises(IntegrityError) as raised:
         SQLAlchemyIOCRepository(rollback_session)._get_or_create(
             ioc_type="sha1",
             value="abc",
@@ -416,7 +416,8 @@ def test_ioc_repository_integrity_retry_and_reraise_paths() -> None:
             warning_list="",
             warning_description="",
         )
-    assert raised.value is rollback_error
+    assert "duplicate" in str(raised.value)
+    assert raised.value.__cause__ is rollback_error
     assert rollback_session.rollback_called is True
 
     missing_session = _IntegritySession([])
@@ -466,8 +467,9 @@ def test_source_repository_integrity_retry_and_reraise_paths() -> None:
 
     rollback_error = RuntimeError("savepoint rollback failed")
     rollback_session = _IntegritySession([], rollback_error=rollback_error)
-    with pytest.raises(RuntimeError):
+    with pytest.raises(IntegrityError) as raised:
         SQLAlchemySourceRepository(rollback_session).get_or_create(kind="file", value="rollback")
+    assert raised.value.__cause__ is rollback_error
     assert rollback_session.rollback_called is True
 
     missing_session = _IntegritySession([])

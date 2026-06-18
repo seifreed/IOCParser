@@ -938,6 +938,14 @@ class TestCoverageMissing:
         # Should extract NetBIOS names
         assert any("FILESERVER" in host.upper() for host in result)
 
+    def test_extract_hosts_dotted_unc_names_are_defanged(self):
+        """Test extract_hosts keeps dotted UNC hosts and defangs them by default."""
+        extractor = IOCExtractor()
+
+        result = extractor.extract_hosts(r"\\\\evil.example\\share\\file.txt")
+
+        assert result == ["evil[.]example"]
+
     def test_extract_hosts_filter_common_names(self):
         """Test extract_hosts filters common false positive names."""
         text = r"""

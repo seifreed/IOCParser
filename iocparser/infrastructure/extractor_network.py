@@ -57,7 +57,9 @@ def _dedup_urls(urls: list[str]) -> list[str]:
             result.append(url)
     return result
 
-UNC_HOST_PATTERN = re.compile(r"\\\\([A-Z][A-Z0-9\-]{2,14})(?:\\|\s)", re.IGNORECASE)
+UNC_HOST_PATTERN = re.compile(
+    r"(?<!\\)\\\\+([A-Z][A-Z0-9.\-]{2,252})(?:\\\\+[^\\\s]+)*", re.IGNORECASE
+)
 NORMALIZED_DOT_PATTERN = re.compile(r"[\[\(\{]\.[\]\)\}]")
 
 
@@ -198,9 +200,12 @@ class NetworkHeuristicPolicy:
             valid_emails = [email.replace("@", "[@]").replace(".", "[.]") for email in valid_emails]
         return dedup_case_insensitive(valid_emails)
 
-    def extracted_hosts(self, *, domains: list[str], text: str) -> list[str]:
+    def extracted_hosts(self, *, domains: list[str], text: str, defang: bool) -> list[str]:
         valid_hosts = [domain for domain in domains if self.is_valid_host_candidate(domain)]
-        valid_hosts.extend(self.unc_hosts(text))
+        unc_hosts = self.unc_hosts(text)
+        if defang:
+            unc_hosts = [host.replace(".", "[.]") for host in unc_hosts]
+        valid_hosts.extend(unc_hosts)
         return dedup_case_insensitive(valid_hosts)
 
     def extracted_domains(
@@ -456,4 +461,6 @@ class NetworkExtractionMixin(ExtractorBase):
         Extract actual network hostnames and domains from text.
         Returns only valid domains and explicitly mentioned machine names.
         """
-        return DEFAULT_NETWORK_POLICY.extracted_hosts(domains=self.extract_domains(text), text=text)
+        return DEFAULT_NETWORK_POLICY.extracted_hosts(
+            domains=self.extract_domains(text), text=text, defang=self.defang
+        )

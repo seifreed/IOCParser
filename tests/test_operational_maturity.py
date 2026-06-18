@@ -2917,6 +2917,8 @@ def test_import_history_normalizes_replayed_dead_letter_identity_fields(
     payload["dead_letter_jobs"][0]["source_value"] = " https://same.example/feed "
     payload["dead_letter_jobs"][0]["job_id"] = " job-1 "
     payload["dead_letter_jobs"][0]["correlation_id"] = " corr-1 "
+    payload["dead_letter_jobs"][0]["error_code"] = " INPUT_TIMEOUT "
+    payload["dead_letter_jobs"][0]["error_category"] = " timeout "
     payload["dead_letter_jobs"][0]["error_message"] = " timeout "
 
     assert import_history_raw(target_db_uri, payload)["dead_letter_jobs"] == 1

@@ -101,19 +101,13 @@ HistoryModelType = (
     | type[DistributedJobModel]
     | type[DeadLetterJobModel]
 )
-
-
 def _string_key_mapping(mapping: Mapping[object, object]) -> dict[str, object]:
     return {key: value for key, value in mapping.items() if isinstance(key, str)}
-
-
 def _normalized_ioc_type(value: str) -> str:
     try:
         return ioc_type_name(IOCType.from_name(value))
     except ValueError:
         return value.strip().lower()
-
-
 def _json_object(raw_value: str) -> dict[str, object]:
     try:
         decoded: object = json.loads(raw_value or "{}")
@@ -480,6 +474,8 @@ def _existing_dead_letter_job(
     queue_name = str(row.get("queue_name", "")).strip()
     source_value = str(row.get("source_value", "")).strip()
     correlation_id = str(row.get("correlation_id", "")).strip()
+    error_code = str(row.get("error_code", "")).strip()
+    error_category = str(row.get("error_category", "")).strip()
     error_message = str(row.get("error_message", "")).strip()
     candidates = (
         session.execute(
@@ -497,8 +493,8 @@ def _existing_dead_letter_job(
                 DeadLetterJobModel.source_value == source_value,
                 DeadLetterJobModel.attempts == int(row.get("attempts", 0)),  # type: ignore[call-overload]
                 DeadLetterJobModel.max_attempts == int(row.get("max_attempts", 0)),  # type: ignore[call-overload]
-                DeadLetterJobModel.error_code == str(row.get("error_code", "")),
-                DeadLetterJobModel.error_category == str(row.get("error_category", "")),
+                DeadLetterJobModel.error_code == error_code,
+                DeadLetterJobModel.error_category == error_category,
                 DeadLetterJobModel.error_message == error_message,
                 DeadLetterJobModel.retryable == bool_from_row(row.get("retryable")),
             )
@@ -912,6 +908,8 @@ def _import_dead_letter_jobs(
         typed["queue_name"] = str(typed.get("queue_name", "")).strip()
         typed["source_value"] = str(typed.get("source_value", "")).strip()
         typed["correlation_id"] = str(typed.get("correlation_id", "")).strip()
+        typed["error_code"] = str(typed.get("error_code", "")).strip()
+        typed["error_category"] = str(typed.get("error_category", "")).strip()
         typed["error_message"] = str(typed.get("error_message", "")).strip()
         if (
             _existing_dead_letter_job(

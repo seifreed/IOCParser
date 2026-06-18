@@ -136,7 +136,8 @@ def persist_failed_batch_items(
     for item in items:
         if not isinstance(item, dict) or str(item.get("status", "")).lower() != "failed":
             continue
-        source_value = str(item.get("url", "")).strip()
+        raw_url = item.get("url")
+        source_value = raw_url.strip() if isinstance(raw_url, str) else ""
         if not source_value:
             continue
         run_id = _cli_output.persist_results(

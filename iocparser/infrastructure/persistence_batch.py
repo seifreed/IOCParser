@@ -129,10 +129,14 @@ def create_batch_job(
         if run is not None:
             run.batch_job_id = job.id
     for item in failures:
+        raw_url = item.get("url")
+        source_value = raw_url.strip() if isinstance(raw_url, str) else ""
+        if not source_value:
+            continue
         session.add(
             FailedBatchItemModel(
                 batch_job_id=job.id,
-                source_value=str(item.get("url", "")),
+                source_value=source_value,
                 error_type=str(item.get("error_type", "unknown")),
                 error_message=str(item.get("error", "")),
                 retry_attempt=_int_report_value(item, "retry_attempt", 0),

@@ -2838,12 +2838,20 @@ def test_persist_failed_batch_items_creates_failed_runs(tmp_path: Path) -> None:
         ),
     )
     persist_failed_batch_items(
+        {"items": [{"url": None, "status": "failed", "error": "bad-url"}], "run_metadata_map": {}},
+        config=config,
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
+    )
+    persist_failed_batch_items(
         {"items": [{"url": "https://bad2.example", "status": "failed"}], "run_metadata_map": []},
         config=config,
         options=PersistOptions(
             defang=False, check_warnings=False, force_update=False, output_format="json"
         ),
     )
+    assert "None" not in {item.source_value for item in query_persisted_runs(db_uri=db_uri).items}
 
 
 def test_persist_failed_batch_items_defaults_invalid_duration_metadata(tmp_path: Path) -> None:
@@ -2874,6 +2882,28 @@ def test_persist_failed_batch_items_defaults_invalid_duration_metadata(tmp_path:
 
     runs = query_persisted_runs(db_uri=db_uri, limit=10)
     assert runs.items[0].duration_ms == 0
+
+
+def test_persist_batch_job_skips_non_string_failed_item_urls(tmp_path: Path) -> None:
+    from iocparser.infrastructure.persistence.history import list_failed_batch_items
+
+    db_uri = f"sqlite:///{tmp_path / 'batch-job-bad-url.sqlite'}"
+    config = load_config(cli_persist=True, cli_db_uri=db_uri, cli_config_path=None)
+    batch_job_id = persist_batch_job(
+        {
+            "total": 1,
+            "successful": 0,
+            "failed": 1,
+            "items": [{"url": None, "status": "failed", "error": "timeout"}],
+        },
+        config=config,
+        source_kind="url",
+        run_ids=(),
+        effective_config={},
+    )
+
+    assert batch_job_id is not None
+    assert list_failed_batch_items(db_uri, batch_job_id=batch_job_id) == []
 
 
 def test_cli_dispatch_workflow_persists_failed_batch_items(tmp_path: Path) -> None:

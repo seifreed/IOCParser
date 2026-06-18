@@ -20,6 +20,7 @@ from iocparser.domain.sources import normalize_url_value
 
 def test_source_kind_and_ioc_type_resolve_aliases() -> None:
     assert SourceKind.from_name("file") is SourceKind.FILE
+    assert SourceKind.from_name(" URL ") is SourceKind.URL
     assert IOCType.from_name("domain") is IOCType.DOMAIN
     assert IOCType.from_name("host") is IOCType.HOST
     assert IOCType.from_name("ip") is IOCType.IP

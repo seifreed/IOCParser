@@ -60,7 +60,7 @@ class SourceKind(StrEnum):
     @classmethod
     def from_name(cls, value: str) -> SourceKind:
         """Resolve a source kind from its wire value."""
-        return cls(value)
+        return cls(value.strip().lower())
 
 
 class IOCType(StrEnum):

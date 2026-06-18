@@ -5,6 +5,7 @@ from iocparser.api_persistence_query import (
     validated_non_negative_days,
     validated_non_negative_int,
     validated_required_id,
+    validated_optional_str,
 )
 from iocparser.application.contracts import (
     BatchJobInput,
@@ -105,8 +106,8 @@ def prune_persisted_runs(
         PrunePersistedRunsInput(
             before=before,
             keep_latest=_validated_keep_latest(keep_latest),
-            source_kind=source_kind,
-            source_value=source_value,
+            source_kind=validated_optional_str(source_kind, field="source_kind"),
+            source_value=validated_optional_str(source_value, field="source_value"),
             # Accept a comma-separated string (like retain_persisted_history /
             # list_batch_jobs) as well as a pre-split tuple; passing a bare string used to
             # reach SQLAlchemy's .in_() and raise a cryptic ArgumentError.

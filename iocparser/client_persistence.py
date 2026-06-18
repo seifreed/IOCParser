@@ -15,6 +15,7 @@ from iocparser.api_persistence_query import (
     validated_run_sort,
     validated_search_backend,
     validated_search_sort,
+    validated_optional_str,
     validated_tag_mode,
 )
 from iocparser.application.contracts import QueryRunsInput, SearchPersistedIOCsInput
@@ -98,8 +99,8 @@ class PersistenceClient:
             offset=validated_non_negative_int(options.get("offset", 0), field="offset"),
             date_from=validated_iso_datetime(optional_str(options.get("date_from"))),
             date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
-            source_kind=optional_str(options.get("source_kind")),
-            source_value=optional_str(options.get("source_value")),
+            source_kind=validated_optional_str(options.get("source_kind"), field="source_kind"),
+            source_value=validated_optional_str(options.get("source_value"), field="source_value"),
             sort_by=validated_run_sort(optional_str(options.get("sort_by")) or "newest"),
         )
         return self._typed_service.query_runs_page(
@@ -119,8 +120,8 @@ class PersistenceClient:
             offset=validated_non_negative_int(options.get("offset", 0), field="offset"),
             date_from=validated_iso_datetime(optional_str(options.get("date_from"))),
             date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
-            source_kind=options.get("source_kind"),
-            source_value=options.get("source_value"),
+            source_kind=validated_optional_str(options.get("source_kind"), field="source_kind"),
+            source_value=validated_optional_str(options.get("source_value"), field="source_value"),
             sort_by=validated_run_sort(optional_str(options.get("sort_by")) or "newest"),
         )
 
@@ -146,8 +147,8 @@ class PersistenceClient:
             offset=validated_non_negative_int(options.get("offset", 0), field="offset"),
             date_from=validated_iso_datetime(optional_str(options.get("date_from"))),
             date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
-            source_kind=optional_str(options.get("source_kind")),
-            source_value=optional_str(options.get("source_value")),
+            source_kind=validated_optional_str(options.get("source_kind"), field="source_kind"),
+            source_value=validated_optional_str(options.get("source_value"), field="source_value"),
             ioc_type=validated_ioc_type_filters(options.get("ioc_type"))
             or None,
             # parse_string_filters accepts a comma-separated string as well as a pre-split
@@ -191,8 +192,8 @@ class PersistenceClient:
             offset=validated_non_negative_int(options.get("offset", 0), field="offset"),
             date_from=validated_iso_datetime(optional_str(options.get("date_from"))),
             date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
-            source_kind=optional_str(options.get("source_kind")),
-            source_value=options.get("source_value"),
+            source_kind=validated_optional_str(options.get("source_kind"), field="source_kind"),
+            source_value=validated_optional_str(options.get("source_value"), field="source_value"),
             ioc_type=validated_ioc_type_filters(options.get("ioc_type"))
             or None,
             severity=validated_severity_values(parse_string_filters(options.get("severity"))),
@@ -300,8 +301,8 @@ class PersistenceClient:
         return self._typed_service.prune_runs(
             before=before,
             keep_latest=_validated_keep_latest(keep_latest),
-            source_kind=source_kind,
-            source_value=source_value,
+            source_kind=validated_optional_str(source_kind, field="source_kind"),
+            source_value=validated_optional_str(source_value, field="source_value"),
             statuses=parse_string_filters(statuses),
         )
 

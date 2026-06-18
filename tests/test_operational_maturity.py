@@ -17,6 +17,7 @@ from iocparser.api_persistence import (
     import_persisted_history,
     list_distributed_jobs,
     list_failed_batch_jobs,
+    prune_persisted_runs,
     query_persisted_iocs,
     query_persisted_runs,
     render_persisted_diff,
@@ -469,8 +470,10 @@ def test_public_query_api_validates_dates_and_min_severity(tmp_path: Path) -> No
         client.query_runs(sort_by="bogus")
 
     assert client.query_runs(sort_by=None).total >= 2
-    assert query_persisted_runs(db_uri=db_uri, source_value=1).total == 0
-    assert client.query_runs(source_value=1).total == 0
+    with pytest.raises(ValidationError, match="source_value"):
+        query_persisted_runs(db_uri=db_uri, source_value=1)
+    with pytest.raises(ValidationError, match="source_value"):
+        client.query_runs(source_value=1)
     client_search_page = client.search_iocs(
         value="alpha",
         tag_mode=None,
@@ -481,7 +484,8 @@ def test_public_query_api_validates_dates_and_min_severity(tmp_path: Path) -> No
 
     normalized_page = query_persisted_iocs(db_uri=db_uri, value="alpha", severity="HIGH")
     assert normalized_page.total == 1
-    assert query_persisted_iocs(db_uri=db_uri, value="alpha", source_value=1).total == 0
+    with pytest.raises(ValidationError, match="source_value"):
+        query_persisted_iocs(db_uri=db_uri, value="alpha", source_value=1)
     alias_page = query_persisted_iocs(db_uri=db_uri, value="alpha", ioc_type="domain")
     assert alias_page.total == 1
     alias_diff = diff_persisted_runs(
@@ -493,7 +497,8 @@ def test_public_query_api_validates_dates_and_min_severity(tmp_path: Path) -> No
     assert alias_diff.added.total_count() == 1
     assert alias_diff.removed.total_count() == 1
     assert client.search_iocs(value="alpha", ioc_type="domain").items[0].value == "alpha.example"
-    assert client.search_iocs(value="alpha", source_value=1).total == 0
+    with pytest.raises(ValidationError, match="source_value"):
+        client.search_iocs(value="alpha", source_value=1)
 
     hash_left = _persist_result_with_iocs(
         db_uri,
@@ -589,6 +594,8 @@ def test_public_query_api_rejects_unknown_keyword_options(tmp_path: Path) -> Non
 
     # A valid keyword set is unaffected.
     assert query_persisted_iocs(db_uri=db_uri, value="alpha", min_severity="low").total == 1
+    with pytest.raises(ValidationError, match="source_value"):
+        prune_persisted_runs(db_uri=db_uri, source_value=1)
 
     # The PersistenceClient class wraps its own **options and must reject typos too.
     client = PersistenceClient(db_uri)
@@ -597,6 +604,8 @@ def test_public_query_api_rejects_unknown_keyword_options(tmp_path: Path) -> Non
     with pytest.raises(ValidationError, match="Unknown run query option"):
         client.query_runs(limitt=5)
     assert client.search_iocs(value="alpha", min_severity="low").total == 1
+    with pytest.raises(ValidationError, match="source_value"):
+        client.prune_runs(source_value=1)
 
 
 def test_persistence_client_search_accepts_string_severity_and_tags(tmp_path: Path) -> None:

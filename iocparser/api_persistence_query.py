@@ -131,6 +131,7 @@ class PersistedDiffFilters(PersistedExportFilters):
 MISSING_DIFF_TARGET_ERROR = "Missing diff target"
 INVALID_DATE_ERROR = "Invalid ISO date: {value}"
 INVALID_IOC_TYPE_ERROR = "Invalid ioc_type: {value}"
+INVALID_STRING_FILTER_ERROR = "Invalid {field}: {value}"
 INVALID_MIN_SEVERITY_ERROR = "Invalid min_severity: {value}"
 INVALID_TAG_MODE_ERROR = "Invalid tag_mode: {value}"
 INVALID_SORT_BY_ERROR = "Invalid sort_by: {value}"
@@ -159,6 +160,15 @@ def optional_str(value: object | None) -> str | None:
     return stripped or None
 
 
+def validated_optional_str(value: object | None, *, field: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValidationError(INVALID_STRING_FILTER_ERROR.format(field=field, value=value))
+    stripped = value.strip()
+    return stripped or None
+
+
 def bool_option(value: object | None, default: bool = False) -> bool:
     if value is None:
         return default
@@ -181,7 +191,7 @@ def runs_input(options: QueryRunsOptions) -> QueryRunsInput:
             "offset": validated_non_negative_int(options.get("offset", 0), field="offset"),
             "date_from": validated_iso_datetime(optional_str(options.get("date_from"))),
             "date_to": validated_iso_datetime(optional_str(options.get("date_to"))),
-            "source_value": optional_str(options.get("source_value")),
+            "source_value": validated_optional_str(options.get("source_value"), field="source_value"),
             "sort_by": validated_run_sort(optional_str(options.get("sort_by")) or "newest"),
         }
     )
@@ -195,8 +205,8 @@ def search_input(value: str, options: SearchPersistedIOCOptions) -> SearchPersis
         offset=validated_non_negative_int(options.get("offset", 0), field="offset"),
         date_from=validated_iso_datetime(optional_str(options.get("date_from"))),
         date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
-        source_kind=optional_str(options.get("source_kind")),
-        source_value=optional_str(options.get("source_value")),
+        source_kind=validated_optional_str(options.get("source_kind"), field="source_kind"),
+        source_value=validated_optional_str(options.get("source_value"), field="source_value"),
         ioc_type=validated_ioc_type_filters(options.get("ioc_type")) or None,
         severity=validated_severity_filters(options.get("severity")),
         tags=parse_string_filters(options.get("tag")),

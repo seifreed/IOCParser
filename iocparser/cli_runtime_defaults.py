@@ -10,6 +10,7 @@ from iocparser.errors import ValidationError
 from iocparser.shared_utils import validated_diff_only
 
 INVALID_HTTP_MAPPING_ERROR = "Invalid HTTP mapping JSON: {value}"
+INVALID_HTTP_MAPPING_ITEM_ERROR = "Invalid HTTP mapping item: {value}"
 TLS_FILE_NOT_FOUND = "{flag} file does not exist: {path}"
 
 
@@ -146,11 +147,11 @@ def parse_http_mapping(value: object, *, separator: str) -> dict[str, str]:
     elif isinstance(value, (list, tuple)):
         items = [str(item) for item in value if str(item).strip()]
     else:
-        items = [str(value)]
+        return {}
     mapping: dict[str, str] = {}
     for item in items:
         if separator not in item:
-            continue
+            raise ValidationError(INVALID_HTTP_MAPPING_ITEM_ERROR.format(value=item))
         name, raw_value = item.split(separator, maxsplit=1)
         normalized_name = name.strip()
         if not normalized_name:

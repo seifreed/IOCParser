@@ -2717,6 +2717,10 @@ def test_internal_http_mapping_and_static_timeout_helpers() -> None:
     assert _parse_http_mapping(["A: one", "B: two"], separator=":") == {"A": "one", "B": "two"}
     assert _parse_http_mapping([": bad", "A: ok"], separator=":") == {"A": "ok"}
     assert _parse_http_mapping(123, separator="=") == {}
+    with pytest.raises(ValidationError, match="Invalid HTTP mapping item"):
+        _parse_http_mapping("MissingSeparator", separator=":")
+    with pytest.raises(ValidationError, match="Invalid HTTP mapping item"):
+        _parse_http_mapping(["A: ok", "MissingSeparator"], separator=":")
     with pytest.raises(ValidationError, match="Invalid HTTP mapping JSON"):
         _parse_http_mapping("{bad", separator=":")
     with pytest.raises(ValidationError, match="Invalid HTTP mapping JSON"):

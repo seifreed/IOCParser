@@ -10,6 +10,7 @@ from sqlalchemy.engine import Engine
 
 from iocparser import cli_args as _cli_args
 from iocparser import cli_output as _cli_output
+from iocparser.api_persistence_query import validated_non_negative_int
 from iocparser.application.contracts import ListFailedBatchesInput, RetainHistoryInput
 from iocparser.application.maintenance_use_cases import (
     compact_persisted_history as uc_compact_persisted_history,
@@ -152,7 +153,11 @@ def _handle_history_maintenance(args: argparse.Namespace, config: AppConfig) -> 
     if not _cli_args.get_bool_arg(args, "list_failed_batches"):
         return False
     jobs = uc_list_failed_batch_jobs(
-        ListFailedBatchesInput(limit=_cli_args.get_int_arg(args, "batch_limit", 20)),
+        ListFailedBatchesInput(
+            limit=validated_non_negative_int(
+                _cli_args.get_int_arg(args, "batch_limit", 20), field="limit"
+            )
+        ),
         persistence_query_service=_query_service_for(config),
     )
     if _cli_args.get_bool_arg(args, "json"):

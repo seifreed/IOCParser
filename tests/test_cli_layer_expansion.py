@@ -252,6 +252,16 @@ def test_cli_negative_run_limit_is_rejected(monkeypatch: pytest.MonkeyPatch) -> 
         )
 
 
+def test_cli_negative_batch_limit_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cli_queries, "_query_service_for", lambda _config: StaticQueryService())
+    with pytest.raises(ValidationError, match="limit"):
+        cli_queries.handle_query_commands(
+            _query_args(list_batches=True, batch_limit=-1),
+            SimpleNamespace(db_uri="sqlite:///unused"),
+            file_writer=MemoryWriter(),
+        )
+
+
 @pytest.mark.parametrize(
     ("overrides", "message"),
     [

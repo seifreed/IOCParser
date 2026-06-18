@@ -245,7 +245,7 @@ def _handle_list_batches(args: argparse.Namespace, config: AppConfig) -> bool:
         return False
     jobs = query_uc.list_batch_jobs(
         ListBatchJobsInput(
-            limit=_cli_args.get_int_arg(args, "batch_limit", 20),
+            limit=_validated_limit(args, "batch_limit", 20, field="limit"),
             statuses=_string_filters_attr(args, "prune_status"),
         ),
         persistence_query_service=_query_service_for(config),

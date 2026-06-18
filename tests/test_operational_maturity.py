@@ -1297,6 +1297,25 @@ def test_cli_schema_validation_errors_and_noop() -> None:
         )
     with pytest.raises(ValidationError):
         handle_schema_commands(SimpleNamespace(export_history="-"), config, file_writer=writer)
+    with pytest.raises(ValidationError, match="limit"):
+        handle_schema_commands(
+            SimpleNamespace(
+                schema_version=False,
+                migrate=False,
+                validate_schema=False,
+                export_history=None,
+                archive_history=None,
+                import_history=None,
+                restore_history=None,
+                compact_history=False,
+                retain_days=None,
+                prune_status=None,
+                list_failed_batches=True,
+                batch_limit=-1,
+            ),
+            config,
+            file_writer=writer,
+        )
     assert (
         handle_schema_commands(
             SimpleNamespace(

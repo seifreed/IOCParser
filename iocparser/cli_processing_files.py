@@ -440,6 +440,8 @@ def _process_duplicate_files(
         except (FileExistenceError, FileProcessingError) as exc:
             normal_iocs, warning_iocs = {}, {}
             error_message = str(exc)
+        except ValidationError:
+            raise
         except Exception as exc:
             logger.exception("Batch processing failed for %s", source_value)
             normal_iocs, warning_iocs = {}, {}
@@ -573,6 +575,8 @@ def process_multiple_files_payload(
                     error_message=str(exc),
                 )
                 continue
+            except ValidationError:
+                raise
             except Exception as exc:
                 logger.exception("Batch processing failed for %s", source_value)
                 results.add(

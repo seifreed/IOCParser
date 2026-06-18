@@ -1329,6 +1329,31 @@ def test_duplicate_file_processing_interrupts_and_generic_errors(
         )
 
 
+def test_duplicate_file_processing_propagates_validation_errors(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import iocparser.cli_processing_files as files
+    from iocparser.errors import FileSizeError
+
+    sample = tmp_path / "sample.txt"
+    sample.write_text("payload", encoding="utf-8")
+    request = files.MultiFileProcessingRequest()
+
+    monkeypatch.setattr(
+        files,
+        "process_file",
+        lambda *_args, **_kwargs: _raise(FileSizeError(1.0, 0.5)),
+    )
+    with pytest.raises(FileSizeError):
+        files._process_duplicate_files(
+            [sample],
+            reader=SimpleNamespace(),
+            warning_service=None,
+            request=request,
+        )
+
+
 def test_pipeline_url_preparation_derives_missing_hash_metadata(tmp_path) -> None:
     import hashlib
 

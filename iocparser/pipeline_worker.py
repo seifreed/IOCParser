@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -30,6 +31,8 @@ from iocparser.pipeline_worker_support import (
     prepared_temp_file,
     success_result,
 )
+
+logger = logging.getLogger(__name__)
 
 _PreparedInput = PreparedInput
 _metadata_int = metadata_int
@@ -83,6 +86,7 @@ class PipelineWorker:
             phase_timings_ms=phase_timings_ms,
         )
         prepared: PreparedInput | None = None
+        primary_exc: BaseException | None = None
         try:
             prepare_started = time.perf_counter()
             prepared = prepare_input(client=self.client, limits=self.limits, request=request)
@@ -102,7 +106,6 @@ class PipelineWorker:
                 skip_processed=self.limits.skip_processed,
             )
             if skipped is not None:
-                cleanup_prepared_input(request=request, prepared=prepared)
                 return skipped
 
             extract_started = time.perf_counter()
@@ -118,21 +121,18 @@ class PipelineWorker:
             )
             if run_id is not None:
                 phase_timings_ms["persist"] = int((time.perf_counter() - persist_started) * 1000)
-            output = success_result(
+            return success_result(
                 context=context,
                 prepared=prepared,
                 result=result,
                 run_id=run_id,
             )
-            cleanup_prepared_input(request=request, prepared=prepared)
-            return output
         except (KeyboardInterrupt, SystemExit):
             raise
         except (MemoryError, RecursionError, SystemError):
             raise
         except Exception as exc:
-            if prepared is not None:
-                cleanup_prepared_input(request=request, prepared=prepared)
+            primary_exc = exc
             return failed_result(
                 request=request,
                 exc=exc,
@@ -142,6 +142,14 @@ class PipelineWorker:
                 started_at=started_at,
                 phase_timings_ms=phase_timings_ms,
             )
+        finally:
+            if prepared is not None:
+                try:
+                    cleanup_prepared_input(request=request, prepared=prepared)
+                except Exception:
+                    if primary_exc is None:
+                        raise
+                    logger.warning("Cleanup failed after pipeline processing error", exc_info=True)
 
     @contextmanager
     def _reservation(self) -> Iterator[None]:

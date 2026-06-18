@@ -186,8 +186,7 @@ def cleanup_prepared_input(*, request: PipelineJobRequest, prepared: PreparedInp
         return
     raw_value = prepared.metadata.get("temp_file")
     if isinstance(raw_value, str) and raw_value:
-        with suppress(OSError):
-            Path(raw_value).unlink()
+        Path(raw_value).unlink()
 
 
 def enforce_size_limit(*, limits: ResourceLimits, input_size_bytes: int) -> None:
@@ -440,18 +439,14 @@ def extract_result(
             exclude=request.exclude,
         )
     temp_file = prepared_temp_file(prepared)
-    try:
-        return client.extract_result_from_file(
-            temp_file,
-            check_warnings=request.check_warnings,
-            force_update=request.force_update,
-            defang=request.defang,
-            only=request.only,
-            exclude=request.exclude,
-        )
-    finally:
-        with suppress(OSError):
-            Path(temp_file).unlink()
+    return client.extract_result_from_file(
+        temp_file,
+        check_warnings=request.check_warnings,
+        force_update=request.force_update,
+        defang=request.defang,
+        only=request.only,
+        exclude=request.exclude,
+    )
 
 
 def ensure_input_deadline(*, limits: ResourceLimits, started: float, source_value: str) -> None:

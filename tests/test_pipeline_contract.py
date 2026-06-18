@@ -358,6 +358,44 @@ def test_pipeline_worker_cleans_downloaded_url_when_processed_run_is_skipped(
     assert not temp_file.exists()
 
 
+def test_pipeline_worker_raises_when_success_cleanup_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    temp_file = tmp_path / "downloaded.txt"
+    temp_file.write_text("cached input", encoding="utf-8")
+
+    class FakeDownloader:
+        last_download_metadata = {"input_size": temp_file.stat().st_size}
+
+        def download(self, url: str) -> str:
+            assert url == "https://example.test/report"
+            return str(temp_file)
+
+    class FakeClient:
+        downloader = FakeDownloader()
+
+        def extract_result_from_text(self, text_content: str, **kwargs: object) -> ExtractionResult:
+            raise AssertionError("text extraction should not run")
+
+        def extract_result_from_file(self, file_path: str, **kwargs: object) -> ExtractionResult:
+            assert file_path == str(temp_file)
+            return _result()
+
+    def failing_unlink(*_args: object, **_kwargs: object) -> None:
+        raise OSError("cleanup failed")
+
+    monkeypatch.setattr("iocparser.pipeline_worker_support.Path.unlink", failing_unlink)
+
+    with pytest.raises(OSError, match="cleanup failed"):
+        PipelineWorker(client=FakeClient()).process(
+            PipelineJobRequest(
+                input_kind="url",
+                source_value="https://example.test/report",
+                check_warnings=False,
+            )
+        )
+
+
 def test_pipeline_worker_enforces_time_limit_and_invalid_kind() -> None:
     timed = PipelineWorker(limits=ResourceLimits(max_input_seconds=0.0))
     timed_result = timed.process(

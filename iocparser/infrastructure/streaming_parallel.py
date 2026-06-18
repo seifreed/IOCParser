@@ -52,15 +52,16 @@ class ParallelStreamingExtractor:
                 try:
                     path_str, iocs_result = future.result()
                     results[path_str] = iocs_result
-                    completed_files += 1
-                    if progress_callback:
-                        progress_callback(int((completed_files / total_files) * 100))
                     logger.info("Completed extraction from %s", path_str)
                 except (KeyboardInterrupt, SystemExit):
                     raise
                 except Exception as exc:
                     logger.exception("Error processing %s", file_path)
                     results[str(file_path)] = {"_errors": [f"{file_path}: {exc}"]}
+                finally:
+                    completed_files += 1
+                    if progress_callback:
+                        progress_callback(int((completed_files / total_files) * 100))
 
         # Return in input order, not thread-completion order, so the downstream merge
         # dedup is deterministic across runs (see ThreadPoolFileBatchExecutor).

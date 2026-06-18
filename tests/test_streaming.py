@@ -1024,6 +1024,34 @@ class TestParallelStreamingExtractor:
         finally:
             valid_file.unlink()
 
+    def test_extract_from_files_reports_completion_for_failed_files(self):
+        """
+        Test parallel extraction reports final progress even when some files fail.
+        """
+        progress_values = []
+
+        def progress_callback(progress: int) -> None:
+            progress_values.append(progress)
+
+        extractor = ParallelStreamingExtractor(max_workers=2)
+
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
+            f.write("Valid content: test.com")
+            valid_file = Path(f.name)
+
+        invalid_file = Path(tempfile.gettempdir()) / "non_existent_parallel_test_12345.txt"
+
+        try:
+            results = extractor.extract_from_files(
+                [valid_file, invalid_file], progress_callback=progress_callback
+            )
+
+            assert len(results) == 2
+            assert 100 in progress_values
+            assert all(0 <= p <= 100 for p in progress_values)
+        finally:
+            valid_file.unlink()
+
     def test_extract_from_files_concurrent_processing(self):
         """
         Test that files are actually processed concurrently.

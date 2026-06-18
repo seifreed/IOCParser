@@ -173,7 +173,7 @@ def test_streaming_extractors_cover_buffer_and_parallel_fallbacks(tmp_path: Path
 
     assert "https://stream.example/path" in results[str(text_file)]["urls"]
     assert "_errors" in results["broken-path"]
-    assert progress_values == [50]
+    assert progress_values == [50, 100]
 
 
 def test_network_and_base_edge_paths_cover_remaining_branches() -> None:

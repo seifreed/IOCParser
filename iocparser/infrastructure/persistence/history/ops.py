@@ -12,6 +12,7 @@ from sqlalchemy import inspect, or_, select, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 
+from iocparser.domain.enums import IOCType, ioc_type_name
 from iocparser.domain.jobs import BatchJobDetail, BatchJobSummary, FailedBatchItem
 from iocparser.domain.models import PersistedRunSummary
 from iocparser.domain.sources import normalize_url_value
@@ -107,6 +108,13 @@ HistoryModelType = (
 
 def _string_key_mapping(mapping: Mapping[object, object]) -> dict[str, object]:
     return {key: value for key, value in mapping.items() if isinstance(key, str)}
+
+
+def _normalized_ioc_type(value: str) -> str:
+    try:
+        return ioc_type_name(IOCType.from_name(value))
+    except ValueError:
+        return value.strip().lower()
 
 
 def _json_object(raw_value: str) -> dict[str, object]:
@@ -264,9 +272,10 @@ def _existing_source(session: Session, row: dict[str, object]) -> SourceModel | 
 
 
 def _existing_ioc(session: Session, row: dict[str, object]) -> IOCModel | None:
+    ioc_type = _normalized_ioc_type(str(row.get("ioc_type", "")))
     return session.execute(
         select(IOCModel).where(
-            IOCModel.ioc_type == str(row.get("ioc_type", "")),
+            IOCModel.ioc_type == ioc_type,
             IOCModel.value == str(row.get("value", "")),
             IOCModel.is_warning == bool_from_row(row.get("is_warning")),
             IOCModel.warning_list == str(row.get("warning_list", "")),
@@ -551,10 +560,12 @@ def _import_iocs(session: Session, rows: list[dict[str, object]]) -> tuple[int, 
         typed = typed_row(row)
         if not isinstance(typed.get("ioc_type"), str) or not isinstance(typed.get("value"), str):
             continue
+        ioc_type = _normalized_ioc_type(str(typed.get("ioc_type", "")))
+        typed["ioc_type"] = ioc_type
         search_value = normalize_ioc_search(str(typed.get("value", "")))
         typed["value_search"] = search_value
         typed["dedup_hash"] = ioc_dedup_hash(
-            str(typed.get("ioc_type", "")),
+            ioc_type,
             str(typed.get("value", "")),
             bool(typed.get("is_warning")),
             str(typed.get("warning_list", "")),

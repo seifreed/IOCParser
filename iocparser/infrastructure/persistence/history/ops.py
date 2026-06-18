@@ -899,6 +899,15 @@ def _import_dead_letter_jobs(
     for row in rows:
         typed = typed_row(row)
         if (
+            not all(
+                isinstance(typed.get(key), str)
+                for key in ("correlation_id", "queue_backend", "queue_name", "source_value")
+            )
+            or not all(isinstance(typed.get(key), str) for key in ("error_code", "error_category", "error_message"))
+            or not isinstance(typed.get("dead_lettered_at"), datetime)
+        ):
+            continue
+        if (
             _existing_dead_letter_job(
                 session, typed, archive_id=archive_id, same_origin=same_origin
             )
@@ -1134,8 +1143,6 @@ def import_history(db_uri: str, payload: dict[str, object]) -> dict[str, int]:
         }
         session.commit()
         return counts
-
-
 def archive_history(db_uri: str, output_path: str) -> str:
     path = Path(output_path)
     path.write_text(json.dumps(export_history(db_uri), indent=2, sort_keys=True), encoding="utf-8")
@@ -1146,8 +1153,6 @@ def restore_history(db_uri: str, archive_path: str) -> dict[str, int]:
     if not isinstance(payload, dict):
         raise TypeError(INVALID_HISTORY_ARCHIVE)
     return import_history(db_uri, _string_key_mapping(payload))
-
-
 def _history_compaction_sql(dialect_name: str, table_names: tuple[str, ...]) -> list[str]:
     """Per-dialect space reclamation: SQLite VACUUM, MySQL/MariaDB OPTIMIZE TABLE, else no-op."""
     if dialect_name == "sqlite":
@@ -1162,16 +1167,12 @@ def compact_history(db_uri: str) -> None:
         dialect_name = connection.engine.dialect.name
         for statement in _history_compaction_sql(dialect_name, table_names):
             connection.exec_driver_sql(statement)
-
-
 def retain_history(db_uri: str, *, days: int, statuses: tuple[str, ...] = ()) -> int:
     cutoff = (datetime.now(UTC) - timedelta(days=max(0, days))).isoformat()
     with _managed_session(db_uri) as session:
         deleted = prune_runs(session, before=cutoff, statuses=statuses)
         session.commit()
         return deleted
-
-
 def list_failed_batches(db_uri: str, *, limit: int = 20) -> list[BatchJobSummary]:
     safe_limit = max(0, limit)
     with _managed_session(db_uri) as session:
@@ -1186,8 +1187,6 @@ def list_failed_batches(db_uri: str, *, limit: int = 20) -> list[BatchJobSummary
             .all()
         )
         return [_batch_job_summary(session, job) for job in jobs]
-
-
 def list_failed_batch_items(db_uri: str, *, batch_job_id: int) -> list[FailedBatchItem]:
     with _managed_session(db_uri) as session:
         return [
@@ -1201,8 +1200,6 @@ def list_failed_batch_items(db_uri: str, *, batch_job_id: int) -> list[FailedBat
             )
             for item in load_failed_batch_items(session, batch_job_id=batch_job_id)
         ]
-
-
 def list_batch_jobs(
     db_uri: str, *, limit: int = 20, statuses: tuple[str, ...] = ()
 ) -> list[BatchJobSummary]:
@@ -1217,8 +1214,6 @@ def list_batch_jobs(
             stmt = stmt.where(BatchJobModel.status.in_(statuses))
         jobs = session.execute(stmt).scalars().all()
         return [_batch_job_summary(session, job) for job in jobs]
-
-
 def get_batch_job(db_uri: str, *, batch_job_id: int) -> BatchJobDetail | None:
     with _managed_session(db_uri) as session:
         job = session.get(BatchJobModel, batch_job_id)
@@ -1239,8 +1234,6 @@ def get_batch_job(db_uri: str, *, batch_job_id: int) -> BatchJobDetail | None:
             metrics=_json_object(job.metrics_json or "{}"),
             failed_item_count=len(load_failed_batch_items(session, batch_job_id=job.id)),
         )
-
-
 def list_batch_runs(db_uri: str, *, batch_job_id: int) -> list[PersistedRunSummary]:
     with _managed_session(db_uri) as session:
         stmt = (
@@ -1249,8 +1242,6 @@ def list_batch_runs(db_uri: str, *, batch_job_id: int) -> list[PersistedRunSumma
             .order_by(RunModel.started_at.asc(), RunModel.id.asc())
         )
         return [build_summary(session, run) for run in session.execute(stmt).scalars().all()]
-
-
 def _batch_job_summary(session: Session, job: BatchJobModel) -> BatchJobSummary:
     return BatchJobSummary(
         batch_job_id=job.id,

@@ -1791,6 +1791,28 @@ def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_pa
         )["distributed_jobs"]
         == 0
     )
+    assert (
+        import_history_raw(
+            db_uri,
+            {
+                "dead_letter_jobs": [
+                    {
+                        "id": 1,
+                        "job_id": None,
+                        "correlation_id": None,
+                        "queue_backend": None,
+                        "queue_name": None,
+                        "source_value": None,
+                        "error_code": None,
+                        "error_category": None,
+                        "error_message": None,
+                        "dead_lettered_at": None,
+                    }
+                ]
+            },
+        )["dead_letter_jobs"]
+        == 0
+    )
     invalid_fk_counts = import_history_raw(
         db_uri,
         {

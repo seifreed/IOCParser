@@ -2834,6 +2834,7 @@ def test_import_history_normalizes_replayed_dead_letter_identity_fields(
 
     payload = export_persisted_history(db_uri=source_db_uri)
     payload["dead_letter_jobs"][0]["queue_backend"] = " filesystem "
+    payload["dead_letter_jobs"][0]["queue_name"] = " default "
     payload["dead_letter_jobs"][0]["source_value"] = " https://same.example/feed "
 
     assert import_history_raw(target_db_uri, payload)["dead_letter_jobs"] == 1

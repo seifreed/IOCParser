@@ -478,6 +478,7 @@ def _existing_dead_letter_job(
     original_id = row.get("id")
     public_job_id = str(row.get("job_id", ""))
     queue_backend = normalized_queue_backend(str(row.get("queue_backend", "")))
+    queue_name = str(row.get("queue_name", "")).strip()
     source_value = str(row.get("source_value", "")).strip()
     candidates = (
         session.execute(
@@ -491,7 +492,7 @@ def _existing_dead_letter_job(
                 DeadLetterJobModel.dead_lettered_at == row.get("dead_lettered_at"),
                 DeadLetterJobModel.correlation_id == str(row.get("correlation_id", "")),
                 DeadLetterJobModel.queue_backend == queue_backend,
-                DeadLetterJobModel.queue_name == str(row.get("queue_name", "")),
+                DeadLetterJobModel.queue_name == queue_name,
                 DeadLetterJobModel.source_value == source_value,
                 DeadLetterJobModel.attempts == int(row.get("attempts", 0)),  # type: ignore[call-overload]
                 DeadLetterJobModel.max_attempts == int(row.get("max_attempts", 0)),  # type: ignore[call-overload]
@@ -897,6 +898,7 @@ def _import_dead_letter_jobs(
         ):
             continue
         typed["queue_backend"] = normalized_queue_backend(str(typed.get("queue_backend", "")))
+        typed["queue_name"] = str(typed.get("queue_name", "")).strip()
         typed["source_value"] = str(typed.get("source_value", "")).strip()
         if (
             _existing_dead_letter_job(

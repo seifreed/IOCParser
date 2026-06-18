@@ -105,7 +105,10 @@ def _string_key_mapping(mapping: Mapping[object, object]) -> dict[str, object]:
 
 
 def _json_object(raw_value: str) -> dict[str, object]:
-    decoded: object = json.loads(raw_value or "{}")
+    try:
+        decoded: object = json.loads(raw_value or "{}")
+    except json.JSONDecodeError:
+        return {}
     if not isinstance(decoded, dict):
         return {}
     return _string_key_mapping(decoded)

@@ -111,6 +111,8 @@ def _failed_batch_item_matches_retry_filters(
 
 
 def _load_valid_batch_report_payload(report_path: Path) -> dict[str, object]:
+    if not report_path.is_file():
+        raise FileExistenceError(str(report_path))
     try:
         payload = _json_dict(report_path)
     except JSONDecodeError as exc:
@@ -129,8 +131,6 @@ def _failed_urls_from_report(
     error_type_filter: str | None = None,
     error_substring: str | None = None,
 ) -> list[str]:
-    if not report_path.is_file():
-        raise FileExistenceError(str(report_path))
     payload = _load_valid_batch_report_payload(report_path)
     urls = [
         str(item.get("url", "")).strip()

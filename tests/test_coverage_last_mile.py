@@ -108,6 +108,14 @@ def test_retry_attempt_occurrence_out_of_range(tmp_path):
     )
 
 
+def test_retry_attempt_missing_report_raises_file_error(tmp_path):
+    from iocparser.cli_processing_urls import retry_attempt_for_url
+    from iocparser.errors import FileExistenceError
+
+    with pytest.raises(FileExistenceError):
+        retry_attempt_for_url("https://a.com", str(tmp_path / "missing.json"))
+
+
 # cli_processing_urls.py:199 — retry from batch with occurrence out of range
 def test_retry_from_batch_occurrence_out_of_range(tmp_path):
     from iocparser.cli_processing_urls import retry_attempt_for_url

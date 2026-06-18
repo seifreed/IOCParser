@@ -820,6 +820,8 @@ def test_queue_factory_and_optional_queue_adapters() -> None:
 
     with pytest.raises(ValueError, match="requires queue_url"):
         create_queue_adapter("rabbitmq")
+    with pytest.raises(ValueError, match="requires queue_url"):
+        create_queue_adapter("rabbitmq", queue_url="   ")
     with pytest.raises(ValueError, match="Unsupported queue backend"):
         create_queue_adapter("unsupported")
 

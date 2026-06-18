@@ -18,6 +18,8 @@ def _unsupported_backend_error(backend: str) -> ValueError:
 
 
 def _require_queue_url(backend: str, queue_url: str | None) -> str:
+    if isinstance(queue_url, str):
+        queue_url = queue_url.strip()
     if queue_url:
         return queue_url
     raise _missing_queue_url_error(backend)

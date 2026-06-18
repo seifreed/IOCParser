@@ -8,6 +8,7 @@ Author: Marc Rivero | @seifreed
 
 from __future__ import annotations
 
+import re
 from abc import ABC, abstractmethod
 from typing import ClassVar
 
@@ -48,10 +49,13 @@ class WarningListDiagnosticsMixin(ABC):
         """Check if list is relevant based on expected lists."""
         if not expected_lists:
             return False
-        return any(
-            expected.lower() in name.lower() or expected.lower() in description.lower()
-            for expected in expected_lists
-        )
+        name_tokens = {
+            token
+            for text in (name, description)
+            for token in re.split(r"[|\-_ /.]+", text.lower())
+            if token
+        }
+        return any(expected.lower() in name_tokens for expected in expected_lists)
 
     def _is_list_relevant_for_type(
         self,
@@ -64,19 +68,25 @@ class WarningListDiagnosticsMixin(ABC):
         if ioc_type not in self.TYPE_KEYWORDS:
             return False
 
-        name_lower = name.lower()
-        desc_lower = description.lower()
-        if any(
-            keyword in name_lower or keyword in desc_lower
+        text_tokens = {
+            token
+            for text in (name, description)
+            for token in re.split(r"[|\-_ /.]+", text.lower())
+            if token
+        }
+        if any(keyword in text_tokens
             for keyword in self.TYPE_KEYWORDS[ioc_type]
         ):
             return True
         if not matching_attributes:
             return False
-        attrs_lower = " ".join(
-            matching_attribute_name(attr).lower() for attr in matching_attributes
-        )
-        return any(keyword in attrs_lower for keyword in self.TYPE_KEYWORDS[ioc_type])
+        attrs = {
+            token
+            for attr in matching_attributes
+            for token in re.split(r"[|\-_ /]", matching_attribute_name(attr).lower())
+            if token
+        }
+        return any(keyword in attrs for keyword in self.TYPE_KEYWORDS[ioc_type])
 
     def _log_matched_value(self, clean_val: str, vals: list[IOCValue]) -> None:
         """Log which specific entry matched."""

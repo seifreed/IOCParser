@@ -1531,6 +1531,39 @@ class TestWarningListsDiagnostic:
 
         logger.removeHandler(handler)
 
+    def test_diagnose_ignores_unrelated_matching_attributes(self):
+        """Diagnostics should not treat substring accidents as relevant attribute tokens."""
+        import io
+        import logging
+
+        warning_lists = make_warning_lists()
+
+        warning_lists.warning_lists = {
+            "ghost-list": {
+                "name": "Ghost List",
+                "description": "Unrelated entries",
+                "type": "string",
+                "matching_attributes": ["ghost-field"],
+                "list": ["example.com"],
+            }
+        }
+        warning_lists._preprocess_lists()
+
+        log_capture = io.StringIO()
+        handler = logging.StreamHandler(log_capture)
+        logger = logging.getLogger("iocparser.infrastructure.warninglists")
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+
+        warning_lists.diagnose_value_detection("example.com", "domains")
+
+        log_output = log_capture.getvalue()
+
+        assert "Found 0 potentially relevant lists" in log_output
+        assert "\nChecking list: Ghost List\n" not in log_output
+
+        logger.removeHandler(handler)
+
     def test_diagnose_with_host_keyword_only_list_name(self):
         """Host diagnostics should not miss host-oriented list names."""
         import io

@@ -2545,6 +2545,34 @@ def test_import_history_keeps_identical_runs_from_distinct_payloads_separate(
     assert query_persisted_runs(db_uri=target_db_uri, limit=10).total == 2
 
 
+def test_import_history_trims_replayed_run_identity_fields(tmp_path: Path) -> None:
+    source_db_uri = f"sqlite:///{tmp_path / 'history-run-normalized-source.sqlite'}"
+    target_db_uri = f"sqlite:///{tmp_path / 'history-run-normalized-target.sqlite'}"
+
+    persist_results(
+        PersistResultsRequest(
+            config=load_config(True, source_db_uri, None),
+            source_kind="file",
+            source_value="f.txt",
+            normal_iocs={"domains": ["same.example"]},
+            warning_iocs={},
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
+            tool_version="5.0.0",
+            run_metadata={"duration_ms": 10},
+        )
+    )
+
+    payload = export_persisted_history(db_uri=source_db_uri)
+    payload["runs"][0]["tool_version"] = " 5.0.0 "
+    payload["runs"][0]["status"] = " completed "
+
+    assert import_history_raw(target_db_uri, payload)["runs"] == 1
+    assert import_history_raw(target_db_uri, payload)["runs"] == 0
+    assert query_persisted_runs(db_uri=target_db_uri, limit=10).total == 1
+
+
 def test_export_history_is_idempotent_for_same_snapshot_from_same_db(tmp_path: Path) -> None:
     source_db_uri = f"sqlite:///{tmp_path / 'history-same-db.sqlite'}"
     target_db_uri = f"sqlite:///{tmp_path / 'history-same-db-target.sqlite'}"

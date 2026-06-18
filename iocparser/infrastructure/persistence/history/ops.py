@@ -391,6 +391,8 @@ def _existing_run(
     original_id: int | None,
     same_origin: bool,
 ) -> RunModel | None:
+    tool_version = str(row.get("tool_version", "")).strip()
+    status = str(row.get("status", "")).strip()
     candidates = (
         session.execute(
             select(RunModel).where(
@@ -398,7 +400,7 @@ def _existing_run(
                 RunModel.batch_job_id == batch_job_id,
                 RunModel.started_at == row.get("started_at"),
                 RunModel.finished_at == row.get("finished_at"),
-                RunModel.tool_version == str(row.get("tool_version", "")),
+                RunModel.tool_version == tool_version,
                 RunModel.normal_ioc_count == int(row.get("normal_ioc_count", 0)),  # type: ignore[call-overload]
                 RunModel.warning_ioc_count == int(row.get("warning_ioc_count", 0)),  # type: ignore[call-overload]
                 RunModel.processed_items == int(row.get("processed_items", 0)),  # type: ignore[call-overload]
@@ -406,7 +408,7 @@ def _existing_run(
                 RunModel.failed_items == int(row.get("failed_items", 0)),  # type: ignore[call-overload]
                 RunModel.partial_error_count == int(row.get("partial_error_count", 0)),  # type: ignore[call-overload]
                 RunModel.duration_ms == int(row.get("duration_ms", 0)),  # type: ignore[call-overload]
-                RunModel.status == str(row.get("status", "")),
+                RunModel.status == status,
                 RunModel.error_message == str(row.get("error_message", "")),
             )
         )
@@ -701,6 +703,8 @@ def _import_runs(
             isinstance(typed.get(key), datetime) for key in ("started_at", "finished_at")
         ):
             continue
+        typed["tool_version"] = str(typed.get("tool_version", "")).strip()
+        typed["status"] = str(typed.get("status", "")).strip()
         original_batch_id = typed.get("batch_job_id")
         batch_job_id = (
             batch_map.get(int(original_batch_id)) if isinstance(original_batch_id, int) else None

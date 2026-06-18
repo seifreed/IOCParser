@@ -7,6 +7,8 @@ from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
+import pytest
+
 from iocparser.infrastructure.warninglists import MISPWarningLists, WarningListLookups
 from tests.http_server_helpers import ThreadedHTTPServer
 
@@ -209,6 +211,36 @@ def test_partial_download_keeps_fallback_but_stamps_cache_stale(tmp_path: Path) 
     assert "good-domains" in cached
     metadata = json.loads(warning_lists.cache_metadata_file.read_text(encoding="utf-8"))
     assert metadata["last_update"] == 0.0
+
+
+def test_partial_download_does_not_keep_incomplete_state_when_cache_write_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    warning_lists = OfflineWarningLists(tmp_path)
+    warning_lists.warning_lists = {
+        "stale": {
+            "name": "Stale",
+            "type": "string",
+            "matching_attributes": ["domain"],
+            "list": ["stale.example"],
+        }
+    }
+
+    def explode(*args: object, **kwargs: object) -> None:
+        del args, kwargs
+        raise OSError("disk full")
+
+    monkeypatch.setattr(warning_lists, "_write_cache", explode)
+
+    with (
+        WarningListServer(["good-domains", "bad-domains"], GOOD_BAD_DOMAIN_PAYLOADS) as base_url,
+        patched_github_bases(base_url),
+    ):
+        warning_lists._update_warning_lists()
+
+    assert warning_lists.warning_lists == {}
+    assert not warning_lists.cache_file.exists()
+    assert not warning_lists.cache_metadata_file.exists()
 
 
 def test_full_download_stamps_cache_fresh(tmp_path: Path) -> None:

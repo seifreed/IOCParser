@@ -156,7 +156,12 @@ class WarningListCacheMixin:
             current_logger.info("Downloading %s MISP warning lists...", len(list_directories))
             warning_lists, failed_downloads = self._download_warning_lists(list_directories)
             self.warning_lists = warning_lists
-            self._write_cache(complete=not failed_downloads)
+            try:
+                self._write_cache(complete=not failed_downloads)
+            except (OSError, ValueError):
+                if failed_downloads:
+                    self.warning_lists = {}
+                    raise
             self._log_failed_downloads(failed_downloads)
             current_logger.info(
                 "Successfully updated %s MISP warning lists", len(self.warning_lists)

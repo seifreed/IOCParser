@@ -23,6 +23,7 @@ from iocparser.api_persistence import (
     render_persisted_run,
     retain_persisted_history,
 )
+from iocparser.api_persistence_query import PersistedRenderOptions
 from iocparser.application.contracts import PersistRunInput
 from iocparser.application.use_cases import persist_run
 from iocparser.cli_output import (
@@ -393,6 +394,13 @@ def test_public_query_api_validates_dates_and_min_severity(tmp_path: Path) -> No
             left_run_id=first_run_id,
             right_run_id=second_run_id,
             ioc_type="bogus",
+        )
+
+    with pytest.raises(ValidationError, match="Invalid ioc_type"):
+        render_persisted_run(
+            db_uri=db_uri,
+            run_id=first_run_id,
+            render=PersistedRenderOptions(output_format="stix", stix_types="bogus"),
         )
 
     with pytest.raises(ValidationError, match="Invalid limit"):

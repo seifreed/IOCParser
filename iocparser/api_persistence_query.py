@@ -34,6 +34,7 @@ from iocparser.domain.models import (
     PersistedRunSummary,
     ioc_type_name,
 )
+from iocparser.domain.type_filters import parse_ioc_types
 from iocparser.errors import ValidationError
 from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
 from iocparser.interfaces.ports import OutputRenderer
@@ -249,6 +250,16 @@ def validated_ioc_type_filters(value: str | None) -> tuple[str, ...]:
     return tuple(normalized)
 
 
+def validated_stix_types(value: str | None) -> str | None:
+    if value is None:
+        return None
+    try:
+        parse_ioc_types(value)
+    except ValueError as exc:
+        raise ValidationError(INVALID_IOC_TYPE_ERROR.format(value=value)) from exc
+    return value
+
+
 def validated_tag_mode(value: str) -> str:
     return _validated_choice(value, valid=VALID_TAG_MODES, error=INVALID_TAG_MODE_ERROR)
 
@@ -345,7 +356,11 @@ def renderer_for_format(
     with_context: bool = False,
     stix_types: str | None = None,
 ) -> OutputRenderer:
-    return get_renderer(output_format, with_context=with_context, stix_types=stix_types)
+    return get_renderer(
+        output_format,
+        with_context=with_context,
+        stix_types=validated_stix_types(stix_types),
+    )
 
 
 def coerce_render_options(

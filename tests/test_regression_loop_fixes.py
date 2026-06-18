@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import codecs
+import io
 import json
 import sys
 import time
@@ -29,6 +30,7 @@ from iocparser.infrastructure.file_parser import decode_file_bytes
 from iocparser.infrastructure.file_readers import MagicTextSourceReader
 from iocparser.infrastructure.migration_revisions import rev_0005_fts_metrics
 from iocparser.infrastructure.persistence.history.row_values import typed_row
+from iocparser.infrastructure.streaming_chunks import read_chunks_with_prefix
 from iocparser.infrastructure.persistence_fts import build_fts_query
 from iocparser.worker_config_support import load_worker_file_values
 
@@ -88,6 +90,22 @@ def test_streaming_size_flags_accept_valid_values() -> None:
     args = parser.parse_args(["--chunk-size", "256", "--overlap", "0", "--stdin"])
     assert args.chunk_size == 256
     assert args.overlap == 0
+
+
+def test_binary_chunk_reader_preserves_split_utf8_character() -> None:
+    """Binary streaming must not drop UTF-8 characters split across chunk reads."""
+    chunks = list(
+        read_chunks_with_prefix(
+            file_obj=io.BytesIO("éexample.com".encode("utf-8")),
+            chunk_size=1,
+            overlap=0,
+            progress_callback=None,
+            is_text=False,
+        )
+    )
+
+    assert [chunk for chunk, _prefix_length, _is_final in chunks if not chunk] == []
+    assert "".join(chunk for chunk, _prefix_length, _is_final in chunks) == "éexample.com"
 
 
 def test_stix_asn_pattern_emits_integer_not_quoted_string() -> None:

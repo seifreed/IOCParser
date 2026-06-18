@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import codecs
 import io
 from collections.abc import Callable, Iterator
 from typing import BinaryIO, TextIO
@@ -32,6 +33,8 @@ def read_chunks_with_prefix(
     except (OSError, io.UnsupportedOperation):
         pass
 
+    utf8_decoder = codecs.getincrementaldecoder("utf-8")(errors="ignore")
+
     # Read one chunk ahead so the final chunk can be flagged on any stream -- seekable
     # or not. A chunk whose body fills chunk_size normally defers an IOC ending at its
     # boundary to the next chunk; on the final chunk there is no next chunk, so that
@@ -48,15 +51,6 @@ def read_chunks_with_prefix(
         except Exception as exc:
             next_raw_chunk = b"" if isinstance(raw_chunk, bytes) else ""
             deferred_error = exc
-        chunk = decode_chunk(raw_chunk)
-        prefix = previous_chunk_tail
-        if prefix and not previous_tail_has_leading_context:
-            # Preserve a known left boundary when the overlap starts at the stream origin.
-            prefix = f" {prefix}"
-        prefix_length = len(prefix)
-        if prefix:
-            chunk = prefix + chunk
-
         bytes_read += (
             len(raw_chunk)
             if isinstance(raw_chunk, bytes)
@@ -64,6 +58,24 @@ def read_chunks_with_prefix(
         )
         if progress_callback and total_size:
             progress_callback(min(100, int((bytes_read / total_size) * 100)))
+
+        chunk = (
+            utf8_decoder.decode(raw_chunk, final=not next_raw_chunk)
+            if isinstance(raw_chunk, bytes)
+            else raw_chunk
+        )
+        if not chunk:
+            if deferred_error is not None:
+                raise deferred_error
+            raw_chunk = next_raw_chunk
+            continue
+        prefix = previous_chunk_tail
+        if prefix and not previous_tail_has_leading_context:
+            # Preserve a known left boundary when the overlap starts at the stream origin.
+            prefix = f" {prefix}"
+        prefix_length = len(prefix)
+        if prefix:
+            chunk = prefix + chunk
 
         is_final = not next_raw_chunk
         yield chunk, prefix_length, is_final

@@ -388,6 +388,27 @@ def test_prune_keep_latest_uses_newest_run_id_as_timestamp_tiebreaker(tmp_path) 
     assert [run.run_id for run in remaining] == [run_ids[1]]
 
 
+def test_query_service_trims_source_kind_filters(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-source-kind-filter.db"
+    service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
+    service.persist_multiple_runs(
+        [
+            (
+                "file",
+                "sample.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["example.com"]}, {}),
+            )
+        ],
+        tool_version="5.0.0",
+        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+    )
+
+    assert service.query_runs_page(limit=10, source_kind="file").total == 1
+    assert service.query_runs_page(limit=10, source_kind=" file ").total == 1
+    assert service.search_iocs_page(value="example.com", source_kind="file").total == 1
+    assert service.search_iocs_page(value="example.com", source_kind=" file ").total == 1
+
+
 def test_unit_of_work_rollback_discards_uncommitted_changes(tmp_path) -> None:
     db_path = tmp_path / "iocparser-rollback.db"
     unit_of_work = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")

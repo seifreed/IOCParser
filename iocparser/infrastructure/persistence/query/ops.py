@@ -228,8 +228,8 @@ def _run_filter_clauses(
         clauses.append(RunModel.started_at >= parse_datetime(date_from))
     if date_to:
         clauses.append(RunModel.started_at <= parse_datetime(date_to))
-    if source_kind:
-        clauses.append(SourceModel.kind == source_kind)
+    if source_kind and (normalized_kind := source_kind.strip().lower()):
+        clauses.append(SourceModel.kind == normalized_kind)
     if source_value:
         clauses.append(source_value_clause(source_kind=source_kind, source_value=source_value))
     return tuple(clauses)

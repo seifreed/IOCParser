@@ -222,6 +222,17 @@ def test_retry_report_ignores_non_string_urls(tmp_path: Path) -> None:
         _failed_urls_from_report(report_path)
 
 
+def test_public_batch_report_ignores_non_string_failed_urls() -> None:
+    report = public_batch_report(
+        {
+            "items": [{"url": None, "status": "failed", "error": "timeout"}],
+            "failures": {},
+        }
+    )
+
+    assert report["failures"] == {}
+
+
 class _Writer:
     def write(self, path: str, content: str) -> None:
         Path(path).write_text(content, encoding="utf-8")

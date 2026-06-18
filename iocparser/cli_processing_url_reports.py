@@ -118,7 +118,8 @@ def _group_failures(item_reports: list[BatchItemReport]) -> dict[str, int]:
 
 
 def _item_url(item: BatchItemReport) -> str:
-    return str(item.get("url", ""))
+    value = item.get("url", "")
+    return value.strip() if isinstance(value, str) else ""
 
 
 def _public_batch_item(item: BatchItemReport) -> BatchItemReport:
@@ -137,14 +138,14 @@ def public_batch_report(report: BatchReport) -> BatchReport:
     for item in public_items:
         if str(item.get("status", "")).lower() != "failed":
             continue
-        url = str(item.get("url", "")).strip()
+        url = _item_url(item)
         if url:
             url_totals[url] = url_totals.get(url, 0) + 1
     url_counts: dict[str, int] = {}
     for item in public_items:
         if str(item.get("status", "")).lower() != "failed":
             continue
-        url = str(item.get("url", "")).strip()
+        url = _item_url(item)
         error = str(item.get("error", "")).strip()
         if url:
             # Gate on url only, not error: a message-less exception (str(exc) == "") is

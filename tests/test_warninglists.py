@@ -581,6 +581,25 @@ class TestWarningListsPreprocessing:
         assert "invalid-regex-list" in warning_lists.compiled_regex
         assert len(warning_lists.compiled_regex["invalid-regex-list"]) == 1
 
+    def test_preprocess_lists_supports_slash_delimited_regex(self):
+        """Test preprocessing handles MISP-style slash-delimited regex patterns."""
+        warning_lists = make_warning_lists()
+
+        warning_lists.warning_lists = {
+            "common-contact-emails": {
+                "name": "Common Contact Emails",
+                "description": "Regex-delimited contact email list",
+                "type": "regex",
+                "matching_attributes": ["email-src", "email-dst"],
+                "list": [r"/^(security|noc|soc|abuse)\@.*\..*$/i"],
+            }
+        }
+
+        warning_lists._preprocess_lists()
+
+        assert "common-contact-emails" in warning_lists.compiled_regex
+        assert warning_lists.check_value("security@example.com", "emails")[0]
+
     def test_scoped_list_with_unmapped_attribute_is_still_checked(self):
         """A scoped list whose matching_attributes map to no known IOC type must
         not be dead — its values should still be checked.
@@ -1940,6 +1959,25 @@ class TestWarningListsCheckValueEdgeCases:
             "https://storage.googleapis.com/bucket", "urls"
         )
         assert is_warning
+
+    def test_check_value_with_slash_delimited_regex_match(self):
+        """Slash-delimited regex patterns should match like raw regexes."""
+        warning_lists = make_warning_lists()
+
+        warning_lists.warning_lists = {
+            "common-contact-emails": {
+                "name": "Common Contact Emails",
+                "description": "Regex-delimited contact email list",
+                "type": "regex",
+                "matching_attributes": ["email-src", "email-dst"],
+                "list": [r"/^(security|noc|soc|abuse)\@.*\..*$/i"],
+            }
+        }
+        warning_lists._preprocess_lists()
+
+        is_warning, info = warning_lists.check_value("security@example.com", "emails")
+        assert is_warning
+        assert info["name"] == "Common Contact Emails"
 
     def test_check_value_with_cidr_match(self):
         """

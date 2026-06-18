@@ -77,19 +77,50 @@ class WarningListPreprocessMixin:
 
         return _re.search(r"[+*?]\)[+*?]", pattern) is None
 
+    @staticmethod
+    def _normalize_regex_pattern(pattern: str) -> tuple[str, int]:
+        """Normalize raw or slash-delimited regex text into a Python pattern.
+
+        MISP warning lists may store regexes either as plain expressions or in
+        ``/pattern/flags`` form. We only need to support the common flags that
+        map cleanly to Python's ``re`` module.
+        """
+        pattern = pattern.strip()
+        if not pattern.startswith("/") or pattern.count("/") < 2:
+            return pattern, re.IGNORECASE
+
+        closing = pattern.rfind("/")
+        body = pattern[1:closing]
+        flags_text = pattern[closing + 1 :]
+        if not body or not flags_text.isalpha():
+            return pattern, re.IGNORECASE
+
+        flags = re.IGNORECASE
+        for flag in flags_text.lower():
+            if flag == "g":
+                continue
+            if flag == "m":
+                flags |= re.MULTILINE
+            elif flag == "s":
+                flags |= re.DOTALL
+            elif flag == "x":
+                flags |= re.VERBOSE
+        return body, flags
+
     def _add_regex_values(self, list_id: str, values_val: list[WarningListEntry]) -> None:
         compiled_patterns: list[re.Pattern[str]] = []
         for pattern in values_val:
             if pattern is None:
                 continue
             pattern_str = str(pattern)
-            if not self._is_safe_regex(pattern_str):
+            normalized_pattern, pattern_flags = self._normalize_regex_pattern(pattern_str)
+            if not self._is_safe_regex(normalized_pattern):
                 self._get_logger().warning(
                     "Skipping potentially unsafe regex pattern: %s", pattern_str
                 )
                 continue
             try:
-                compiled_patterns.append(re.compile(pattern_str, re.IGNORECASE))
+                compiled_patterns.append(re.compile(normalized_pattern, pattern_flags))
             except (re.error, TypeError):
                 self._get_logger().debug("Invalid regex pattern: %s", pattern)
         if compiled_patterns:

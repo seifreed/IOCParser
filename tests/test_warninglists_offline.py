@@ -217,14 +217,23 @@ def test_partial_download_does_not_keep_incomplete_state_when_cache_write_fails(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     warning_lists = OfflineWarningLists(tmp_path)
-    warning_lists.warning_lists = {
-        "stale": {
-            "name": "Stale",
-            "type": "string",
-            "matching_attributes": ["domain"],
-            "list": ["stale.example"],
-        }
-    }
+    stale_timestamp = time.time()
+    warning_lists.cache_file.write_text(
+        json.dumps(
+            {
+                "stale": {
+                    "name": "Stale",
+                    "type": "string",
+                    "matching_attributes": ["domain"],
+                    "list": ["stale.example"],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    warning_lists.cache_metadata_file.write_text(
+        json.dumps({"last_update": stale_timestamp}), encoding="utf-8"
+    )
 
     def explode(*args: object, **kwargs: object) -> None:
         del args, kwargs
@@ -239,8 +248,17 @@ def test_partial_download_does_not_keep_incomplete_state_when_cache_write_fails(
         warning_lists._update_warning_lists()
 
     assert warning_lists.warning_lists == {}
-    assert not warning_lists.cache_file.exists()
-    assert not warning_lists.cache_metadata_file.exists()
+    assert json.loads(warning_lists.cache_file.read_text(encoding="utf-8")) == {
+        "stale": {
+            "name": "Stale",
+            "type": "string",
+            "matching_attributes": ["domain"],
+            "list": ["stale.example"],
+        }
+    }
+    assert json.loads(warning_lists.cache_metadata_file.read_text(encoding="utf-8")) == {
+        "last_update": stale_timestamp
+    }
 
 
 def test_full_download_keeps_fresh_state_when_cache_write_fails(

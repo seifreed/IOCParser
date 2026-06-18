@@ -150,6 +150,7 @@ class WarningListCacheMixin:
     def _update_warning_lists(self) -> None:
         current_logger = self._get_logger()
         self.warning_lists = {}
+        partial_refresh_failed = False
         try:
             current_logger.warning("Updating MISP warning lists from GitHub repository...")
             list_directories = self._fetch_list_directories()
@@ -160,6 +161,7 @@ class WarningListCacheMixin:
                 self._write_cache(complete=not failed_downloads)
             except (OSError, ValueError):
                 if failed_downloads:
+                    partial_refresh_failed = True
                     self.warning_lists = {}
                     raise
                 current_logger.exception("Could not write warning list cache")
@@ -169,7 +171,7 @@ class WarningListCacheMixin:
             )
         except (OSError, ValueError, requests.RequestException, json.JSONDecodeError):
             current_logger.exception("Could not update warning lists")
-            if self.cache_file.exists():
+            if self.cache_file.exists() and not partial_refresh_failed:
                 try:
                     with self.cache_file.open() as handle:
                         loaded_data: JSONData = json.load(handle)

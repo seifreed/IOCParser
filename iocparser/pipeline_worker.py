@@ -118,12 +118,14 @@ class PipelineWorker:
             )
             if run_id is not None:
                 phase_timings_ms["persist"] = int((time.perf_counter() - persist_started) * 1000)
-            return success_result(
+            output = success_result(
                 context=context,
                 prepared=prepared,
                 result=result,
                 run_id=run_id,
             )
+            cleanup_prepared_input(request=request, prepared=prepared)
+            return output
         except (KeyboardInterrupt, SystemExit):
             raise
         except (MemoryError, RecursionError, SystemError):

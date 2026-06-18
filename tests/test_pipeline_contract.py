@@ -530,6 +530,7 @@ def test_pipeline_worker_handles_file_url_and_backpressure(tmp_path: Path, capsy
         ),
     )
     assert url_result.status == "success"
+    assert not (file_path.parent / "downloaded.txt").exists()
 
     worker._inflight = 1
     with pytest.raises(RuntimeError, match="at capacity"):

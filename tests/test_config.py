@@ -119,6 +119,13 @@ def test_config_rejects_invalid_bool_env_value() -> None:
         load_config(None, None, None)
 
 
+def test_config_ignores_blank_persist_env() -> None:
+    with _env(IOCPARSER_PERSIST="   "):
+        config = load_config(None, None, None)
+
+    assert config.persist is False
+
+
 def test_config_rejects_invalid_boolean_values(tmp_path) -> None:
     config_path = tmp_path / "iocparser.ini"
     config_path.write_text("[database]\npersist=definitely\n", encoding="utf-8")

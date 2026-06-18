@@ -370,10 +370,9 @@ def load_config(
     _apply_env_overrides(file_values)
 
     env_persist: bool | None = None
-    if "IOCPARSER_PERSIST" in os.environ:
-        env_persist = _parse_bool_value(
-            os.environ["IOCPARSER_PERSIST"], option_name="IOCPARSER_PERSIST"
-        )
+    raw_env_persist = os.environ.get("IOCPARSER_PERSIST")
+    if raw_env_persist is not None and raw_env_persist.strip():
+        env_persist = _parse_bool_value(raw_env_persist, option_name="IOCPARSER_PERSIST")
 
     env_db_uri = os.environ.get("IOCPARSER_DB_URI")
 

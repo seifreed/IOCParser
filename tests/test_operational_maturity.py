@@ -606,6 +606,8 @@ def test_public_query_api_rejects_unknown_keyword_options(tmp_path: Path) -> Non
     assert client.search_iocs(value="alpha", min_severity="low").total == 1
     with pytest.raises(ValidationError, match="source_value"):
         client.prune_runs(source_value=1)
+    with pytest.raises(ValidationError, match="source_kind"):
+        client.query_runs_page(source_kind=1)
 
 
 def test_persistence_client_search_accepts_string_severity_and_tags(tmp_path: Path) -> None:

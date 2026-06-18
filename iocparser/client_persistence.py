@@ -132,8 +132,8 @@ class PersistenceClient:
             offset=validated_non_negative_int(options.get("offset", 0), field="offset"),
             date_from=validated_iso_datetime(optional_str(options.get("date_from"))),
             date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
-            source_kind=options.get("source_kind"),
-            source_value=options.get("source_value"),
+            source_kind=validated_optional_str(options.get("source_kind"), field="source_kind"),
+            source_value=validated_optional_str(options.get("source_value"), field="source_value"),
             sort_by=validated_run_sort(optional_str(options.get("sort_by")) or "newest"),
         )
 

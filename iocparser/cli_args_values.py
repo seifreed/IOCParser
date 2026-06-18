@@ -121,7 +121,10 @@ def get_list_arg(args: argparse.Namespace, name: str) -> list[str]:
 def get_optional_str_arg(args: argparse.Namespace, name: str) -> str | None:
     """Get optional string argument from argparse namespace."""
     value: object = getattr(args, name, None)
-    return str(value) if value is not None else None
+    if value is None:
+        return None
+    normalized = str(value).strip()
+    return normalized or None
 
 
 @dataclass(frozen=True)

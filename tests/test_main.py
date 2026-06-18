@@ -123,6 +123,13 @@ class TestArgumentHelpers:
         result = get_str_arg(args, "nonexistent", default="fallback")
         assert result == "fallback"
 
+    def test_get_optional_str_arg_trims_and_drops_blank_values(self) -> None:
+        """Test optional string args normalize whitespace-only values to None."""
+        args = argparse.Namespace(output="  result.json  ", log_file="   ")
+
+        assert get_optional_str_arg(args, "output") == "result.json"
+        assert get_optional_str_arg(args, "log_file") is None
+
     def test_get_bool_arg_true(self) -> None:
         """Test get_bool_arg returns True for truthy values."""
         args = argparse.Namespace(verbose=True, debug=1, enabled="yes")

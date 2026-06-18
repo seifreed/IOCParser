@@ -243,6 +243,23 @@ def test_extract_from_url_ignores_cleanup_errors_for_directories(tmp_path: Path)
     assert temp_dir.exists()
 
 
+def test_temporary_file_cleaner_ignores_exists_permission_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    temp_file = tmp_path / "downloaded.txt"
+    temp_file.write_text("payload", encoding="utf-8")
+
+    def explode(*args: object, **kwargs: object) -> bool:
+        del args, kwargs
+        raise PermissionError("exists denied")
+
+    monkeypatch.setattr(Path, "exists", explode)
+
+    TemporaryFileCleaner().cleanup(str(temp_file))
+
+    assert not temp_file.is_file()
+
+
 def test_extract_from_url_raises_cleanup_errors_after_success(tmp_path: Path) -> None:
     temp_file = tmp_path / "downloaded.txt"
     temp_file.write_text("IOC URL: https://cleanup.example/path", encoding="utf-8")

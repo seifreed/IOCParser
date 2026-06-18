@@ -10,8 +10,7 @@ class TemporaryFileCleaner(TemporaryResourceCleaner):
 
     def cleanup(self, resource_path: str) -> None:
         path = Path(resource_path)
-        if path.exists():
-            try:
-                path.unlink()
-            except (OSError, PermissionError):
-                return
+        try:
+            path.unlink(missing_ok=True)
+        except (OSError, PermissionError):
+            return

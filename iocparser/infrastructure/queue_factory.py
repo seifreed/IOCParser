@@ -35,7 +35,7 @@ def create_queue_adapter(
     """Create a queue adapter for the selected backend."""
     normalized = backend.strip().lower()
     if normalized == "filesystem":
-        root = Path(queue_path or ".iocparser-queue")
+        root = Path(queue_path.strip() if isinstance(queue_path, str) and queue_path.strip() else ".iocparser-queue")
         return FilesystemQueueAdapter(root)
     if normalized == "rabbitmq":
         return RabbitMQQueueAdapter(_require_queue_url("rabbitmq", queue_url))

@@ -656,7 +656,9 @@ def test_distributed_pipeline_client_lists_and_drains(tmp_path: Path) -> None:
     assert client.list_dead_letters(limit=10) == []
 
 
-def test_queue_factory_and_optional_queue_adapters() -> None:
+def test_queue_factory_and_optional_queue_adapters(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     class FakeRabbitChannel:
         def __init__(self) -> None:
             self.queues: dict[str, list[tuple[object, bytes]]] = {}
@@ -824,6 +826,10 @@ def test_queue_factory_and_optional_queue_adapters() -> None:
         create_queue_adapter("rabbitmq", queue_url="   ")
     with pytest.raises(ValueError, match="Unsupported queue backend"):
         create_queue_adapter("unsupported")
+    monkeypatch.chdir(tmp_path)
+    filesystem = create_queue_adapter("filesystem", queue_path="   ")
+    assert isinstance(filesystem, FilesystemQueueAdapter)
+    assert filesystem.root_dir == Path(".iocparser-queue")
 
 
 def test_sqs_dead_letter_does_not_keep_dead_queue_mapping_on_send_failure() -> None:

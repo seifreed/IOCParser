@@ -201,13 +201,17 @@ class DistributedPipelineCoordinator:
             raise
 
     def _archive_dead_letter(self, *, receipt: QueueReceipt, envelope: QueueEnvelope) -> str:
-        """Archive the message to the dead-letter sink; if the backend cannot (e.g. SQS
-        with no DLQ), ack to drop it so it never redelivers (already DB dead-lettered)."""
+        """Archive the message to the dead-letter sink."""
         try:
             return self.queue_adapter.dead_letter(
                 receipt, envelope=advance_envelope(envelope)
             ).receipt_id
-        except Exception:
+        except RuntimeError as exc:
+            if str(exc) != (
+                "SQS dead-letter queue URL not configured; refusing to re-enqueue to the main "
+                "queue which would cause an infinite processing loop. Set dead_letter_queue_url."
+            ):
+                raise
             self.queue_adapter.ack(receipt)
             return receipt.receipt_id
 

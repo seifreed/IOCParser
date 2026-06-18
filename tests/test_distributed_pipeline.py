@@ -210,7 +210,9 @@ def test_process_next_drops_message_when_dead_letter_archival_fails(tmp_path: Pa
             self.acked: list[str] = []
 
         def dead_letter(self, receipt, *, envelope):  # type: ignore[no-untyped-def]
-            raise RuntimeError("dead-letter queue not configured")
+            from iocparser.infrastructure.queue_sqs import MISSING_DEAD_LETTER_QUEUE_ERROR
+
+            raise RuntimeError(MISSING_DEAD_LETTER_QUEUE_ERROR)
 
         def ack(self, receipt):  # type: ignore[no-untyped-def]
             self.acked.append(receipt.receipt_id)
@@ -334,11 +336,8 @@ def test_completed_job_not_dead_lettered_when_ack_fails(tmp_path: Path) -> None:
     assert "job_completed" not in event_names
 
 
-def test_unexpected_exception_acks_when_dead_letter_archival_fails(tmp_path: Path) -> None:
-    """Regression: the unexpected-exception path must ack a poison message when the
-    backend cannot archive it, mirroring the failed-result path. Otherwise a backend
-    like SQS without a DLQ redelivers and reprocesses it forever.
-    """
+def test_unexpected_exception_propagates_unexpected_dead_letter_failure(tmp_path: Path) -> None:
+    """Regression: unexpected dead-letter failures must surface instead of being dropped."""
 
     class DeadLetterFailsAdapter(FilesystemQueueAdapter):
         def __init__(self, root: Path) -> None:
@@ -346,7 +345,7 @@ def test_unexpected_exception_acks_when_dead_letter_archival_fails(tmp_path: Pat
             self.acked: list[str] = []
 
         def dead_letter(self, receipt, *, envelope):  # type: ignore[no-untyped-def]
-            raise RuntimeError("dead-letter queue not configured")
+            raise RuntimeError("boom")
 
         def ack(self, receipt):  # type: ignore[no-untyped-def]
             self.acked.append(receipt.receipt_id)
@@ -367,12 +366,53 @@ def test_unexpected_exception_acks_when_dead_letter_archival_fails(tmp_path: Pat
         raise RuntimeError("db failure")
 
     service.job_service.mark_running = exploding_mark_running
-    with pytest.raises(RuntimeError, match="db failure"):
+    with pytest.raises(RuntimeError, match="boom"):
         service.process_next(queue_name="unexpected")
 
-    assert len(queue.acked) == 1
+    assert queue.acked == []
     assert queue.pending_count(queue_name="unexpected") == 0
-    assert not list((tmp_path / "queue" / "unexpected" / "processing").glob("*.json"))
+    assert list((tmp_path / "queue" / "unexpected" / "processing").glob("*.json"))
+
+
+def test_archive_dead_letter_propagates_unexpected_dead_letter_errors() -> None:
+    from iocparser.application.distributed_use_cases import DistributedPipelineCoordinator
+    from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
+    from iocparser.domain.pipeline import PipelineJobRequest
+    from iocparser.infrastructure.runtime.telemetry import InMemoryTelemetrySink
+
+    class UnexpectedDeadLetterAdapter:
+        def __init__(self) -> None:
+            self.acked: list[str] = []
+
+        def dead_letter(self, receipt, *, envelope):  # type: ignore[no-untyped-def]
+            raise RuntimeError("boom")
+
+        def ack(self, receipt):  # type: ignore[no-untyped-def]
+            self.acked.append(receipt.receipt_id)
+
+    class NoopProcessor:
+        def process(self, request: PipelineJobRequest):  # type: ignore[no-untyped-def]
+            raise AssertionError(f"unexpected process call for {request.source_value}")
+
+    adapter = UnexpectedDeadLetterAdapter()
+    coordinator = DistributedPipelineCoordinator(
+        queue_adapter=adapter,
+        processor=NoopProcessor(),
+        telemetry_sink=InMemoryTelemetrySink(),
+    )
+    request = PipelineJobRequest(
+        input_kind="text",
+        source_value="dead letter me",
+        persist=False,
+        check_warnings=False,
+    )
+    envelope = QueueEnvelope(request=request, queue_backend="filesystem", queue_name="dl")
+    receipt = QueueReceipt("filesystem", "dl", "receipt-1", "message-1")
+
+    with pytest.raises(RuntimeError, match="boom"):
+        coordinator._archive_dead_letter(receipt=receipt, envelope=envelope)
+
+    assert adapter.acked == []
 
 
 def test_filesystem_dead_letter_preserves_existing_dead_record(tmp_path: Path) -> None:

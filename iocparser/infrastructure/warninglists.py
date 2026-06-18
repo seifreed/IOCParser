@@ -4,6 +4,7 @@
 
 import ipaddress
 import re
+import tempfile
 from pathlib import Path
 from typing import ClassVar
 
@@ -89,7 +90,12 @@ class MISPWarningLists(
     # Defanging cleaners for URL/domain normalization
     DEFANG_CLEANERS: ClassVar[list[tuple[str, str]]] = list(DEFANG_REPLACEMENTS)
 
-    def __init__(self, cache_duration: int = 24, force_update: bool = False) -> None:
+    def __init__(
+        self,
+        cache_duration: int = 24,
+        force_update: bool = False,
+        cache_dir: Path | None = None,
+    ) -> None:
         """
         Initialize the warning lists manager.
 
@@ -102,10 +108,14 @@ class MISPWarningLists(
         self.warning_lists: dict[str, WarningListDict] = {}
         self.logger = logger
 
-        # Fix: Use Path for better path handling
         self.data_dir: Path = Path(__file__).parent / "data"
-        self.cache_file: Path = self.data_dir / "misp_warninglists_cache.json"
-        self.cache_metadata_file: Path = self.data_dir / "misp_warninglists_metadata.json"
+        self.cache_dir: Path = (
+            cache_dir
+            if cache_dir is not None
+            else Path(tempfile.gettempdir()) / "iocparser-warninglists"
+        )
+        self.cache_file: Path = self.cache_dir / "misp_warninglists_cache.json"
+        self.cache_metadata_file: Path = self.cache_dir / "misp_warninglists_metadata.json"
 
         # OPTIMIZATION: Pre-computed lookup structures
         self.lookup_data = WarningListLookups(
@@ -119,6 +129,7 @@ class MISPWarningLists(
 
         # Create the data directory if it doesn't exist
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Load or update the lists
         self._load_or_update_lists()

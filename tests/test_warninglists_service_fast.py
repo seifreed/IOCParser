@@ -75,11 +75,10 @@ def test_warninglists_real_init_sets_paths_and_preprocesses(tmp_path: Path) -> N
     assert warning_lists.load_called is True
     assert warning_lists.preprocess_called is True
     assert warning_lists.data_dir == tmp_path / "data"
-    assert warning_lists.cache_file == warning_lists.data_dir / "misp_warninglists_cache.json"
-    assert (
-        warning_lists.cache_metadata_file
-        == warning_lists.data_dir / "misp_warninglists_metadata.json"
-    )
+    assert warning_lists.cache_dir.exists()
+    assert warning_lists.cache_file.parent == warning_lists.cache_dir
+    assert warning_lists.cache_metadata_file.parent == warning_lists.cache_dir
+    assert warning_lists.cache_file.parent != warning_lists.data_dir
     assert warning_lists.data_dir.exists()
 
 

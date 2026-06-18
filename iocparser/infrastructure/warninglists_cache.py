@@ -22,6 +22,7 @@ class WarningListCacheMixin:
     logger: Logger
     cache_file: Path
     cache_metadata_file: Path
+    cache_dir: Path
     cache_duration: int
     force_update: bool
     warning_lists: dict[str, WarningListDict]

@@ -45,7 +45,11 @@ from iocparser.infrastructure.persistence_schema import (
     RunModel,
     SourceModel,
 )
-from iocparser.infrastructure.persistence_support import build_summary, normalized_source_filter, prune_runs
+from iocparser.infrastructure.persistence_support import (
+    build_summary,
+    normalized_source_filter,
+    prune_runs,
+)
 from iocparser.infrastructure.persistence_uow import create_engine_for_uri
 
 _typed_row = typed_row
@@ -219,7 +223,7 @@ def _payload_rows(payload: dict[str, object], key: str) -> list[dict[str, object
 
 
 def _source_identity(row: dict[str, object]) -> tuple[object, ...]:
-    kind = str(row.get("kind", ""))
+    kind = normalized_source_filter(str(row.get("kind", "")))
     value = str(row.get("value", ""))
     normalized_url = row.get("normalized_url")
     if kind == "url":
@@ -513,11 +517,13 @@ def _import_sources(session: Session, rows: list[dict[str, object]]) -> tuple[in
             isinstance(typed.get(key), datetime) for key in ("first_seen", "last_seen")
         ):
             continue
-        if str(typed.get("kind", "")) == "url":
+        kind = normalized_source_filter(str(typed.get("kind", "")))
+        typed["kind"] = kind
+        if kind == "url":
             typed["original_url"] = typed.get("original_url") or typed.get("value")
             typed["normalized_url"] = _source_identity(typed)[1]
         typed["dedup_hash"] = source_dedup_hash(
-            str(typed.get("kind", "")), str(typed.get("value", ""))
+            kind, str(typed.get("value", ""))
         )
         existing = _existing_source(session, typed)
         if existing is None:

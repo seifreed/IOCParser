@@ -206,6 +206,48 @@ def test_pipeline_worker_checks_file_size_before_reading(
     assert result.error.code == "VALIDATION_FAILED"
 
 
+def test_pipeline_worker_ignores_missing_temp_file_during_url_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    temp_file = tmp_path / "downloaded.txt"
+    temp_file.write_text("cached input", encoding="utf-8")
+
+    class FakeDownloader:
+        last_download_metadata = {"input_size": temp_file.stat().st_size}
+
+        def download(self, url: str) -> str:
+            assert url == "https://example.test/report"
+            return str(temp_file)
+
+    class FakeClient:
+        downloader = FakeDownloader()
+
+        def extract_result_from_text(self, text_content: str, **kwargs: object) -> ExtractionResult:
+            raise AssertionError("text extraction should not run")
+
+        def extract_result_from_file(self, file_path: str, **kwargs: object) -> ExtractionResult:
+            raise AssertionError("file extraction should not run")
+
+    def fail_limit(*args: object, **kwargs: object) -> None:
+        del args, kwargs
+        temp_file.unlink()
+        raise ValidationError("too big")
+
+    monkeypatch.setattr("iocparser.pipeline_worker_support.enforce_size_limit", fail_limit)
+
+    result = PipelineWorker(client=FakeClient()).process(
+        PipelineJobRequest(
+            input_kind="url",
+            source_value="https://example.test/report",
+            check_warnings=False,
+        )
+    )
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "VALIDATION_FAILED"
+
+
 def test_pipeline_worker_cleans_downloaded_url_when_runtime_size_limit_fails(
     tmp_path: Path,
 ) -> None:

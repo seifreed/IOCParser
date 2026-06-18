@@ -287,7 +287,7 @@ def _prepare_url_input(
         )
     except Exception:
         try:
-            Path(temp_file).unlink()
+            Path(temp_file).unlink(missing_ok=True)
         except OSError:
             logger.warning("Failed to remove temporary URL input after preparation error", exc_info=True)
         raise

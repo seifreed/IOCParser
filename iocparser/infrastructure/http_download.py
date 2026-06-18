@@ -464,7 +464,10 @@ class RequestsURLDownloader(URLDownloader):
                     except Exception:
                         logger.exception("Failed to close redirect response missing Location")
                     raise DownloadError(url, "redirect missing Location header")
-                response.close()
+                try:
+                    response.close()
+                except Exception:
+                    logger.warning("Failed to close redirect response", exc_info=True)
                 current = urljoin(current, location)
                 continue
             return response, str(response.url)

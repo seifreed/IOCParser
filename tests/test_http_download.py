@@ -598,6 +598,38 @@ def test_redirect_to_public_host_is_followed(monkeypatch, tmp_path) -> None:
     assert downloader.download_metadata()["response_url"] == "http://93.184.216.34/final"
 
 
+def test_redirect_close_failure_does_not_abort_following_redirect(
+    monkeypatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.delenv("IOCPARSER_ALLOW_PRIVATE_URLS", raising=False)
+    downloader = RequestsURLDownloader()
+
+    class _RedirectResponse(_FakeRedirectResponse):
+        def close(self):
+            self.closed = True
+            raise RuntimeError("close failed")
+
+    responses = [
+        _RedirectResponse(is_redirect=True, location="http://93.184.216.34/final"),
+        _FakeRedirectResponse(is_redirect=False, url="http://93.184.216.34/final"),
+    ]
+
+    def fake_get(_self, _url, **_kwargs):
+        return responses.pop(0)
+
+    monkeypatch.setattr(requests.Session, "get", fake_get)
+    monkeypatch.setattr(RequestsURLDownloader, "_assert_host_allowed", lambda self, parsed_url: None)
+    caplog.clear()
+    response, final_url = downloader._open_validated(
+        "http://93.184.216.34/start",
+        {"User-Agent": "test"},
+        requests.Session(),
+    )
+    assert final_url == "http://93.184.216.34/final"
+    assert response.url == "http://93.184.216.34/final"
+    assert "Failed to close redirect response" in caplog.text
+
+
 def test_assert_host_allowed_rejects_missing_hostname(monkeypatch) -> None:
     monkeypatch.delenv("IOCPARSER_ALLOW_PRIVATE_URLS", raising=False)
     with pytest.raises(InvalidURLError):

@@ -935,7 +935,8 @@ def test_optional_queue_adapters_quarantine_invalid_payloads() -> None:
         def __init__(self) -> None:
             self.queues: dict[str, list[dict[str, str]]] = {
                 "https://sqs.example/jobs": [
-                    {"Body": "[]", "ReceiptHandle": "rh-bad", "MessageId": "bad-sqs"}
+                    {"Body": "[]", "ReceiptHandle": "rh-bad", "MessageId": "bad-sqs"},
+                    {"ReceiptHandle": "rh-missing-body", "MessageId": "missing-body-sqs"},
                 ]
             }
 
@@ -994,10 +995,13 @@ def test_optional_queue_adapters_quarantine_invalid_payloads() -> None:
             dead_letter_queue_url="https://sqs.example/jobs-dead",
         )
         assert sqs.dequeue(queue_name="ignored") is None
+        assert sqs.dequeue(queue_name="ignored") is None
         assert sqs.client.queues["https://sqs.example/jobs"] == []
-        assert len(sqs.client.queues["https://sqs.example/jobs-dead"]) == 1
+        assert len(sqs.client.queues["https://sqs.example/jobs-dead"]) == 2
         dead_body = json.loads(sqs.client.queues["https://sqs.example/jobs-dead"][0]["Body"])
         assert dead_body["invalid_payload"] == "[]"
+        missing_body = json.loads(sqs.client.queues["https://sqs.example/jobs-dead"][1]["Body"])
+        assert missing_body["invalid_payload"] == ""
 
 
 def test_celery_queue_falls_back_to_task_id_and_dead_letters_receipt_queue() -> None:

@@ -116,10 +116,12 @@ class SQSQueueAdapter:
             message["ReceiptHandle"],
             str(message.get("MessageId", uuid4())),
         )
+        body = message.get("Body", "")
+        payload = body if isinstance(body, str) else ""
         try:
-            envelope = QueueEnvelope.from_record(load_queue_record(message["Body"]))
+            envelope = QueueEnvelope.from_record(load_queue_record(payload))
         except (json.JSONDecodeError, TypeError, ValueError) as exc:
-            self._quarantine_invalid_payload(receipt, payload=message["Body"], error=exc)
+            self._quarantine_invalid_payload(receipt, payload=payload, error=exc)
             return None
         return receipt, envelope
 

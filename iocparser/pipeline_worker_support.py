@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import time
 from collections.abc import Mapping
 from contextlib import suppress
@@ -35,9 +36,10 @@ from iocparser.interfaces.ports import (
     SourceRepository,
 )
 from iocparser.pipeline_errors import classify_pipeline_exception
-from iocparser.shared_utils import normalize_metadata_values
+from iocparser.shared_utils import normalize_metadata_values, rollback_and_log
 
 BACKPRESSURE_MESSAGE = "worker queue is at capacity"
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -397,7 +399,11 @@ def persist_result(
             unit_of_work=unit,
         ).run_id
     except Exception:
-        unit.rollback()
+        rollback_and_log(
+            unit,
+            logger=logger,
+            message="Rollback failed while persisting pipeline result",
+        )
         raise
     finally:
         unit.close()

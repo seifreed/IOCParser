@@ -330,3 +330,28 @@ def test_persist_run_rolls_back_on_failure() -> None:
 
     assert unit_of_work.committed is False
     assert unit_of_work.rolled_back is True
+
+
+def test_persist_run_preserves_original_error_when_rollback_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    unit_of_work = RecordingUnitOfWork(fail_on_create=True)
+
+    def _rollback() -> None:
+        raise RuntimeError("rollback failed")
+
+    monkeypatch.setattr(unit_of_work, "rollback", _rollback)
+    request = PersistRunInput(
+        source=Source.from_raw("url", "https://source.example"),
+        result=ExtractionResult(iocs=(IOC.from_raw("domains", "example.com"),)),
+        tool_version="1.2.3",
+        options=PersistOptions(
+            defang=False,
+            check_warnings=False,
+            force_update=False,
+            output_format="text",
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="boom"):
+        persist_run(request, unit_of_work=unit_of_work)

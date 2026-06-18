@@ -1,6 +1,8 @@
+import logging
 import re as _re
 from collections.abc import Callable, Iterable, Mapping
 from threading import Lock
+from typing import Protocol
 
 from iocparser.errors import ValidationError
 
@@ -12,6 +14,17 @@ def lazy_singleton[T](holder: list[T], lock: Lock, factory: Callable[[], T]) -> 
             if not holder:
                 holder.append(factory())
     return holder[0]
+
+
+class _RollbackUnit(Protocol):
+    def rollback(self) -> None: ...
+
+
+def rollback_and_log(unit: _RollbackUnit, *, logger: logging.Logger, message: str) -> None:
+    try:
+        unit.rollback()
+    except Exception:
+        logger.exception(message)
 
 
 TRUE_BOOL_VALUES: frozenset[str] = frozenset({"1", "true", "yes", "on"})

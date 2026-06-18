@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from re import escape, finditer
 
@@ -27,6 +28,9 @@ from iocparser.interfaces.ports import (
     URLDownloader,
     WarningListService,
 )
+from iocparser.shared_utils import rollback_and_log
+
+logger = logging.getLogger(__name__)
 
 
 def _build_evidence(text_content: str, value: str, *, source: str = "") -> tuple[IOCEvidence, ...]:
@@ -233,5 +237,9 @@ def persist_run(
     except (KeyboardInterrupt, SystemExit):
         raise
     except Exception:
-        unit_of_work.rollback()
+        rollback_and_log(
+            unit_of_work,
+            logger=logger,
+            message="Rollback failed while persisting run",
+        )
         raise

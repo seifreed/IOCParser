@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 
 from sqlalchemy import select
@@ -34,8 +35,10 @@ from iocparser.infrastructure.persistence_schema import (
     DistributedJobModel,
     SQLAlchemyUnitOfWork,
 )
+from iocparser.shared_utils import rollback_and_log
 
 AMBIGUOUS_DISTRIBUTED_JOB_ID = "ambiguous distributed job id"
+logger = logging.getLogger(__name__)
 
 
 def _history_job_like_prefix(job_id: str) -> str:
@@ -60,7 +63,11 @@ class SQLAlchemyDistributedJobService:
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception:
-            unit.rollback()
+            rollback_and_log(
+                unit,
+                logger=logger,
+                message="Rollback failed while creating distributed job",
+            )
             raise
         finally:
             unit.close()
@@ -289,7 +296,11 @@ class SQLAlchemyDistributedJobService:
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception:
-            unit.rollback()
+            rollback_and_log(
+                unit,
+                logger=logger,
+                message="Rollback failed while transitioning distributed job",
+            )
             raise
         finally:
             unit.close()

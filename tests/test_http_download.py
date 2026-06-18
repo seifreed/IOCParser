@@ -458,8 +458,11 @@ def test_redirect_to_public_host_is_followed(monkeypatch, tmp_path) -> None:
         "get",
         lambda self, url, **_kwargs: responses.pop(0),
     )
-    path = RequestsURLDownloader().download("http://93.184.216.34/start")
+    downloader = RequestsURLDownloader()
+    path = downloader.download("http://93.184.216.34/start")
     assert Path(path).read_text(encoding="utf-8") == "ok"
+    assert downloader.download_metadata()["normalized_url"] == "http://93.184.216.34/final"
+    assert downloader.download_metadata()["response_url"] == "http://93.184.216.34/final"
 
 
 def test_assert_host_allowed_rejects_missing_hostname(monkeypatch) -> None:

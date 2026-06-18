@@ -486,7 +486,7 @@ class RequestsURLDownloader(URLDownloader):
         content_hash = hashlib.sha256(temp_file.read_bytes()).hexdigest()
         self.last_download_metadata = {
             "original_url": url,
-            "normalized_url": normalize_url_value(parsed_url.geturl()),
+            "normalized_url": normalize_url_value(response_url),
             "mime_type": content_type or None,
             "input_size": downloaded_size,
             "attempt_count": attempt_count,

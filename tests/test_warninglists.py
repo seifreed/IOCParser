@@ -245,6 +245,12 @@ class TestMISPWarningLists:
         assert is_warning
         assert info["name"] == "Google IP ranges"
 
+        warning_lists.warning_lists["google-cidr"]["list"][0] = " 8.8.8.0/24 "
+        warning_lists._preprocess_lists()
+        is_warning, info = warning_lists.check_value("8.8.8.100", "ips")
+        assert is_warning
+        assert info["name"] == "Google IP ranges"
+
         # Test domain in Alexa list
         is_warning, info = warning_lists.check_value("google.com", "domains")
         assert is_warning

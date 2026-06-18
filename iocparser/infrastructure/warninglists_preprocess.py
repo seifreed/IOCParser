@@ -94,7 +94,7 @@ class WarningListPreprocessMixin:
         for cidr_value in values_val:
             if cidr_value is None:
                 continue
-            cidr_text = str(cidr_value)
+            cidr_text = str(cidr_value).strip()
             try:
                 networks.append(ipaddress.ip_network(cidr_text, strict=False))
             except (ValueError, ipaddress.AddressValueError):

@@ -368,6 +368,8 @@ def _process_duplicate_streaming_files(
             )
         except (KeyboardInterrupt, SystemExit):
             raise
+        except ValidationError:
+            raise
         except Exception as exc:
             logger.exception("Batch streaming failed for %s", source_value)
             result = ExtractionResult()

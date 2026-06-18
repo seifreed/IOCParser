@@ -320,6 +320,8 @@ class RequestsURLDownloader(URLDownloader):
             length = int(content_length)
         except ValueError as exc:
             raise ValueError(INVALID_CONTENT_LENGTH_ERROR.format(value=content_length)) from exc
+        if length < 0:
+            raise ValueError(INVALID_CONTENT_LENGTH_ERROR.format(value=content_length))
         max_size = self._effective_max_size()
         if length > max_size:
             raise FileSizeError(

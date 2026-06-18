@@ -128,6 +128,11 @@ def test_check_content_size_accepts_empty_and_small_values() -> None:
     check_content_size("1024")
 
 
+def test_check_content_size_rejects_negative_value() -> None:
+    with pytest.raises(ValueError, match="Content-Length"):
+        check_content_size("-1")
+
+
 def test_check_content_size_rejects_oversized_value() -> None:
     with pytest.raises(FileSizeError):
         check_content_size(str(MAX_URL_SIZE + 1))

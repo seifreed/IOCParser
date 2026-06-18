@@ -141,7 +141,7 @@ def _apply_network_defaults(args: argparse.Namespace, config: AppConfig) -> None
     }
     for name, configured in network_defaults.items():
         current_network: object = getattr(args, name, None)
-        if current_network is None and configured:
+        if current_network is None and configured is not None:
             setattr(args, name, configured)
     if getattr(args, "allow_redirects", None) is None:
         args.allow_redirects = config.allow_redirects

@@ -525,6 +525,55 @@ def test_apply_config_defaults_sets_pipeline_limit_values(tmp_path: Path) -> Non
     assert args.max_queue_size == 9
 
 
+def test_apply_config_defaults_keeps_zero_network_timeouts(tmp_path: Path) -> None:
+    config_path = tmp_path / "iocparser.ini"
+    config_path.write_text(
+        "[network]\nconnect_timeout = 0.0\nread_timeout = 0.0\n",
+        encoding="utf-8",
+    )
+    config = load_config(None, None, str(config_path))
+    args = SimpleNamespace(
+        only=None,
+        exclude=None,
+        stix_types=None,
+        severity=None,
+        tag=None,
+        headers_json=None,
+        cookies_json=None,
+        with_context=False,
+        streaming=False,
+        summary=False,
+        skip_processed=False,
+        json=False,
+        jsonl=False,
+        csv=False,
+        stix=False,
+        output_format=None,
+        url_workers=None,
+        url_retries=None,
+        url_backoff=None,
+        rate_limit=None,
+        parallel=None,
+        chunk_size=None,
+        overlap=None,
+        max_queue_size=None,
+        max_input_size_mb=None,
+        max_input_seconds=None,
+        diff_only=None,
+        user_agent=None,
+        proxy=None,
+        tls_cert=None,
+        ca_bundle=None,
+        connect_timeout=None,
+        read_timeout=None,
+        allow_redirects=True,
+        tls_verify=True,
+    )
+    apply_config_defaults(args, config)
+    assert args.connect_timeout == 0.0
+    assert args.read_timeout == 0.0
+
+
 @pytest.mark.parametrize(
     ("config_text", "message"),
     [

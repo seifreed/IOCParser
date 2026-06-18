@@ -26,6 +26,7 @@ def check_substring_type(value: str, values: list[IOCValue]) -> bool:
 
 
 def check_regex_type(get_logger: Callable[[], Logger], value: str, values: list[IOCValue]) -> bool:
+    value = value.strip()
     for regex_pattern in values:
         if regex_pattern is None:
             continue

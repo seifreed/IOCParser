@@ -190,6 +190,7 @@ class TestMISPWarningLists:
         # Regex match
         assert warning_lists._check_value_in_list("mail.google.com", values, "regex")
         assert warning_lists._check_value_in_list("192.168.1.1", values, "regex")
+        assert warning_lists._check_value_in_list(" mail.google.com ", values, "regex")
 
         # No match
         assert not warning_lists._check_value_in_list("google.net", values, "regex")
@@ -1051,6 +1052,7 @@ class TestWarningListsHelperFunctions:
 
         # Should skip None values
         assert warning_lists._check_regex_type("mail.google.com", values)
+        assert warning_lists._check_regex_type(" mail.google.com ", values)
         assert warning_lists._check_regex_type("testdomain.com", values)
         assert not warning_lists._check_regex_type("example.com", values)
 

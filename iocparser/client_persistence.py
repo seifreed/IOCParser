@@ -27,8 +27,11 @@ from iocparser.domain.models import (
     PersistedRunsPage,
     PersistedRunSummary,
 )
+from iocparser.errors import ValidationError
 from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
 from iocparser.shared_utils import parse_string_filters
+
+IMPORT_PAYLOAD_OBJECT_REQUIRED = "history import payload must be a mapping (JSON object)"
 
 
 class QueryRunsOptions(TypedDict, total=False):
@@ -160,6 +163,8 @@ class PersistenceClient:
         return self._typed_service.export_history()
 
     def import_history(self, payload: dict[str, object]) -> dict[str, int]:
+        if not isinstance(payload, dict):
+            raise ValidationError(IMPORT_PAYLOAD_OBJECT_REQUIRED)
         return self._typed_service.import_history(payload)
 
     def list_failed_batches(self, *, limit: int = 20) -> list[BatchJobSummary]:

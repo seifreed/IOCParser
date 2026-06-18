@@ -912,13 +912,17 @@ def test_import_persisted_history_rejects_non_mapping_payload(tmp_path: Path) ->
     a clear ValidationError, matching the CLI's non-object import-file guard.
     """
     db_uri = f"sqlite:///{tmp_path / 'import-shape.sqlite'}"
+    client = PersistenceClient(db_uri)
     for bad_payload in ("not a dict", ["a", "b"], None, 42):
         with pytest.raises(ValidationError, match="history import payload must be a mapping"):
             import_persisted_history(db_uri=db_uri, payload=bad_payload)  # type: ignore[arg-type]
+        with pytest.raises(ValidationError, match="history import payload must be a mapping"):
+            client.import_history(bad_payload)  # type: ignore[arg-type]
 
     # An empty mapping is a valid (no-op) import: every table count is zero.
     empty_result = import_persisted_history(db_uri=db_uri, payload={})
     assert set(empty_result.values()) == {0}
+    assert set(client.import_history({}).values()) == {0}
 
 
 def test_history_compaction_sql_is_dialect_aware() -> None:

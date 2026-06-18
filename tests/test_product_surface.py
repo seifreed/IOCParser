@@ -728,6 +728,21 @@ def test_retry_batch_job_attempts_follow_filtered_failed_items(tmp_path: Path) -
     assert report["items"][0]["retry_attempt"] == 6
 
 
+def test_retry_batch_job_rejects_non_integer_value() -> None:
+    from iocparser import cli_url_batch_workflow as workflow
+
+    with pytest.raises(ValidationError, match=r"Invalid retry_batch_job"):
+        workflow.run_url_batch_workflow(
+            workflow.URLBatchWorkflowRequest(
+                args=_args(retry_batch_job=[]),  # type: ignore[arg-type]
+                reader=MagicTextSourceReader(),
+                warning_service=None,
+                downloader=RequestsURLDownloader(),
+                db_uri=None,
+            )
+        )
+
+
 def test_source_value_file_filter_preserves_case_sensitive_identity(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'case-sensitive-source-filter.sqlite'}"
     config = load_config(cli_persist=True, cli_db_uri=db_uri, cli_config_path=None)

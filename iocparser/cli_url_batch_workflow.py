@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from iocparser import cli_processing_urls_execution as _execution
+from iocparser.api_persistence_query import validated_required_id
 from iocparser.cli_args import ProcessingOptions, get_int_arg, get_optional_str_arg
 from iocparser.cli_processing_files import merge_batch_results
 from iocparser.cli_processing_support import (
@@ -55,7 +56,9 @@ def run_url_batch_workflow(
     retry_report = get_optional_str_arg(request.args, "retry_failed_from")
     retry_batch_job_value: object = getattr(request.args, "retry_batch_job", None)
     retry_batch_job = (
-        _support.int_value(retry_batch_job_value) if retry_batch_job_value is not None else None
+        validated_required_id(retry_batch_job_value, field="retry_batch_job")
+        if retry_batch_job_value is not None
+        else None
     )
     job_id = (
         get_optional_str_arg(request.args, "job_id")

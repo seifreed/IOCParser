@@ -130,7 +130,7 @@ def _collect_url_results(
     url_workers_value = getattr(request.args, "url_workers", None)
     try:
         max_workers = max(1, get_int_arg(request.args, "url_workers", 4))
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, ValidationError) as exc:
         raise _invalid_url_workers(url_workers_value) from exc
     retry_error_type = get_optional_str_arg(request.args, "retry_error_type")
     retry_error_contains = get_optional_str_arg(request.args, "retry_error_contains")

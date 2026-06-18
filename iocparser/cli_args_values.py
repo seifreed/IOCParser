@@ -99,7 +99,7 @@ def get_bool_arg(args: argparse.Namespace, name: str, default: bool = False) -> 
 def get_int_arg(args: argparse.Namespace, name: str, default: int = 0) -> int:
     """Get integer argument from argparse namespace."""
     value: object = getattr(args, name, None)
-    return int(str(value)) if value is not None else default
+    return default if value is None else int_arg_value(value, name)
 
 
 def validated_int_arg(args: argparse.Namespace, name: str, default: int = 0) -> int:

@@ -182,6 +182,13 @@ class TestArgumentHelpers:
         result = get_int_arg(args, "nonexistent", default=100)
         assert result == 100
 
+    def test_get_int_arg_invalid_string_raises_validation_error(self) -> None:
+        """Test get_int_arg rejects non-numeric strings with a ValidationError."""
+        args = argparse.Namespace(port="bad")
+
+        with pytest.raises(ValidationError, match="port requires an integer value"):
+            get_int_arg(args, "port")
+
     def test_get_list_arg_with_list(self) -> None:
         """Test get_list_arg returns list when attribute is a list."""
         args = argparse.Namespace(files=["file1.txt", "file2.pdf", "file3.html"])

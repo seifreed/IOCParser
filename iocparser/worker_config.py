@@ -31,6 +31,22 @@ def _non_negative_float_or_default(value: float | None, default: float) -> float
     return value
 
 
+def _str_env(name: str, default: str) -> str:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    stripped = raw.strip()
+    return stripped or default
+
+
+def _optional_str_env(name: str, default: str | None) -> str | None:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    stripped = raw.strip()
+    return stripped or default
+
+
 @dataclass(frozen=True)
 class WorkerServiceConfig:
     """Environment-driven configuration for the standalone worker service."""
@@ -68,20 +84,19 @@ class WorkerServiceConfig:
             poll_interval_default,
         )
         return cls(
-            queue_backend=os.environ.get(
+            queue_backend=_str_env(
                 "IOCPARSER_WORKER_QUEUE_BACKEND", str(file_values["queue_backend"])
             ),
-            queue_name=os.environ.get(
-                "IOCPARSER_WORKER_QUEUE_NAME", str(file_values["queue_name"])
+            queue_name=_str_env("IOCPARSER_WORKER_QUEUE_NAME", str(file_values["queue_name"])),
+            queue_url=_optional_str_env(
+                "IOCPARSER_WORKER_QUEUE_URL", str_or_none(file_values["queue_url"])
             ),
-            queue_url=os.environ.get("IOCPARSER_WORKER_QUEUE_URL")
-            or str_or_none(file_values["queue_url"]),
-            queue_path=os.environ.get(
-                "IOCPARSER_WORKER_QUEUE_PATH", str(file_values["queue_path"])
+            queue_path=_str_env("IOCPARSER_WORKER_QUEUE_PATH", str(file_values["queue_path"])),
+            dead_letter_queue_url=_optional_str_env(
+                "IOCPARSER_WORKER_DEAD_LETTER_QUEUE_URL",
+                str_or_none(file_values["dead_letter_queue_url"]),
             ),
-            dead_letter_queue_url=os.environ.get("IOCPARSER_WORKER_DEAD_LETTER_QUEUE_URL")
-            or str_or_none(file_values["dead_letter_queue_url"]),
-            db_uri=os.environ.get("IOCPARSER_WORKER_DB_URI") or str_or_none(file_values["db_uri"]),
+            db_uri=_optional_str_env("IOCPARSER_WORKER_DB_URI", str_or_none(file_values["db_uri"])),
             poll_interval_seconds=poll_interval_seconds,
             max_messages_per_cycle=_positive_int_or_default(
                 int_env(
@@ -97,7 +112,7 @@ class WorkerServiceConfig:
                 int_env("IOCPARSER_WORKER_CONCURRENCY", int_or(file_values["concurrency"], 1)),
                 1,
             ),
-            telemetry_mode=os.environ.get(
+            telemetry_mode=_str_env(
                 "IOCPARSER_WORKER_TELEMETRY_MODE", str(file_values["telemetry_mode"])
             ),
             max_input_size_bytes=int_env(

@@ -63,6 +63,27 @@ def test_worker_config_from_env_and_limits(tmp_path: Path) -> None:
     assert limits.skip_processed is True
 
 
+def test_worker_config_blank_env_strings_use_defaults() -> None:
+    with _Env(
+        IOCPARSER_WORKER_QUEUE_BACKEND="",
+        IOCPARSER_WORKER_QUEUE_NAME="",
+        IOCPARSER_WORKER_QUEUE_URL="",
+        IOCPARSER_WORKER_QUEUE_PATH="",
+        IOCPARSER_WORKER_DEAD_LETTER_QUEUE_URL="",
+        IOCPARSER_WORKER_DB_URI="",
+        IOCPARSER_WORKER_TELEMETRY_MODE="",
+    ):
+        config = WorkerServiceConfig.from_sources()
+
+    assert config.queue_backend == "filesystem"
+    assert config.queue_name == "default"
+    assert config.queue_url is None
+    assert config.queue_path == ".iocparser-queue"
+    assert config.dead_letter_queue_url is None
+    assert config.db_uri is None
+    assert config.telemetry_mode == "logging"
+
+
 def test_worker_config_from_ini_file(tmp_path: Path) -> None:
     config_path = tmp_path / "iocparser.ini"
     config_path.write_text(

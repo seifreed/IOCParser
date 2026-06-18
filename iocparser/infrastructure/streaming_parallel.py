@@ -58,9 +58,9 @@ class ParallelStreamingExtractor:
                     logger.info("Completed extraction from %s", path_str)
                 except (KeyboardInterrupt, SystemExit):
                     raise
-                except Exception:
+                except Exception as exc:
                     logger.exception("Error processing %s", file_path)
-                    results[str(file_path)] = {"_errors": [str(file_path)]}
+                    results[str(file_path)] = {"_errors": [f"{file_path}: {exc}"]}
 
         # Return in input order, not thread-completion order, so the downstream merge
         # dedup is deterministic across runs (see ThreadPoolFileBatchExecutor).

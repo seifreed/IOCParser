@@ -1016,7 +1016,7 @@ class TestParallelStreamingExtractor:
             assert str(invalid_file) in results
 
             # Invalid file should have error marker
-            assert "_errors" in results[str(invalid_file)]
+            assert results[str(invalid_file)]["_errors"][0].startswith(f"{invalid_file}: ")
 
             # Valid file should have extracted something (or empty dict if no IOCs)
             assert isinstance(results[str(valid_file)], dict)
@@ -1462,7 +1462,7 @@ class TestStreamingExceptionHandling:
             assert str(problem_file) in results
 
             # Problem file should have error marker
-            assert "_errors" in results[str(problem_file)]
+            assert results[str(problem_file)]["_errors"][0].startswith(f"{problem_file}: ")
 
             # Valid file should have been processed
             assert isinstance(results[str(valid_file)], dict)

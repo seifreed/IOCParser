@@ -1152,7 +1152,10 @@ def archive_history(db_uri: str, output_path: str) -> str:
     return str(path)
 
 def restore_history(db_uri: str, archive_path: str) -> dict[str, int]:
-    payload: object = json.loads(Path(archive_path).read_text(encoding="utf-8"))
+    try:
+        payload: object = json.loads(Path(archive_path).read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise TypeError(INVALID_HISTORY_ARCHIVE) from exc
     if not isinstance(payload, dict):
         raise TypeError(INVALID_HISTORY_ARCHIVE)
     return import_history(db_uri, _string_key_mapping(payload))

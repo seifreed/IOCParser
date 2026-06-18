@@ -904,6 +904,9 @@ def test_history_export_import_compact_and_retain(tmp_path: Path) -> None:
     invalid_archive.write_text(json.dumps([]), encoding="utf-8")
     with pytest.raises(TypeError):
         restore_history(restored_db, str(invalid_archive))
+    invalid_archive.write_text("{bad", encoding="utf-8")
+    with pytest.raises(TypeError):
+        restore_history(restored_db, str(invalid_archive))
 
 
 def test_import_persisted_history_rejects_non_mapping_payload(tmp_path: Path) -> None:

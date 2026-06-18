@@ -109,6 +109,13 @@ class TestArgumentHelpers:
         assert result == str(temp_path)
         assert isinstance(result, str)
 
+    def test_get_str_arg_trims_and_defaults_blank_values(self) -> None:
+        """Test get_str_arg trims whitespace and falls back on blank strings."""
+        args = argparse.Namespace(file_path="  sample.txt  ", empty="   ")
+
+        assert get_str_arg(args, "file_path") == "sample.txt"
+        assert get_str_arg(args, "empty", default="fallback.txt") == "fallback.txt"
+
     def test_get_str_arg_with_none(self) -> None:
         """Test get_str_arg returns default when attribute is None."""
         args = argparse.Namespace(file_path=None)

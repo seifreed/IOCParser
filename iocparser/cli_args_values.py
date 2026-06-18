@@ -82,7 +82,10 @@ def int_value(value: object, *, default: int = 0) -> int:
 def get_str_arg(args: argparse.Namespace, name: str, default: str = "") -> str:
     """Get string argument from argparse namespace."""
     value: object = getattr(args, name, None)
-    return str(value) if value is not None else default
+    if value is None:
+        return default
+    normalized = str(value).strip()
+    return normalized or default
 
 
 def get_bool_arg(args: argparse.Namespace, name: str, default: bool = False) -> bool:

@@ -113,6 +113,7 @@ class PersistenceClient:
         )
 
     def list_runs(self, **options: Unpack[QueryRunsOptions]) -> list[PersistedRunSummary]:
+        reject_unknown_options(options, _RUNS_OPTION_KEYS, context="run query")
         return self._typed_service.list_runs(
             limit=validated_non_negative_int(options.get("limit", 20), field="limit"),
             offset=validated_non_negative_int(options.get("offset", 0), field="offset"),
@@ -124,6 +125,7 @@ class PersistenceClient:
         )
 
     def query_runs_page(self, **options: Unpack[QueryRunsOptions]) -> PersistedRunsPage:
+        reject_unknown_options(options, _RUNS_OPTION_KEYS, context="run query")
         return self._typed_service.query_runs_page(
             limit=validated_non_negative_int(options.get("limit", 20), field="limit"),
             offset=validated_non_negative_int(options.get("offset", 0), field="offset"),

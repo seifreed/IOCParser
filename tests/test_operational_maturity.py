@@ -628,6 +628,13 @@ def test_persistence_client_exposes_remaining_service_methods(tmp_path: Path) ->
     config = load_config(cli_persist=True, cli_db_uri=db_uri, cli_config_path=None)
     client = PersistenceClient(db_uri)
 
+    with pytest.raises(ValidationError, match="Unknown run query option"):
+        client.list_runs(limitt=5)
+    with pytest.raises(ValidationError, match="Unknown run query option"):
+        client.query_runs_page(limitt=5)
+    with pytest.raises(ValidationError, match="Unknown IOC search option"):
+        client.search_iocs_page(value="first", min_severty="high")
+
     assert len(client.list_runs(limit=10)) == 2
     assert client.query_runs_page(limit=1).total == 2
     assert client.search_iocs_page(value="first", limit=10).total == 1

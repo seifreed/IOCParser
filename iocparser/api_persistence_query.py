@@ -196,7 +196,7 @@ def search_input(value: str, options: SearchPersistedIOCOptions) -> SearchPersis
         date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
         source_kind=optional_str(options.get("source_kind")),
         source_value=options.get("source_value"),
-        ioc_type=validated_ioc_type_filter(optional_str(options.get("ioc_type"))),
+        ioc_type=validated_ioc_type_filters(optional_str(options.get("ioc_type"))) or None,
         severity=validated_severity_filters(options.get("severity")),
         tags=parse_string_filters(options.get("tag")),
         exclude_tags=parse_string_filters(options.get("exclude_tag")),

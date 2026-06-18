@@ -70,7 +70,7 @@ class SearchPersistedIOCsInput:
     date_to: str | None = None
     source_kind: str | None = None
     source_value: str | None = None
-    ioc_type: str | None = None
+    ioc_type: tuple[str, ...] | None = None
     severity: tuple[str, ...] = ()
     tags: tuple[str, ...] = ()
     exclude_tags: tuple[str, ...] = ()

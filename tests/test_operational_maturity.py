@@ -516,6 +516,7 @@ def test_public_query_api_validates_dates_and_min_severity(tmp_path: Path) -> No
     assert hashes_diff.added.total_count() == 1
     assert hashes_diff.removed.total_count() == 1
     assert {str(ioc_type) for ioc_type in hashes_diff.added.canonical_by_type()} == {"md5"}
+    assert client.search_iocs(value="d41d8cd98f00b204e9800998ecf8427e", ioc_type="hashes").total == 1
 
 
 def test_public_query_api_rejects_unknown_keyword_options(tmp_path: Path) -> None:

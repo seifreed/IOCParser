@@ -74,6 +74,7 @@ from iocparser.infrastructure.persistence_support import (
     source_value_clause,
 )
 from iocparser.interfaces.ports import PersistenceQueryService
+from iocparser.infrastructure.persistence.query.type_filters import normalize_ioc_type_filter
 from iocparser.shared_utils import normalize_tokens
 
 RUN_NOT_FOUND_TEMPLATE = "Run not found: {run_id}"
@@ -112,7 +113,7 @@ class IOCSearchPageQuery:
     date_to: str | None = None
     source_kind: str | None = None
     source_value: str | None = None
-    ioc_type: str | None = None
+    ioc_type: tuple[str, ...] | str | None = None
     severity: tuple[str, ...] = ()
     tags: tuple[str, ...] = ()
     exclude_tags: tuple[str, ...] = ()
@@ -153,13 +154,13 @@ def query_runs_page(query: RunPageQuery) -> PersistedRunsPage:
     finally:
         unit_of_work.close()
 
-
 def search_iocs_page(query: IOCSearchPageQuery) -> PersistedIOCSearchPage:
     unit_of_work = SQLAlchemyUnitOfWork(query.db_uri)
     try:
         normalized_value = normalize_ioc_search(query.value)
         if not normalized_value:
             raise ValueError(SEARCH_QUERY_REQUIRED)
+        ioc_types = normalize_ioc_type_filter(query.ioc_type)
         stmt = (
             select(RunModel, SourceModel, IOCModel, RunIOCModel)
             .join(SourceModel, RunModel.source_id == SourceModel.id)
@@ -179,8 +180,8 @@ def search_iocs_page(query: IOCSearchPageQuery) -> PersistedIOCSearchPage:
             source_value=query.source_value,
         ):
             stmt = stmt.where(clause)
-        if query.ioc_type:
-            stmt = stmt.where(IOCModel.ioc_type == query.ioc_type)
+        if ioc_types:
+            stmt = stmt.where(IOCModel.ioc_type.in_(ioc_types))
         if query.severity:
             stmt = stmt.where(RunIOCModel.severity.in_(query.severity))
         if query.tags:
@@ -215,7 +216,6 @@ def search_iocs_page(query: IOCSearchPageQuery) -> PersistedIOCSearchPage:
     finally:
         unit_of_work.close()
 
-
 def _run_filter_clauses(
     *,
     date_from: str | None,
@@ -235,6 +235,7 @@ def _run_filter_clauses(
         else []
     )
     return tuple(clauses)
+
 def _order_run_query_stmt[SelectT: (RunSelect, SearchSelect)](
     stmt: SelectT, *, sort_by: str
 ) -> SelectT:
@@ -249,10 +250,8 @@ def _order_run_query_stmt[SelectT: (RunSelect, SearchSelect)](
         )
     return stmt.order_by(RunModel.started_at.desc(), RunModel.id.desc())
 
-
 def _escaped_like_value(normalized_value: str) -> str:
     return normalized_value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
 
 def _tag_search_clause(normalized_tag: str) -> ClauseElement:
     # tags_search is delimiter-wrapped (see build_tags_search), so an exact
@@ -261,7 +260,6 @@ def _tag_search_clause(normalized_tag: str) -> ClauseElement:
     escaped = _escaped_like_value(normalized_tag)
     pattern = f"%{TAG_SEARCH_DELIMITER}{escaped}{TAG_SEARCH_DELIMITER}%"
     return RunIOCModel.tags_search.like(pattern, escape="\\")
-
 
 def _apply_search_backend(
     stmt: SearchSelect,
@@ -290,7 +288,6 @@ def _apply_search_backend(
     return stmt.where(
         IOCModel.value_search.like(f"%{_escaped_like_value(normalized_value)}%", escape="\\")
     )
-
 
 def _coerce_count(value: object) -> int:
     if isinstance(value, int):
@@ -464,7 +461,7 @@ class SQLAlchemyPersistenceService(PersistenceQueryService):
         date_to: str | None = None,
         source_kind: str | None = None,
         source_value: str | None = None,
-        ioc_type: str | None = None,
+        ioc_type: tuple[str, ...] | None = None,
         severity: tuple[str, ...] = (),
         tags: tuple[str, ...] = (),
         exclude_tags: tuple[str, ...] = (),
@@ -508,7 +505,7 @@ class SQLAlchemyPersistenceService(PersistenceQueryService):
         date_to: str | None = None,
         source_kind: str | None = None,
         source_value: str | None = None,
-        ioc_type: str | None = None,
+        ioc_type: tuple[str, ...] | None = None,
         severity: tuple[str, ...] = (),
         tags: tuple[str, ...] = (),
         exclude_tags: tuple[str, ...] = (),

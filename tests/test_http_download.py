@@ -224,6 +224,46 @@ def test_download_with_size_check_removes_partial_file_on_write_error(
     assert not output_file.exists()
 
 
+def test_download_with_size_check_preserves_original_error_when_cleanup_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output_file = tmp_path / "partial.bin"
+    original_open = Path.open
+
+    class FailingWriteHandle:
+        def __init__(self, path: Path) -> None:
+            self.path = path
+            self.handle = None
+
+        def __enter__(self):
+            self.handle = original_open(self.path, "wb")
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            del exc_type, exc, tb
+            assert self.handle is not None
+            self.handle.close()
+
+        def write(self, data: bytes) -> int:
+            assert self.handle is not None
+            self.handle.write(data)
+            raise OSError("disk full")
+
+    def failing_open(path: Path, mode: str = "r", *args, **kwargs):
+        if path == output_file and mode == "wb":
+            return FailingWriteHandle(path)
+        return original_open(path, mode, *args, **kwargs)
+
+    def failing_unlink(*_args, **_kwargs):
+        raise OSError("unlink failed")
+
+    monkeypatch.setattr(Path, "open", failing_open)
+    monkeypatch.setattr(Path, "unlink", failing_unlink)
+
+    with pytest.raises(OSError, match="disk full"):
+        download_with_size_check(StaticResponse([b"abc"]), output_file, 10)
+
+
 def test_requests_url_downloader_downloads_pdf_and_html_files() -> None:
     downloader = RequestsURLDownloader()
 

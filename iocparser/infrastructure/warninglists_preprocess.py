@@ -13,6 +13,7 @@ from iocparser.infrastructure.warninglists_types import (
     WarningListLookups,
     get_mixin_logger,
     matching_attribute_name,
+    normalized_warning_list_text,
 )
 
 logger = get_logger("iocparser.infrastructure.warninglists")
@@ -49,11 +50,16 @@ class WarningListPreprocessMixin:
         with suppress(AttributeError):
             self._warning_lookup_cache.clear()
 
-    def _add_string_values(self, list_id: str, values_val: list[WarningListEntry]) -> None:
+    def _add_string_values(
+        self,
+        list_id: str,
+        values_val: list[WarningListEntry],
+        list_type: str,
+    ) -> None:
         for value in values_val:
             if value is None:
                 continue
-            value_lower = str(value).strip().lower()
+            value_lower = normalized_warning_list_text(value, list_type=list_type)
             if value_lower not in self.lookup_data.string_lookups:
                 self.lookup_data.string_lookups[value_lower] = set()
             self.lookup_data.string_lookups[value_lower].add(list_id)
@@ -129,7 +135,7 @@ class WarningListPreprocessMixin:
                 # MISP "hostname" lists (Alexa, bank domains, whitelists, ...) match
                 # exactly like "string" lists; without this branch their entries were
                 # never indexed, so 19 shipped lists never produced a single match.
-                self._add_string_values(list_id, values_val)
+                self._add_string_values(list_id, values_val, list_type)
             elif list_type == "regex":
                 self._add_regex_values(list_id, values_val)
             elif list_type == "cidr":

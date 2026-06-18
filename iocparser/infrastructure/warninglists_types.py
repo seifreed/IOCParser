@@ -22,6 +22,14 @@ def matching_attribute_name(attr: WarningListEntry) -> str:
     return str(attr)
 
 
+def normalized_warning_list_text(value: WarningListEntry, *, list_type: str) -> str:
+    """Normalize warning-list text entries for exact/string-style matching."""
+    text = str(value).strip()
+    if list_type == "hostname":
+        text = text.rstrip("\\")
+    return text.lower()
+
+
 def get_mixin_logger(instance: object, fallback: Logger) -> Logger:
     """Shared logger accessor for warning-list mixins."""
     logger = getattr(instance, "logger", None)

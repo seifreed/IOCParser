@@ -156,6 +156,11 @@ class TestMISPWarningLists:
         values = ["google.com", "facebook.com"]
         assert warning_lists._check_value_in_list("google.com", values, "hostname")
         assert warning_lists._check_value_in_list("GOOGLE.COM", values, "hostname")
+        assert warning_lists._check_value_in_list(
+            "static-185.132.201.202.andorpac.ad",
+            ["static-185.132.201.202.andorpac.ad\\ "],
+            "hostname",
+        )
         assert not warning_lists._check_value_in_list("amazon.com", values, "hostname")
 
     def test_check_value_in_list_substring(self):
@@ -1071,6 +1076,27 @@ class TestWarningListsHelperFunctions:
         is_warning, info = warning_lists.check_value("https://google.com/search?q=test", "urls")
         assert is_warning
         assert info["name"] == "Alexa Top Sites"
+
+    def test_check_value_with_hostname_escape_artifact(self):
+        """Hostname entries with escaped trailing whitespace should still match."""
+        warning_lists = make_warning_lists()
+
+        warning_lists.warning_lists = {
+            "public-dns-hostname": {
+                "name": "Public DNS Hostname",
+                "description": "Hostname list with escaped trailing whitespace",
+                "type": "hostname",
+                "matching_attributes": ["domain"],
+                "list": ["static-185.132.201.202.andorpac.ad\\ "],
+            }
+        }
+        warning_lists._preprocess_lists()
+
+        is_warning, info = warning_lists.check_value(
+            "static-185.132.201.202.andorpac.ad", "domains"
+        )
+        assert is_warning
+        assert info["name"] == "Public DNS Hostname"
 
     def test_check_value_with_extracted_domain_in_regex(self):
         """Test check_value when extracted domain matches regex."""

@@ -5,7 +5,7 @@ import re
 from collections.abc import Callable
 from logging import Logger
 
-from iocparser.infrastructure.warninglists_types import IOCValue
+from iocparser.infrastructure.warninglists_types import IOCValue, normalized_warning_list_text
 
 
 def check_string_type(value: str, values: list[IOCValue]) -> bool:
@@ -73,6 +73,10 @@ def check_value_in_list(
     if list_type in ("string", "hostname"):
         # Preprocessing indexes "hostname" lists with the string lookups, so the
         # diagnostic must match them the same way or it contradicts check_value.
+        if list_type == "hostname":
+            return value.lower() in [
+                normalized_warning_list_text(v, list_type=list_type) for v in values if v is not None
+            ]
         return check_string_type(value, values)
     if list_type == "substring":
         return check_substring_type(value, values)

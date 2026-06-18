@@ -14,7 +14,10 @@ from typing import ClassVar
 
 from iocparser.domain.enums import IOCType, ioc_type_name
 from iocparser.infrastructure.logger import get_logger
-from iocparser.infrastructure.warninglists_types import matching_attribute_name
+from iocparser.infrastructure.warninglists_types import (
+    matching_attribute_name,
+    normalized_warning_list_text,
+)
 
 # Type aliases for diagnostics
 WarningListEntry = str | dict[str, str] | int | bool | None
@@ -94,11 +97,11 @@ class WarningListDiagnosticsMixin(ABC):
         }
         return any(keyword in attrs for keyword in self.TYPE_KEYWORDS[ioc_type])
 
-    def _log_matched_value(self, clean_val: str, vals: list[IOCValue]) -> None:
+    def _log_matched_value(self, clean_val: str, vals: list[IOCValue], list_type: str) -> None:
         """Log which specific entry matched."""
         for val in vals:
-            if str(val).strip().lower() == clean_val.lower():
-                logger.info("    Matched: %s", str(val).strip())
+            if normalized_warning_list_text(val, list_type=list_type) == clean_val.lower():
+                logger.info("    Matched: %s", normalized_warning_list_text(val, list_type=list_type))
                 break
 
     def _log_list_check_result(
@@ -121,8 +124,8 @@ class WarningListDiagnosticsMixin(ABC):
         list_type_str = str(list_type) if list_type is not None else "string"
         if self._check_value_in_list(clean_val, vals, list_type_str):
             logger.info("  ✓ VALUE FOUND IN THIS LIST")
-            if list_type == "string":
-                self._log_matched_value(clean_val, vals)
+            if list_type in ("string", "hostname"):
+                self._log_matched_value(clean_val, vals, list_type_str)
         else:
             logger.info("  ✗ Value not in this list")
             if vals:

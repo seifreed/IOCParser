@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import threading
 from collections.abc import Callable
+from contextlib import suppress
 from typing import Protocol, cast
 from uuid import uuid4
 
@@ -135,6 +136,14 @@ class RabbitMQQueueAdapter:
         return channel
 
     def _reset_connection(self) -> None:
+        channel = self._channel
+        if channel is not None:
+            with suppress(Exception):
+                channel.close()
+        connection = self._connection
+        if connection is not None:
+            with suppress(Exception):
+                connection.close()
         self._channel = None
         self._connection = None
 

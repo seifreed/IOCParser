@@ -589,6 +589,7 @@ def test_rabbitmq_adapter_resets_cache_when_publish_fails(monkeypatch: pytest.Mo
     import iocparser.infrastructure.queue_rabbitmq as rabbitmq
 
     connection_calls = [0]
+    closed: list[str] = []
 
     class _Channel:
         def queue_declare(self, *, queue: str, durable: bool) -> object:
@@ -599,11 +600,15 @@ def test_rabbitmq_adapter_resets_cache_when_publish_fails(monkeypatch: pytest.Mo
         def basic_publish(self, **_kwargs: object) -> bool:
             raise RuntimeError("publish failed")
 
+        def close(self) -> None:
+            closed.append("channel")
+
     class _Connection:
         def channel(self) -> _Channel:
             return _Channel()
 
         def close(self) -> object:
+            closed.append("connection")
             return None
 
     def _blocking_connection(_params: object) -> _Connection:
@@ -627,12 +632,14 @@ def test_rabbitmq_adapter_resets_cache_when_publish_fails(monkeypatch: pytest.Mo
         adapter.enqueue(queue_name="ingest", envelope=envelope)
     assert adapter._channel is None
     assert adapter._connection is None
+    assert closed == ["channel", "connection"]
 
     with pytest.raises(RuntimeError, match="publish failed"):
         adapter.enqueue(queue_name="ingest", envelope=envelope)
     assert connection_calls == [2]
     assert adapter._channel is None
     assert adapter._connection is None
+    assert closed == ["channel", "connection", "channel", "connection"]
 
 
 def test_streaming_mmap_boundary_and_interruptions(

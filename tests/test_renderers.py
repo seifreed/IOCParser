@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 from textwrap import dedent
 
+import iocparser.domain.enums as enums_module
 from iocparser.adapters.renderers import JSONOutputRenderer, STIXOutputRenderer, TextOutputRenderer
+from iocparser.domain.enums import register_custom_ioc_type
 from iocparser.domain.models import IOC, ExtractionResult, IOCType, WarningMatch
 from iocparser.domain.results import IOCEvidence
 
@@ -80,6 +82,22 @@ def test_stix_output_renders_cryptocurrency_wallets() -> None:
     assert "[x-cryptocurrency:value = '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa']" in patterns
     # EIP-55 checksum case must be preserved (not lowercased).
     assert "[x-cryptocurrency:value = '0x32Be343B94f860124dC4fEe278FDCBD38C102D88']" in patterns
+
+
+def test_stix_type_filter_includes_custom_types_by_base_type() -> None:
+    """--stix-types urls must keep custom IOC types derived from urls."""
+    name = "renderer_custom_url"
+    enums_module._custom_ioc_types.pop(name, None)
+    try:
+        register_custom_ioc_type(name, base_type="urls")
+        result = ExtractionResult(iocs=(IOC.from_raw(name, "hxxps://example.com/a"),))
+
+        bundle = json.loads(STIXOutputRenderer(allowed_types={IOCType.URL}).render(result))
+        patterns = {item["pattern"] for item in bundle["objects"]}
+
+        assert "[url:value = 'https://example.com/a']" in patterns
+    finally:
+        enums_module._custom_ioc_types.pop(name, None)
 
 
 def test_stix_output_renders_cve_as_vulnerability_sdo() -> None:

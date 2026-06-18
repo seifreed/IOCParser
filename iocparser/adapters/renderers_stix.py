@@ -117,8 +117,6 @@ class STIXOutputRenderer(OutputRenderer):
     def _build_indicator(
         self, ioc_type: IOCType | str, value: str, warning: WarningMatch | None
     ) -> Indicator | Vulnerability | None:
-        if self.allowed_types is not None and ioc_type not in self.allowed_types:
-            return None
         lookup_type = get_custom_ioc_type(ioc_type) if isinstance(ioc_type, str) else None
         base_lookup_type = (
             lookup_type.base_type
@@ -127,6 +125,12 @@ class STIXOutputRenderer(OutputRenderer):
             if isinstance(ioc_type, IOCType)
             else None
         )
+        if (
+            self.allowed_types is not None
+            and ioc_type not in self.allowed_types
+            and base_lookup_type not in self.allowed_types
+        ):
+            return None
         if base_lookup_type == IOCType.CVE:
             return self._build_cve_vulnerability(value, warning)
         # An explicit custom stix_pattern is an override and must win over the

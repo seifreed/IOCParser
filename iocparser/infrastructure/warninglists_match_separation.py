@@ -14,7 +14,6 @@ def extract_ioc_value(ioc: str | dict[str, str]) -> str:
 def get_warnings_for_iocs(
     check_value: Callable[[str, str], tuple[bool, dict[str, str] | None]],
     iocs: dict[str, list[str | dict[str, str]]],
-    email_domain_in_warning_list: Callable[[str], tuple[bool, dict[str, str] | None]] | None = None,
 ) -> dict[str, list[dict[str, str]]]:
     warnings: dict[str, list[dict[str, str]]] = {}
     for ioc_type, ioc_list in iocs.items():
@@ -22,11 +21,6 @@ def get_warnings_for_iocs(
         for ioc in ioc_list:
             value = extract_ioc_value(ioc)
             in_warning_list, warning_info = check_value(value, ioc_type)
-            if not (in_warning_list and warning_info) and ioc_type == "emails":
-                # Mirror separate_iocs_by_warnings: an email whose domain is
-                # warning-listed is itself a warning match.
-                if email_domain_in_warning_list is not None:
-                    in_warning_list, warning_info = email_domain_in_warning_list(value)
             if in_warning_list and warning_info:
                 type_warnings.append(
                     {
@@ -44,7 +38,6 @@ def separate_iocs_by_warnings(
     *,
     get_logger: Callable[[], Logger],
     extract_ioc_value: Callable[[str | dict[str, str]], str],
-    email_domain_in_warning_list: Callable[[str], tuple[bool, dict[str, str] | None]],
     check_value: Callable[[str, str], tuple[bool, dict[str, str] | None]],
     build_warning_entry: Callable[[str, dict[str, str], str | dict[str, str]], dict[str, str]],
     iocs: dict[str, list[str | dict[str, str]]],
@@ -62,12 +55,6 @@ def separate_iocs_by_warnings(
             if in_warning_list and warning_info:
                 warning_list.append(build_warning_entry(value, warning_info, ioc))
                 continue
-            if ioc_type == "emails":
-                domain_match, domain_info = email_domain_in_warning_list(value)
-                if domain_match and domain_info:
-                    current_logger.info("Email IOC has warning-listed domain: %s", value)
-                    warning_list.append(build_warning_entry(value, domain_info, ioc))
-                    continue
             normal_list.append(ioc)
         if normal_list:
             normal_iocs[ioc_type] = normal_list

@@ -1077,6 +1077,25 @@ class TestWarningListsHelperFunctions:
         assert is_warning
         assert info["name"] == "Alexa Top Sites"
 
+    def test_check_value_with_extracted_domain_in_email_lookups(self):
+        """Test check_value when email domain is in string lookups."""
+        warning_lists = make_warning_lists()
+
+        warning_lists.warning_lists = {
+            "domain-block": {
+                "name": "Domain Block",
+                "description": "Domain-scoped blocklist",
+                "type": "string",
+                "matching_attributes": ["domain"],
+                "list": ["example.com"],
+            }
+        }
+        warning_lists._preprocess_lists()
+
+        is_warning, info = warning_lists.check_value("user@example.com", "emails")
+        assert is_warning
+        assert info["name"] == "Domain Block"
+
     def test_check_value_with_hostname_escape_artifact(self):
         """Hostname entries with escaped trailing whitespace should still match."""
         warning_lists = make_warning_lists()

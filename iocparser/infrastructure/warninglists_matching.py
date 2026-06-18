@@ -184,7 +184,7 @@ class WarningListMatchingMixin:
         related_types = [ioc_type]
         if ioc_type == "hosts":
             related_types.append("domains")
-        if ioc_type == "urls":
+        if ioc_type in {"urls", "emails"}:
             related_types.append("domains")
         elif ioc_type == "ips":
             related_types.append("ipv6")
@@ -301,6 +301,8 @@ class WarningListMatchingMixin:
         extracted_domain: str | None = None
         if ioc_type == "urls":
             extracted_domain = self._extract_domain_from_url(clean_value)
+        elif ioc_type == "emails":
+            extracted_domain = self._extract_email_domain(clean_value)
         candidate_list_ids = self._get_candidate_list_ids(ioc_type)
         warning = self._check_string_lookups(
             clean_value_lower, extracted_domain, candidate_list_ids
@@ -385,7 +387,7 @@ class WarningListMatchingMixin:
         self,
         iocs: dict[str, list[str | dict[str, str]]],
     ) -> dict[str, list[dict[str, str]]]:
-        return _get_warnings_for_iocs(self.check_value, iocs, self._email_domain_in_warning_list)
+        return _get_warnings_for_iocs(self.check_value, iocs)
 
     def _build_warning_entry(
         self,
@@ -411,7 +413,6 @@ class WarningListMatchingMixin:
         return _separate_iocs_by_warnings(
             get_logger=self._get_logger,
             extract_ioc_value=extract_ioc_value,
-            email_domain_in_warning_list=self._email_domain_in_warning_list,
             check_value=self.check_value,
             build_warning_entry=self._build_warning_entry,
             iocs=iocs,

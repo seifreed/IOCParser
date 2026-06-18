@@ -151,7 +151,7 @@ class IOCType(StrEnum):
             # emits the key "yara_rules" while the canonical enum value is "yara".
             "yara_rules": cls.YARA,
         }
-        normalized = value.lower()
+        normalized = value.strip().lower()
         if normalized in aliases:
             return aliases[normalized]
         try:

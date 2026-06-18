@@ -26,6 +26,7 @@ def test_source_kind_and_ioc_type_resolve_aliases() -> None:
     assert IOCType.from_name("ipv4") is IOCType.IP
     assert IOCType.from_name("url") is IOCType.URL
     assert IOCType.from_name("email") is IOCType.EMAIL
+    assert IOCType.from_name(" domains ") is IOCType.DOMAIN
 
 
 def test_yara_rules_extraction_key_resolves_to_yara_type() -> None:

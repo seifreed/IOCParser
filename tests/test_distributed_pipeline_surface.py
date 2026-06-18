@@ -824,6 +824,83 @@ def test_queue_factory_and_optional_queue_adapters() -> None:
         create_queue_adapter("unsupported")
 
 
+def test_sqs_dead_letter_does_not_keep_dead_queue_mapping_on_send_failure() -> None:
+    class FakeSQSClient:
+        def __init__(self) -> None:
+            self.deleted: list[tuple[str, str]] = []
+
+        def send_message(self, **kwargs: object) -> dict[str, str]:
+            del kwargs
+            raise RuntimeError("send failed")
+
+        def receive_message(self, **kwargs: object) -> dict[str, object]:
+            del kwargs
+            return {}
+
+        def delete_message(self, *, QueueUrl: str, ReceiptHandle: str) -> None:
+            self.deleted.append((QueueUrl, ReceiptHandle))
+
+    class FakeBoto3:
+        def __init__(self) -> None:
+            self.client_obj = FakeSQSClient()
+
+        def client(self, service_name: str) -> FakeSQSClient:
+            assert service_name == "sqs"
+            return self.client_obj
+
+    envelope = _envelope("dead-failure")
+    with installed_module("boto3", FakeBoto3()):
+        sqs = SQSQueueAdapter(
+            "https://sqs.example/jobs",
+            dead_letter_queue_url="https://sqs.example/jobs-dead",
+        )
+        receipt = QueueReceipt("sqs", "jobs", "rh-1", "msg-1")
+
+        with pytest.raises(RuntimeError, match="send failed"):
+            sqs.dead_letter(receipt, envelope=envelope)
+
+        assert sqs._resolve_queue_url("jobs.dead") == "https://sqs.example/jobs"
+        assert sqs.client.deleted == []
+
+
+def test_sqs_invalid_payload_quarantine_does_not_keep_dead_queue_mapping_on_send_failure() -> None:
+    class FakeSQSClient:
+        def __init__(self) -> None:
+            self.deleted: list[tuple[str, str]] = []
+
+        def send_message(self, **kwargs: object) -> dict[str, str]:
+            del kwargs
+            raise RuntimeError("send failed")
+
+        def receive_message(self, **kwargs: object) -> dict[str, object]:
+            del kwargs
+            return {}
+
+        def delete_message(self, *, QueueUrl: str, ReceiptHandle: str) -> None:
+            self.deleted.append((QueueUrl, ReceiptHandle))
+
+    class FakeBoto3:
+        def __init__(self) -> None:
+            self.client_obj = FakeSQSClient()
+
+        def client(self, service_name: str) -> FakeSQSClient:
+            assert service_name == "sqs"
+            return self.client_obj
+
+    with installed_module("boto3", FakeBoto3()):
+        sqs = SQSQueueAdapter(
+            "https://sqs.example/jobs",
+            dead_letter_queue_url="https://sqs.example/jobs-dead",
+        )
+        receipt = QueueReceipt("sqs", "jobs", "rh-1", "msg-1")
+
+        with pytest.raises(RuntimeError, match="send failed"):
+            sqs._quarantine_invalid_payload(receipt, payload="{}", error=ValueError("bad"))
+
+        assert sqs._resolve_queue_url("jobs.dead") == "https://sqs.example/jobs"
+        assert sqs.client.deleted == []
+
+
 def test_rabbitmq_adapter_serializes_concurrent_access() -> None:
     """The shared RabbitMQ channel must be accessed by one thread at a time.
 

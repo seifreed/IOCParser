@@ -145,8 +145,6 @@ class SQSQueueAdapter:
         self, receipt: QueueReceipt, *, payload: str, error: Exception
     ) -> None:
         if self.dead_letter_queue_url:
-            dead_queue_name = f"{receipt.queue_name}.dead"
-            self._queue_urls[dead_queue_name] = self.dead_letter_queue_url
             self.client.send_message(
                 QueueUrl=self.dead_letter_queue_url,
                 MessageBody=build_invalid_payload_record(
@@ -158,6 +156,8 @@ class SQSQueueAdapter:
             )
         resolved_url = self._resolve_queue_url(receipt.queue_name)
         self.client.delete_message(QueueUrl=resolved_url, ReceiptHandle=receipt.receipt_id)
+        if self.dead_letter_queue_url:
+            self._queue_urls[f"{receipt.queue_name}.dead"] = self.dead_letter_queue_url
 
     def dead_letter(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
         with self._lock:
@@ -165,7 +165,6 @@ class SQSQueueAdapter:
                 raise RuntimeError(MISSING_DEAD_LETTER_QUEUE_ERROR)
             target_queue = self.dead_letter_queue_url
             dead_queue_name = f"{receipt.queue_name}.dead"
-            self._queue_urls[dead_queue_name] = target_queue
             response = self.client.send_message(
                 QueueUrl=target_queue,
                 MessageBody=serialize_queue_record(envelope),
@@ -173,4 +172,5 @@ class SQSQueueAdapter:
             message_id = str(response["MessageId"])
             resolved_url = self._resolve_queue_url(receipt.queue_name)
             self.client.delete_message(QueueUrl=resolved_url, ReceiptHandle=receipt.receipt_id)
+            self._queue_urls[dead_queue_name] = target_queue
             return QueueReceipt("sqs", dead_queue_name, message_id, message_id)

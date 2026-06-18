@@ -77,15 +77,6 @@ def validated_severity_values(values: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(normalized)
 
 
-def _ioc_type_filter_value(value: object) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, tuple):
-        joined = ",".join(str(item) for item in value if str(item).strip())
-        return joined or None
-    return optional_str(value)
-
-
 @dataclass(frozen=True)
 class PersistenceClient:
     """Reusable persistence/query client with a shared query service."""
@@ -157,7 +148,7 @@ class PersistenceClient:
             date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
             source_kind=optional_str(options.get("source_kind")),
             source_value=options.get("source_value"),
-            ioc_type=validated_ioc_type_filters(_ioc_type_filter_value(options.get("ioc_type")))
+            ioc_type=validated_ioc_type_filters(options.get("ioc_type"))
             or None,
             # parse_string_filters accepts a comma-separated string as well as a pre-split
             # tuple; a bare string like severity="high"/tags="foo" otherwise became
@@ -202,7 +193,7 @@ class PersistenceClient:
             date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
             source_kind=optional_str(options.get("source_kind")),
             source_value=options.get("source_value"),
-            ioc_type=validated_ioc_type_filters(_ioc_type_filter_value(options.get("ioc_type")))
+            ioc_type=validated_ioc_type_filters(options.get("ioc_type"))
             or None,
             severity=validated_severity_values(parse_string_filters(options.get("severity"))),
             tags=parse_string_filters(options.get("tags")),

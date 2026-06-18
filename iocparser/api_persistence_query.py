@@ -159,14 +159,6 @@ def optional_str(value: object | None) -> str | None:
     return stripped or None
 
 
-def _ioc_type_filter_value(value: object | None) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, tuple):
-        return ",".join(str(ioc_type).strip() for ioc_type in value if str(ioc_type).strip())
-    return optional_str(value)
-
-
 def bool_option(value: object | None, default: bool = False) -> bool:
     if value is None:
         return default
@@ -204,7 +196,7 @@ def search_input(value: str, options: SearchPersistedIOCOptions) -> SearchPersis
         date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
         source_kind=optional_str(options.get("source_kind")),
         source_value=options.get("source_value"),
-        ioc_type=validated_ioc_type_filters(_ioc_type_filter_value(options.get("ioc_type"))) or None,
+        ioc_type=validated_ioc_type_filters(options.get("ioc_type")) or None,
         severity=validated_severity_filters(options.get("severity")),
         tags=parse_string_filters(options.get("tag")),
         exclude_tags=parse_string_filters(options.get("exclude_tag")),
@@ -260,11 +252,18 @@ def validated_ioc_type_filter(value: str | None) -> str | None:
         raise ValidationError(INVALID_IOC_TYPE_ERROR.format(value=value)) from exc
 
 
-def validated_ioc_type_filters(value: str | None) -> tuple[str, ...]:
+def validated_ioc_type_filters(value: object | None) -> tuple[str, ...]:
     if value is None:
         return ()
     try:
-        normalized = [ioc_type_name(ioc_type) for ioc_type in parse_ioc_types(value)]
+        if isinstance(value, (list, tuple)):
+            normalized = [
+                ioc_type_name(ioc_type)
+                for item in value
+                for ioc_type in parse_ioc_types(str(item))
+            ]
+        else:
+            normalized = [ioc_type_name(ioc_type) for ioc_type in parse_ioc_types(str(value))]
     except ValueError as exc:
         raise ValidationError(INVALID_IOC_TYPE_ERROR.format(value=value)) from exc
     return tuple(dict.fromkeys(normalized))
@@ -362,7 +361,7 @@ def persisted_diff_input(
         only_removed=diff_only == "removed",
         only_warnings=bool_option(options.get("only_warnings")),
         only_normal=bool_option(options.get("only_normal")),
-        ioc_types=validated_ioc_type_filters(_ioc_type_filter_value(options.get("ioc_type"))),
+        ioc_types=validated_ioc_type_filters(options.get("ioc_type")),
         severity=validated_severity_filters(options.get("severity")),
         tags=parse_string_filters(options.get("tag")),
     )
@@ -381,7 +380,7 @@ def latest_source_diff_input(
         only_removed=diff_only == "removed",
         only_warnings=bool_option(options.get("only_warnings")),
         only_normal=bool_option(options.get("only_normal")),
-        ioc_types=validated_ioc_type_filters(_ioc_type_filter_value(options.get("ioc_type"))),
+        ioc_types=validated_ioc_type_filters(options.get("ioc_type")),
         severity=validated_severity_filters(options.get("severity")),
         tags=parse_string_filters(options.get("tag")),
     )
@@ -439,7 +438,7 @@ def coerce_diff_filters(
         only_warnings=bool_option(option_overrides.pop("only_warnings", False)),
         only_normal=bool_option(option_overrides.pop("only_normal", False)),
         diff_only=validated_diff_only(optional_str(option_overrides.pop("diff_only", None))),
-        ioc_type=_ioc_type_filter_value(option_overrides.pop("ioc_type", None)),
+        ioc_type=validated_ioc_type_filters(option_overrides.pop("ioc_type", None)) or None,
     )
 
 

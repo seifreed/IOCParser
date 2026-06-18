@@ -834,10 +834,19 @@ def test_cli_search_normalizes_ioc_type_and_severity() -> None:
     case-sensitive exact SQL comparison, silently returning zero hits.
     """
     from iocparser.api_persistence_query import validated_ioc_type_filter
+    from iocparser.api_persistence_query import validated_ioc_type_filters
     from iocparser.shared_utils import validated_severity_filters
 
     assert validated_ioc_type_filter("ip") == "ips"
     assert validated_ioc_type_filter("domain") == "domains"
+    assert validated_ioc_type_filters(("hashes",)) == (
+        "imphash",
+        "md5",
+        "sha1",
+        "sha256",
+        "sha512",
+        "ssdeep",
+    )
     assert validated_severity_filters("HIGH") == ("high",)
 
 

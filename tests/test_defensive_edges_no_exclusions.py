@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import threading
 from datetime import UTC, datetime
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -13,6 +14,7 @@ from sqlalchemy.orm import Session
 from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
 from iocparser.domain.models import ExtractionOptions, ExtractionResult, PersistOptions, Source
 from iocparser.domain.pipeline import PipelineJobRequest
+from iocparser.errors import ValidationError
 
 
 class _ScalarResult:
@@ -1623,6 +1625,35 @@ def test_pipeline_url_preparation_derives_missing_hash_metadata(tmp_path) -> Non
         url="https://example.com/report",
     )
     assert prepared_without_fingerprint.fingerprint == expected_hash[:16]
+
+
+def test_pipeline_url_preparation_logs_cleanup_failure_on_error(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    from iocparser.domain.pipeline import ResourceLimits
+    from iocparser.pipeline_worker_support import _prepare_url_input
+
+    payload_path = tmp_path / "download.txt"
+    payload_path.write_bytes(b"url payload")
+
+    class Downloader:
+        last_download_metadata = {"input_size": payload_path.stat().st_size}
+
+        def download(self, _url: str) -> str:
+            return str(payload_path)
+
+    def failing_unlink(*_args, **_kwargs):
+        raise OSError("unlink failed")
+
+    monkeypatch.setattr(Path, "unlink", failing_unlink)
+    caplog.clear()
+    with pytest.raises(ValidationError):
+        _prepare_url_input(
+            client=SimpleNamespace(downloader=Downloader()),
+            limits=ResourceLimits(max_input_size_bytes=1),
+            url="https://example.com/report",
+        )
+    assert "Failed to remove temporary URL input after preparation error" in caplog.text
 
 
 def test_worker_config_bool_env_false_value(monkeypatch: pytest.MonkeyPatch) -> None:

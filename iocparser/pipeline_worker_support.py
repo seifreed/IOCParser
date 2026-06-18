@@ -4,7 +4,6 @@ import hashlib
 import logging
 import time
 from collections.abc import Mapping
-from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -287,8 +286,10 @@ def _prepare_url_input(
             metadata=url_metadata,
         )
     except Exception:
-        with suppress(OSError):
+        try:
             Path(temp_file).unlink()
+        except OSError:
+            logger.warning("Failed to remove temporary URL input after preparation error", exc_info=True)
         raise
 
 

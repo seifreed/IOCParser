@@ -676,7 +676,8 @@ def test_pipeline_worker_and_service_preserve_operational_interruptions() -> Non
         poll_interval_seconds=0.0,
         max_messages_per_cycle=1,
     )
-    assert worker_service.concurrency == 1
+    with pytest.raises(ValueError, match="invalid literal for int"):
+        _ = worker_service.concurrency
 
     zero_limits = ResourceLimits(max_workers=0)
     zero_service = SimpleNamespace(limits=zero_limits, process_next=lambda **_k: None)

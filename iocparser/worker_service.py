@@ -81,10 +81,7 @@ class DistributedWorkerService:
     @property
     def concurrency(self) -> int:
         limits = getattr(self.service, "limits", None)
-        try:
-            return max(1, int(getattr(limits, "max_workers", 1)))
-        except (ValueError, TypeError):
-            return 1
+        return max(1, int(getattr(limits, "max_workers", 1)))
 
     def _process_one(self) -> bool:
         return self.service.process_next(queue_name=self.queue_name) is not None

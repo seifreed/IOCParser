@@ -642,6 +642,38 @@ def test_rabbitmq_adapter_resets_cache_when_publish_fails(monkeypatch: pytest.Mo
     assert closed == ["channel", "connection", "channel", "connection"]
 
 
+def test_rabbitmq_channel_for_preserves_channel_error_when_close_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import iocparser.infrastructure.queue_rabbitmq as rabbitmq
+
+    closed: list[str] = []
+
+    class _Connection:
+        def channel(self) -> object:
+            raise RuntimeError("channel failed")
+
+        def close(self) -> object:
+            closed.append("connection")
+            raise RuntimeError("close failed")
+
+    monkeypatch.setattr(
+        rabbitmq,
+        "_pika_module",
+        lambda: SimpleNamespace(
+            URLParameters=lambda url: url,
+            BlockingConnection=lambda _params: _Connection(),
+        ),
+    )
+    adapter = rabbitmq.RabbitMQQueueAdapter("amqp://localhost")
+
+    with pytest.raises(RuntimeError, match="channel failed"):
+        adapter._channel_for()
+    assert closed == ["connection"]
+    assert adapter._connection is None
+    assert adapter._channel is None
+
+
 def test_streaming_mmap_boundary_and_interruptions(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

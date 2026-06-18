@@ -127,7 +127,8 @@ class RabbitMQQueueAdapter:
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception:
-            connection.close()
+            with suppress(Exception):
+                connection.close()
             self._connection = None
             self._channel = None
             raise

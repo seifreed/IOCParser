@@ -418,6 +418,10 @@ def diff_render_result(diff: PersistedRunDiff, diff_only: str) -> ExtractionResu
     )
 
 
+def reject_unused_render_overrides(option_overrides: Mapping[str, object]) -> None:
+    reject_unknown_options(option_overrides, frozenset(), context="render/filter")
+
+
 def export_persisted_run(*, db_uri: str, run_id: int) -> PersistedRunExport:
     return _export_persisted_run(
         ExportPersistedRunInput(run_id=run_id),
@@ -551,6 +555,7 @@ def render_persisted_diff(
 ) -> str:
     render_options = coerce_render_options(render, option_overrides)
     diff_filters = coerce_diff_filters(filters, option_overrides)
+    reject_unused_render_overrides(option_overrides)
     if run_id is not None:
         diff = diff_run_against_previous_source(
             db_uri=db_uri,
@@ -593,6 +598,7 @@ def render_persisted_run(
 ) -> str:
     render_options = coerce_render_options(render, option_overrides)
     export_filters = coerce_export_filters(filters, option_overrides)
+    reject_unused_render_overrides(option_overrides)
     export = export_persisted_run(db_uri=db_uri, run_id=run_id)
     if (
         export_filters.severity is not None

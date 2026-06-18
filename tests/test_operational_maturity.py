@@ -23,7 +23,11 @@ from iocparser.api_persistence import (
     render_persisted_run,
     retain_persisted_history,
 )
-from iocparser.api_persistence_query import PersistedRenderOptions
+from iocparser.api_persistence_query import (
+    PersistedDiffFilters,
+    PersistedExportFilters,
+    PersistedRenderOptions,
+)
 from iocparser.application.contracts import PersistRunInput
 from iocparser.application.use_cases import persist_run
 from iocparser.cli_output import (
@@ -478,6 +482,32 @@ def test_public_query_api_rejects_unknown_keyword_options(tmp_path: Path) -> Non
     with pytest.raises(ValidationError, match="Unknown diff option"):
         diff_persisted_runs(
             db_uri=db_uri, left_run_id=run_id, right_run_id=run_id, diff_onlyy="added"
+        )
+
+    with pytest.raises(ValidationError, match="Unknown render/filter option"):
+        render_persisted_run(
+            db_uri=db_uri,
+            run_id=run_id,
+            render=PersistedRenderOptions(),
+            output_formatt="json",
+        )
+
+    with pytest.raises(ValidationError, match="Unknown render/filter option"):
+        render_persisted_run(
+            db_uri=db_uri,
+            run_id=run_id,
+            filters=PersistedExportFilters(),
+            severityy="high",
+        )
+
+    with pytest.raises(ValidationError, match="Unknown render/filter option"):
+        render_persisted_diff(
+            db_uri=db_uri,
+            left_run_id=run_id,
+            right_run_id=run_id,
+            render=PersistedRenderOptions(),
+            filters=PersistedDiffFilters(),
+            diff_onlyy="added",
         )
 
     # A valid keyword set is unaffected.

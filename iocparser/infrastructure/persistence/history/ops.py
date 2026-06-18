@@ -136,10 +136,8 @@ def _payload_fingerprint(payload: Mapping[str, object]) -> str:
     encoded = json.dumps(filtered_payload, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
-
 def _select_rows(session: Session, model: HistoryModelType) -> list[dict[str, object]]:
     return [_row_dict(row) for row in session.execute(select(model)).scalars().all()]
-
 
 def _archive_id(payload: dict[str, object]) -> str:
     raw_value = payload.get(HISTORY_ARCHIVE_ID_KEY)
@@ -184,7 +182,6 @@ def _has_legacy_archive_collision(session: Session, *, archive_id: str) -> bool:
 def _history_origin_id(session: Session) -> str:
     dialect_name = session.get_bind().dialect.name
     key = quote_identifier(dialect_name, "key")
-    # Constant per-dialect literals (no interpolation) keep this injection-free.
     origin_select = (
         "SELECT value FROM history_metadata WHERE `key` = 'origin_id'"
         if key == "`key`"
@@ -542,6 +539,10 @@ def _import_sources(session: Session, rows: list[dict[str, object]]) -> tuple[in
     source_map: dict[int, int] = {}
     for row in rows:
         typed = typed_row(row)
+        if not all(isinstance(typed.get(key), str) for key in ("kind", "value")) or not all(
+            isinstance(typed.get(key), datetime) for key in ("first_seen", "last_seen")
+        ):
+            continue
         if str(typed.get("kind", "")) == "url":
             typed["original_url"] = typed.get("original_url") or typed.get("value")
             typed["normalized_url"] = _source_identity(typed)[1]
@@ -778,7 +779,6 @@ def _import_run_iocs(
                 },
                 run_id=run_id,
                 ioc_id=ioc_id,
-                # Recompute the derived column; older archives stored a different format.
                 tags_search=build_tags_search(tags_from_json(typed.get("tags_json"))),
             )
         )

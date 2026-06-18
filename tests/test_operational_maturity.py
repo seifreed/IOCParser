@@ -1688,6 +1688,12 @@ def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_pa
     db_uri = f"sqlite:///{tmp_path / 'entry.sqlite'}"
     assert import_history_raw(db_uri, {"sources": "bad"})["sources"] == 0
     assert import_history_raw(db_uri, {"sources": [1]})["sources"] == 0
+    assert import_history_raw(db_uri, {"sources": [{"id": 1, "kind": None, "value": None}]})[
+        "sources"
+    ] == 0
+    assert import_history_raw(db_uri, {"sources": [{"id": 1, "kind": "text", "value": "x"}]})[
+        "sources"
+    ] == 0
     invalid_fk_counts = import_history_raw(
         db_uri,
         {

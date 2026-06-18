@@ -603,6 +603,72 @@ def test_public_persistence_run_ids_reject_non_integer_values(tmp_path: Path) ->
         client.prune_runs(before="2999-01-01", keep_latest="bad")  # type: ignore[arg-type]
 
 
+def test_persistence_client_exposes_remaining_service_methods(tmp_path: Path) -> None:
+    db_uri = f"sqlite:///{tmp_path / 'client-remaining.sqlite'}"
+    service = SQLAlchemyPersistenceService(db_uri)
+    first_run_id, second_run_id = service.persist_multiple_runs(
+        [
+            (
+                "file",
+                "same.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["first.example"]}, {}),
+            ),
+            (
+                "file",
+                "same.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["second.example"]}, {}),
+            ),
+        ],
+        tool_version="5.0.0",
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
+    )
+
+    config = load_config(cli_persist=True, cli_db_uri=db_uri, cli_config_path=None)
+    client = PersistenceClient(db_uri)
+
+    assert len(client.list_runs(limit=10)) == 2
+    assert client.query_runs_page(limit=1).total == 2
+    assert client.search_iocs_page(value="first", limit=10).total == 1
+    assert client.diff_run_against_previous_source(run_id=second_run_id).added.total_count() == 1
+    assert client.delete_run(run_id=first_run_id) is True
+    assert client.delete_run(run_id=first_run_id) is False
+    client.compact_history()
+
+    report = {
+        "items": [
+            {
+                "url": "https://batch.example/path",
+                "status": "failed",
+                "error": "timeout",
+                "error_type": "IOCTimeoutError",
+                "retry_attempt": 1,
+            }
+        ],
+        "run_metadata_map": {
+            "https://batch.example/path": {"status": "failed", "failed_items": 1}
+        },
+    }
+    failed_run_ids = persist_failed_batch_items(
+        report,
+        config=config,
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
+        source_kind="url",
+    )
+    batch_job_id = persist_batch_job(
+        report,
+        config=config,
+        source_kind="url",
+        run_ids=failed_run_ids,
+        effective_config={"url_workers": 2},
+    )
+    assert batch_job_id is not None
+    assert len(client.list_failed_batch_items(batch_job_id=batch_job_id)) == 1
+
+
 def test_direct_persistence_services_do_not_treat_negative_limits_as_unbounded(
     tmp_path: Path,
 ) -> None:

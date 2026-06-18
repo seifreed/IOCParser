@@ -23,6 +23,7 @@ from iocparser.domain.models import (
     BatchJobSummary,
     DeadLetterRecord,
     DistributedJobRecord,
+    FailedBatchItem,
     PersistedIOCSearchPage,
     PersistedRunDiff,
     PersistedRunExport,
@@ -111,6 +112,28 @@ class PersistenceClient:
             sort_by=query.sort_by,
         )
 
+    def list_runs(self, **options: Unpack[QueryRunsOptions]) -> list[PersistedRunSummary]:
+        return self._typed_service.list_runs(
+            limit=validated_non_negative_int(options.get("limit", 20), field="limit"),
+            offset=validated_non_negative_int(options.get("offset", 0), field="offset"),
+            date_from=validated_iso_datetime(optional_str(options.get("date_from"))),
+            date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
+            source_kind=options.get("source_kind"),
+            source_value=options.get("source_value"),
+            sort_by=validated_run_sort(optional_str(options.get("sort_by")) or "newest"),
+        )
+
+    def query_runs_page(self, **options: Unpack[QueryRunsOptions]) -> PersistedRunsPage:
+        return self._typed_service.query_runs_page(
+            limit=validated_non_negative_int(options.get("limit", 20), field="limit"),
+            offset=validated_non_negative_int(options.get("offset", 0), field="offset"),
+            date_from=validated_iso_datetime(optional_str(options.get("date_from"))),
+            date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
+            source_kind=options.get("source_kind"),
+            source_value=options.get("source_value"),
+            sort_by=validated_run_sort(optional_str(options.get("sort_by")) or "newest"),
+        )
+
     def search_iocs(
         self, *, value: str, **options: Unpack[SearchIOCsOptions]
     ) -> PersistedIOCSearchPage:
@@ -155,6 +178,47 @@ class PersistenceClient:
             search_backend=query.search_backend,
         )
 
+    def search_iocs_page(
+        self, *, value: str, **options: Unpack[SearchIOCsOptions]
+    ) -> PersistedIOCSearchPage:
+        reject_unknown_options(options, _SEARCH_OPTION_KEYS, context="IOC search")
+        query = SearchPersistedIOCsInput(
+            value=value,
+            limit=validated_non_negative_int(options.get("limit", 50), field="limit"),
+            offset=validated_non_negative_int(options.get("offset", 0), field="offset"),
+            date_from=validated_iso_datetime(optional_str(options.get("date_from"))),
+            date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
+            source_kind=options.get("source_kind"),
+            source_value=options.get("source_value"),
+            ioc_type=validated_ioc_type_filter(optional_str(options.get("ioc_type"))),
+            severity=validated_severity_values(parse_string_filters(options.get("severity"))),
+            tags=parse_string_filters(options.get("tags")),
+            exclude_tags=parse_string_filters(options.get("exclude_tags")),
+            min_severity=validated_min_severity(optional_str(options.get("min_severity"))),
+            tag_mode=validated_tag_mode(optional_str(options.get("tag_mode")) or "all"),
+            sort_by=validated_search_sort(optional_str(options.get("sort_by")) or "newest"),
+            search_backend=validated_search_backend(
+                optional_str(options.get("search_backend")) or "auto"
+            ),
+        )
+        return self._typed_service.search_iocs_page(
+            value=query.value,
+            limit=query.limit,
+            offset=query.offset,
+            date_from=query.date_from,
+            date_to=query.date_to,
+            source_kind=query.source_kind,
+            source_value=query.source_value,
+            ioc_type=query.ioc_type,
+            severity=query.severity,
+            tags=query.tags,
+            exclude_tags=query.exclude_tags,
+            min_severity=query.min_severity,
+            tag_mode=query.tag_mode,
+            sort_by=query.sort_by,
+            search_backend=query.search_backend,
+        )
+
     def export_run(self, *, run_id: int) -> PersistedRunExport:
         return self._typed_service.export_run(
             run_id=validated_required_id(run_id, field="run_id")
@@ -171,6 +235,11 @@ class PersistenceClient:
             right_run_id=validated_required_id(right_run_id, field="right_run_id"),
         )
 
+    def diff_run_against_previous_source(self, *, run_id: int) -> PersistedRunDiff:
+        return self._typed_service.diff_run_against_previous_source(
+            run_id=validated_required_id(run_id, field="run_id")
+        )
+
     def export_history(self) -> dict[str, object]:
         return self._typed_service.export_history()
 
@@ -178,6 +247,9 @@ class PersistenceClient:
         if not isinstance(payload, dict):
             raise ValidationError(IMPORT_PAYLOAD_OBJECT_REQUIRED)
         return self._typed_service.import_history(payload)
+
+    def compact_history(self) -> None:
+        self._typed_service.compact_history()
 
     def list_failed_batches(self, *, limit: int = 20) -> list[BatchJobSummary]:
         return self._typed_service.list_failed_batches(
@@ -199,6 +271,11 @@ class PersistenceClient:
 
     def list_batch_runs(self, *, batch_job_id: int) -> list[PersistedRunSummary]:
         return self._typed_service.list_batch_runs(
+            batch_job_id=validated_required_id(batch_job_id, field="batch_job_id")
+        )
+
+    def list_failed_batch_items(self, *, batch_job_id: int) -> list[FailedBatchItem]:
+        return self._typed_service.list_failed_batch_items(
             batch_job_id=validated_required_id(batch_job_id, field="batch_job_id")
         )
 

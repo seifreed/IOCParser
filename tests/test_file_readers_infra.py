@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -7,11 +8,13 @@ import pytest
 
 from iocparser.domain.models import ExtractionOptions
 from iocparser.infrastructure import file_readers as file_readers_module
+from iocparser.infrastructure.file_parser import HTMLParser
 from iocparser.infrastructure.file_readers import (
     MagicTextSourceReader,
     detect_file_type,
     read_text_content,
 )
+from tests.http_server_helpers import LocalHTTPTextServer
 
 
 def test_detect_file_type_falls_back_to_extension_for_missing_file(tmp_path: Path) -> None:
@@ -131,3 +134,23 @@ def test_detect_file_type_prefers_html_extension_for_text_plain_magic(
     reader._magic_local = SimpleNamespace()
 
     assert reader.detect_file_type(sample) == "html"
+
+
+def test_html_parser_keeps_remote_content_when_temp_cleanup_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(tmp_path))
+
+    original_unlink = Path.unlink
+
+    def failing_unlink(self: Path, *args, **kwargs):
+        if self.parent == tmp_path / "iocparser":
+            raise OSError("unlink failed")
+        return original_unlink(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", failing_unlink)
+
+    with LocalHTTPTextServer(b"<html><body>IOC domain: example.com</body></html>") as url:
+        text = HTMLParser(url).extract_text()
+
+    assert "example.com" in text

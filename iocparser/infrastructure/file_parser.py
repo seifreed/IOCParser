@@ -128,18 +128,12 @@ def _local_parse_path(file_path: str) -> Iterator[str]:
         return
 
     temp_path = _download_remote_source(file_path)
-    primary_exc: BaseException | None = None
     try:
         yield str(temp_path)
-    except BaseException as exc:
-        primary_exc = exc
-        raise
     finally:
         try:
             temp_path.unlink(missing_ok=True)
         except OSError:
-            if primary_exc is None:
-                raise
             logger.warning("Failed to remove temporary parse file", exc_info=True)
 
 

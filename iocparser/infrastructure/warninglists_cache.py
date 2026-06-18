@@ -149,6 +149,7 @@ class WarningListCacheMixin:
 
     def _update_warning_lists(self) -> None:
         current_logger = self._get_logger()
+        self.warning_lists = {}
         try:
             current_logger.warning("Updating MISP warning lists from GitHub repository...")
             list_directories = self._fetch_list_directories()

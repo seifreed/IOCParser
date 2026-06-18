@@ -255,6 +255,41 @@ def test_update_warning_lists_falls_back_to_cache_and_handles_bad_cache(tmp_path
     assert warning_lists.warning_lists == {}
 
 
+def test_update_warning_lists_clears_stale_state_when_refresh_fails(tmp_path: Path) -> None:
+    warning_lists = OfflineWarningLists(tmp_path)
+    warning_lists.warning_lists = {
+        "stale": {
+            "name": "Stale",
+            "type": "string",
+            "matching_attributes": ["domain"],
+            "list": ["stale.example"],
+        }
+    }
+
+    class BadJSONServer(ThreadedHTTPServer):
+        path = ""
+
+        def build_handler(self) -> type[BaseHTTPRequestHandler]:
+            class Handler(BaseHTTPRequestHandler):
+                def do_GET(self) -> None:
+                    body = b"not-json"
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+
+                def log_message(self, format: str, *args) -> None:
+                    del format, args
+
+            return Handler
+
+    with BadJSONServer() as base_url, patched_github_bases(base_url):
+        warning_lists._update_warning_lists()
+
+    assert warning_lists.warning_lists == {}
+
+
 def test_preprocess_and_matching_helpers_cover_edge_cases(tmp_path: Path) -> None:
     warning_lists = OfflineWarningLists(tmp_path)
     warning_lists.warning_lists = {

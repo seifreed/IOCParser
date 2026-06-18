@@ -166,9 +166,11 @@ class PersistenceClient:
         return self._typed_service.list_failed_batches(limit=limit)
 
     def list_batch_jobs(
-        self, *, limit: int = 20, statuses: tuple[str, ...] = ()
+        self, *, limit: int = 20, statuses: str | tuple[str, ...] | None = None
     ) -> list[BatchJobSummary]:
-        return self._typed_service.list_batch_jobs(limit=limit, statuses=statuses)
+        return self._typed_service.list_batch_jobs(
+            limit=limit, statuses=parse_string_filters(statuses)
+        )
 
     def get_batch_job(self, *, batch_job_id: int) -> BatchJobDetail | None:
         return self._typed_service.get_batch_job(batch_job_id=batch_job_id)

@@ -628,6 +628,36 @@ def test_direct_persistence_services_do_not_treat_negative_limits_as_unbounded(
     assert distributed.list_dead_letters(limit=-1) == []
 
 
+def test_persistence_client_list_batch_jobs_accepts_string_statuses(tmp_path: Path) -> None:
+    db_uri = f"sqlite:///{tmp_path / 'client-batch-status.sqlite'}"
+    service = SQLAlchemyPersistenceService(db_uri)
+    service.persist_batch_job(
+        source_kind="url",
+        run_ids=(),
+        report={
+            "total": 1,
+            "successful": 0,
+            "failed": 1,
+            "items": [
+                {
+                    "status": "failed",
+                    "url": "https://failed.example",
+                    "error_type": "DownloadError",
+                    "error": "failed",
+                }
+            ],
+        },
+        config={},
+    )
+
+    client = PersistenceClient(db_uri)
+
+    assert client.list_batch_jobs(statuses="success") == []
+    failed_jobs = client.list_batch_jobs(statuses="failed")
+    assert len(failed_jobs) == 1
+    assert failed_jobs[0].status == "failed"
+
+
 def test_like_search_treats_percent_and_underscore_as_literals(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'like-literals.sqlite'}"
     _persist_result(db_uri, source_value="first.txt", ioc_value="alpha%beta.example")

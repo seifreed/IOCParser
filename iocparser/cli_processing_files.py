@@ -322,12 +322,14 @@ def _add_result(
     item_key: str,
     source_value: str,
     result: ExtractionResult,
+    error_message: str | None = None,
 ) -> None:
     results.add(
         item_key=item_key,
         source_value=source_value,
         normal_iocs=result.grouped_iocs(),
         warning_iocs=result.grouped_warnings(),
+        error_message=error_message,
         result=result,
     )
 
@@ -355,6 +357,7 @@ def _process_duplicate_streaming_files(
 ) -> BatchResultsCollection:
     results = BatchResultsCollection()
     for item_key, source_value in batch_item_keys(str(path) for path in file_paths):
+        error_message: str | None = None
         try:
             result = _streaming_result(
                 Path(source_value),
@@ -365,10 +368,17 @@ def _process_duplicate_streaming_files(
             )
         except (KeyboardInterrupt, SystemExit):
             raise
-        except Exception:
+        except Exception as exc:
             logger.exception("Batch streaming failed for %s", source_value)
             result = ExtractionResult()
-        _add_result(results, item_key=item_key, source_value=source_value, result=result)
+            error_message = str(exc)
+        _add_result(
+            results,
+            item_key=item_key,
+            source_value=source_value,
+            result=result,
+            error_message=error_message,
+        )
     return results
 
 
@@ -392,9 +402,18 @@ def _process_parallel_streaming_files(
             options.include_types,
             options.exclude_types,
         )
+        error_message = None
+        if "_errors" in raw_iocs:
+            error_message = "; ".join(str(item) for item in raw_iocs["_errors"])
         if request.check_warnings and warning_service is not None:
             result = warning_service.separate(result.iocs, force_update=request.force_update)
-        _add_result(results, item_key=path, source_value=path, result=result)
+        _add_result(
+            results,
+            item_key=path,
+            source_value=path,
+            result=result,
+            error_message=error_message,
+        )
     return results
 
 
@@ -408,6 +427,7 @@ def _process_duplicate_files(
     results = BatchResultsCollection()
     file_request = _non_streaming_file_request(request)
     for item_key, source_value in batch_item_keys(str(path) for path in file_paths):
+        error_message: str | None = None
         try:
             normal_iocs, warning_iocs = process_file(
                 Path(source_value),
@@ -417,16 +437,19 @@ def _process_duplicate_files(
             )
         except (KeyboardInterrupt, SystemExit):
             raise
-        except (FileExistenceError, FileProcessingError):
+        except (FileExistenceError, FileProcessingError) as exc:
             normal_iocs, warning_iocs = {}, {}
-        except Exception:
+            error_message = str(exc)
+        except Exception as exc:
             logger.exception("Batch processing failed for %s", source_value)
             normal_iocs, warning_iocs = {}, {}
+            error_message = str(exc)
         results.add(
             item_key=item_key,
             source_value=source_value,
             normal_iocs=normal_iocs,
             warning_iocs=warning_iocs,
+            error_message=error_message,
         )
     return results
 
@@ -541,15 +564,23 @@ def process_multiple_files_payload(
                 )
             except (KeyboardInterrupt, SystemExit):
                 raise
-            except (FileExistenceError, FileProcessingError):
+            except (FileExistenceError, FileProcessingError) as exc:
                 results.add(
-                    item_key=item_key, source_value=source_value, normal_iocs={}, warning_iocs={}
+                    item_key=item_key,
+                    source_value=source_value,
+                    normal_iocs={},
+                    warning_iocs={},
+                    error_message=str(exc),
                 )
                 continue
-            except Exception:
+            except Exception as exc:
                 logger.exception("Batch processing failed for %s", source_value)
                 results.add(
-                    item_key=item_key, source_value=source_value, normal_iocs={}, warning_iocs={}
+                    item_key=item_key,
+                    source_value=source_value,
+                    normal_iocs={},
+                    warning_iocs={},
+                    error_message=str(exc),
                 )
                 continue
             results.add(

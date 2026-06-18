@@ -1313,6 +1313,7 @@ def test_duplicate_file_processing_interrupts_and_generic_errors(
     )
     assert results.entries[0].normal_iocs == {}
     assert results.entries[0].warning_iocs == {}
+    assert results.entries[0].error_message == "batch failed"
 
     monkeypatch.setattr(
         files,

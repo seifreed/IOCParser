@@ -845,9 +845,9 @@ class TestHTMLParserURLFetching:
         assert len(extracted_text) > 0
         assert "HTTPS-like Page" in extracted_text
 
-    def test_extract_text_from_url_preserves_cleanup_warning(self, monkeypatch, caplog) -> None:
+    def test_extract_text_from_url_raises_cleanup_error_after_success(self, monkeypatch) -> None:
         """
-        Test URL extraction still succeeds when temporary cleanup fails.
+        Test URL cleanup failure surfaces after successful extraction.
         """
 
         def failing_unlink(*args, **kwargs):
@@ -858,11 +858,8 @@ class TestHTMLParserURLFetching:
         with self._LocalHTTPServer(
             body=b"<html><body><h1>Cleanup Page</h1></body></html>"
         ) as test_url:
-            caplog.clear()
-            extracted_text = HTMLParser(test_url).extract_text()
-
-        assert "Cleanup Page" in extracted_text
-        assert "Failed to remove temporary parse file" in caplog.text
+            with pytest.raises(HTMLProcessingError):
+                HTMLParser(test_url).extract_text()
 
     def test_extract_text_from_url_with_bad_status(self) -> None:
         """

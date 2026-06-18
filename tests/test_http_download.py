@@ -543,6 +543,29 @@ def test_redirect_without_location_is_rejected(monkeypatch) -> None:
         RequestsURLDownloader().download("http://93.184.216.34/start")
 
 
+def test_redirect_without_location_preserves_download_error_when_close_fails(
+    monkeypatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.delenv("IOCPARSER_ALLOW_PRIVATE_URLS", raising=False)
+
+    class _FailingCloseRedirect(_FakeRedirectResponse):
+        def close(self):
+            self.closed = True
+            raise RuntimeError("close failed")
+
+    monkeypatch.setattr(
+        requests.Session,
+        "get",
+        lambda self, url, **_kwargs: _FailingCloseRedirect(
+            is_redirect=True, location=None, url=url
+        ),
+    )
+    caplog.clear()
+    with pytest.raises(DownloadError, match="Location"):
+        RequestsURLDownloader().download("http://93.184.216.34/start")
+    assert "Failed to close redirect response missing Location" in caplog.text
+
+
 def test_redirect_limit_is_enforced(monkeypatch) -> None:
     monkeypatch.delenv("IOCPARSER_ALLOW_PRIVATE_URLS", raising=False)
     monkeypatch.setattr(

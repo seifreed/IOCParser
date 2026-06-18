@@ -458,9 +458,13 @@ class RequestsURLDownloader(URLDownloader):
             )
             if self.allow_redirects and response.is_redirect:
                 location = response.headers.get("Location", "")
-                response.close()
                 if not location:
+                    try:
+                        response.close()
+                    except Exception:
+                        logger.exception("Failed to close redirect response missing Location")
                     raise DownloadError(url, "redirect missing Location header")
+                response.close()
                 current = urljoin(current, location)
                 continue
             return response, str(response.url)

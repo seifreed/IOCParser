@@ -120,6 +120,7 @@ class TestMISPWarningLists:
         assert warning_lists._check_cidr("192.168.1.100", cidr_list)
         assert warning_lists._check_cidr("10.5.5.5", cidr_list)
         assert warning_lists._check_cidr("8.8.8.8", cidr_list)
+        assert warning_lists._check_cidr(" 192.168.1.100 ", cidr_list)
 
         # Should not match
         assert not warning_lists._check_cidr("192.168.2.1", cidr_list)
@@ -140,6 +141,7 @@ class TestMISPWarningLists:
         assert warning_lists._check_value_in_list("google.com", values, "string")
         assert warning_lists._check_value_in_list("GOOGLE.COM", values, "string")
         assert warning_lists._check_value_in_list("Google.Com", values, "string")
+        assert warning_lists._check_value_in_list(" google.com ", values, "string")
 
         # No match
         assert not warning_lists._check_value_in_list("amazon.com", values, "string")
@@ -156,6 +158,7 @@ class TestMISPWarningLists:
         values = ["google.com", "facebook.com"]
         assert warning_lists._check_value_in_list("google.com", values, "hostname")
         assert warning_lists._check_value_in_list("GOOGLE.COM", values, "hostname")
+        assert warning_lists._check_value_in_list(" google.com ", values, "hostname")
         assert warning_lists._check_value_in_list(
             "static-185.132.201.202.andorpac.ad",
             ["static-185.132.201.202.andorpac.ad\\ "],
@@ -200,6 +203,7 @@ class TestMISPWarningLists:
 
         assert warning_lists._check_value_in_list("192.168.1.24", values, "cidr")
         assert warning_lists._check_value_in_list("10.0.0.1", values, "cidr")
+        assert warning_lists._check_value_in_list(" 192.168.1.24 ", values, "cidr")
         assert warning_lists._check_value_in_list("192.168.1.24", [" 192.168.1.0/24 "], "cidr")
         assert not warning_lists._check_value_in_list("172.16.0.1", values, "cidr")
 
@@ -211,6 +215,7 @@ class TestMISPWarningLists:
 
         assert warning_lists._check_string_type("google.com", values)
         assert warning_lists._check_string_type("MICROSOFT.COM", values)
+        assert warning_lists._check_string_type(" google.com ", values)
         assert warning_lists._check_string_type("google.com", [" google.com "])
         assert not warning_lists._check_string_type("amazon.com", values)
 

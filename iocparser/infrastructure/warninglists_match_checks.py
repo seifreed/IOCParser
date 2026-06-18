@@ -9,11 +9,11 @@ from iocparser.infrastructure.warninglists_types import IOCValue, normalized_war
 
 
 def check_string_type(value: str, values: list[IOCValue]) -> bool:
-    return value.lower() in [str(v).strip().lower() for v in values if v is not None]
+    return value.strip().lower() in [str(v).strip().lower() for v in values if v is not None]
 
 
 def check_substring_type(value: str, values: list[IOCValue]) -> bool:
-    value_lower = value.lower()
+    value_lower = value.strip().lower()
     for list_value in values:
         if list_value is None:
             continue
@@ -42,7 +42,7 @@ def check_regex_type(get_logger: Callable[[], Logger], value: str, values: list[
 
 def check_cidr(get_logger: Callable[[], Logger], ip_value: str, cidr_list: list[IOCValue]) -> bool:
     try:
-        ip_obj = ipaddress.ip_address(ip_value)
+        ip_obj = ipaddress.ip_address(ip_value.strip())
         for cidr_value in cidr_list:
             if cidr_value is None:
                 continue
@@ -74,7 +74,7 @@ def check_value_in_list(
         # Preprocessing indexes "hostname" lists with the string lookups, so the
         # diagnostic must match them the same way or it contradicts check_value.
         if list_type == "hostname":
-            return value.lower() in [
+            return value.strip().lower() in [
                 normalized_warning_list_text(v, list_type=list_type) for v in values if v is not None
             ]
         return check_string_type(value, values)

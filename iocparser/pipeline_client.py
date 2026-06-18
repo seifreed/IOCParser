@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from iocparser.api_persistence_query import validated_non_negative_int
 from iocparser.distributed_pipeline import DistributedPipelineService, default_queue_backend
 from iocparser.domain.distributed import DeadLetterRecord, DistributedJobRecord
 from iocparser.domain.pipeline import PipelineJobRequest, PipelineJobResult
@@ -98,7 +99,7 @@ class DistributedPipelineClient:
         queue_backend: str | None = None,
     ) -> list[DistributedJobRecord]:
         return self._service.list_jobs(
-            limit=limit,
+            limit=validated_non_negative_int(limit, field="limit"),
             statuses=statuses,
             queue_backend=queue_backend,
         )
@@ -106,4 +107,6 @@ class DistributedPipelineClient:
     def list_dead_letters(
         self, *, limit: int = 50, queue_backend: str | None = None
     ) -> list[DeadLetterRecord]:
-        return self._service.list_dead_letters(limit=limit, queue_backend=queue_backend)
+        return self._service.list_dead_letters(
+            limit=validated_non_negative_int(limit, field="limit"), queue_backend=queue_backend
+        )

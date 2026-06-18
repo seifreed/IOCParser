@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from iocparser.api_persistence_query import query_service
+from iocparser.api_persistence_query import (
+    query_service,
+    validated_non_negative_days,
+    validated_non_negative_int,
+)
 from iocparser.application.contracts import (
     BatchJobInput,
     DeletePersistedRunInput,
@@ -48,7 +52,7 @@ IMPORT_PAYLOAD_OBJECT_REQUIRED = "history import payload must be a mapping (JSON
 
 def list_failed_batch_jobs(*, db_uri: str, limit: int = 20) -> list[BatchJobSummary]:
     return _list_failed_batch_jobs(
-        ListFailedBatchesInput(limit=limit),
+        ListFailedBatchesInput(limit=validated_non_negative_int(limit, field="limit")),
         persistence_query_service=query_service(db_uri),
     )
 
@@ -57,7 +61,10 @@ def list_batch_jobs(
     *, db_uri: str, limit: int = 20, statuses: str | None = None
 ) -> list[BatchJobSummary]:
     return _list_batch_jobs(
-        ListBatchJobsInput(limit=limit, statuses=parse_string_filters(statuses)),
+        ListBatchJobsInput(
+            limit=validated_non_negative_int(limit, field="limit"),
+            statuses=parse_string_filters(statuses),
+        ),
         persistence_query_service=query_service(db_uri),
     )
 
@@ -126,7 +133,9 @@ def compact_persisted_history(*, db_uri: str) -> None:
 
 def retain_persisted_history(*, db_uri: str, days: int, statuses: str | None = None) -> int:
     return _retain_persisted_history(
-        RetainHistoryInput(days=days, statuses=parse_string_filters(statuses)),
+        RetainHistoryInput(
+            days=validated_non_negative_days(days), statuses=parse_string_filters(statuses)
+        ),
         persistence_query_service=query_service(db_uri),
     )
 

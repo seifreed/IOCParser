@@ -137,6 +137,7 @@ INVALID_SORT_BY_ERROR = "Invalid sort_by: {value}"
 INVALID_SEARCH_BACKEND_ERROR = "Invalid search_backend: {value}"
 INVALID_LIMIT_ERROR = "Invalid limit: {value}"
 INVALID_OFFSET_ERROR = "Invalid offset: {value}"
+INVALID_DAYS_ERROR = "Invalid days: {value}"
 INVALID_BOOLEAN_ERROR = "Invalid boolean option: {value}"
 VALID_TAG_MODES = {"all", "any"}
 VALID_RUN_SORT_VALUES = {"newest", "oldest", "source"}
@@ -297,6 +298,13 @@ def validated_non_negative_int(value: object, *, field: str) -> int:
             raise ValidationError(INVALID_LIMIT_ERROR.format(value=value))
         raise ValidationError(INVALID_OFFSET_ERROR.format(value=value))
     return parsed
+
+
+def validated_non_negative_days(value: object) -> int:
+    try:
+        return validated_non_negative_int(value, field="limit")
+    except ValidationError as exc:
+        raise ValidationError(INVALID_DAYS_ERROR.format(value=value)) from exc
 
 
 def _validated_search_call[T](value: str, call: Callable[[], T]) -> T:
@@ -529,7 +537,7 @@ def list_distributed_jobs(
     queue_backend: str | None = None,
 ) -> list[DistributedJobRecord]:
     return query_service(db_uri).list_distributed_jobs(
-        limit=limit,
+        limit=validated_non_negative_int(limit, field="limit"),
         # Accept a comma-separated string like the sibling list/retain/prune functions;
         # a bare string would otherwise reach SQLAlchemy's .in_() and raise ArgumentError.
         statuses=parse_string_filters(statuses),
@@ -540,7 +548,9 @@ def list_distributed_jobs(
 def list_dead_letters(
     *, db_uri: str, limit: int = 50, queue_backend: str | None = None
 ) -> list[DeadLetterRecord]:
-    return query_service(db_uri).list_dead_letters(limit=limit, queue_backend=queue_backend)
+    return query_service(db_uri).list_dead_letters(
+        limit=validated_non_negative_int(limit, field="limit"), queue_backend=queue_backend
+    )
 
 
 def render_persisted_diff(

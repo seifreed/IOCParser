@@ -544,6 +544,30 @@ def test_persistence_client_search_accepts_string_severity_and_tags(tmp_path: Pa
     assert client.search_iocs(value="alpha", severity=("high",), tags=("c2",)).total == 1
 
 
+def test_public_persistence_limits_reject_non_integer_values(tmp_path: Path) -> None:
+    from iocparser.api_persistence import list_batch_jobs, list_dead_letters
+
+    db_uri = f"sqlite:///{tmp_path / 'bad-limits.sqlite'}"
+    client = PersistenceClient(db_uri)
+
+    for call in (
+        lambda: client.list_failed_batches(limit="bad"),  # type: ignore[arg-type]
+        lambda: client.list_batch_jobs(limit="bad"),  # type: ignore[arg-type]
+        lambda: client.list_distributed_jobs(limit="bad"),  # type: ignore[arg-type]
+        lambda: client.list_dead_letters(limit="bad"),  # type: ignore[arg-type]
+        lambda: list_failed_batch_jobs(db_uri=db_uri, limit="bad"),  # type: ignore[arg-type]
+        lambda: list_batch_jobs(db_uri=db_uri, limit="bad"),  # type: ignore[arg-type]
+        lambda: list_distributed_jobs(db_uri=db_uri, limit="bad"),  # type: ignore[arg-type]
+        lambda: list_dead_letters(db_uri=db_uri, limit="bad"),  # type: ignore[arg-type]
+    ):
+        with pytest.raises(ValidationError, match="Invalid limit"):
+            call()
+    with pytest.raises(ValidationError, match="Invalid days"):
+        client.retain_history(days="bad")  # type: ignore[arg-type]
+    with pytest.raises(ValidationError, match="Invalid days"):
+        retain_persisted_history(db_uri=db_uri, days="bad")  # type: ignore[arg-type]
+
+
 def test_direct_persistence_services_do_not_treat_negative_limits_as_unbounded(
     tmp_path: Path,
 ) -> None:

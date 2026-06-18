@@ -9,6 +9,7 @@ from iocparser.api_persistence_query import (
     validated_ioc_type_filter,
     validated_iso_datetime,
     validated_min_severity,
+    validated_non_negative_days,
     validated_non_negative_int,
     validated_run_sort,
     validated_search_backend,
@@ -168,13 +169,16 @@ class PersistenceClient:
         return self._typed_service.import_history(payload)
 
     def list_failed_batches(self, *, limit: int = 20) -> list[BatchJobSummary]:
-        return self._typed_service.list_failed_batches(limit=limit)
+        return self._typed_service.list_failed_batches(
+            limit=validated_non_negative_int(limit, field="limit")
+        )
 
     def list_batch_jobs(
         self, *, limit: int = 20, statuses: str | tuple[str, ...] | None = None
     ) -> list[BatchJobSummary]:
         return self._typed_service.list_batch_jobs(
-            limit=limit, statuses=parse_string_filters(statuses)
+            limit=validated_non_negative_int(limit, field="limit"),
+            statuses=parse_string_filters(statuses),
         )
 
     def get_batch_job(self, *, batch_job_id: int) -> BatchJobDetail | None:
@@ -185,7 +189,7 @@ class PersistenceClient:
 
     def retain_history(self, *, days: int, statuses: str | None = None) -> int:
         return self._typed_service.retain_history(
-            days=days, statuses=parse_string_filters(statuses)
+            days=validated_non_negative_days(days), statuses=parse_string_filters(statuses)
         )
 
     def get_distributed_job(self, *, job_id: str) -> DistributedJobRecord | None:
@@ -199,7 +203,7 @@ class PersistenceClient:
         queue_backend: str | None = None,
     ) -> list[DistributedJobRecord]:
         return self._typed_service.list_distributed_jobs(
-            limit=limit,
+            limit=validated_non_negative_int(limit, field="limit"),
             # A bare string statuses must parse like the sibling functions, not reach
             # SQLAlchemy's .in_() as a raw string (cryptic ArgumentError).
             statuses=parse_string_filters(statuses),
@@ -209,7 +213,9 @@ class PersistenceClient:
     def list_dead_letters(
         self, *, limit: int = 50, queue_backend: str | None = None
     ) -> list[DeadLetterRecord]:
-        return self._typed_service.list_dead_letters(limit=limit, queue_backend=queue_backend)
+        return self._typed_service.list_dead_letters(
+            limit=validated_non_negative_int(limit, field="limit"), queue_backend=queue_backend
+        )
 
 
 def _parse_string_filters(value: str | None) -> tuple[str, ...]:

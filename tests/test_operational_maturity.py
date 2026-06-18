@@ -2754,6 +2754,8 @@ def test_import_history_keeps_identical_distributed_jobs_from_distinct_payloads_
 
     first_payload = export_persisted_history(db_uri=first_source_db_uri)
     second_payload = export_persisted_history(db_uri=second_source_db_uri)
+    second_payload["distributed_jobs"][0]["job_id"] = " job-1 "
+    second_payload["distributed_jobs"][0]["correlation_id"] = " corr-1 "
 
     assert import_history_raw(target_db_uri, first_payload)["distributed_jobs"] == 1
     assert import_history_raw(target_db_uri, second_payload)["distributed_jobs"] == 1
@@ -2866,6 +2868,8 @@ def test_import_history_normalizes_replayed_dead_letter_identity_fields(
     payload["dead_letter_jobs"][0]["queue_backend"] = " filesystem "
     payload["dead_letter_jobs"][0]["queue_name"] = " default "
     payload["dead_letter_jobs"][0]["source_value"] = " https://same.example/feed "
+    payload["dead_letter_jobs"][0]["job_id"] = " job-1 "
+    payload["dead_letter_jobs"][0]["correlation_id"] = " corr-1 "
     payload["dead_letter_jobs"][0]["error_message"] = " timeout "
 
     assert import_history_raw(target_db_uri, payload)["dead_letter_jobs"] == 1

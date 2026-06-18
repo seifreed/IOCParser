@@ -291,7 +291,6 @@ def _same_origin_archive(session: Session, payload: dict[str, object]) -> bool:
         return False
     return _history_origin_id(session) == raw_origin_id.strip()
 
-
 def _batch_job_signature(row: dict[str, object]) -> tuple[object, ...]:
     return (
         str(row.get("source_kind", "")),
@@ -448,7 +447,7 @@ def _existing_distributed_job(
     same_origin: bool,
 ) -> DistributedJobModel | None:
     original_id = row.get("id")
-    public_job_id = str(row.get("job_id", ""))
+    public_job_id = str(row.get("job_id", "")).strip()
     candidates = (
         session.execute(
             select(DistributedJobModel).where(
@@ -480,10 +479,11 @@ def _existing_dead_letter_job(
     same_origin: bool,
 ) -> DeadLetterJobModel | None:
     original_id = row.get("id")
-    public_job_id = str(row.get("job_id", ""))
+    public_job_id = str(row.get("job_id", "")).strip()
     queue_backend = normalized_queue_backend(str(row.get("queue_backend", "")))
     queue_name = str(row.get("queue_name", "")).strip()
     source_value = str(row.get("source_value", "")).strip()
+    correlation_id = str(row.get("correlation_id", "")).strip()
     error_message = str(row.get("error_message", "")).strip()
     candidates = (
         session.execute(
@@ -495,7 +495,7 @@ def _existing_dead_letter_job(
                     )
                 ),
                 DeadLetterJobModel.dead_lettered_at == row.get("dead_lettered_at"),
-                DeadLetterJobModel.correlation_id == str(row.get("correlation_id", "")),
+                DeadLetterJobModel.correlation_id == correlation_id,
                 DeadLetterJobModel.queue_backend == queue_backend,
                 DeadLetterJobModel.queue_name == queue_name,
                 DeadLetterJobModel.source_value == source_value,
@@ -858,6 +858,7 @@ def _import_distributed_jobs(
             for key in ("correlation_id", "queue_backend", "queue_name", "input_kind", "source_value")
         ) or not isinstance(typed.get("submitted_at"), datetime):
             continue
+        typed["job_id"] = str(typed.get("job_id", "")).strip()
         existing = _existing_distributed_job(
             session, typed, archive_id=archive_id, same_origin=same_origin
         )
@@ -906,9 +907,11 @@ def _import_dead_letter_jobs(
             or not isinstance(typed.get("dead_lettered_at"), datetime)
         ):
             continue
+        typed["job_id"] = str(typed.get("job_id", "")).strip()
         typed["queue_backend"] = normalized_queue_backend(str(typed.get("queue_backend", "")))
         typed["queue_name"] = str(typed.get("queue_name", "")).strip()
         typed["source_value"] = str(typed.get("source_value", "")).strip()
+        typed["correlation_id"] = str(typed.get("correlation_id", "")).strip()
         typed["error_message"] = str(typed.get("error_message", "")).strip()
         if (
             _existing_dead_letter_job(

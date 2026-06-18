@@ -28,9 +28,10 @@ class ThreadPoolFileBatchExecutor(FileBatchExecutor):
         key_for: Callable[[TBatchRequest], str],
     ) -> dict[str, ExtractionResult]:
         results: dict[str, ExtractionResult] = {}
+        request_items = [(request, key_for(request)) for request in requests]
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             future_map = {
-                executor.submit(handler, request): key_for(request) for request in requests
+                executor.submit(handler, request): key for request, key in request_items
             }
             for future in concurrent.futures.as_completed(future_map):
                 source_key = future_map[future]
@@ -46,4 +47,4 @@ class ThreadPoolFileBatchExecutor(FileBatchExecutor):
         # Return results in input order, not thread-completion order, so the downstream
         # merge dedup (which keeps the first-seen raw value for a shared canonical IOC)
         # is deterministic across runs rather than dependent on which worker finished first.
-        return {key: results[key] for request in requests if (key := key_for(request)) in results}
+        return {key: results[key] for _, key in request_items if key in results}

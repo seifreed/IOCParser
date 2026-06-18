@@ -95,3 +95,27 @@ class TestFileBatchExecutorRegression:
         )
 
         assert list(results.keys()) == ["a", "b", "c"]
+
+    def test_key_for_is_only_called_once_per_request(self):
+        """Regression: the return path must not call key_for() a second time."""
+        executor = ThreadPoolFileBatchExecutor(max_workers=1)
+        calls = 0
+
+        def handler(request):
+            return ExtractionResult.from_grouped_payload({"domains": [str(request)]}, {})
+
+        def key_for(request):
+            nonlocal calls
+            calls += 1
+            if calls > 1:
+                raise RuntimeError("key_for called twice")
+            return f"key:{request}"
+
+        results = executor.execute(
+            requests=["item"],
+            handler=handler,
+            key_for=key_for,
+        )
+
+        assert calls == 1
+        assert list(results.keys()) == ["key:item"]

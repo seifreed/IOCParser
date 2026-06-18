@@ -162,6 +162,7 @@ class WarningListCacheMixin:
                 if failed_downloads:
                     self.warning_lists = {}
                     raise
+                current_logger.exception("Could not write warning list cache")
             self._log_failed_downloads(failed_downloads)
             current_logger.info(
                 "Successfully updated %s MISP warning lists", len(self.warning_lists)

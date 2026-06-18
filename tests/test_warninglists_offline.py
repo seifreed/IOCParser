@@ -243,6 +243,55 @@ def test_partial_download_does_not_keep_incomplete_state_when_cache_write_fails(
     assert not warning_lists.cache_metadata_file.exists()
 
 
+def test_full_download_keeps_fresh_state_when_cache_write_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    warning_lists = OfflineWarningLists(tmp_path)
+    warning_lists.cache_file.write_text(
+        json.dumps(
+            {
+                "stale-domains": {
+                    "name": "Stale Domains",
+                    "type": "string",
+                    "matching_attributes": ["domain"],
+                    "list": ["stale.example"],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    warning_lists.cache_metadata_file.write_text(
+        json.dumps({"last_update": 0.0}), encoding="utf-8"
+    )
+
+    def explode(*args: object, **kwargs: object) -> None:
+        del args, kwargs
+        raise OSError("disk full")
+
+    monkeypatch.setattr(warning_lists, "_write_cache", explode)
+
+    payloads: dict[str, tuple[int, object]] = {
+        "good-domains": GOOD_BAD_DOMAIN_PAYLOADS["good-domains"],
+    }
+
+    with (
+        WarningListServer(["good-domains"], payloads) as base_url,
+        patched_github_bases(base_url),
+    ):
+        warning_lists._update_warning_lists()
+
+    assert "good-domains" in warning_lists.warning_lists
+    assert "stale-domains" not in warning_lists.warning_lists
+    assert json.loads(warning_lists.cache_file.read_text(encoding="utf-8")) == {
+        "stale-domains": {
+            "name": "Stale Domains",
+            "type": "string",
+            "matching_attributes": ["domain"],
+            "list": ["stale.example"],
+        }
+    }
+
+
 def test_full_download_stamps_cache_fresh(tmp_path: Path) -> None:
     warning_lists = OfflineWarningLists(tmp_path)
     payloads: dict[str, tuple[int, object]] = {

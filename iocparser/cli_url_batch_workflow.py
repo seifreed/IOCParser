@@ -17,6 +17,7 @@ from iocparser.cli_processing_support import (
     batch_item_keys,
 )
 from iocparser.domain.options import ExtractionOptions
+from iocparser.errors import ValidationError
 from iocparser.interfaces.ports import TextSourceReader, URLDownloader, WarningListService
 
 if TYPE_CHECKING:
@@ -126,7 +127,11 @@ def _collect_url_results(
 ) -> None:
     from iocparser import cli_processing_urls as _support
 
-    max_workers = max(1, get_int_arg(request.args, "url_workers", 4))
+    url_workers_value = getattr(request.args, "url_workers", None)
+    try:
+        max_workers = max(1, get_int_arg(request.args, "url_workers", 4))
+    except (TypeError, ValueError) as exc:
+        raise _invalid_url_workers(url_workers_value) from exc
     retry_error_type = get_optional_str_arg(request.args, "retry_error_type")
     retry_error_contains = get_optional_str_arg(request.args, "retry_error_contains")
     url_occurrences: dict[str, int] = {}
@@ -213,3 +218,7 @@ def _collect_url_results(
             state.source_metadata_map[item_key] = (
                 {**metadata, "input_value": url} if metadata else {"input_value": url}
             )
+
+
+def _invalid_url_workers(url_workers_value: object) -> ValidationError:
+    return ValidationError(f"Invalid url_workers: {url_workers_value}")

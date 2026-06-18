@@ -155,7 +155,7 @@ def _handle_history_maintenance(args: argparse.Namespace, config: AppConfig) -> 
     jobs = uc_list_failed_batch_jobs(
         ListFailedBatchesInput(
             limit=validated_non_negative_int(
-                _cli_args.get_int_arg(args, "batch_limit", 20), field="limit"
+                _cli_args.validated_int_arg(args, "batch_limit", 20), field="limit"
             )
         ),
         persistence_query_service=_query_service_for(config),

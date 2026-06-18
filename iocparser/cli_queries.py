@@ -69,7 +69,9 @@ def _string_filters_attr(args: argparse.Namespace, field_name: str) -> tuple[str
 
 def _validated_limit(args: argparse.Namespace, name: str, default: int, *, field: str) -> int:
     # Reject negatives, matching the programmatic API (the CLI used to clamp to 0).
-    return validated_non_negative_int(_cli_args.get_int_arg(args, name, default), field=field)
+    return validated_non_negative_int(
+        _cli_args.validated_int_arg(args, name, default), field=field
+    )
 
 
 def _diff_run_ids(args: argparse.Namespace) -> tuple[int, int] | None:
@@ -309,7 +311,7 @@ def _handle_prune_runs(args: argparse.Namespace, config: AppConfig) -> bool:
     if prune_before is None:
         return False
     # A negative keep_latest folds to "keep none" downstream (delete every match).
-    keep_latest = _cli_args.get_int_arg(args, "keep_latest", 0)
+    keep_latest = _cli_args.validated_int_arg(args, "keep_latest", 0)
     if keep_latest < 0:
         raise ValidationError(INVALID_KEEP_LATEST_ERROR.format(value=keep_latest))
     deleted_count = query_uc.prune_persisted_runs(

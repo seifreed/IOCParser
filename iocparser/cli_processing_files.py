@@ -13,9 +13,9 @@ from iocparser.application.use_cases import extract_from_files as app_extract_fr
 from iocparser.cli_args import (
     ProcessingOptions,
     get_bool_arg,
-    get_int_arg,
     get_list_arg,
     get_optional_str_arg,
+    validated_int_arg,
 )
 from iocparser.cli_processing_support import (
     BatchInputPayload,
@@ -572,9 +572,9 @@ def process_multiple_files_payload(
                 include_types=options.include_types,
                 exclude_types=options.exclude_types,
                 streaming=get_bool_arg(args, "streaming"),
-                chunk_size=get_int_arg(args, "chunk_size", 1024 * 1024),
-                overlap=get_int_arg(args, "overlap", 1024),
-                max_workers=get_int_arg(args, "parallel", default=1),
+                chunk_size=validated_int_arg(args, "chunk_size", 1024 * 1024),
+                overlap=validated_int_arg(args, "overlap", 1024),
+                max_workers=validated_int_arg(args, "parallel", default=1),
             ),
         )
     merged = merge_batch_results(results)

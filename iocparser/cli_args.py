@@ -19,6 +19,7 @@ from iocparser.cli_args_values import (
     int_value,
     namespace_value,
     parse_string_filters,
+    validated_int_arg,
 )
 from iocparser.domain.type_filters import parse_ioc_types
 
@@ -42,4 +43,5 @@ __all__ = [
     "namespace_value",
     "parse_ioc_types",
     "parse_string_filters",
+    "validated_int_arg",
 ]

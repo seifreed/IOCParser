@@ -309,6 +309,27 @@ def test_cli_negative_keep_latest_is_rejected(monkeypatch: pytest.MonkeyPatch) -
         )
 
 
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"prune_before": "2030-01-01", "keep_latest": []}, "keep_latest requires"),
+        ({"list_batches": True, "batch_limit": "bad"}, "batch_limit requires"),
+    ],
+)
+def test_cli_integer_limits_reject_invalid_types(
+    monkeypatch: pytest.MonkeyPatch,
+    overrides: dict[str, object],
+    message: str,
+) -> None:
+    monkeypatch.setattr(cli_queries, "_query_service_for", lambda _config: StaticQueryService())
+    with pytest.raises(ValidationError, match=message):
+        cli_queries.handle_query_commands(
+            _query_args(**overrides),
+            SimpleNamespace(db_uri="sqlite:///unused"),
+            file_writer=MemoryWriter(),
+        )
+
+
 def test_cli_repeated_prune_statuses_are_forwarded(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, tuple[str, ...]] = {}
 

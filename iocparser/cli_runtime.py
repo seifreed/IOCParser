@@ -4,7 +4,12 @@ import argparse
 import logging
 from pathlib import Path
 
-from iocparser.cli_args import get_bool_arg, get_int_arg, get_list_arg, get_optional_str_arg
+from iocparser.cli_args import (
+    get_bool_arg,
+    get_list_arg,
+    get_optional_str_arg,
+    validated_int_arg,
+)
 from iocparser.cli_runtime_defaults import (
     _apply_boolean_defaults,
     _apply_filter_defaults,
@@ -15,9 +20,7 @@ from iocparser.cli_runtime_defaults import (
     mb_to_bytes,
     resolve_tls_options,
 )
-from iocparser.cli_runtime_defaults import (
-    parse_http_mapping as _parse_http_mapping,
-)
+from iocparser.cli_runtime_defaults import parse_http_mapping as _parse_http_mapping
 from iocparser.config import AppConfig, load_config
 from iocparser.infrastructure.extraction import MagicTextSourceReader, RequestsURLDownloader
 from iocparser.infrastructure.runtime import LocalFileWriter, get_logger, setup_logger
@@ -126,7 +129,7 @@ def downloader_for_args(args: argparse.Namespace) -> RequestsURLDownloader:
         timeout = RequestsURLDownloader.default_timeout()
     return RequestsURLDownloader(
         timeout=timeout,
-        retries=get_int_arg(args, "url_retries", 0),
+        retries=validated_int_arg(args, "url_retries", 0),
         backoff=_optional_float_arg(args, "url_backoff") or 0.0,
         rate_limit_delay=_optional_float_arg(args, "rate_limit") or 0.0,
         headers=headers,

@@ -743,6 +743,36 @@ def test_retry_batch_job_rejects_non_integer_value() -> None:
         )
 
 
+@pytest.mark.parametrize("value", [[], "bad"])
+def test_url_batch_workers_rejects_non_integer_value(tmp_path: Path, value: object) -> None:
+    from iocparser import cli_url_batch_workflow as workflow
+
+    class NoopDownloader:
+        def with_policy(self, **overrides: object) -> NoopDownloader:
+            del overrides
+            return self
+
+        def download(self, url: str) -> str:
+            raise AssertionError(f"download should not be called for {url}")
+
+        def download_metadata(self) -> dict[str, object]:
+            return {}
+
+    url_file = tmp_path / "urls.txt"
+    url_file.write_text("https://workers.example/path\n", encoding="utf-8")
+
+    with pytest.raises(ValidationError, match=r"Invalid url_workers"):
+        workflow.run_url_batch_workflow(
+            workflow.URLBatchWorkflowRequest(
+                args=_args(url_file=str(url_file), url_workers=value),
+                reader=MagicTextSourceReader(),
+                warning_service=None,
+                downloader=NoopDownloader(),
+                db_uri=None,
+            )
+        )
+
+
 def test_source_value_file_filter_preserves_case_sensitive_identity(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'case-sensitive-source-filter.sqlite'}"
     config = load_config(cli_persist=True, cli_db_uri=db_uri, cli_config_path=None)

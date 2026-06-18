@@ -12,7 +12,7 @@ from iocparser.application.use_cases import extract_from_url as app_extract_from
 from iocparser.cli_args import (
     ProcessingOptions,
     get_bool_arg,
-    get_int_arg,
+    validated_int_arg,
 )
 from iocparser.cli_processing_files import FileProcessingRequest
 from iocparser.cli_processing_support import GroupedIocs, GroupedWarnings, SingleInputPayload
@@ -250,8 +250,8 @@ def process_file_payload(
             include_types=context.options.include_types,
             exclude_types=context.options.exclude_types,
             streaming=get_bool_arg(context.args, "streaming"),
-            chunk_size=get_int_arg(context.args, "chunk_size", 1024 * 1024),
-            overlap=get_int_arg(context.args, "overlap", 1024),
+            chunk_size=validated_int_arg(context.args, "chunk_size", 1024 * 1024),
+            overlap=validated_int_arg(context.args, "overlap", 1024),
         ),
     )
     return SingleInputPayload(

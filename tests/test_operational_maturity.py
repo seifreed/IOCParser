@@ -168,6 +168,33 @@ def _persist_result(
         unit_of_work.close()
 
 
+def _persist_result_with_iocs(
+    db_uri: str,
+    *,
+    source_value: str,
+    iocs: tuple[IOC, ...],
+) -> int:
+    unit_of_work = SQLAlchemyUnitOfWork(db_uri)
+    try:
+        persisted = persist_run(
+            PersistRunInput(
+                source=Source.from_raw("file", source_value),
+                result=ExtractionResult(iocs=iocs),
+                tool_version="5.0.0",
+                options=PersistOptions(
+                    defang=False, check_warnings=False, force_update=False, output_format="json"
+                ),
+            ),
+            unit_of_work=unit_of_work,
+        )
+        return persisted.run_id
+    except Exception:
+        unit_of_work.rollback()
+        raise
+    finally:
+        unit_of_work.close()
+
+
 def test_search_page_uses_sql_side_filters_and_indexes(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'search.sqlite'}"
     _persist_result(
@@ -463,6 +490,32 @@ def test_public_query_api_validates_dates_and_min_severity(tmp_path: Path) -> No
     assert alias_diff.added.total_count() == 1
     assert alias_diff.removed.total_count() == 1
     assert client.search_iocs(value="alpha", ioc_type="domain").items[0].value == "alpha.example"
+
+    hash_left = _persist_result_with_iocs(
+        db_uri,
+        source_value="hash-a.txt",
+        iocs=(
+            IOC.from_raw("md5", "d41d8cd98f00b204e9800998ecf8427e"),
+            IOC.from_raw("domains", "hash-a.example"),
+        ),
+    )
+    hash_right = _persist_result_with_iocs(
+        db_uri,
+        source_value="hash-b.txt",
+        iocs=(
+            IOC.from_raw("md5", "5d41402abc4b2a76b9719d911017c592"),
+            IOC.from_raw("domains", "hash-b.example"),
+        ),
+    )
+    hashes_diff = diff_persisted_runs(
+        db_uri=db_uri,
+        left_run_id=hash_left,
+        right_run_id=hash_right,
+        ioc_type="hashes",
+    )
+    assert hashes_diff.added.total_count() == 1
+    assert hashes_diff.removed.total_count() == 1
+    assert {str(ioc_type) for ioc_type in hashes_diff.added.canonical_by_type()} == {"md5"}
 
 
 def test_public_query_api_rejects_unknown_keyword_options(tmp_path: Path) -> None:

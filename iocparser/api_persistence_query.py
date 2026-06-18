@@ -253,12 +253,13 @@ def validated_ioc_type_filter(value: str | None) -> str | None:
 
 
 def validated_ioc_type_filters(value: str | None) -> tuple[str, ...]:
-    normalized: list[str] = []
-    for item in parse_string_filters(value):
-        ioc_type = validated_ioc_type_filter(item)
-        if ioc_type is not None:
-            normalized.append(ioc_type)
-    return tuple(normalized)
+    if value is None:
+        return ()
+    try:
+        normalized = [ioc_type_name(ioc_type) for ioc_type in parse_ioc_types(value)]
+    except ValueError as exc:
+        raise ValidationError(INVALID_IOC_TYPE_ERROR.format(value=value)) from exc
+    return tuple(dict.fromkeys(normalized))
 
 
 def validated_stix_types(value: str | None) -> str | None:

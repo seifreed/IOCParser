@@ -408,7 +408,25 @@ class TestPluginRegistration:
             get_extractor,
             get_postprocessor,
             get_renderer,
+            register_extractor,
+            register_postprocessor,
         )
+
+        class _Extractor:
+            def extract(self, text: str, *, defang: bool = True):
+                del text, defang
+
+        class _PostProcessor:
+            def process(self, result):
+                return result
+
+        register_extractor("trimmed_plugin_lookup", _Extractor)
+        register_postprocessor("trimmed_post_lookup", _PostProcessor)
+
+        assert get_renderer(" json ") is not None
+        assert get_enricher(" misp ") is not None
+        assert get_extractor(" trimmed_plugin_lookup ") is not None
+        assert get_postprocessor(" trimmed_post_lookup ") is not None
 
         with pytest.raises(ValidationError, match="Unknown renderer 'nope'"):
             get_renderer("nope")

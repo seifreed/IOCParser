@@ -28,8 +28,9 @@ UNKNOWN_PLUGIN_ERROR = "Unknown {kind} '{name}'. Available: {available}"
 
 def _resolve_plugin[FactoryT](registry: dict[str, FactoryT], name: str, *, kind: str) -> FactoryT:
     """Look a plugin up by name, raising a clean error (not a bare KeyError) if absent."""
+    normalized = name.strip()
     try:
-        return registry[name.lower()]
+        return registry[normalized.lower()]
     except KeyError as exc:
         available = ", ".join(sorted(registry)) or "(none)"
         raise ValidationError(

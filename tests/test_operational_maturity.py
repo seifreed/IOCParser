@@ -2479,6 +2479,51 @@ def test_import_history_keeps_identical_batch_jobs_from_distinct_payloads_separa
     assert len(imported_jobs) == 2
 
 
+def test_import_history_normalizes_replayed_failed_batch_item_identity_fields(
+    tmp_path: Path,
+) -> None:
+    source_db_uri = f"sqlite:///{tmp_path / 'history-failed-batch-source.sqlite'}"
+    target_db_uri = f"sqlite:///{tmp_path / 'history-failed-batch-target.sqlite'}"
+    config = load_config(True, source_db_uri, None)
+    report = {
+        "total": 2,
+        "successful": 0,
+        "failed": 2,
+        "status": "failed",
+        "duration_ms": 10,
+        "items": [
+            {
+                "url": "https://dup.example",
+                "status": "failed",
+                "error": "boom",
+                "error_type": "TimeoutError",
+                "retry_attempt": 1,
+            },
+            {
+                "url": "https://dup.example",
+                "status": "failed",
+                "error": "boom",
+                "error_type": "TimeoutError",
+                "retry_attempt": 1,
+            },
+        ],
+    }
+    persist_batch_job(report, config=config, source_kind="url", run_ids=(), effective_config={})
+    payload = export_persisted_history(db_uri=source_db_uri)
+    payload["failed_batch_items"][0]["error_type"] = " TimeoutError "
+    payload["failed_batch_items"][0]["error_message"] = " boom "
+
+    assert import_history_raw(target_db_uri, payload)["failed_batch_items"] == 2
+    assert import_history_raw(target_db_uri, payload)["failed_batch_items"] == 0
+    imported_jobs = list_failed_batch_jobs(db_uri=target_db_uri, limit=10)
+    assert len(imported_jobs) == 1
+    assert len(
+        list_failed_batch_items(
+            db_uri=target_db_uri, batch_job_id=imported_jobs[0].batch_job_id
+        )
+    ) == 2
+
+
 def test_import_history_normalizes_replayed_batch_job_identity_fields(
     tmp_path: Path,
 ) -> None:

@@ -290,7 +290,6 @@ def _same_origin_archive(session: Session, payload: dict[str, object]) -> bool:
     if not isinstance(raw_origin_id, str) or not raw_origin_id.strip():
         return False
     return _history_origin_id(session) == raw_origin_id.strip()
-
 def _batch_job_signature(row: dict[str, object]) -> tuple[object, ...]:
     return (
         str(row.get("source_kind", "")),
@@ -521,8 +520,6 @@ def _existing_dead_letter_job(
         if same_origin and marker is None and candidate.job_id == public_job_id:
             return candidate
     return None
-
-
 def _import_sources(session: Session, rows: list[dict[str, object]]) -> tuple[int, dict[int, int]]:
     inserted = 0
     source_map: dict[int, int] = {}
@@ -805,11 +802,13 @@ def _import_failed_batch_items(
         if not isinstance(typed.get("source_value"), str) or not isinstance(typed.get("created_at"), datetime):
             continue
         typed["source_value"] = str(typed.get("source_value", "")).strip()
+        typed["error_type"] = str(typed.get("error_type", "")).strip()
+        typed["error_message"] = str(typed.get("error_message", "")).strip()
         signature = (
             batch_job_id,
             typed["source_value"],
-            str(typed.get("error_type", "")),
-            str(typed.get("error_message", "")),
+            typed["error_type"],
+            typed["error_message"],
             int_from_row(typed.get("retry_attempt"), default=0) or 0,
             typed.get("created_at"),
         )

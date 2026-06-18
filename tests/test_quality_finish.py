@@ -93,6 +93,7 @@ from iocparser.pipeline_worker import (
     _RunRepositoryAdapter,
 )
 from iocparser.pipeline_worker_support import PreparedInput, cleanup_prepared_input, persist_result
+from iocparser.shared_utils import normalize_metadata_values
 from iocparser.worker_config_support import (
     bool_env,
     float_env,
@@ -280,6 +281,11 @@ def test_cli_rendering_metadata_helpers_accept_strings() -> None:
     metadata = {"duration_ms": "4", "processed_items": "5"}
     assert _int_run_metadata_value(metadata, "processed_items", 0) == 5
     assert _optional_int_run_metadata_value(metadata, "duration_ms") == 4
+    assert normalize_metadata_values({"flag": True, "count": 3, "name": "x"}) == {
+        "flag": "True",
+        "count": 3,
+        "name": "x",
+    }
 
 
 def test_cli_and_schema_integer_helpers_raise_validation_errors() -> None:

@@ -362,7 +362,7 @@ def test_worker_service_concurrent_positive_result():
 
 
 def test_worker_service_survives_run_once_exception():
-    """Concurrent loop must survive when run_once itself raises."""
+    """Concurrent loop must surface run_once worker exceptions."""
     svc = _SimpleNamespace(
         process_next=lambda *_args, **_kwargs: None, limits=_SimpleNamespace(max_workers=2)
     )
@@ -371,12 +371,14 @@ def test_worker_service_survives_run_once_exception():
     )
     original_run_once = w.run_once
 
-    def exploding_run_once():
+    def exploding_run_once(*args, **kwargs):
+        del args, kwargs
         original_run_once()
         raise RuntimeError("boom")
 
     w.run_once = exploding_run_once
-    assert w.run_forever(max_cycles=1) == 0
+    with pytest.raises(RuntimeError, match="boom"):
+        w.run_forever(max_cycles=1)
 
 
 def test_worker_service_propagates_keyboard_interrupt_run_once():

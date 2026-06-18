@@ -13,8 +13,6 @@ from iocparser.pipeline_worker import PipelineWorker
 from iocparser.worker_config import WorkerServiceConfig
 
 logger = logging.getLogger(__name__)
-
-
 @dataclass(frozen=True)
 class WorkerServiceRuntime:
     service: DistributedPipelineService
@@ -99,8 +97,7 @@ class DistributedWorkerService:
             raise
         except Exception:
             # Return what was already processed this cycle, not 0. Discarding the count
-            # made run_forever back off as if the queue were empty after a mid-cycle
-            # failure and under-counted the aggregate throughput total.
+            # made run_forever back off as if the queue were empty after a mid-cycle failure.
             logger.exception("Error during worker run_once")
         return processed
 
@@ -126,6 +123,7 @@ class DistributedWorkerService:
         else:
             with ThreadPoolExecutor(max_workers=workers) as executor:
                 while stop_event is None or not stop_event.is_set():
+                    cycle_error: Exception | None = None
                     futures = [
                         executor.submit(self.run_once, stop_event=stop_event)
                         for _ in range(workers)
@@ -136,10 +134,14 @@ class DistributedWorkerService:
                             current += f.result()
                         except (KeyboardInterrupt, SystemExit):
                             raise
-                        except Exception:
+                        except Exception as exc:
                             logger.exception("Worker thread raised an exception")
+                            if cycle_error is None:
+                                cycle_error = exc
                     processed += current
                     cycles += 1
+                    if cycle_error is not None:
+                        raise cycle_error
                     if max_cycles is not None and cycles >= max_cycles:
                         break
                     if current == 0:

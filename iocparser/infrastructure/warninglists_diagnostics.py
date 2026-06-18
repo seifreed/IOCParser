@@ -97,8 +97,8 @@ class WarningListDiagnosticsMixin(ABC):
     def _log_matched_value(self, clean_val: str, vals: list[IOCValue]) -> None:
         """Log which specific entry matched."""
         for val in vals:
-            if str(val).lower() == clean_val.lower():
-                logger.info("    Matched: %s", val)
+            if str(val).strip().lower() == clean_val.lower():
+                logger.info("    Matched: %s", str(val).strip())
                 break
 
     def _log_list_check_result(

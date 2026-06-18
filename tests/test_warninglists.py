@@ -168,6 +168,7 @@ class TestMISPWarningLists:
         assert warning_lists._check_value_in_list("google.com", values, "substring")
         assert warning_lists._check_value_in_list("mail.google.com", values, "substring")
         assert warning_lists._check_value_in_list("virustotal.com", values, "substring")
+        assert warning_lists._check_value_in_list("mail.google.com", [" google "], "substring")
 
         # No match
         assert not warning_lists._check_value_in_list("amazon.com", values, "substring")
@@ -194,6 +195,7 @@ class TestMISPWarningLists:
 
         assert warning_lists._check_value_in_list("192.168.1.24", values, "cidr")
         assert warning_lists._check_value_in_list("10.0.0.1", values, "cidr")
+        assert warning_lists._check_value_in_list("192.168.1.24", [" 192.168.1.0/24 "], "cidr")
         assert not warning_lists._check_value_in_list("172.16.0.1", values, "cidr")
 
     def test_check_string_type(self):
@@ -204,6 +206,7 @@ class TestMISPWarningLists:
 
         assert warning_lists._check_string_type("google.com", values)
         assert warning_lists._check_string_type("MICROSOFT.COM", values)
+        assert warning_lists._check_string_type("google.com", [" google.com "])
         assert not warning_lists._check_string_type("amazon.com", values)
 
     def test_get_logger_falls_back_to_module_logger(self):
@@ -1022,6 +1025,7 @@ class TestWarningListsHelperFunctions:
         assert warning_lists._check_substring_type("malwarebytes.com", values)
         assert warning_lists._check_substring_type("antivirus-software", values)
         assert warning_lists._check_substring_type("trojan-dropper", values)
+        assert warning_lists._check_substring_type("mail.google.com", [" google "])
 
         # Should also match if value contains list item
         assert warning_lists._check_substring_type("malware", values)
@@ -1446,6 +1450,39 @@ class TestWarningListsDiagnostic:
         assert "FINAL RESULT: Value IS in warning list" in log_output
 
         # Cleanup
+        logger.removeHandler(handler)
+
+    def test_diagnose_with_padded_string_entry(self):
+        """Diagnostics should normalize padded string list entries."""
+        import io
+        import logging
+
+        warning_lists = make_warning_lists()
+
+        warning_lists.warning_lists = {
+            "alexa-top": {
+                "name": "Alexa Top Sites",
+                "description": "Top websites",
+                "type": "string",
+                "matching_attributes": ["domain"],
+                "list": [" google.com "],
+            }
+        }
+        warning_lists._preprocess_lists()
+
+        log_capture = io.StringIO()
+        handler = logging.StreamHandler(log_capture)
+        logger = logging.getLogger("iocparser.infrastructure.warninglists")
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+
+        warning_lists.diagnose_value_detection("google.com", "domains")
+
+        log_output = log_capture.getvalue()
+
+        assert "Matched: google.com" in log_output
+        assert "FINAL RESULT: Value IS in warning list" in log_output
+
         logger.removeHandler(handler)
 
     def test_diagnose_with_email_domain_warning(self):

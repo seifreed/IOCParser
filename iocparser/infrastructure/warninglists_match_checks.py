@@ -9,7 +9,7 @@ from iocparser.infrastructure.warninglists_types import IOCValue
 
 
 def check_string_type(value: str, values: list[IOCValue]) -> bool:
-    return value.lower() in [str(v).lower() for v in values if v is not None]
+    return value.lower() in [str(v).strip().lower() for v in values if v is not None]
 
 
 def check_substring_type(value: str, values: list[IOCValue]) -> bool:
@@ -17,8 +17,8 @@ def check_substring_type(value: str, values: list[IOCValue]) -> bool:
     for list_value in values:
         if list_value is None:
             continue
-        list_value_str = str(list_value).lower()
-        if not list_value_str.strip():
+        list_value_str = str(list_value).strip().lower()
+        if not list_value_str:
             continue
         if list_value_str in value_lower:
             return True
@@ -46,7 +46,7 @@ def check_cidr(get_logger: Callable[[], Logger], ip_value: str, cidr_list: list[
         for cidr_value in cidr_list:
             if cidr_value is None:
                 continue
-            cidr_str = str(cidr_value)
+            cidr_str = str(cidr_value).strip()
             try:
                 if "/" in cidr_str:
                     network = ipaddress.ip_network(cidr_str, strict=False)

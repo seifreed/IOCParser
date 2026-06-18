@@ -1145,6 +1145,41 @@ def test_batch_job_persistence_and_failed_batch_listing(tmp_path: Path) -> None:
     )
 
 
+def test_persist_many_results_preserves_batch_error_message(tmp_path: Path, monkeypatch) -> None:
+    from iocparser import cli_output as _cli_output
+    from iocparser.cli_persistence import persist_many_results
+    from iocparser.cli_processing_support import BatchResultsCollection
+    from iocparser.domain.models import PersistOptions
+
+    db_uri = f"sqlite:///{tmp_path / 'persist-many.sqlite'}"
+    config = load_config(True, db_uri, None)
+    results = BatchResultsCollection()
+    results.add(
+        item_key="batch-item:1",
+        source_value="sample.txt",
+        normal_iocs={},
+        warning_iocs={},
+        error_message="batch failed",
+    )
+    captured: dict[str, object] = {}
+
+    def fake_persist_results(request):
+        captured["run_metadata"] = request.run_metadata
+        return 1
+
+    monkeypatch.setattr(_cli_output, "persist_results", fake_persist_results)
+
+    run_ids = persist_many_results(
+        results,
+        config=config,
+        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        source_kind="file",
+    )
+
+    assert run_ids == (1,)
+    assert captured["run_metadata"]["error_message"] == "batch failed"
+
+
 def test_batch_job_persistence_uses_report_status_and_max_retry_attempt(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'batch-status.sqlite'}"
     config = load_config(True, db_uri, None)

@@ -99,7 +99,13 @@ def persist_many_results(
 ) -> tuple[int, ...]:
     normalized = _normalized_run_metadata_map(run_metadata_map)
     run_ids: list[int] = []
-    for item_key, source_path, file_iocs, file_warnings in _batch_result_entries(results):
+    for item_key, source_path, file_iocs, file_warnings, error_message in _batch_result_entries(
+        results
+    ):
+        run_metadata = _batch_run_metadata(normalized, item_key, source_path)
+        if error_message:
+            run_metadata = dict(run_metadata or {})
+            run_metadata["error_message"] = error_message
         run_id = _cli_output.persist_results(
             _persist_results_request(
                 PersistResultsRequestData(
@@ -110,7 +116,7 @@ def persist_many_results(
                     warning_iocs=file_warnings,
                     options=options,
                     source_metadata=_batch_metadata(source_metadata_map, item_key),
-                    run_metadata=_batch_run_metadata(normalized, item_key, source_path),
+                    run_metadata=run_metadata,
                 )
             ),
         )
@@ -160,14 +166,20 @@ def persist_failed_batch_items(
 
 def _batch_result_entries(
     results: BatchResults | dict[str, tuple[GroupedIocs, GroupedWarnings]],
-) -> list[tuple[str, str, GroupedIocs, GroupedWarnings]]:
+) -> list[tuple[str, str, GroupedIocs, GroupedWarnings, str | None]]:
     if isinstance(results, dict):
         return [
-            (item_key, item_key, normal_iocs, warning_iocs)
+            (item_key, item_key, normal_iocs, warning_iocs, None)
             for item_key, (normal_iocs, warning_iocs) in results.items()
         ]
     return [
-        (entry.item_key, entry.source_value, entry.normal_iocs, entry.warning_iocs)
+        (
+            entry.item_key,
+            entry.source_value,
+            entry.normal_iocs,
+            entry.warning_iocs,
+            entry.error_message,
+        )
         for entry in results.entries
     ]
 

@@ -804,6 +804,8 @@ def _import_failed_batch_items(
         batch_job_id = batch_map.get(int_from_row(typed.get("batch_job_id"), default=0) or 0)
         if batch_job_id is None:
             continue
+        if not isinstance(typed.get("source_value"), str) or not isinstance(typed.get("created_at"), datetime):
+            continue
         signature = (
             batch_job_id,
             str(typed.get("source_value", "")),
@@ -882,7 +884,6 @@ def _import_distributed_jobs(
         )
         inserted += 1
     return inserted
-
 
 def _import_dead_letter_jobs(
     session: Session,
@@ -1073,7 +1074,6 @@ def export_history(db_uri: str) -> dict[str, object]:
             HISTORY_ARCHIVE_ID_KEY: archive_id,
             **payload,
         }
-
 
 def import_history(db_uri: str, payload: dict[str, object]) -> dict[str, int]:
     with _managed_session(db_uri) as session:

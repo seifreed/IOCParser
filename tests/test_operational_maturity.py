@@ -1711,6 +1711,12 @@ def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_pa
         "first_seen": timestamp,
         "last_seen": timestamp,
     }
+    valid_batch = {
+        "id": 1,
+        "source_kind": "text",
+        "started_at": timestamp,
+        "finished_at": timestamp,
+    }
     assert (
         import_history_raw(
             db_uri,
@@ -1745,6 +1751,24 @@ def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_pa
                 ],
             },
         )["runs"]
+        == 0
+    )
+    assert (
+        import_history_raw(
+            db_uri,
+            {
+                "batch_jobs": [valid_batch],
+                "failed_batch_items": [
+                    {
+                        "batch_job_id": 1,
+                        "source_value": None,
+                        "error_type": "Timeout",
+                        "error_message": "boom",
+                        "created_at": None,
+                    }
+                ],
+            },
+        )["failed_batch_items"]
         == 0
     )
     invalid_fk_counts = import_history_raw(

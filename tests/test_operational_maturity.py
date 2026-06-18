@@ -1771,6 +1771,26 @@ def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_pa
         )["failed_batch_items"]
         == 0
     )
+    assert (
+        import_history_raw(
+            db_uri,
+            {
+                "distributed_jobs": [
+                    {
+                        "id": 1,
+                        "job_id": None,
+                        "correlation_id": None,
+                        "queue_backend": None,
+                        "queue_name": None,
+                        "input_kind": None,
+                        "source_value": None,
+                        "submitted_at": None,
+                    }
+                ]
+            },
+        )["distributed_jobs"]
+        == 0
+    )
     invalid_fk_counts = import_history_raw(
         db_uri,
         {

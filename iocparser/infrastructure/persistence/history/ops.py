@@ -843,7 +843,6 @@ def _import_failed_batch_items(
         seen_signatures[signature] = seen_count + 1
         inserted += 1
     return inserted
-
 def _import_distributed_jobs(
     session: Session,
     rows: list[dict[str, object]],
@@ -855,6 +854,11 @@ def _import_distributed_jobs(
     inserted = 0
     for row in rows:
         typed = typed_row(row)
+        if not all(
+            isinstance(typed.get(key), str)
+            for key in ("correlation_id", "queue_backend", "queue_name", "input_kind", "source_value")
+        ) or not isinstance(typed.get("submitted_at"), datetime):
+            continue
         existing = _existing_distributed_job(
             session, typed, archive_id=archive_id, same_origin=same_origin
         )
@@ -884,7 +888,6 @@ def _import_distributed_jobs(
         )
         inserted += 1
     return inserted
-
 def _import_dead_letter_jobs(
     session: Session,
     rows: list[dict[str, object]],
@@ -923,7 +926,6 @@ def _import_dead_letter_jobs(
         )
         inserted += 1
     return inserted
-
 def _row_dict(model: HistoryModel) -> dict[str, object]:
     if isinstance(model, SourceModel):
         return {
@@ -1051,7 +1053,6 @@ def _row_dict(model: HistoryModel) -> dict[str, object]:
         "payload_json": _json_without_import_marker(model.payload_json),
         "dead_lettered_at": model.dead_lettered_at.isoformat(),
     }
-
 def export_history(db_uri: str) -> dict[str, object]:
     with _managed_session(db_uri) as session:
         origin_id = _history_origin_id(session)
@@ -1074,7 +1075,6 @@ def export_history(db_uri: str) -> dict[str, object]:
             HISTORY_ARCHIVE_ID_KEY: archive_id,
             **payload,
         }
-
 def import_history(db_uri: str, payload: dict[str, object]) -> dict[str, int]:
     with _managed_session(db_uri) as session:
         same_origin = _same_origin_archive(session, payload)

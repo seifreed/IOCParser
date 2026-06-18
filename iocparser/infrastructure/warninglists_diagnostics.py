@@ -49,13 +49,19 @@ class WarningListDiagnosticsMixin(ABC):
         """Check if list is relevant based on expected lists."""
         if not expected_lists:
             return False
-        name_tokens = {
+        haystack_tokens = {
             token
             for text in (name, description)
             for token in re.split(r"[|\-_ /.]+", text.lower())
             if token
         }
-        return any(expected.lower() in name_tokens for expected in expected_lists)
+        for expected in expected_lists:
+            expected_tokens = {
+                token for token in re.split(r"[|\-_ /.]+", expected.lower()) if token
+            }
+            if expected_tokens and expected_tokens.issubset(haystack_tokens):
+                return True
+        return False
 
     def _is_list_relevant_for_type(
         self,

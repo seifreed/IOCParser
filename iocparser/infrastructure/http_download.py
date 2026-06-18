@@ -7,7 +7,6 @@ import socket
 import time
 import uuid
 from collections.abc import Mapping
-from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
@@ -367,12 +366,16 @@ class RequestsURLDownloader(URLDownloader):
                         break
                     handle.write(chunk)
         except Exception:
-            with suppress(OSError):
+            try:
                 temp_file.unlink(missing_ok=True)
+            except OSError:
+                logger.warning("Failed to remove partial download after write error", exc_info=True)
             raise
         if exceeded_size_limit:
-            with suppress(OSError):
+            try:
                 temp_file.unlink(missing_ok=True)
+            except OSError:
+                logger.warning("Failed to remove oversized download", exc_info=True)
             raise DownloadSizeError(max_size / 1024 / 1024)
         return downloaded_size
 

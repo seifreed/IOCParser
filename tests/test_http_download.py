@@ -225,7 +225,7 @@ def test_download_with_size_check_removes_partial_file_on_write_error(
 
 
 def test_download_with_size_check_preserves_original_error_when_cleanup_fails(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     output_file = tmp_path / "partial.bin"
     original_open = Path.open
@@ -260,8 +260,26 @@ def test_download_with_size_check_preserves_original_error_when_cleanup_fails(
     monkeypatch.setattr(Path, "open", failing_open)
     monkeypatch.setattr(Path, "unlink", failing_unlink)
 
+    caplog.clear()
     with pytest.raises(OSError, match="disk full"):
         download_with_size_check(StaticResponse([b"abc"]), output_file, 10)
+    assert "Failed to remove partial download after write error" in caplog.text
+
+
+def test_download_with_size_check_logs_cleanup_failure_for_oversized_download(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    oversized_file = tmp_path / "oversized.bin"
+
+    def failing_unlink(*_args, **_kwargs):
+        raise OSError("unlink failed")
+
+    monkeypatch.setattr(Path, "unlink", failing_unlink)
+
+    caplog.clear()
+    with pytest.raises(DownloadSizeError):
+        download_with_size_check(StaticResponse([b"1234", b"5678"]), oversized_file, 6)
+    assert "Failed to remove oversized download" in caplog.text
 
 
 def test_requests_url_downloader_downloads_pdf_and_html_files() -> None:

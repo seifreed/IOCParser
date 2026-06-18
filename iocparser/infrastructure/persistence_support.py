@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from urllib.parse import urlsplit, urlunsplit
 
 from sqlalchemy import ClauseElement, Select, delete, func, or_, select
 from sqlalchemy.orm import Session
@@ -107,10 +108,15 @@ def _url_filter_variants(value: str) -> tuple[str, ...]:
     if normalized is None:
         return ()
     variants.append(normalized)
-    if normalized.endswith("/") and normalized.count("/") > 2:
-        variants.append(normalized.rstrip("/"))
-    elif not normalized.endswith("/"):
-        variants.append(f"{normalized}/")
+    parsed = urlsplit(normalized)
+    if parsed.path.endswith("/") and parsed.path != "/":
+        variants.append(urlunsplit(parsed._replace(path=parsed.path.rstrip("/"))))
+    elif parsed.path == "/":
+        variants.append(urlunsplit(parsed._replace(path="")))
+    elif parsed.path:
+        variants.append(urlunsplit(parsed._replace(path=f"{parsed.path}/")))
+    else:
+        variants.append(urlunsplit(parsed._replace(path="/")))
     return tuple(dict.fromkeys(variant for variant in variants if variant))
 
 

@@ -1634,10 +1634,11 @@ def test_config_output_format_is_case_insensitive() -> None:
     assert stix_args.stix is True
 
     invalid_args = create_argument_parser().parse_args([])
-    apply_config_defaults(
-        invalid_args, AppConfig(persist=False, db_uri=None, config_path=None, output_format="yaml")
-    )
-    assert not any(getattr(invalid_args, fmt) for fmt in ("json", "jsonl", "csv", "stix"))
+    with pytest.raises(ValidationError, match="output_format"):
+        apply_config_defaults(
+            invalid_args,
+            AppConfig(persist=False, db_uri=None, config_path=None, output_format="yaml"),
+        )
 
 
 def test_cli_numeric_defaults_override_config_when_explicit() -> None:

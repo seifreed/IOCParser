@@ -14,6 +14,7 @@ INVALID_HTTP_MAPPING_ITEM_ERROR = "Invalid HTTP mapping item: {value}"
 INVALID_CHUNK_SIZE = "Invalid chunk_size: {value}"
 INVALID_OVERLAP = "Invalid overlap: {value}"
 INVALID_MAX_INPUT_SIZE_MB = "Invalid max_input_size_mb: {value}"
+INVALID_OUTPUT_FORMAT = "Invalid output_format: {value}"
 TLS_FILE_NOT_FOUND = "{flag} file does not exist: {path}"
 
 
@@ -87,10 +88,13 @@ def _apply_boolean_defaults(args: argparse.Namespace, config: AppConfig) -> None
 def _apply_output_defaults(args: argparse.Namespace, config: AppConfig) -> None:
     # Normalize case/whitespace so an INI/env "output_format = JSON" is honored rather than
     # silently falling back to text; the CLI flags and the valid set are lowercase.
-    output_format = (config.output_format or "").strip().lower()
-    if not any(
-        get_bool_arg(args, name) for name in ("json", "jsonl", "csv", "stix")
-    ) and output_format in {"json", "jsonl", "csv", "stix"}:
+    raw_output_format = config.output_format
+    output_format = (raw_output_format or "").strip().lower()
+    if output_format and output_format not in {"text", "json", "jsonl", "csv", "stix"}:
+        raise ValidationError(INVALID_OUTPUT_FORMAT.format(value=raw_output_format))
+    if not any(get_bool_arg(args, name) for name in ("json", "jsonl", "csv", "stix")) and (
+        output_format in {"json", "jsonl", "csv", "stix"}
+    ):
         setattr(args, output_format, True)
 
 

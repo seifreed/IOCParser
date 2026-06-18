@@ -464,6 +464,30 @@ def test_apply_config_defaults_rejects_invalid_streaming_sizes_from_config(
         apply_config_defaults(args, config)
 
 
+def test_apply_config_defaults_rejects_invalid_output_format_config(tmp_path: Path) -> None:
+    config_path = tmp_path / "iocparser.ini"
+    config_path.write_text("[defaults]\noutput_format = jsno\n", encoding="utf-8")
+    config = load_config(None, None, str(config_path))
+    args = SimpleNamespace(json=False, jsonl=False, csv=False, stix=False)
+
+    with pytest.raises(ValidationError, match="output_format"):
+        apply_config_defaults(args, config)
+
+
+def test_apply_config_defaults_accepts_text_output_format_config(tmp_path: Path) -> None:
+    config_path = tmp_path / "iocparser.ini"
+    config_path.write_text("[defaults]\noutput_format = text\n", encoding="utf-8")
+    config = load_config(None, None, str(config_path))
+    args = SimpleNamespace(json=False, jsonl=False, csv=False, stix=False)
+
+    apply_config_defaults(args, config)
+
+    assert args.json is False
+    assert args.jsonl is False
+    assert args.csv is False
+    assert args.stix is False
+
+
 def test_apply_config_defaults_rejects_invalid_diff_only_config(tmp_path: Path) -> None:
     config_path = tmp_path / "iocparser.ini"
     config_path.write_text("[defaults]\ndiff_only = bogus\n", encoding="utf-8")

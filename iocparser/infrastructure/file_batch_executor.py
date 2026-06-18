@@ -42,7 +42,7 @@ class ThreadPoolFileBatchExecutor(FileBatchExecutor):
                     raise
                 except Exception:
                     logger.exception("Batch processing failed for %s", source_key)
-                    results[source_key] = ExtractionResult()
+                    raise
         # Return results in input order, not thread-completion order, so the downstream
         # merge dedup (which keeps the first-seen raw value for a shared canonical IOC)
         # is deterministic across runs rather than dependent on which worker finished first.

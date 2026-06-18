@@ -1215,7 +1215,7 @@ class TestProcessMultipleFiles:
                     file_path.unlink()
 
     def test_process_multiple_files_with_error(self) -> None:
-        """Test processing multiple files handles errors gracefully."""
+        """Test processing multiple files surfaces validation errors."""
         files = []
         try:
             # Create one valid file
@@ -1228,26 +1228,14 @@ class TestProcessMultipleFiles:
                 f2.write(b"X" * (MAX_FILE_SIZE + 1000))
                 files.append(Path(f2.name))
 
-            results = process_multiple_files(
-                files,
-                file_type="text",
-                defang=False,
-                check_warnings=False,
-                max_workers=2,
-            )
-
-            # Should have results for all files (even failed ones)
-            assert len(results) == 2
-
-            # First file should succeed
-            assert str(files[0]) in results
-            normal_iocs, _ = results[str(files[0])]
-            assert len(normal_iocs) > 0
-
-            # Second file should have empty results due to error
-            assert str(files[1]) in results
-            normal_iocs, _ = results[str(files[1])]
-            assert len(normal_iocs) == 0
+            with pytest.raises(FileSizeError, match="exceeds maximum allowed size"):
+                process_multiple_files(
+                    files,
+                    file_type="text",
+                    defang=False,
+                    check_warnings=False,
+                    max_workers=2,
+                )
 
         finally:
             for file_path in files:

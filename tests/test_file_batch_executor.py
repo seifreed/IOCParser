@@ -6,7 +6,10 @@ Regression tests for file_batch_executor bug fixes
 import logging
 import threading
 
+import pytest
+
 from iocparser.domain.models import ExtractionResult
+from iocparser.errors import SourceNotFoundError, SourceProcessingError
 from iocparser.infrastructure.file_batch_executor import ThreadPoolFileBatchExecutor
 
 
@@ -32,15 +35,43 @@ class TestFileBatchExecutorRegression:
             raise RuntimeError("boom")
 
         with caplog.at_level(logging.ERROR, logger="iocparser.infrastructure.file_batch_executor"):
-            results = executor.execute(
-                requests=["item"],
-                handler=exploding_handler,
-                key_for=lambda _: "key1",
-            )
+            with pytest.raises(RuntimeError, match="boom"):
+                executor.execute(
+                    requests=["item"],
+                    handler=exploding_handler,
+                    key_for=lambda _: "key1",
+                )
 
-        assert results["key1"] == ExtractionResult()
         assert "Batch processing failed" in caplog.text
         assert "RuntimeError: boom" in caplog.text
+
+    def test_known_file_errors_still_yield_empty_results(self):
+        executor = ThreadPoolFileBatchExecutor(max_workers=1)
+
+        def missing_handler(_):
+            raise SourceNotFoundError("missing.txt")
+
+        results = executor.execute(
+            requests=["item"],
+            handler=missing_handler,
+            key_for=lambda _: "key1",
+        )
+
+        assert results["key1"] == ExtractionResult()
+
+    def test_known_processing_errors_still_yield_empty_results(self):
+        executor = ThreadPoolFileBatchExecutor(max_workers=1)
+
+        def broken_handler(_):
+            raise SourceProcessingError("broken.txt", "boom")
+
+        results = executor.execute(
+            requests=["item"],
+            handler=broken_handler,
+            key_for=lambda _: "key1",
+        )
+
+        assert results["key1"] == ExtractionResult()
 
     def test_results_returned_in_input_order_not_completion_order(self):
         """Regression: results must be keyed in input order, not thread-completion order,

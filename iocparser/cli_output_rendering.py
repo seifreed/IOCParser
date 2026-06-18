@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TextIO
@@ -15,7 +14,9 @@ from iocparser.cli_args import (
     get_bool_arg,
     get_optional_str_arg,
     get_output_filename,
+    int_arg_value,
     int_value,
+    namespace_value,
     parse_string_filters,
 )
 from iocparser.cli_args_values import validated_stix_types
@@ -184,8 +185,6 @@ def persist_results_request(request: PersistResultsRequest) -> int | None:
 def filter_result_for_output(
     args: argparse.Namespace, result: ExtractionResult
 ) -> ExtractionResult:
-    namespace: Mapping[str, object] = vars(args)
-    raw_max_evidence = namespace.get("max_evidence")
     severities = validated_severity_filters(get_optional_str_arg(args, "severity"))
     tags = parse_string_filters(get_optional_str_arg(args, "tag"))
     include_normal = not get_bool_arg(args, "only_warnings")
@@ -195,9 +194,16 @@ def filter_result_for_output(
         tags=tags,
         include_normal=include_normal,
         include_warnings=include_warnings,
-        max_evidence=raw_max_evidence if isinstance(raw_max_evidence, int) else None,
+        max_evidence=_optional_int_arg(args, "max_evidence"),
         sort_by=get_optional_str_arg(args, "sort_by") or "type",
     )
+
+
+def _optional_int_arg(args: argparse.Namespace, name: str) -> int | None:
+    raw_value = namespace_value(args, name)
+    if raw_value is None:
+        return None
+    return int_arg_value(raw_value, name)
 
 
 def render_summary(result: ExtractionResult) -> str:

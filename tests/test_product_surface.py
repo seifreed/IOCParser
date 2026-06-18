@@ -1463,6 +1463,8 @@ def test_render_result_supports_summary_and_analyst_filters() -> None:
 
     with pytest.raises(ValidationError, match="Invalid severity"):
         render_result(_args(json=True, severity="critical"), result)
+    with pytest.raises(ValidationError, match="max_evidence"):
+        render_result(_args(json=True, max_evidence=[]), result)  # type: ignore[arg-type]
 
     trimmed = result.filter_analyst_view(max_evidence=0, sort_by="value", severities=("high",))
     assert len(trimmed.iocs) == 1

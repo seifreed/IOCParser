@@ -600,6 +600,25 @@ class TestWarningListsPreprocessing:
         assert "common-contact-emails" in warning_lists.compiled_regex
         assert warning_lists.check_value("security@example.com", "emails")[0]
 
+    def test_preprocess_lists_supports_slash_delimited_regex_flags(self):
+        """Test preprocessing handles slash-delimited regex flags like /.../g."""
+        warning_lists = make_warning_lists()
+
+        warning_lists.warning_lists = {
+            "phone_numbers": {
+                "name": "Phone Numbers",
+                "description": "Regex-delimited phone list",
+                "type": "regex",
+                "matching_attributes": ["phone-number", "whois-registrant-phone"],
+                "list": [r"/((?:\+|00)61)?1900654321/g"],
+            }
+        }
+
+        warning_lists._preprocess_lists()
+
+        assert "phone_numbers" in warning_lists.compiled_regex
+        assert warning_lists.check_value("1900654321", "unknown-type")[0]
+
     def test_scoped_list_with_unmapped_attribute_is_still_checked(self):
         """A scoped list whose matching_attributes map to no known IOC type must
         not be dead — its values should still be checked.

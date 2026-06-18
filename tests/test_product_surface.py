@@ -59,7 +59,12 @@ from iocparser.cli_persistence import (
 from iocparser.cli_processing import process_url_file_input_with_report
 from iocparser.cli_processing_files import merge_batch_results
 from iocparser.cli_processing_support import BatchResultsCollection, batch_item_keys
-from iocparser.cli_processing_urls import _report_item, build_batch_report, public_batch_report
+from iocparser.cli_processing_urls import (
+    _failed_urls_from_report,
+    _report_item,
+    build_batch_report,
+    public_batch_report,
+)
 from iocparser.cli_runtime import (
     _parse_http_mapping,
     apply_config_defaults,
@@ -204,6 +209,17 @@ def test_batch_report_item_parses_retryable_bool_strings() -> None:
     assert invalid["retryable"] is False
     assert invalid_ints["duration_ms"] == 0
     assert invalid_ints["retry_attempt"] == 0
+
+
+def test_retry_report_ignores_non_string_urls(tmp_path: Path) -> None:
+    report_path = tmp_path / "bad-url-report.json"
+    report_path.write_text(
+        json.dumps({"items": [{"url": None, "status": "failed", "error": "timeout"}]}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="No failed URLs found"):
+        _failed_urls_from_report(report_path)
 
 
 class _Writer:

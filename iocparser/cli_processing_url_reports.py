@@ -247,7 +247,8 @@ def build_batch_report(context: BatchReportContext) -> BatchReport:
 
 def _set_batch_item_string(item: BatchItemReport, key: str, value: object) -> bool:
     if key == "url":
-        item["url"] = str(value)
+        if isinstance(value, str):
+            item["url"] = value
         return True
     if key == "status":
         item["status"] = str(value)

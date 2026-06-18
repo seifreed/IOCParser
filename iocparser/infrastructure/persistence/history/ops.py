@@ -66,7 +66,6 @@ def _managed_session(db_uri: str) -> Iterator[Session]:
     finally:
         engine.dispose()
 
-
 @contextmanager
 def _managed_connection(db_uri: str) -> Iterator[Connection]:
     """Create, migrate, and safely dispose a SQLAlchemy engine, yielding a Connection."""
@@ -77,7 +76,6 @@ def _managed_connection(db_uri: str) -> Iterator[Connection]:
             yield connection
     finally:
         engine.dispose()
-
 
 INVALID_HISTORY_ARCHIVE = "invalid history archive"
 AMBIGUOUS_LEGACY_HISTORY_ARCHIVE = "ambiguous legacy history archive"
@@ -606,6 +604,8 @@ def _import_batch_jobs(
             continue
         typed["source_kind"] = normalized_source_filter(str(typed.get("source_kind", "")))
         typed["status"] = str(typed.get("status", "")).strip()
+        typed["error_summary_json"] = _json_without_import_marker(typed.get("error_summary_json", "{}"))
+        typed["metrics_json"] = _json_without_import_marker(typed.get("metrics_json", "{}"))
         original_id = typed.get("id")
         import_marker = {
             "archive_id": archive_id,
@@ -623,8 +623,8 @@ def _import_batch_jobs(
                     BatchJobModel.failed_inputs == int(typed.get("failed_inputs", 0)),  # type: ignore[call-overload]
                     BatchJobModel.retry_attempt == int(typed.get("retry_attempt", 0)),  # type: ignore[call-overload]
                     BatchJobModel.status == typed["status"],
-                    BatchJobModel.error_summary_json == str(typed.get("error_summary_json", "{}")),
-                    BatchJobModel.metrics_json == str(typed.get("metrics_json", "{}")),
+                    BatchJobModel.error_summary_json == typed["error_summary_json"],
+                    BatchJobModel.metrics_json == typed["metrics_json"],
                 )
                 .order_by(BatchJobModel.id.asc())
             )

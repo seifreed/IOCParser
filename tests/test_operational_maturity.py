@@ -2554,6 +2554,8 @@ def test_import_history_normalizes_replayed_batch_job_identity_fields(
     payload = export_persisted_history(db_uri=source_db_uri)
     payload["batch_jobs"][0]["source_kind"] = " URL "
     payload["batch_jobs"][0]["status"] = " failed "
+    payload["batch_jobs"][0]["error_summary_json"] = "{\n  \"TimeoutError\": 1\n}"
+    payload["batch_jobs"][0]["metrics_json"] = "{\n  \"duration_ms\": 10\n}"
 
     assert import_history_raw(target_db_uri, payload)["batch_jobs"] == 1
     assert import_history_raw(target_db_uri, payload)["batch_jobs"] == 0

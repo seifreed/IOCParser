@@ -33,7 +33,10 @@ SEVERITY_ORDER = {
 
 
 def _json_list(raw_value: str) -> list[object]:
-    decoded: object = json.loads(raw_value)
+    try:
+        decoded: object = json.loads(raw_value)
+    except json.JSONDecodeError:
+        return []
     if not isinstance(decoded, list):
         return []
     return list(decoded)

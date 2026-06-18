@@ -757,6 +757,35 @@ def test_distributed_job_create_or_get_surfaces_close_failure(
     assert unit.closed is True
 
 
+def test_distributed_job_get_job_surfaces_close_failure(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import iocparser.infrastructure.persistence_distributed as distributed
+    from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
+    from iocparser.infrastructure.persistence_schema import DistributedJobModel
+
+    db_uri = _fresh_db(tmp_path, "distributed-close.db")
+    engine = create_engine(db_uri, future=True)
+    try:
+        with Session(engine) as session:
+            session.add(DistributedJobModel(**_job_model_kwargs(job_id="job-close")))
+            session.commit()
+    finally:
+        engine.dispose()
+
+    original_close = distributed.SQLAlchemyUnitOfWork.close
+
+    def failing_close(self) -> None:
+        original_close(self)
+        raise RuntimeError("close failed")
+
+    monkeypatch.setattr(distributed.SQLAlchemyUnitOfWork, "close", failing_close)
+    service = SQLAlchemyDistributedJobService(db_uri)
+
+    with pytest.raises(RuntimeError, match="close failed"):
+        service.get_job(job_id="job-close")
+
+
 def test_streaming_mmap_boundary_and_interruptions(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

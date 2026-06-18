@@ -134,7 +134,7 @@ class SQLAlchemyDistributedJobService:
                 raise ValueError(AMBIGUOUS_DISTRIBUTED_JOB_ID)
             return model_record(imported[0])
         finally:
-            unit.close()
+            close_and_log(unit, logger=logger, message="Close failed while reading distributed job")
 
     def find_by_idempotency_key(self, *, idempotency_key: str) -> DistributedJobRecord | None:
         unit = SQLAlchemyUnitOfWork(self.db_uri)
@@ -143,7 +143,9 @@ class SQLAlchemyDistributedJobService:
             model = unit.session.execute(stmt).scalar_one_or_none()
             return model_record(model) if model is not None else None
         finally:
-            unit.close()
+            close_and_log(
+                unit, logger=logger, message="Close failed while reading idempotency key"
+            )
 
     def list_jobs(
         self, *, limit: int = 50, statuses: tuple[str, ...] = (), queue_backend: str | None = None
@@ -154,7 +156,7 @@ class SQLAlchemyDistributedJobService:
             models = list(unit.session.execute(stmt).scalars().all())
             return [model_record(model) for model in models]
         finally:
-            unit.close()
+            close_and_log(unit, logger=logger, message="Close failed while listing distributed jobs")
 
     def mark_running(
         self, *, job_id: str, attempts: int, receipt_id: str
@@ -245,7 +247,9 @@ class SQLAlchemyDistributedJobService:
             unit.commit()
             return model_record(model)
         finally:
-            unit.close()
+            close_and_log(
+                unit, logger=logger, message="Close failed while marking job dead lettered"
+            )
 
     def list_dead_letters(
         self, *, limit: int = 50, queue_backend: str | None = None
@@ -256,7 +260,11 @@ class SQLAlchemyDistributedJobService:
             models = list(unit.session.execute(stmt).scalars().all())
             return [_dead_letter_record(model) for model in models]
         finally:
-            unit.close()
+            close_and_log(
+                unit,
+                logger=logger,
+                message="Close failed while listing distributed dead letters",
+            )
 
     def _transition(
         self,
@@ -307,4 +315,4 @@ class SQLAlchemyDistributedJobService:
             )
             raise
         finally:
-            unit.close()
+            close_and_log(unit, logger=logger, message="Close failed while transitioning distributed job")

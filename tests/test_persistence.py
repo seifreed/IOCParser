@@ -10,6 +10,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from iocparser.api_persistence_history import export_persisted_history
 from iocparser.domain.models import ExtractionResult, PersistOptions
 from iocparser.infrastructure.persistence import (
     IOCModel,
@@ -285,6 +286,29 @@ def test_import_history_trims_replayed_source_kind_identity(tmp_path) -> None:
             }
         ]
     }
+
+    counts = service.import_history(payload)
+
+    checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
+    with Session(checker.engine) as session:
+        sources = session.execute(select(Source)).scalars().all()
+    checker.close()
+
+    assert counts["sources"] == 0
+    assert len(sources) == 1
+
+
+def test_import_history_trims_replayed_non_url_source_value(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-import-source-value.db"
+    service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
+    result = ExtractionResult.from_grouped_payload({"domains": ["example.com"]}, {})
+    service.persist_multiple_runs(
+        [("file", "f.txt", result)],
+        tool_version="5.0.0",
+        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+    )
+    payload = export_persisted_history(db_uri=f"sqlite:///{db_path}")
+    payload["sources"][0]["value"] = " f.txt "
 
     counts = service.import_history(payload)
 

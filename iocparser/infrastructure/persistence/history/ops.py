@@ -232,7 +232,7 @@ def _payload_rows(payload: dict[str, object], key: str) -> list[dict[str, object
 
 def _source_identity(row: dict[str, object]) -> tuple[object, ...]:
     kind = normalized_source_filter(str(row.get("kind", "")))
-    value = str(row.get("value", ""))
+    value = str(row.get("value", "")).strip()
     normalized_url = row.get("normalized_url")
     if kind == "url":
         normalized = normalize_url_value(str(normalized_url)) or normalize_url_value(value) or value
@@ -264,9 +264,10 @@ def _existing_source(session: Session, row: dict[str, object]) -> SourceModel | 
             if candidate_identity == identity:
                 return candidate
         return None
+    value = str(identity[1])
     return session.execute(
         select(SourceModel).where(
-            SourceModel.kind == str(identity[0]), SourceModel.value == str(identity[1])
+            SourceModel.kind == str(identity[0]), SourceModel.value == value
         )
     ).scalar_one_or_none()
 

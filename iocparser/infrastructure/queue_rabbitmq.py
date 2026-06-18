@@ -3,17 +3,18 @@ from __future__ import annotations
 import json
 import threading
 from collections.abc import Callable
-from contextlib import suppress
 from typing import Protocol, cast
 from uuid import uuid4
 
 from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
+from iocparser.infrastructure.logger import get_logger
 from iocparser.infrastructure.queue_records import (
     build_invalid_payload_record,
     import_optional_backend_module,
     load_queue_record,
     serialize_queue_record,
 )
+from iocparser.shared_utils import close_and_log
 
 
 class _RabbitMQMethodFrame(Protocol):
@@ -62,6 +63,9 @@ class _PikaModule(Protocol):
     URLParameters: Callable[[str], object]
     BlockingConnection: Callable[[object], _RabbitMQConnection]
     BasicProperties: _BasicPropertiesFactory
+
+
+logger = get_logger(__name__)
 
 
 def _pika_module() -> _PikaModule:
@@ -127,8 +131,7 @@ class RabbitMQQueueAdapter:
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception:
-            with suppress(Exception):
-                connection.close()
+            close_and_log(connection, logger=logger, message="Close failed while opening RabbitMQ channel")
             self._connection = None
             self._channel = None
             raise
@@ -139,12 +142,14 @@ class RabbitMQQueueAdapter:
     def _reset_connection(self) -> None:
         channel = self._channel
         if channel is not None:
-            with suppress(Exception):
-                channel.close()
+            close_and_log(channel, logger=logger, message="Close failed while resetting RabbitMQ channel")
         connection = self._connection
         if connection is not None:
-            with suppress(Exception):
-                connection.close()
+            close_and_log(
+                connection,
+                logger=logger,
+                message="Close failed while resetting RabbitMQ connection",
+            )
         self._channel = None
         self._connection = None
 

@@ -585,7 +585,9 @@ def test_queue_adapters_close_and_preserve_interruptions(monkeypatch: pytest.Mon
     assert closed == [True]
 
 
-def test_rabbitmq_adapter_resets_cache_when_publish_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_rabbitmq_adapter_resets_cache_when_publish_fails(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
     import iocparser.infrastructure.queue_rabbitmq as rabbitmq
 
     connection_calls = [0]
@@ -602,6 +604,7 @@ def test_rabbitmq_adapter_resets_cache_when_publish_fails(monkeypatch: pytest.Mo
 
         def close(self) -> None:
             closed.append("channel")
+            raise RuntimeError("channel close failed")
 
     class _Connection:
         def channel(self) -> _Channel:
@@ -609,7 +612,7 @@ def test_rabbitmq_adapter_resets_cache_when_publish_fails(monkeypatch: pytest.Mo
 
         def close(self) -> object:
             closed.append("connection")
-            return None
+            raise RuntimeError("connection close failed")
 
     def _blocking_connection(_params: object) -> _Connection:
         connection_calls[0] += 1
@@ -628,12 +631,16 @@ def test_rabbitmq_adapter_resets_cache_when_publish_fails(monkeypatch: pytest.Mo
     request = PipelineJobRequest(input_kind="text", source_value="ioc", persist=False)
     envelope = QueueEnvelope(request=request, queue_backend="rabbitmq", queue_name="ingest")
 
+    caplog.clear()
     with pytest.raises(RuntimeError, match="publish failed"):
         adapter.enqueue(queue_name="ingest", envelope=envelope)
     assert adapter._channel is None
     assert adapter._connection is None
     assert closed == ["channel", "connection"]
+    assert "Close failed while resetting RabbitMQ channel" in caplog.text
+    assert "Close failed while resetting RabbitMQ connection" in caplog.text
 
+    caplog.clear()
     with pytest.raises(RuntimeError, match="publish failed"):
         adapter.enqueue(queue_name="ingest", envelope=envelope)
     assert connection_calls == [2]
@@ -643,7 +650,7 @@ def test_rabbitmq_adapter_resets_cache_when_publish_fails(monkeypatch: pytest.Mo
 
 
 def test_rabbitmq_channel_for_preserves_channel_error_when_close_fails(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
 ) -> None:
     import iocparser.infrastructure.queue_rabbitmq as rabbitmq
 
@@ -667,11 +674,13 @@ def test_rabbitmq_channel_for_preserves_channel_error_when_close_fails(
     )
     adapter = rabbitmq.RabbitMQQueueAdapter("amqp://localhost")
 
+    caplog.clear()
     with pytest.raises(RuntimeError, match="channel failed"):
         adapter._channel_for()
     assert closed == ["connection"]
     assert adapter._connection is None
     assert adapter._channel is None
+    assert "Close failed while opening RabbitMQ channel" in caplog.text
 
 
 def test_rabbitmq_close_clears_state_and_surfaces_primary_error(

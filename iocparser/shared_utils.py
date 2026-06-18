@@ -22,7 +22,7 @@ class _RollbackUnit(Protocol):
 
 
 class _CloseUnit(Protocol):
-    def close(self) -> None: ...
+    def close(self) -> object: ...
 
 
 def rollback_and_log(unit: _RollbackUnit, *, logger: logging.Logger, message: str) -> None:

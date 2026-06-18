@@ -260,6 +260,10 @@ class TestMISPWarningLists:
         assert not is_warning
         assert info is None
 
+        is_warning, info = warning_lists.check_value(" google.com ", "domains")
+        assert is_warning
+        assert info["name"] == "Alexa Top 1000"
+
     def test_string_lookup_selection_is_deterministic(self):
         """A value in several string lists must resolve to a stable list.
 

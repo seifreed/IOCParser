@@ -142,7 +142,7 @@ class WarningListPreprocessMixin:
         cached = cache.get(value)
         if cached is not None:
             return cached
-        clean_value = value
+        clean_value = value.strip()
         for old, new in self.DEFANG_CLEANERS:
             clean_value = clean_value.replace(old, new)
         if len(cache) >= 10000:

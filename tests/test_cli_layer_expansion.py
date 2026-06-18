@@ -240,6 +240,28 @@ def test_cli_search_repeated_exclude_tags_are_forwarded(monkeypatch: pytest.Monk
     assert captured["exclude_tags"] == ("benign", "noise", "internal")
 
 
+def test_cli_search_expands_ioc_type_categories(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    class CaptureSearchService:
+        def search_iocs(self, **kwargs: object) -> list[PersistedRunQueryHit]:
+            captured.update(kwargs)
+            return []
+
+    monkeypatch.setattr(cli_queries, "_query_service_for", lambda _config: CaptureSearchService())
+
+    assert (
+        cli_queries.handle_query_commands(
+            _query_args(search_ioc="alpha", ioc_type="hashes"),
+            SimpleNamespace(db_uri="sqlite:///unused"),
+            file_writer=MemoryWriter(),
+        )
+        is True
+    )
+
+    assert captured["ioc_type"] == ("imphash", "md5", "sha1", "sha256", "sha512", "ssdeep")
+
+
 def test_cli_negative_run_limit_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     """Regression: the CLI must reject a negative limit like the programmatic API,
     not silently clamp it to 0 and return an empty result with exit 0."""

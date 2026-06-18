@@ -16,6 +16,7 @@ from iocparser.domain.models import (
     register_custom_ioc_type,
 )
 from iocparser.domain.sources import normalize_url_value
+from iocparser.domain.type_filters import parse_ioc_types
 
 
 def test_source_kind_and_ioc_type_resolve_aliases() -> None:
@@ -55,8 +56,6 @@ def test_hashes_category_filter_selects_whole_hash_family() -> None:
     Regression: "hashes" was aliased to IOCType.SHA256, so --only hashes dropped
     md5/sha1/sha512/ssdeep/imphash and --exclude hashes left them behind.
     """
-    from iocparser.domain.type_filters import parse_ioc_types
-
     expanded = {str(ioc_type) for ioc_type in parse_ioc_types("hashes")}
     assert expanded == {"md5", "sha1", "sha256", "sha512", "ssdeep", "imphash"}
     # Blank segments are skipped; a single category still expands fully.
@@ -82,6 +81,22 @@ def test_hashes_category_filter_selects_whole_hash_family() -> None:
     grouped = only_hashes.grouped_iocs()
     assert set(grouped) == {"md5", "sha256"}
     assert "domains" not in grouped
+
+
+def test_base_type_filter_selects_custom_ioc_types() -> None:
+    """A custom URL-derived IOC should match include/exclude filters for urls."""
+    import iocparser.domain.enums as enums_module
+
+    name = "domain_model_custom_url"
+    enums_module._custom_ioc_types.pop(name, None)
+    try:
+        register_custom_ioc_type(name, base_type="urls")
+        result = ExtractionResult(iocs=(IOC.from_raw(name, "hxxps://example.com/a"),))
+
+        assert result.filter_types(include_types=parse_ioc_types("urls")).total_count() == 1
+        assert result.filter_types(exclude_types=parse_ioc_types("urls")).total_count() == 0
+    finally:
+        enums_module._custom_ioc_types.pop(name, None)
 
 
 def test_grouped_iocs_keeps_case_distinct_urls_but_collapses_domains() -> None:

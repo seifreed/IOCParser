@@ -253,9 +253,11 @@ class ExtractionResult:
 
         def allowed(ioc_type: IOCType | IOCTypeName) -> bool:
             name = ioc_type_name(ioc_type)
-            if include_names and name not in include_names:
+            custom_type = get_custom_ioc_type(ioc_type)
+            base_name = ioc_type_name(custom_type.base_type) if custom_type is not None else name
+            if include_names and name not in include_names and base_name not in include_names:
                 return False
-            return name not in exclude_names
+            return name not in exclude_names and base_name not in exclude_names
 
         return ExtractionResult(
             iocs=tuple(ioc for ioc in self.iocs if allowed(ioc.ioc_type)),

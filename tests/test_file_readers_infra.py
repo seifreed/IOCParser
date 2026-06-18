@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from iocparser.domain.models import ExtractionOptions
+from iocparser.errors import HTMLProcessingError
 from iocparser.infrastructure import file_readers as file_readers_module
 from iocparser.infrastructure.file_parser import HTMLParser
 from iocparser.infrastructure.file_readers import (
@@ -136,7 +137,7 @@ def test_detect_file_type_prefers_html_extension_for_text_plain_magic(
     assert reader.detect_file_type(sample) == "html"
 
 
-def test_html_parser_keeps_remote_content_when_temp_cleanup_fails(
+def test_html_parser_raises_when_temp_cleanup_fails_after_success(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(tempfile, "gettempdir", lambda: str(tmp_path))
@@ -151,6 +152,5 @@ def test_html_parser_keeps_remote_content_when_temp_cleanup_fails(
     monkeypatch.setattr(Path, "unlink", failing_unlink)
 
     with LocalHTTPTextServer(b"<html><body>IOC domain: example.com</body></html>") as url:
-        text = HTMLParser(url).extract_text()
-
-    assert "example.com" in text
+        with pytest.raises(HTMLProcessingError):
+            HTMLParser(url).extract_text()

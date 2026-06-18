@@ -31,7 +31,7 @@ def _load_magic_module(
         return None
     try:
         return import_module("magic")
-    except Exception:
+    except (ImportError, OSError):
         return None
 
 

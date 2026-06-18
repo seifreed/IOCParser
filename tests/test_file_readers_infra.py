@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from iocparser.domain.models import ExtractionOptions
 from iocparser.infrastructure import file_readers as file_readers_module
 from iocparser.infrastructure.file_readers import (
@@ -50,6 +52,14 @@ def test_load_magic_module_handles_import_failure() -> None:
         raise OSError("missing native library")
 
     assert file_readers_module._load_magic_module("linux", raise_import_error) is None
+
+
+def test_load_magic_module_propagates_unexpected_errors() -> None:
+    def raise_runtime_error(_name: str) -> object:
+        raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError, match="boom"):
+        file_readers_module._load_magic_module("linux", raise_runtime_error)
 
 
 def test_load_magic_module_returns_imported_module() -> None:

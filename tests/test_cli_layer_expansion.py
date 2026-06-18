@@ -179,6 +179,7 @@ def _query_args(**overrides: object) -> argparse.Namespace:
         "query_sort": "newest",
         "tag_mode": "all",
         "min_severity": None,
+        "search_backend": "auto",
         "only_warnings": False,
         "only_normal": False,
         "max_evidence": None,
@@ -246,6 +247,29 @@ def test_cli_negative_run_limit_is_rejected(monkeypatch: pytest.MonkeyPatch) -> 
     with pytest.raises(ValidationError, match="limit"):
         cli_queries.handle_query_commands(
             _query_args(list_runs=True, run_limit=-1),
+            SimpleNamespace(db_uri="sqlite:///unused"),
+            file_writer=MemoryWriter(),
+        )
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"list_runs": True, "query_sort": "bogus"}, "sort_by"),
+        ({"search_ioc": "alpha", "min_severity": "critical"}, "min_severity"),
+        ({"search_ioc": "alpha", "tag_mode": "bogus"}, "tag_mode"),
+        ({"search_ioc": "alpha", "search_backend": "bogus"}, "search_backend"),
+    ],
+)
+def test_cli_query_filters_reject_invalid_values(
+    monkeypatch: pytest.MonkeyPatch,
+    overrides: dict[str, object],
+    message: str,
+) -> None:
+    monkeypatch.setattr(cli_queries, "_query_service_for", lambda _config: StaticQueryService())
+    with pytest.raises(ValidationError, match=message):
+        cli_queries.handle_query_commands(
+            _query_args(**overrides),
             SimpleNamespace(db_uri="sqlite:///unused"),
             file_writer=MemoryWriter(),
         )

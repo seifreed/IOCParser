@@ -11,8 +11,14 @@ from iocparser.api_persistence_query import (
     validated_ioc_type_filter,
     validated_ioc_type_filters,
     validated_iso_datetime,
+    validated_min_severity,
     validated_non_negative_int,
+    validated_run_sort,
+    validated_search_backend,
+    validated_search_sort,
+    validated_tag_mode,
 )
+from iocparser.application import query_use_cases as query_uc
 from iocparser.application.contracts import (
     BatchJobInput,
     DeletePersistedRunInput,
@@ -23,36 +29,6 @@ from iocparser.application.contracts import (
     PrunePersistedRunsInput,
     QueryRunsInput,
     SearchPersistedIOCsInput,
-)
-from iocparser.application.query_use_cases import (
-    delete_persisted_run as uc_delete_persisted_run,
-)
-from iocparser.application.query_use_cases import (
-    diff_latest_source_run as uc_diff_latest_source_run,
-)
-from iocparser.application.query_use_cases import (
-    diff_persisted_runs as uc_diff_persisted_runs,
-)
-from iocparser.application.query_use_cases import (
-    export_persisted_run as uc_export_persisted_run,
-)
-from iocparser.application.query_use_cases import (
-    get_batch_job as uc_get_batch_job,
-)
-from iocparser.application.query_use_cases import (
-    list_batch_jobs as uc_list_batch_jobs,
-)
-from iocparser.application.query_use_cases import (
-    list_batch_runs as uc_list_batch_runs,
-)
-from iocparser.application.query_use_cases import (
-    prune_persisted_runs as uc_prune_persisted_runs,
-)
-from iocparser.application.query_use_cases import (
-    query_runs as uc_query_runs,
-)
-from iocparser.application.query_use_cases import (
-    search_persisted_iocs as uc_search_persisted_iocs,
 )
 from iocparser.cli_persistence import query_service_for
 from iocparser.config import AppConfig
@@ -125,7 +101,7 @@ def _emit_query_result(
 def _handle_list_runs(args: argparse.Namespace, config: AppConfig) -> bool:
     if not _cli_args.get_bool_arg(args, "list_runs"):
         return False
-    runs = uc_query_runs(
+    runs = query_uc.query_runs(
         QueryRunsInput(
             limit=_validated_limit(args, "run_limit", 20, field="limit"),
             offset=_validated_limit(args, "offset", 0, field="offset"),
@@ -133,7 +109,9 @@ def _handle_list_runs(args: argparse.Namespace, config: AppConfig) -> bool:
             date_to=_cli_args.get_optional_str_arg(args, "date_to"),
             source_kind=_cli_args.get_optional_str_arg(args, "source_kind"),
             source_value=_cli_args.get_optional_str_arg(args, "source_value"),
-            sort_by=_cli_args.get_optional_str_arg(args, "query_sort") or "newest",
+            sort_by=validated_run_sort(
+                _cli_args.get_optional_str_arg(args, "query_sort") or "newest"
+            ),
         ),
         persistence_query_service=_query_service_for(config),
     )
@@ -161,15 +139,21 @@ def _handle_search_ioc(args: argparse.Namespace, config: AppConfig) -> bool:
         severity=validated_severity_filters(_cli_args.get_optional_str_arg(args, "severity")),
         tags=_string_filters_attr(args, "tag"),
         exclude_tags=_string_filters_attr(args, "exclude_tag"),
-        min_severity=_cli_args.get_optional_str_arg(args, "min_severity"),
-        tag_mode=_cli_args.get_optional_str_arg(args, "tag_mode") or "all",
-        sort_by=_cli_args.get_optional_str_arg(args, "query_sort") or "newest",
-        search_backend=_cli_args.get_optional_str_arg(args, "search_backend") or "auto",
+        min_severity=validated_min_severity(
+            _cli_args.get_optional_str_arg(args, "min_severity")
+        ),
+        tag_mode=validated_tag_mode(_cli_args.get_optional_str_arg(args, "tag_mode") or "all"),
+        sort_by=validated_search_sort(
+            _cli_args.get_optional_str_arg(args, "query_sort") or "newest"
+        ),
+        search_backend=validated_search_backend(
+            _cli_args.get_optional_str_arg(args, "search_backend") or "auto"
+        ),
     )
     # A bad query (e.g. an empty FTS query) raises a bare ValueError; translate it at the
     # CLI boundary so the user sees a clean message, not a stack trace.
     with _missing_run_as_validation():
-        hits = uc_search_persisted_iocs(
+        hits = query_uc.search_persisted_iocs(
             search_input, persistence_query_service=_query_service_for(config)
         )
     _emit_query_result(
@@ -187,7 +171,7 @@ def _handle_diff_runs(
     if current_diff_run_ids is None:
         return False
     with _missing_run_as_validation():
-        diff = uc_diff_persisted_runs(
+        diff = query_uc.diff_persisted_runs(
             DiffPersistedRunsInput(
                 left_run_id=current_diff_run_ids[0],
                 right_run_id=current_diff_run_ids[1],
@@ -214,7 +198,7 @@ def _handle_diff_latest(
     if diff_latest_run_id is None:
         return False
     with _missing_run_as_validation():
-        diff = uc_diff_latest_source_run(
+        diff = query_uc.diff_latest_source_run(
             DiffLatestSourceRunInput(
                 run_id=diff_latest_run_id,
                 only_added=_cli_args.get_optional_str_arg(args, "diff_only") == "added",
@@ -240,7 +224,7 @@ def _handle_export_run(
     if export_run_id is None:
         return False
     with _missing_run_as_validation():
-        export = uc_export_persisted_run(
+        export = query_uc.export_persisted_run(
             ExportPersistedRunInput(
                 run_id=export_run_id,
                 severity=validated_severity_filters(_cli_args.namespace_value(args, "severity")),
@@ -259,7 +243,7 @@ def _handle_export_run(
 def _handle_list_batches(args: argparse.Namespace, config: AppConfig) -> bool:
     if not _cli_args.get_bool_arg(args, "list_batches"):
         return False
-    jobs = uc_list_batch_jobs(
+    jobs = query_uc.list_batch_jobs(
         ListBatchJobsInput(
             limit=_cli_args.get_int_arg(args, "batch_limit", 20),
             statuses=_string_filters_attr(args, "prune_status"),
@@ -278,7 +262,7 @@ def _handle_batch_job_detail(args: argparse.Namespace, config: AppConfig) -> boo
     batch_job_id = _optional_int_attr(args, "batch_job")
     if batch_job_id is None:
         return False
-    detail = uc_get_batch_job(
+    detail = query_uc.get_batch_job(
         BatchJobInput(batch_job_id=batch_job_id),
         persistence_query_service=_query_service_for(config),
     )
@@ -296,7 +280,7 @@ def _handle_batch_runs(args: argparse.Namespace, config: AppConfig) -> bool:
     batch_runs_id = _optional_int_attr(args, "batch_runs")
     if batch_runs_id is None:
         return False
-    runs = uc_list_batch_runs(
+    runs = query_uc.list_batch_runs(
         BatchJobInput(batch_job_id=batch_runs_id),
         persistence_query_service=_query_service_for(config),
     )
@@ -312,7 +296,7 @@ def _handle_delete_run(args: argparse.Namespace, config: AppConfig) -> bool:
     delete_run_id = _optional_int_attr(args, "delete_run")
     if delete_run_id is None:
         return False
-    deleted = uc_delete_persisted_run(
+    deleted = query_uc.delete_persisted_run(
         DeletePersistedRunInput(run_id=delete_run_id),
         persistence_query_service=_query_service_for(config),
     )
@@ -328,7 +312,7 @@ def _handle_prune_runs(args: argparse.Namespace, config: AppConfig) -> bool:
     keep_latest = _cli_args.get_int_arg(args, "keep_latest", 0)
     if keep_latest < 0:
         raise ValidationError(INVALID_KEEP_LATEST_ERROR.format(value=keep_latest))
-    deleted_count = uc_prune_persisted_runs(
+    deleted_count = query_uc.prune_persisted_runs(
         PrunePersistedRunsInput(
             before=prune_before,
             keep_latest=keep_latest,

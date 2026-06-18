@@ -1655,6 +1655,25 @@ class TestWarningListsCheckValueEdgeCases:
         assert is_warning
         assert info["name"] == "Exact IPs"
 
+    def test_check_value_applies_domain_lists_to_hosts(self):
+        """Host IOCs should match the same warning-list scopes as domains."""
+        warning_lists = make_warning_lists()
+
+        warning_lists.warning_lists = {
+            "blocked-hosts": {
+                "name": "Blocked Hosts",
+                "description": "Domain-scoped blocklist",
+                "type": "string",
+                "matching_attributes": ["domain"],
+                "list": ["blocked.example"],
+            }
+        }
+        warning_lists._preprocess_lists()
+
+        is_warning, info = warning_lists.check_value("blocked.example", "hosts")
+        assert is_warning
+        assert info["name"] == "Blocked Hosts"
+
     def test_check_value_with_substring_fallback(self):
         """
         Test check_value substring type fallback path.

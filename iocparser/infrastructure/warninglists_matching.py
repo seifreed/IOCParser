@@ -178,6 +178,8 @@ class WarningListMatchingMixin:
 
     def _get_candidate_list_ids(self, ioc_type: str) -> list[str]:
         related_types = [ioc_type]
+        if ioc_type == "hosts":
+            related_types.append("domains")
         if ioc_type == "urls":
             related_types.append("domains")
         elif ioc_type == "ips":

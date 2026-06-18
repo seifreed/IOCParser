@@ -44,6 +44,7 @@ class MISPWarningLists(
     IOC_TYPE_MAPPING: ClassVar[dict[str, str]] = {
         "domain": "domains",
         "hostname": "domains",
+        "hosts": "domains",
         "fqdn": "domains",
         "ip": "ips",
         "ipv4": "ips",
@@ -61,6 +62,7 @@ class MISPWarningLists(
     # MISP attribute types for each IOC type
     MISP_TYPE_MAPPING: ClassVar[dict[str, list[str]]] = {
         "domains": ["hostname", "domain", "domain|ip", "fqdn"],
+        "hosts": ["hostname", "domain", "domain|ip", "fqdn"],
         "urls": ["url", "uri", "link", "uri-path"],
         "emails": [
             "email",

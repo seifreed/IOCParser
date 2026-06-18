@@ -174,7 +174,10 @@ def load_worker_file_values(config_path: Path | None) -> dict[str, object]:
 
 
 def str_or_none(value: object) -> str | None:
-    return str(value) if value is not None else None
+    if value is None:
+        return None
+    stripped = str(value).strip()
+    return stripped or None
 
 
 def int_or(value: object, default: int) -> int:

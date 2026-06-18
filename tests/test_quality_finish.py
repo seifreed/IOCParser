@@ -742,3 +742,10 @@ def test_repository_helpers_cover_remaining_metadata_branches() -> None:
 def test_worker_config_defaults_cover_none_branches() -> None:
     assert int_or(None, 4) == 4
     assert float_or(None, 1.5) == 1.5
+
+
+def test_worker_config_str_or_none_trims_blank_strings() -> None:
+    from iocparser.worker_config_support import str_or_none
+
+    assert str_or_none("  value  ") == "value"
+    assert str_or_none("   ") is None

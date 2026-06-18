@@ -4,6 +4,7 @@ from iocparser.domain.models import (
     IOC,
     DomainValue,
     EmailValue,
+    ExtractionOptions,
     ExtractionResult,
     IOCType,
     IpValue,
@@ -95,6 +96,21 @@ def test_base_type_filter_selects_custom_ioc_types() -> None:
 
         assert result.filter_types(include_types=parse_ioc_types("urls")).total_count() == 1
         assert result.filter_types(exclude_types=parse_ioc_types("urls")).total_count() == 0
+    finally:
+        enums_module._custom_ioc_types.pop(name, None)
+
+
+def test_extraction_options_base_type_allows_custom_ioc_types() -> None:
+    import iocparser.domain.enums as enums_module
+
+    name = "options_custom_url"
+    enums_module._custom_ioc_types.pop(name, None)
+    try:
+        custom_name = register_custom_ioc_type(name, base_type="urls")
+
+        assert ExtractionOptions(include_types=parse_ioc_types("urls")).allows(custom_name)
+        assert not ExtractionOptions(exclude_types=parse_ioc_types("urls")).allows(custom_name)
+        assert not ExtractionOptions(include_types=(custom_name,)).allows(IOCType.URL)
     finally:
         enums_module._custom_ioc_types.pop(name, None)
 

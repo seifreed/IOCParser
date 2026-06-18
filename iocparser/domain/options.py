@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from iocparser.domain.enums import IOCType, IOCTypeName
+from iocparser.domain.enums import IOCType, IOCTypeName, get_custom_ioc_type, ioc_type_name
 
 
 @dataclass(frozen=True)
@@ -18,9 +18,14 @@ class ExtractionOptions:
 
     def allows(self, ioc_type: IOCType | IOCTypeName) -> bool:
         """Return whether the IOC type should be included in the result."""
-        if self.include_types and ioc_type not in self.include_types:
+        name = ioc_type_name(ioc_type)
+        custom_type = get_custom_ioc_type(ioc_type)
+        base_name = ioc_type_name(custom_type.base_type) if custom_type is not None else name
+        include_names = {ioc_type_name(item) for item in self.include_types}
+        exclude_names = {ioc_type_name(item) for item in self.exclude_types}
+        if include_names and name not in include_names and base_name not in include_names:
             return False
-        return ioc_type not in self.exclude_types
+        return name not in exclude_names and base_name not in exclude_names
 
 
 @dataclass(frozen=True)

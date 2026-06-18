@@ -2508,6 +2508,7 @@ def test_import_history_normalizes_replayed_batch_job_identity_fields(
     persist_batch_job(report, config=config, source_kind="url", run_ids=(), effective_config={})
     payload = export_persisted_history(db_uri=source_db_uri)
     payload["batch_jobs"][0]["source_kind"] = " URL "
+    payload["batch_jobs"][0]["status"] = " failed "
 
     assert import_history_raw(target_db_uri, payload)["batch_jobs"] == 1
     assert import_history_raw(target_db_uri, payload)["batch_jobs"] == 0

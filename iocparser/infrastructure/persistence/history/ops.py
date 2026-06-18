@@ -604,6 +604,7 @@ def _import_batch_jobs(
         ):
             continue
         typed["source_kind"] = normalized_source_filter(str(typed.get("source_kind", "")))
+        typed["status"] = str(typed.get("status", "")).strip()
         original_id = typed.get("id")
         import_marker = {
             "archive_id": archive_id,
@@ -620,7 +621,7 @@ def _import_batch_jobs(
                     BatchJobModel.successful_inputs == int(typed.get("successful_inputs", 0)),  # type: ignore[call-overload]
                     BatchJobModel.failed_inputs == int(typed.get("failed_inputs", 0)),  # type: ignore[call-overload]
                     BatchJobModel.retry_attempt == int(typed.get("retry_attempt", 0)),  # type: ignore[call-overload]
-                    BatchJobModel.status == str(typed.get("status", "")),
+                    BatchJobModel.status == typed["status"],
                     BatchJobModel.error_summary_json == str(typed.get("error_summary_json", "{}")),
                     BatchJobModel.metrics_json == str(typed.get("metrics_json", "{}")),
                 )

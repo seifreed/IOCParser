@@ -224,8 +224,8 @@ def _run_filter_clauses(
     source_value: str | None,
 ) -> tuple[ClauseElement, ...]:
     clauses: list[ClauseElement] = []
-    normalized_kind = source_kind.strip().lower() if source_kind else ""
-    normalized_value = source_value.strip() if source_value else ""
+    normalized_kind = str(source_kind).strip().lower() if source_kind is not None else ""
+    normalized_value = str(source_value).strip() if source_value is not None else ""
     clauses.extend([RunModel.started_at >= parse_datetime(date_from)] if date_from else [])
     clauses.extend([RunModel.started_at <= parse_datetime(date_to)] if date_to else [])
     clauses.extend([SourceModel.kind == normalized_kind] if normalized_kind else [])

@@ -126,9 +126,10 @@ def _url_filter_variants(value: str) -> tuple[str, ...]:
 
 
 def source_value_clause(*, source_kind: str | None, source_value: str) -> ClauseElement:
-    exact_value = source_value.strip()
-    url_variants = _url_filter_variants(source_value) if source_kind == "url" else ()
-    if source_kind == "url":
+    normalized_kind = str(source_kind).strip().lower() if source_kind is not None else ""
+    exact_value = str(source_value).strip()
+    url_variants = _url_filter_variants(exact_value) if normalized_kind == "url" else ()
+    if normalized_kind == "url":
         clauses: list[ClauseElement] = [SourceModel.value == exact_value]
         clauses.extend(
             func.coalesce(SourceModel.normalized_url, "") == candidate

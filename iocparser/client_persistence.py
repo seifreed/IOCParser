@@ -99,7 +99,7 @@ class PersistenceClient:
             date_from=validated_iso_datetime(optional_str(options.get("date_from"))),
             date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
             source_kind=optional_str(options.get("source_kind")),
-            source_value=options.get("source_value"),
+            source_value=optional_str(options.get("source_value")),
             sort_by=validated_run_sort(optional_str(options.get("sort_by")) or "newest"),
         )
         return self._typed_service.query_runs_page(
@@ -147,7 +147,7 @@ class PersistenceClient:
             date_from=validated_iso_datetime(optional_str(options.get("date_from"))),
             date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
             source_kind=optional_str(options.get("source_kind")),
-            source_value=options.get("source_value"),
+            source_value=optional_str(options.get("source_value")),
             ioc_type=validated_ioc_type_filters(options.get("ioc_type"))
             or None,
             # parse_string_filters accepts a comma-separated string as well as a pre-split

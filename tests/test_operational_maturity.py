@@ -469,6 +469,8 @@ def test_public_query_api_validates_dates_and_min_severity(tmp_path: Path) -> No
         client.query_runs(sort_by="bogus")
 
     assert client.query_runs(sort_by=None).total >= 2
+    assert query_persisted_runs(db_uri=db_uri, source_value=1).total == 0
+    assert client.query_runs(source_value=1).total == 0
     client_search_page = client.search_iocs(
         value="alpha",
         tag_mode=None,
@@ -479,6 +481,7 @@ def test_public_query_api_validates_dates_and_min_severity(tmp_path: Path) -> No
 
     normalized_page = query_persisted_iocs(db_uri=db_uri, value="alpha", severity="HIGH")
     assert normalized_page.total == 1
+    assert query_persisted_iocs(db_uri=db_uri, value="alpha", source_value=1).total == 0
     alias_page = query_persisted_iocs(db_uri=db_uri, value="alpha", ioc_type="domain")
     assert alias_page.total == 1
     alias_diff = diff_persisted_runs(
@@ -490,6 +493,7 @@ def test_public_query_api_validates_dates_and_min_severity(tmp_path: Path) -> No
     assert alias_diff.added.total_count() == 1
     assert alias_diff.removed.total_count() == 1
     assert client.search_iocs(value="alpha", ioc_type="domain").items[0].value == "alpha.example"
+    assert client.search_iocs(value="alpha", source_value=1).total == 0
 
     hash_left = _persist_result_with_iocs(
         db_uri,

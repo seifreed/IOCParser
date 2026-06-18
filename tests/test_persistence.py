@@ -585,6 +585,27 @@ def test_query_service_normalizes_tuple_ioc_type_filters(tmp_path) -> None:
     assert service.search_iocs_page(value="example.com", ioc_type=("hashes",)).total == 0
 
 
+def test_query_service_normalizes_source_value_filters(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-source-value-filter.db"
+    service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
+    service.persist_multiple_runs(
+        [
+            (
+                "file",
+                "sample.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["example.com"]}, {}),
+            )
+        ],
+        tool_version="5.0.0",
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
+    )
+
+    assert service.query_runs_page(limit=10, source_value=1).total == 0
+    assert service.search_iocs_page(value="example.com", source_value=1).total == 0
+
+
 def test_query_service_trims_source_kind_and_preserves_url_value_matching(tmp_path) -> None:
     db_path = tmp_path / "iocparser-source-kind-url-filter.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")

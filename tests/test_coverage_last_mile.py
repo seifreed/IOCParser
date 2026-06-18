@@ -62,6 +62,7 @@ def test_api_optional_str_and_datetime_trim_whitespace() -> None:
         optional_str,
         query_persisted_iocs,
         validated_iso_datetime,
+        validated_min_severity,
         validated_stix_types,
     )
     from iocparser.domain.models import IOC, ExtractionResult
@@ -74,6 +75,7 @@ def test_api_optional_str_and_datetime_trim_whitespace() -> None:
     assert validated_iso_datetime("   ") is None
     assert validated_stix_types(" urls, domains ") == "urls, domains"
     assert validated_stix_types("   ") is None
+    assert validated_min_severity("   ") is None
 
     with TemporaryDirectory() as d:
         db_uri = f"sqlite:///{Path(d) / 't.db'}"

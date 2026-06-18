@@ -234,7 +234,10 @@ def _validated_choice(value: str, *, valid: AbstractSet[str], error: str) -> str
 def validated_min_severity(value: str | None) -> str | None:
     if value is None:
         return None
-    return _validated_choice(value, valid=VALID_SEVERITIES, error=INVALID_MIN_SEVERITY_ERROR)
+    stripped = value.strip()
+    if not stripped:
+        return None
+    return _validated_choice(stripped, valid=VALID_SEVERITIES, error=INVALID_MIN_SEVERITY_ERROR)
 
 
 def validated_ioc_type_filter(value: str | None) -> str | None:

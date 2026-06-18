@@ -482,6 +482,7 @@ class RequestsURLDownloader(URLDownloader):
         request_headers = dict(self.headers)
         request_headers.setdefault("User-Agent", self.user_agent)
         session = self._build_session()
+        primary_exc: Exception | None = None
         try:
             response, response_url = self._open_validated(url, request_headers, session)
             with response:
@@ -493,8 +494,16 @@ class RequestsURLDownloader(URLDownloader):
                 downloaded_size = self.download_with_size_check(
                     response, temp_file, self._effective_max_size()
                 )
+        except Exception as exc:
+            primary_exc = exc
+            raise
         finally:
-            session.close()
+            try:
+                session.close()
+            except Exception:
+                if primary_exc is None:
+                    raise
+                logger.warning("Failed to close download session after error", exc_info=True)
         content_hash = hashlib.sha256(temp_file.read_bytes()).hexdigest()
         self.last_download_metadata = {
             "original_url": url,

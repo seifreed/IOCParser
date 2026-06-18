@@ -107,8 +107,8 @@ def list_jobs_stmt(
     )
     if statuses:
         stmt = stmt.where(DistributedJobModel.status.in_(statuses))
-    if queue_backend:
-        stmt = stmt.where(DistributedJobModel.queue_backend == normalized_queue_backend(queue_backend))
+    if queue_backend and (normalized_backend := normalized_queue_backend(queue_backend)):
+        stmt = stmt.where(DistributedJobModel.queue_backend == normalized_backend)
     return stmt
 
 
@@ -118,10 +118,8 @@ def list_dead_letters_stmt(*, limit: int, queue_backend: str | None) -> Select[D
         .order_by(DeadLetterJobModel.dead_lettered_at.desc())
         .limit(max(0, limit))
     )
-    if queue_backend:
-        stmt = stmt.where(
-            DeadLetterJobModel.queue_backend == normalized_queue_backend(queue_backend)
-        )
+    if queue_backend and (normalized_backend := normalized_queue_backend(queue_backend)):
+        stmt = stmt.where(DeadLetterJobModel.queue_backend == normalized_backend)
     return stmt
 
 

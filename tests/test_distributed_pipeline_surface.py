@@ -492,8 +492,15 @@ def test_persistence_service_and_public_distributed_wrappers(tmp_path: Path) -> 
         )
         == 1
     )
+    assert (
+        len(
+            service.list_jobs(limit=10, statuses=(JOB_STATUS_DEAD_LETTERED,), queue_backend="   ")
+        )
+        == 1
+    )
     assert len(service.list_dead_letters(limit=10, queue_backend="filesystem")) == 1
     assert len(service.list_dead_letters(limit=10, queue_backend=" filesystem ")) == 1
+    assert len(service.list_dead_letters(limit=10, queue_backend="   ")) == 1
 
     client = PersistenceClient(db_uri)
     assert client.get_distributed_job(job_id="job-1").status == JOB_STATUS_DEAD_LETTERED
@@ -508,6 +515,7 @@ def test_persistence_service_and_public_distributed_wrappers(tmp_path: Path) -> 
     )
     assert len(client.list_dead_letters(limit=10, queue_backend="filesystem")) == 1
     assert len(client.list_dead_letters(limit=10, queue_backend=" filesystem ")) == 1
+    assert len(client.list_dead_letters(limit=10, queue_backend="   ")) == 1
 
     assert get_distributed_job(db_uri=db_uri, job_id="job-1").status == JOB_STATUS_DEAD_LETTERED
     assert (
@@ -516,6 +524,7 @@ def test_persistence_service_and_public_distributed_wrappers(tmp_path: Path) -> 
     )
     assert len(list_dead_letters(db_uri=db_uri, limit=10, queue_backend="filesystem")) == 1
     assert len(list_dead_letters(db_uri=db_uri, limit=10, queue_backend=" filesystem ")) == 1
+    assert len(list_dead_letters(db_uri=db_uri, limit=10, queue_backend="   ")) == 1
 
 
 def test_commit_new_job_or_fetch_handles_integrity_error(tmp_path: Path) -> None:

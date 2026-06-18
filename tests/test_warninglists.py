@@ -1432,6 +1432,39 @@ class TestWarningListsDiagnostic:
         # Cleanup
         logger.removeHandler(handler)
 
+    def test_diagnose_with_host_ioc_type(self):
+        """Host diagnostics should surface domain-scoped warning lists."""
+        import io
+        import logging
+
+        warning_lists = make_warning_lists()
+
+        warning_lists.warning_lists = {
+            "blocked-hosts": {
+                "name": "Blocked Hosts",
+                "description": "Domain-scoped blocklist",
+                "type": "string",
+                "matching_attributes": ["domain"],
+                "list": ["blocked.example"],
+            }
+        }
+        warning_lists._preprocess_lists()
+
+        log_capture = io.StringIO()
+        handler = logging.StreamHandler(log_capture)
+        logger = logging.getLogger("iocparser.infrastructure.warninglists")
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+
+        warning_lists.diagnose_value_detection("blocked.example", "hosts")
+
+        log_output = log_capture.getvalue()
+
+        assert "Blocked Hosts" in log_output
+        assert "FINAL RESULT: Value IS in warning list" in log_output
+
+        logger.removeHandler(handler)
+
     def test_is_list_relevant_for_expected(self):
         """Test expected list relevance checking."""
         warning_lists = make_warning_lists()

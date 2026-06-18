@@ -80,6 +80,7 @@ class MISPWarningLists(
     TYPE_KEYWORDS: ClassVar[dict[str, list[str]]] = {
         "ips": ["ip", "address", "ipv4", "ipv6", "cidr"],
         "domains": ["domain", "hostname", "fqdn", "dns"],
+        "hosts": ["domain", "hostname", "fqdn", "dns"],
         "urls": ["url", "uri", "link"],
         "emails": ["email", "mail"],
         "cves": ["cve", "vulnerability"],

@@ -48,6 +48,7 @@ VALID_DIFF_ONLY_VALUES: frozenset[str] = frozenset({"all", "added", "removed"})
 INVALID_DIFF_ONLY_ERROR = "Invalid diff_only: {value}"
 VALID_SEVERITIES: frozenset[str] = frozenset({"informational", "low", "medium", "high"})
 INVALID_SEVERITY_ERROR = "Invalid severity: {value}"
+INVALID_STRING_FILTER_ERROR = "Invalid filter value: {value}"
 
 
 def parse_bool_token(value: str) -> bool | None:
@@ -90,9 +91,13 @@ def parse_string_filters(value: object) -> tuple[str, ...]:
     if isinstance(value, (list, tuple)):
         items: list[str] = []
         for entry in value:
-            items.extend(part.strip() for part in str(entry).split(",") if part.strip())
+            if not isinstance(entry, str):
+                raise ValidationError(INVALID_STRING_FILTER_ERROR.format(value=entry))
+            items.extend(part.strip() for part in entry.split(",") if part.strip())
         return tuple(items)
-    return tuple(part.strip() for part in str(value).split(",") if part.strip())
+    if not isinstance(value, str):
+        raise ValidationError(INVALID_STRING_FILTER_ERROR.format(value=value))
+    return tuple(part.strip() for part in value.split(",") if part.strip())
 
 
 def validated_severity_filters(value: object) -> tuple[str, ...]:

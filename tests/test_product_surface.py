@@ -1921,6 +1921,10 @@ def test_parse_string_filters_supports_sequences() -> None:
         "informational",
     )
     assert parse_string_filters("high,medium") == ("high", "medium")
+    with pytest.raises(ValidationError, match="Invalid filter value"):
+        parse_string_filters([object()])
+    with pytest.raises(ValidationError, match="Invalid filter value"):
+        parse_string_filters(123)
 
 
 def test_persistence_query_service_raises_for_missing_runs(tmp_path: Path) -> None:

@@ -405,6 +405,17 @@ def test_worker_config_blank_optional_strings_use_defaults(tmp_path: Path) -> No
     assert values["telemetry_mode"] == "logging"
 
 
+def test_worker_config_str_or_none_rejects_non_string_values() -> None:
+    from iocparser.worker_config_support import str_or_none
+
+    class _Textish:
+        def __str__(self) -> str:
+            return "hello"
+
+    with pytest.raises(TypeError, match="Expected string value"):
+        str_or_none(_Textish())  # type: ignore[arg-type]
+
+
 @pytest.mark.parametrize(
     "encoding_bytes",
     [

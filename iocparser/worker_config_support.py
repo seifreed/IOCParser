@@ -176,7 +176,9 @@ def load_worker_file_values(config_path: Path | None) -> dict[str, object]:
 def str_or_none(value: object) -> str | None:
     if value is None:
         return None
-    stripped = str(value).strip()
+    if not isinstance(value, str):
+        raise TypeError(f"Expected string value, got {type(value).__name__}")
+    stripped = value.strip()
     return stripped or None
 
 

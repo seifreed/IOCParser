@@ -459,7 +459,7 @@ def test_import_history_normalizes_new_url_source_metadata(tmp_path) -> None:
             {
                 "id": 99,
                 "kind": "url",
-                "value": "HTTPS://Example.TEST/report#section",
+                "value": " HTTPS://Example.TEST/report#section ",
                 "value_search": "https://example.test/report#section",
                 "normalized_url": "HTTPS://Example.TEST/report#section",
                 "first_seen": timestamp,
@@ -476,6 +476,7 @@ def test_import_history_normalizes_new_url_source_metadata(tmp_path) -> None:
     checker.close()
 
     assert counts["sources"] == 1
+    assert source.value == "HTTPS://Example.TEST/report#section"
     assert source.original_url == "HTTPS://Example.TEST/report#section"
     assert source.normalized_url == "https://example.test/report"
 

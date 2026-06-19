@@ -250,7 +250,7 @@ def _existing_source(session: Session, row: dict[str, object]) -> SourceModel | 
     value = str(identity[1])
     return session.execute(
         select(SourceModel).where(
-            SourceModel.kind == str(identity[0]), SourceModel.value == value
+            SourceModel.kind == str(identity[0]), func.trim(SourceModel.value) == value
         )
     ).scalar_one_or_none()
 

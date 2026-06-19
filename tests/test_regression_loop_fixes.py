@@ -256,6 +256,12 @@ def test_pipeline_job_request_rejects_non_bool_flags() -> None:
         PipelineJobRequest(input_kind="text", source_value="x", emit_only=None)  # type: ignore[arg-type]
 
 
+def test_pipeline_job_request_normalizes_input_kind() -> None:
+    request = PipelineJobRequest(input_kind=" FILE ", source_value="/tmp/sample.bin")
+
+    assert request.input_kind == "file"
+
+
 def test_distributed_records_reject_bool_counters() -> None:
     request = PipelineJobRequest(input_kind="text", source_value="x")
 

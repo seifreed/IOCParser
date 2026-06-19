@@ -130,7 +130,9 @@ class PipelineJobRequest:
                 raise TypeError(f"Expected {field} to be bool, got {type(value).__name__}")
             return value
 
-        object.__setattr__(self, "input_kind", _require_str(self.input_kind, field="input_kind"))
+        object.__setattr__(
+            self, "input_kind", _require_str(self.input_kind, field="input_kind").lower()
+        )
         object.__setattr__(self, "source_value", _require_str(self.source_value, field="source_value"))
         if self.file_type is not None:
             object.__setattr__(self, "file_type", _require_str(self.file_type, field="file_type"))
@@ -188,7 +190,9 @@ class PipelineJobResult:
                 raise TypeError(f"Expected {field} to be non-empty string-like")
             return stripped
 
-        object.__setattr__(self, "input_kind", _require_str(self.input_kind, field="input_kind"))
+        object.__setattr__(
+            self, "input_kind", _require_str(self.input_kind, field="input_kind").lower()
+        )
         object.__setattr__(self, "source_value", _require_str(self.source_value, field="source_value"))
         object.__setattr__(self, "status", _require_str(self.status, field="status"))
         object.__setattr__(self, "correlation_id", _require_str(self.correlation_id, field="correlation_id"))

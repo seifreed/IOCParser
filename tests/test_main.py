@@ -244,6 +244,12 @@ class TestArgumentHelpers:
         result = get_list_arg(args, "file")
         assert result == ["single.txt"]
 
+    def test_get_list_arg_strips_single_value(self) -> None:
+        args = argparse.Namespace(file="  single.txt  ")
+
+        result = get_list_arg(args, "file")
+        assert result == ["single.txt"]
+
     def test_get_list_arg_with_none(self) -> None:
         """Test get_list_arg returns empty list when attribute is None."""
         args = argparse.Namespace(files=None)

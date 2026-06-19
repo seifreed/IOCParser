@@ -141,6 +141,7 @@ INVALID_OFFSET_ERROR = "Invalid offset: {value}"
 INVALID_DAYS_ERROR = "Invalid days: {value}"
 INVALID_ID_ERROR = "Invalid {field}: {value}"
 INVALID_BOOLEAN_ERROR = "Invalid boolean option: {value}"
+INVALID_STRING_OPTION_ERROR = "Invalid string option: {value}"
 VALID_TAG_MODES = {"all", "any"}
 VALID_RUN_SORT_VALUES = {"newest", "oldest", "source"}
 VALID_SEARCH_SORT_VALUES = {"newest", "oldest", "source"}
@@ -156,7 +157,9 @@ def query_service(db_uri: str) -> SQLAlchemyPersistenceService:
 def optional_str(value: object | None) -> str | None:
     if value is None:
         return None
-    stripped = str(value).strip()
+    if not isinstance(value, str):
+        raise ValidationError(INVALID_STRING_OPTION_ERROR.format(value=value))
+    stripped = value.strip()
     return stripped or None
 
 

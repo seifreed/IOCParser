@@ -77,6 +77,9 @@ def test_api_optional_str_and_datetime_trim_whitespace() -> None:
     assert validated_stix_types("   ") is None
     assert validated_min_severity("   ") is None
 
+    with pytest.raises(ValidationError, match="Invalid string option"):
+        optional_str(object())
+
     with TemporaryDirectory() as d:
         db_uri = f"sqlite:///{Path(d) / 't.db'}"
         service = SQLAlchemyPersistenceService(db_uri)

@@ -22,7 +22,7 @@ from iocparser.domain.models import (
     QueueReceipt,
     TelemetryEvent,
 )
-from iocparser.domain.pipeline import PipelineErrorInfo, PipelineJobRequest
+from iocparser.domain.pipeline import PipelineErrorInfo, PipelineJobRequest, ResourceLimits
 from iocparser.errors import IOCTimeoutError
 from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
 from iocparser.infrastructure.persistence_schema import SQLAlchemyUnitOfWork
@@ -34,6 +34,7 @@ from iocparser.infrastructure.queue_sqs import SQSQueueAdapter
 from iocparser.infrastructure.runtime.telemetry import LoggingTelemetrySink, NoOpTelemetrySink
 from iocparser.pipeline_client import DistributedPipelineClient
 from iocparser.pipeline_worker import PipelineWorker
+from iocparser.pipeline_worker_support import prepare_input
 
 
 class TimeoutClient:
@@ -457,6 +458,24 @@ def test_distributed_pipeline_file_and_url_idempotency_keys(tmp_path: Path) -> N
     )
     assert len(service._idempotency_key(file_request)) == 64
     assert len(service._idempotency_key(url_request)) == 64
+
+
+def test_prepare_input_expands_home_file_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    sample = home / "sample.txt"
+    sample.write_text("same bytes", encoding="utf-8")
+
+    prepared = prepare_input(
+        client=TimeoutClient(),
+        limits=ResourceLimits(),
+        request=PipelineJobRequest(input_kind="file", source_value="~/sample.txt", persist=False),
+    )
+
+    assert prepared.metadata["input_size"] == sample.stat().st_size
+    assert prepared.content_hash
+    assert prepared.fingerprint == prepared.content_hash[:16]
 
 
 def test_completed_job_clears_prior_attempt_error(tmp_path: Path) -> None:

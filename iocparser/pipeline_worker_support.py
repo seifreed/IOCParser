@@ -299,7 +299,7 @@ def prepare_input(
     if request.input_kind == "text":
         return _prepare_text_input(limits=limits, text=request.source_value)
     if request.input_kind == "file":
-        return _prepare_file_input(limits=limits, path=Path(request.source_value))
+        return _prepare_file_input(limits=limits, path=Path(request.source_value).expanduser())
     if request.input_kind == "url":
         return _prepare_url_input(client=client, limits=limits, url=request.source_value)
     raise unsupported_input_kind_error(request.input_kind)

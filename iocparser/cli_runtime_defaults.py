@@ -188,4 +188,9 @@ def _parse_json_http_mapping(value: str) -> dict[str, str]:
         raise ValidationError(INVALID_HTTP_MAPPING_ERROR.format(value=value)) from exc
     if not isinstance(parsed, dict):
         raise ValidationError(INVALID_HTTP_MAPPING_ERROR.format(value=value))
-    return {str(key): str(item) for key, item in parsed.items()}
+    mapping: dict[str, str] = {}
+    for key, item in parsed.items():
+        if not isinstance(item, str):
+            raise ValidationError(INVALID_HTTP_MAPPING_ITEM_ERROR.format(value=item))
+        mapping[str(key)] = item
+    return mapping

@@ -1368,6 +1368,9 @@ def test_strict_coverage_option_and_metadata_edge_helpers() -> None:
     assert bool_value(None, default=True) is True
     assert bool_value(1) is True
     assert parse_http_mapping("X-Test: value", separator=":") == {"X-Test": "value"}
+    assert parse_http_mapping('{"X-Test": " value "}', separator=":") == {"X-Test": " value "}
+    with pytest.raises(ValidationError):
+        parse_http_mapping('{"X-Test": 1}', separator=":")
     assert validated_severity_values(("HIGH", "low")) == ("high", "low")
 
     with pytest.raises(TypeError, match="bool-compatible"):

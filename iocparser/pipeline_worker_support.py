@@ -316,7 +316,8 @@ class ProcessContext:
 
 
 def new_job_identifiers(request: PipelineJobRequest) -> tuple[str, str]:
-    return request.job_id or str(uuid4()), request.correlation_id or str(uuid4())
+    job_id = request.job_id or str(uuid4())
+    return job_id, request.correlation_id or job_id
 
 
 def maybe_skipped_result(

@@ -1390,6 +1390,7 @@ def test_strict_coverage_option_and_metadata_edge_helpers() -> None:
 def test_strict_coverage_infrastructure_edge_helpers(tmp_path) -> None:
     from iocparser.infrastructure.http_download import RequestsURLDownloader
     from iocparser.infrastructure.persistence_batch import _int_report_value
+    from iocparser.infrastructure.persistence_distributed_support import build_new_job
     from iocparser.infrastructure.persistence_repository_support import (
         int_metadata_value,
         optional_int_metadata_value,
@@ -1428,6 +1429,15 @@ def test_strict_coverage_infrastructure_edge_helpers(tmp_path) -> None:
     assert not invalid_payload.exists()
     assert len(list(dead_dir.glob("bad*.json"))) == 2
     assert _payload_text(b"\xff") == repr(b"\xff")
+
+    envelope = QueueEnvelope(
+        request=PipelineJobRequest(input_kind="text", source_value="payload", job_id=None),
+        queue_backend="filesystem",
+        queue_name="default",
+    )
+    job = build_new_job(envelope=envelope, receipt_id="receipt")
+    assert job.job_id
+    assert job.correlation_id == job.job_id
 
 
 def test_history_import_updates_stale_ioc_search_value(tmp_path) -> None:

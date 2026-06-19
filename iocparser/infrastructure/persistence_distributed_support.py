@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from uuid import uuid4
 from typing import TypedDict
 
 from sqlalchemy import Select, select
@@ -125,9 +126,11 @@ def list_dead_letters_stmt(*, limit: int, queue_backend: str | None) -> Select[D
 
 def build_new_job(*, envelope: QueueEnvelope, receipt_id: str) -> DistributedJobModel:
     now = datetime.now(UTC)
+    job_id = envelope.request.job_id or str(uuid4())
+    correlation_id = envelope.request.correlation_id or job_id
     return DistributedJobModel(
-        job_id=str(envelope.request.job_id),
-        correlation_id=str(envelope.request.correlation_id or envelope.request.job_id),
+        job_id=job_id,
+        correlation_id=correlation_id,
         queue_backend=envelope.queue_backend,
         queue_name=envelope.queue_name,
         input_kind=envelope.request.input_kind,

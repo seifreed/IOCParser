@@ -80,13 +80,13 @@ def complete_distributed_job(
     service = SQLAlchemyDistributedJobService(db_uri)
     request = PipelineJobRequest(input_kind="url", source_value=source_value)
     envelope = QueueEnvelope(request=request, queue_backend="filesystem", queue_name="default")
-    service.create_or_get_job(envelope=envelope, receipt_id=f"{receipt_prefix}0")
-    service.mark_running(job_id=str(request.job_id), receipt_id=f"{receipt_prefix}1", attempts=1)
+    created = service.create_or_get_job(envelope=envelope, receipt_id=f"{receipt_prefix}0")
+    service.mark_running(job_id=created.job_id, receipt_id=f"{receipt_prefix}1", attempts=1)
     service.mark_completed(
-        job_id=str(request.job_id),
+        job_id=created.job_id,
         attempts=1,
         run_id=run_id,
         result_json={"ok": True},
         metrics={"parse_ms": 10},
     )
-    return str(request.job_id)
+    return created.job_id

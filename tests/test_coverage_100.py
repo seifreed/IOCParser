@@ -281,8 +281,8 @@ class TestDistributedMarkRunning:
         svc = SQLAlchemyDistributedJobService(uri)
         req = PipelineJobRequest(input_kind="text", source_value="test")
         envelope = QueueEnvelope(request=req, queue_backend="filesystem", queue_name="default")
-        svc.create_or_get_job(envelope=envelope, receipt_id="r0")
-        result = svc.mark_running(job_id=str(req.job_id), receipt_id="r1", attempts=1)
+        created = svc.create_or_get_job(envelope=envelope, receipt_id="r0")
+        result = svc.mark_running(job_id=created.job_id, receipt_id="r1", attempts=1)
         assert result is not None
         assert result.status == "running"
 

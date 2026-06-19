@@ -125,7 +125,12 @@ def record_string_list(record: dict[str, object], key: str) -> tuple[str, ...]:
     raw_value = record.get(key, [])
     if not isinstance(raw_value, list):
         return ()
-    return tuple(str(value) for value in raw_value)
+    values: list[str] = []
+    for value in raw_value:
+        if not isinstance(value, str):
+            raise TypeError(f"Expected {key} entries to be string, got {type(value).__name__}")
+        values.append(value)
+    return tuple(values)
 
 
 def record_dict_list(record: dict[str, object], key: str) -> list[dict[str, object]]:

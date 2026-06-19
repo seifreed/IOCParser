@@ -719,6 +719,8 @@ def test_renderers_cover_custom_stix_and_record_helpers() -> None:
     assert "ctx.test" in TextOutputRenderer(include_context=True).render(weird_result)
     assert _record_string_list({"tags": "bad"}, "tags") == ()
     assert _record_dict_list({"evidence": "bad"}, "evidence") == []
+    with pytest.raises(TypeError, match="Expected tags entries to be string"):
+        _record_string_list({"tags": [1]}, "tags")
     assert renderer_json_object("[]") == {}
 
 

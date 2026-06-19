@@ -519,8 +519,10 @@ def test_persistence_helper_functions_cover_conversion_edges() -> None:
         record_json_object("{bad")
     assert _json_int_map(json.dumps({"a": "2"})) == {"a": 2}
     assert _json_int_map(json.dumps({"a": True, "b": "bad", "c": "-3"})) == {"c": -3}
-    assert _json_list("{}") == []
-    assert _json_list("{bad") == []
+    with pytest.raises(ValueError, match="Expected JSON array"):
+        _json_list("{}")
+    with pytest.raises(ValueError, match="Invalid JSON array"):
+        _json_list("{bad")
     original_json_loads = distributed_records_module.json.loads
     distributed_records_module.json.loads = lambda _raw: {1: "one", "two": "2"}
     try:
@@ -538,7 +540,8 @@ def test_persistence_helper_functions_cover_conversion_edges() -> None:
     )
     assert evidence[0].excerpt == "x"
     assert _tags_from_json(json.dumps([1, "tag-a", None])) == ("tag-a",)
-    assert _tags_from_json("not-json") == ()
+    with pytest.raises(ValueError, match="Invalid JSON array"):
+        _tags_from_json("not-json")
     assert _evidence_from_json(json.dumps([{"excerpt": 1, "source": "s"}, {"excerpt": "x", "source": "s"}])) == (
         IOCEvidence(excerpt="x", line_number=None, source="s"),
     )

@@ -198,7 +198,11 @@ def persist_run(
     """Persist a normalized extraction run."""
     started_at = time.perf_counter()
     try:
-        status = request.status or (
+        status = request.status
+        if isinstance(status, str):
+            status = status.strip() or None
+        error_message = request.error_message.strip() if isinstance(request.error_message, str) else request.error_message
+        status = status or (
             "failed"
             if request.successful_items <= 0 and request.failed_items > 0
             else "partial"
@@ -216,7 +220,7 @@ def persist_run(
             if request.duration_ms is not None
             else int((time.perf_counter() - started_at) * 1000),
             "status": status,
-            "error_message": request.error_message,
+            "error_message": error_message,
         }
         source_id = unit_of_work.source_repository.get_or_create(
             kind=request.source.kind.value,

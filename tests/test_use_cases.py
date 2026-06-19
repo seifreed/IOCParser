@@ -111,6 +111,7 @@ class RecordingRunRepository:
     def __init__(self, *, fail_on_create: bool = False) -> None:
         self.fail_on_create = fail_on_create
         self.create_calls: list[tuple[int, str, PersistOptions]] = []
+        self.create_metadata: list[dict[str, int | str | None] | None] = []
         self.attach_calls: list[tuple[int, list[int]]] = []
 
     def create_run(
@@ -121,8 +122,8 @@ class RecordingRunRepository:
         options: PersistOptions,
         metadata: dict[str, int] | None = None,
     ) -> int:
-        del metadata
         self.create_calls.append((source_id, tool_version, options))
+        self.create_metadata.append(metadata)
         if self.fail_on_create:
             raise RuntimeError("boom")
         return 99
@@ -351,6 +352,28 @@ def test_persist_run_commits_on_success() -> None:
         }
     ]
     assert unit_of_work.run_repository.attach_calls == [(99, [11, 12, 21])]
+
+
+def test_persist_run_trims_status_metadata_whitespace() -> None:
+    unit_of_work = RecordingUnitOfWork()
+    request = PersistRunInput(
+        source=Source.from_raw("file", "/tmp/sample.txt"),
+        result=ExtractionResult(),
+        tool_version="1.2.3",
+        options=PersistOptions(
+            defang=True,
+            check_warnings=False,
+            force_update=False,
+            output_format="json",
+        ),
+        status=" partial ",
+        error_message=" boom ",
+    )
+
+    persist_run(request, unit_of_work=unit_of_work)
+
+    assert unit_of_work.run_repository.create_metadata[-1]["status"] == "partial"
+    assert unit_of_work.run_repository.create_metadata[-1]["error_message"] == "boom"
 
 
 def test_persist_run_rolls_back_on_failure() -> None:

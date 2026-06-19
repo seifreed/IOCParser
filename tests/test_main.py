@@ -261,6 +261,21 @@ class TestArgumentHelpers:
         result = get_optional_str_arg(args, "nonexistent")
         assert result is None
 
+    def test_string_helpers_reject_non_string_values(self) -> None:
+        """String helper accessors must not coerce arbitrary objects."""
+        class _Textish:
+            def __str__(self) -> str:
+                return "hello"
+
+        args = argparse.Namespace(file_path=_Textish(), items=[_Textish()], output=_Textish())
+
+        with pytest.raises(ValidationError, match="file_path requires a string value"):
+            get_str_arg(args, "file_path")
+        with pytest.raises(ValidationError, match="items requires a string value"):
+            get_list_arg(args, "items")
+        with pytest.raises(ValidationError, match="output requires a string value"):
+            get_optional_str_arg(args, "output")
+
 
 class TestProcessingOptions:
     """Test ProcessingOptions class and factory methods."""

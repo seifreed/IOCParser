@@ -26,6 +26,13 @@ __all__ = [
 
 INTEGER_VALUE_REQUIRED = "{field_name} requires an integer value"
 INVALID_IOC_TYPE_FILTER = "Invalid IOC type for {flag}: {value}"
+STRING_VALUE_REQUIRED = "{field_name} requires a string value"
+
+
+def _require_str_value(value: object, *, field_name: str) -> str:
+    if not isinstance(value, str):
+        raise ValidationError(STRING_VALUE_REQUIRED.format(field_name=field_name))
+    return value
 
 
 def validated_stix_types(value: object | None) -> str | None:
@@ -88,7 +95,7 @@ def get_str_arg(args: argparse.Namespace, name: str, default: str = "") -> str:
     value: object = getattr(args, name, None)
     if value is None:
         return default
-    normalized = str(value).strip()
+    normalized = _require_str_value(value, field_name=name).strip()
     return normalized or default
 
 
@@ -121,8 +128,10 @@ def get_list_arg(args: argparse.Namespace, name: str) -> list[str]:
     if value is None:
         return []
     if isinstance(value, (list, tuple)):
-        return [str(item) for item in value]
-    return [str(value)]
+        if not all(isinstance(item, str) for item in value):
+            raise ValidationError(STRING_VALUE_REQUIRED.format(field_name=name))
+        return [item for item in value if item.strip()]
+    return [_require_str_value(value, field_name=name)]
 
 
 def get_optional_str_arg(args: argparse.Namespace, name: str) -> str | None:
@@ -130,7 +139,7 @@ def get_optional_str_arg(args: argparse.Namespace, name: str) -> str | None:
     value: object = getattr(args, name, None)
     if value is None:
         return None
-    normalized = str(value).strip()
+    normalized = _require_str_value(value, field_name=name).strip()
     return normalized or None
 
 

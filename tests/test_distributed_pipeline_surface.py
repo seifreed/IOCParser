@@ -207,6 +207,16 @@ def test_queue_envelope_from_record_parses_bool_compatible_values() -> None:
     assert restored.request.emit_only is True
 
 
+def test_queue_envelope_from_record_rejects_non_string_request_fields() -> None:
+    payload = _envelope("job-bad-types").to_record()
+    request_payload = payload["request"]
+    assert isinstance(request_payload, dict)
+    request_payload["job_id"] = 1
+
+    with pytest.raises(TypeError, match="job_id"):
+        QueueEnvelope.from_record(payload)
+
+
 def test_queue_envelope_from_record_rejects_bool_integer_fields() -> None:
     payload = _envelope("job-int").to_record()
     payload["attempts"] = True

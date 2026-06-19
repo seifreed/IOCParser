@@ -944,6 +944,13 @@ def test_queue_factory_and_optional_queue_adapters(
     assert isinstance(filesystem, FilesystemQueueAdapter)
     assert filesystem.root_dir == Path(".iocparser-queue")
 
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    expanded = create_queue_adapter("filesystem", queue_path="~/queue")
+    assert isinstance(expanded, FilesystemQueueAdapter)
+    assert expanded.root_dir == home / "queue"
+
 
 def test_sqs_dead_letter_does_not_keep_dead_queue_mapping_on_send_failure() -> None:
     class FakeSQSClient:

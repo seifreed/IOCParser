@@ -33,7 +33,7 @@ class FilesystemQueueAdapter:
     """Simple filesystem-backed queue for local staging and test environments."""
 
     def __init__(self, root_dir: str | Path) -> None:
-        self.root_dir = Path(root_dir)
+        self.root_dir = Path(root_dir).expanduser()
         self.root_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
 

@@ -242,7 +242,8 @@ def fallback_str(metadata: Mapping[str, int | str | None] | None, key: str, defa
         return default
     if not isinstance(value, str):
         raise TypeError(f"Expected {key} to be string, got {type(value).__name__}")
-    return value
+    stripped = value.strip()
+    return stripped or default
 
 
 def persist_batch_job(

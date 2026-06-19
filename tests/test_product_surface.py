@@ -3034,14 +3034,14 @@ def test_persist_failed_batch_items_defaults_invalid_duration_metadata(tmp_path:
                 {
                     "url": "https://bad-duration.example",
                     "status": "failed",
-                    "error": "timeout",
+                    "error": "",
                     "duration_ms": True,
                 }
             ],
             "run_metadata_map": {
                 "https://bad-duration.example": {
                     "duration_ms": "bad",
-                    "error_message": "timeout",
+                    "error_message": " timeout ",
                 }
             },
         },
@@ -3053,6 +3053,7 @@ def test_persist_failed_batch_items_defaults_invalid_duration_metadata(tmp_path:
 
     runs = query_persisted_runs(db_uri=db_uri, limit=10)
     assert runs.items[0].duration_ms == 0
+    assert runs.items[0].error_message == "timeout"
 
 
 def test_persist_batch_job_skips_non_string_failed_item_urls(tmp_path: Path) -> None:

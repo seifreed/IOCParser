@@ -81,7 +81,7 @@ def bool_value(value: object, *, default: bool = False) -> bool:
 def _json_dict(path: Path) -> dict[str, object]:
     payload: object = loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
-        return {}
+        raise ValueError("Expected JSON object")
     normalized: dict[str, object] = {}
     for key, value in payload.items():
         if not isinstance(key, str):

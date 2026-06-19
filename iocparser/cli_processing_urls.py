@@ -122,7 +122,7 @@ def _load_valid_batch_report_payload(report_path: Path) -> dict[str, object]:
         raise FileExistenceError(str(report_path))
     try:
         payload = _json_dict(report_path)
-    except JSONDecodeError as exc:
+    except (JSONDecodeError, ValueError) as exc:
         raise _invalid_batch_report(report_path) from exc
     if not payload:
         raise _invalid_batch_report(report_path)

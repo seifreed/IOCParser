@@ -224,7 +224,8 @@ def test_cli_processing_url_helper_parsing_and_plugin_builder() -> None:
     payload_path = Path("tmp-url-batch-report.json")
     payload_path.write_text(json.dumps(["bad"]), encoding="utf-8")
     try:
-        assert _json_dict(payload_path) == {}
+        with pytest.raises(ValueError, match="Expected JSON object"):
+            _json_dict(payload_path)
     finally:
         payload_path.unlink()
     original_url_report_loads = url_reports_module.loads

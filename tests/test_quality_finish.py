@@ -291,6 +291,14 @@ def test_cli_rendering_metadata_helpers_accept_strings() -> None:
         normalize_metadata_values({"bad": object()})
 
 
+def test_normalize_tokens_rejects_non_string_items() -> None:
+    from iocparser.shared_utils import normalize_tokens
+
+    assert normalize_tokens([" A ", "b"]) == ("a", "b")
+    with pytest.raises(TypeError, match="Expected token to be string"):
+        normalize_tokens([object()])
+
+
 def test_cli_and_schema_integer_helpers_raise_validation_errors() -> None:
     with pytest.raises(ValidationError):
         int_arg_value([], "offset")

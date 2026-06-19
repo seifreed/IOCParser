@@ -67,7 +67,14 @@ def parse_bool_token(value: str) -> bool | None:
 
 def normalize_tokens(items: Iterable[str]) -> tuple[str, ...]:
     """Strip and lowercase each item, dropping blanks and preserving order."""
-    return tuple(item.strip().lower() for item in items if item.strip())
+    normalized: list[str] = []
+    for item in items:
+        if not isinstance(item, str):
+            raise TypeError(f"Expected token to be string, got {type(item).__name__}")
+        stripped = item.strip()
+        if stripped:
+            normalized.append(stripped.lower())
+    return tuple(normalized)
 
 
 def normalize_metadata_values(metadata: Mapping[str, object]) -> dict[str, int | str | None]:

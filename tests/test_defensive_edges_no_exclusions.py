@@ -1442,6 +1442,15 @@ def test_strict_coverage_infrastructure_edge_helpers(tmp_path) -> None:
     assert payload["request"]["job_id"] == job.job_id
     assert payload["request"]["correlation_id"] == job.correlation_id
 
+    from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
+
+    db_uri = _fresh_db(tmp_path, "distributed-job-id.db")
+    service = SQLAlchemyDistributedJobService(db_uri)
+    created = service.create_or_get_job(envelope=envelope, receipt_id="receipt")
+    assert created.job_id
+    assert created.correlation_id == created.job_id
+    assert service.mark_running(job_id=created.job_id, receipt_id="receipt-2", attempts=1)
+
 
 def test_history_import_updates_stale_ioc_search_value(tmp_path) -> None:
     from iocparser.infrastructure.persistence.history import ops

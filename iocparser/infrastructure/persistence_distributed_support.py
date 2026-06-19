@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
-from dataclasses import replace
 from uuid import uuid4
 from typing import TypedDict
 
@@ -126,15 +125,11 @@ def list_dead_letters_stmt(*, limit: int, queue_backend: str | None) -> Select[D
 
 
 def build_new_job(*, envelope: QueueEnvelope, receipt_id: str) -> DistributedJobModel:
+    envelope = materialize_envelope(envelope)
     now = datetime.now(UTC)
-    job_id = envelope.request.job_id or str(uuid4())
-    correlation_id = envelope.request.correlation_id or job_id
-    request = envelope.request
-    if request.job_id != job_id or request.correlation_id != correlation_id:
-        request = replace(request, job_id=job_id, correlation_id=correlation_id)
     return DistributedJobModel(
-        job_id=job_id,
-        correlation_id=correlation_id,
+        job_id=envelope.request.job_id or "",
+        correlation_id=envelope.request.correlation_id or "",
         queue_backend=envelope.queue_backend,
         queue_name=envelope.queue_name,
         input_kind=envelope.request.input_kind,
@@ -144,8 +139,17 @@ def build_new_job(*, envelope: QueueEnvelope, receipt_id: str) -> DistributedJob
         attempts=envelope.attempts,
         max_attempts=envelope.max_attempts,
         receipt_id=receipt_id,
-        payload_json=serialize_queue_record(replace(envelope, request=request)),
+        payload_json=serialize_queue_record(envelope),
         submitted_at=now,
+    )
+
+
+def materialize_envelope(envelope: QueueEnvelope) -> QueueEnvelope:
+    job_id = envelope.request.job_id or str(uuid4())
+    correlation_id = envelope.request.correlation_id or job_id
+    return replace(
+        envelope,
+        request=replace(envelope.request, job_id=job_id, correlation_id=correlation_id),
     )
 
 

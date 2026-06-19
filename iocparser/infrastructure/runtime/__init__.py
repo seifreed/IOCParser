@@ -28,7 +28,7 @@ OUTPUT_WRITE_FAILED = "Could not write output to {path}: {error}"
 
 class LocalFileWriter(FileWriter):
     def write(self, output_path: str, content: str) -> None:
-        output_file = Path(output_path)
+        output_file = Path(output_path).expanduser()
         # A bad output path (missing/unwritable directory) is user error; surface it
         # as an IOCParserError so the CLI prints a clean message instead of dumping
         # the raw OSError as an "unexpected error" stack trace.

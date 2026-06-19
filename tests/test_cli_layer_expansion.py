@@ -1051,7 +1051,9 @@ def test_missing_run_value_error_becomes_validation_error() -> None:
     assert result == 42
 
 
-def test_local_file_writer_reports_write_failures_cleanly(tmp_path: Path) -> None:
+def test_local_file_writer_reports_write_failures_cleanly(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A bad output path must raise an IOCParserError (clean CLI message), not let
     the raw OSError reach the top-level handler as an unexpected-error traceback."""
     from iocparser.errors import IOCParserError
@@ -1067,3 +1069,9 @@ def test_local_file_writer_reports_write_failures_cleanly(tmp_path: Path) -> Non
     ok_path = tmp_path / "nested" / "ok.json"
     writer.write(str(ok_path), "{}")
     assert ok_path.read_text(encoding="utf-8") == "{}"
+
+    home_dir = tmp_path / "home"
+    monkeypatch.setenv("HOME", str(home_dir))
+    expanded_path = home_dir / "expanded.json"
+    writer.write("~/expanded.json", "{}")
+    assert expanded_path.read_text(encoding="utf-8") == "{}"

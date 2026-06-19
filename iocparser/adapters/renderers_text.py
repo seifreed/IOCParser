@@ -60,7 +60,9 @@ class TextOutputRenderer(OutputRenderer):
         return render_text_output(
             grouped,
             warning_grouped,
-            format_section=lambda _section_key, data: sorted(str(value) for value in data),
+            format_section=lambda _section_key, data: [
+                _require_str(value, field="value") for value in sorted(data)
+            ],
             format_warning=format_warning_item,
             context_map=context_map if self.include_context else None,
             context_lookup=_lookup,

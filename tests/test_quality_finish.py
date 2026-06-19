@@ -719,6 +719,12 @@ def test_renderers_cover_custom_stix_and_record_helpers() -> None:
 
     weird_result = _WeirdContextResult(iocs=(IOC.from_raw("domains", "ctx.test"),))
     assert "ctx.test" in TextOutputRenderer(include_context=True).render(weird_result)
+    class _BadGroupedResult(ExtractionResult):
+        def canonical_by_type(self) -> dict[object, tuple[object, ...]]:
+            return {"domains": (object(),)}
+
+    with pytest.raises(TypeError, match="Expected value to be string"):
+        TextOutputRenderer().render(_BadGroupedResult(iocs=()))
     class _BadContextResult(ExtractionResult):
         def to_records(self) -> list[dict[str, object]]:
             return [{"type": "domains", "raw_value": object(), "value": "ctx.test", "evidence": []}]

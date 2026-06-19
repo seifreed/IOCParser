@@ -160,7 +160,13 @@ def parse_http_mapping(value: object, *, separator: str) -> dict[str, str]:
             return _parse_json_http_mapping(stripped)
         items = [stripped]
     elif isinstance(value, (list, tuple)):
-        items = [str(item) for item in value if str(item).strip()]
+        items = []
+        for item in value:
+            if not isinstance(item, str):
+                raise ValidationError(INVALID_HTTP_MAPPING_ITEM_ERROR.format(value=item))
+            stripped_item = item.strip()
+            if stripped_item:
+                items.append(stripped_item)
     else:
         return {}
     mapping: dict[str, str] = {}

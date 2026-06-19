@@ -36,7 +36,7 @@ def _int_report_value(payload: dict[str, object], key: str, default: int = 0) ->
 def _dict_report_value(payload: dict[str, object], key: str) -> dict[str, object]:
     raw_value = payload.get(key)
     if isinstance(raw_value, dict):
-        return {str(name): value for name, value in raw_value.items()}
+        return {name: value for name, value in raw_value.items() if isinstance(name, str)}
     return {}
 
 
@@ -55,7 +55,7 @@ def _failed_items(items: object) -> list[dict[str, object]]:
     failed: list[dict[str, object]] = []
     for item in items:
         if isinstance(item, dict) and _report_string_value(item, "status").lower() == "failed":
-            failed.append({str(name): value for name, value in item.items()})
+            failed.append({name: value for name, value in item.items() if isinstance(name, str)})
     return failed
 
 

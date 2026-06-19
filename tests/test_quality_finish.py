@@ -66,6 +66,7 @@ from iocparser.infrastructure.persistence.query.ops import _coerce_count, _order
 from iocparser.infrastructure.persistence_batch import (
     BatchJobModel,
     FailedBatchItemModel,
+    _dict_report_value,
     _failed_items,
     _int_report_value,
 )
@@ -434,6 +435,8 @@ def test_persistence_helper_functions_cover_conversion_edges() -> None:
     assert _optional_int_metadata_value({"count": "bad"}, "count") is None
     assert _optional_int_metadata_value({"count": -5}, "count") is None
     assert _failed_items("bad") == []
+    assert _dict_report_value({"data": {1: "one", "two": 2}}, "data") == {"two": 2}
+    assert _failed_items([{1: "one", "status": "failed"}]) == [{"status": "failed"}]
     with pytest.raises(TypeError):
         _int_report_value({"count": []}, "count")
 

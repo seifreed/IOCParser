@@ -352,14 +352,14 @@ def validated_non_negative_int(value: object, *, field: str) -> int:
 
 def validated_non_negative_days(value: object) -> int:
     try:
-        return validated_non_negative_int(value, field="limit")
+        return validated_non_negative_int(value, field="offset")
     except ValidationError as exc:
         raise ValidationError(INVALID_DAYS_ERROR.format(value=value)) from exc
 
 
 def validated_required_id(value: object, *, field: str) -> int:
     try:
-        return validated_non_negative_int(value, field="limit")
+        return validated_non_negative_int(value, field="offset")
     except ValidationError as exc:
         raise ValidationError(INVALID_ID_ERROR.format(field=field, value=value)) from exc
 

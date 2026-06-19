@@ -1312,7 +1312,9 @@ def test_history_import_skip_and_same_origin_batch_paths() -> None:
 def test_strict_coverage_option_and_metadata_edge_helpers() -> None:
     from iocparser.api_persistence_query import (
         bool_option,
+        validated_non_negative_days,
         validated_ioc_type_filter,
+        validated_required_id,
         validated_min_severity,
         validated_run_sort,
         validated_search_backend,
@@ -1346,6 +1348,10 @@ def test_strict_coverage_option_and_metadata_edge_helpers() -> None:
         validated_search_sort(1)  # type: ignore[arg-type]
     with pytest.raises(ValidationError, match="Invalid search_backend"):
         validated_search_backend(1)  # type: ignore[arg-type]
+    with pytest.raises(ValidationError, match="Invalid days"):
+        validated_non_negative_days("bad")  # type: ignore[arg-type]
+    with pytest.raises(ValidationError, match="Invalid run_id"):
+        validated_required_id("bad", field="run_id")  # type: ignore[arg-type]
     assert int_run_metadata_value({"items": "   "}, "items", 3) == 3
     assert optional_int_run_metadata_value({"duration": True}, "duration") is None
     assert optional_int_run_metadata_value({"duration": "   "}, "duration") is None

@@ -216,16 +216,19 @@ def test_persisted_option_overrides_parse_bool_strings() -> None:
 def test_batch_report_item_parses_retryable_bool_strings() -> None:
     disabled = _report_item({"url": "https://a.example", "retryable": "false"})
     enabled = _report_item({"url": "https://b.example", "retryable": "yes"})
-    unknown = _report_item({"url": "https://c.example", "retryable": "maybe"})
     invalid_ints = _report_item(
         {"url": "https://e.example", "duration_ms": True, "retry_attempt": "bad"}
     )
 
     assert disabled["retryable"] is False
     assert enabled["retryable"] is True
-    assert unknown["retryable"] is False
     assert invalid_ints["duration_ms"] == 0
     assert invalid_ints["retry_attempt"] == 0
+
+
+def test_batch_report_item_rejects_unknown_retryable_string() -> None:
+    with pytest.raises(TypeError, match="Expected boolean-compatible value"):
+        _report_item({"url": "https://c.example", "retryable": "maybe"})
 
 
 def test_batch_report_item_rejects_non_boolean_retryable_lists() -> None:

@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from iocparser.api_persistence_history import export_persisted_history
+from iocparser.api_persistence_query import query_persisted_runs
 from iocparser.domain.models import ExtractionResult, PersistOptions
 from iocparser.infrastructure.persistence import (
     IOCModel,
@@ -562,6 +563,29 @@ def test_query_service_trims_source_kind_filters(tmp_path) -> None:
     assert service.query_runs_page(limit=10, source_kind=" file ").total == 1
     assert service.search_iocs_page(value="example.com", source_kind="file").total == 1
     assert service.search_iocs_page(value="example.com", source_kind=" file ").total == 1
+
+
+def test_query_persisted_runs_honors_source_kind_filters(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-source-kind-api.db"
+    service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
+    service.persist_multiple_runs(
+        [
+            (
+                "file",
+                "sample.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["example.com"]}, {}),
+            ),
+            (
+                "url",
+                "https://example.test/report",
+                ExtractionResult.from_grouped_payload({"domains": ["example.com"]}, {}),
+            ),
+        ],
+        tool_version="5.0.0",
+        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+    )
+
+    assert query_persisted_runs(db_uri=f"sqlite:///{db_path}", source_kind="file").total == 1
 
 
 def test_query_service_normalizes_tuple_ioc_type_filters(tmp_path) -> None:

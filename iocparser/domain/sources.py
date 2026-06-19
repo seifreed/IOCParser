@@ -41,7 +41,10 @@ def _require_str(value: object, *, field: str) -> str:
 
 
 def _strip_optional(value: str | None) -> str | None:
-    return value.strip() if isinstance(value, str) else value
+    if not isinstance(value, str):
+        return value
+    stripped = value.strip()
+    return stripped or None
 
 
 @dataclass(frozen=True)

@@ -221,6 +221,24 @@ def test_source_from_raw_trims_optional_url_metadata() -> None:
     assert source.fingerprint == "def456"
 
 
+def test_source_from_raw_collapses_blank_optional_metadata_to_none() -> None:
+    source = Source.from_raw(
+        "url",
+        "https://example.test/feed",
+        original_url="   ",
+        normalized_url="   ",
+        mime_type="   ",
+        content_hash="   ",
+        fingerprint="   ",
+    )
+
+    assert source.original_url == "https://example.test/feed"
+    assert source.normalized_url == "https://example.test/feed"
+    assert source.mime_type is None
+    assert source.content_hash is None
+    assert source.fingerprint is None
+
+
 def test_source_and_ioc_from_raw_reject_non_string_values() -> None:
     import pytest
 

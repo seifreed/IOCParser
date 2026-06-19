@@ -281,28 +281,20 @@ def _same_origin_archive(session: Session, payload: dict[str, object]) -> bool:
     if not isinstance(raw_origin_id, str) or not raw_origin_id.strip():
         return False
     return _history_origin_id(session) == raw_origin_id.strip()
+def _normalized_text(value: object, *, default: str) -> str:
+    if value is None:
+        return default
+    if not isinstance(value, str):
+        raise TypeError(f"Expected string, got {type(value).__name__}")
+    stripped = value.strip()
+    return stripped or default
 def _batch_job_signature(row: dict[str, object]) -> tuple[object, ...]:
-    return (
-        str(row.get("source_kind", "")),
-        row.get("started_at"),
-        row.get("finished_at"),
-        int(row.get("total_inputs", 0)),  # type: ignore[call-overload]
-        int(row.get("successful_inputs", 0)),  # type: ignore[call-overload]
-        int(row.get("failed_inputs", 0)),  # type: ignore[call-overload]
-        int(row.get("retry_attempt", 0)),  # type: ignore[call-overload]
-        str(row.get("status", "")),
-        str(row.get("config_json", "{}")),
-        str(row.get("error_summary_json", "{}")),
-        str(row.get("metrics_json", "{}")),
-    )
-
+    return (str(row.get("source_kind", "")), row.get("started_at"), row.get("finished_at"), int(row.get("total_inputs", 0)), int(row.get("successful_inputs", 0)), int(row.get("failed_inputs", 0)), int(row.get("retry_attempt", 0)), _normalized_text(row.get("status"), default="queued"), _normalized_text(row.get("config_json"), default="{}"), _normalized_text(row.get("error_summary_json"), default="{}"), _normalized_text(row.get("metrics_json"), default="{}"))
 
 def _public_batch_job_config(raw_config_json: object) -> dict[str, object]:
     config = _json_object(str(raw_config_json or "{}"))
     config.pop(HISTORY_IMPORT_MARKER_KEY, None)
     return config
-
-
 def _json_with_import_marker(
     raw_json: object,
     *,
@@ -382,8 +374,8 @@ def _existing_run(
     same_origin: bool,
 ) -> RunModel | None:
     tool_version = str(row.get("tool_version", "")).strip()
-    status = str(row.get("status", "")).strip()
-    error_message = str(row.get("error_message", "")).strip()
+    status = _normalized_text(row.get("status"), default="success")
+    error_message = _normalized_text(row.get("error_message"), default="")
     candidates = (
         session.execute(
             select(RunModel).where(
@@ -600,9 +592,13 @@ def _import_batch_jobs(
         ):
             continue
         typed["source_kind"] = normalized_source_filter(str(typed.get("source_kind", "")))
-        typed["status"] = str(typed.get("status", "")).strip()
-        typed["error_summary_json"] = _json_without_import_marker(typed.get("error_summary_json", "{}"))
-        typed["metrics_json"] = _json_without_import_marker(typed.get("metrics_json", "{}"))
+        typed["status"] = _normalized_text(typed.get("status"), default="queued")
+        typed["error_summary_json"] = _json_without_import_marker(
+            _normalized_text(typed.get("error_summary_json"), default="{}")
+        )
+        typed["metrics_json"] = _json_without_import_marker(
+            _normalized_text(typed.get("metrics_json"), default="{}")
+        )
         original_id = typed.get("id")
         import_marker = {
             "archive_id": archive_id,
@@ -703,8 +699,8 @@ def _import_runs(
         ):
             continue
         typed["tool_version"] = str(typed.get("tool_version", "")).strip()
-        typed["status"] = str(typed.get("status", "")).strip()
-        typed["error_message"] = str(typed.get("error_message", "")).strip()
+        typed["status"] = _normalized_text(typed.get("status"), default="success")
+        typed["error_message"] = _normalized_text(typed.get("error_message"), default="")
         original_batch_id = typed.get("batch_job_id")
         batch_job_id = (
             batch_map.get(int(original_batch_id)) if isinstance(original_batch_id, int) else None
@@ -797,7 +793,10 @@ def _import_failed_batch_items(
         batch_job_id = batch_map.get(int_from_row(typed.get("batch_job_id"), default=0) or 0)
         if batch_job_id is None:
             continue
-        if not isinstance(typed.get("source_value"), str) or not isinstance(typed.get("created_at"), datetime):
+        if not all(
+            isinstance(typed.get(key), str) and typed.get(key).strip()
+            for key in ("source_value", "error_type", "error_message")
+        ) or not isinstance(typed.get("created_at"), datetime):
             continue
         typed["source_value"] = str(typed.get("source_value", "")).strip()
         typed["error_type"] = str(typed.get("error_type", "")).strip()

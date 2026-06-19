@@ -2027,6 +2027,46 @@ def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_pa
                     {
                         "id": 1,
                         "source_id": 1,
+                        "started_at": timestamp,
+                        "finished_at": timestamp,
+                        "tool_version": "1.0.0",
+                        "status": None,
+                        "error_message": None,
+                    }
+                ],
+            },
+        )["runs"]
+        == 1
+    )
+    assert query_persisted_runs(db_uri=db_uri, limit=10).items[0].status == "success"
+    assert query_persisted_runs(db_uri=db_uri, limit=10).items[0].error_message == ""
+    assert (
+        import_history_raw(
+            db_uri,
+            {
+                "batch_jobs": [valid_batch],
+                "failed_batch_items": [
+                    {
+                        "batch_job_id": 1,
+                        "source_value": "https://example.invalid",
+                        "error_type": None,
+                        "error_message": "boom",
+                        "created_at": timestamp,
+                    }
+                ],
+            },
+        )["failed_batch_items"]
+        == 0
+    )
+    assert (
+        import_history_raw(
+            db_uri,
+            {
+                "sources": [valid_source],
+                "runs": [
+                    {
+                        "id": 1,
+                        "source_id": 1,
                         "started_at": None,
                         "finished_at": None,
                         "tool_version": "1",

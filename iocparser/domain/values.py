@@ -15,6 +15,10 @@ class IndicatorValue:
 
     raw: str
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.raw, str):
+            raise TypeError(f"Expected raw to be string-like, got {type(self.raw).__name__}")
+
     def canonical(self) -> str:
         """Return the normalized wire value."""
         return refang_ioc(self.raw).strip()

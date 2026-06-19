@@ -60,6 +60,8 @@ class SourceKind(StrEnum):
     @classmethod
     def from_name(cls, value: str) -> SourceKind:
         """Resolve a source kind from its wire value."""
+        if not isinstance(value, str):
+            raise TypeError(f"Expected value to be string-like, got {type(value).__name__}")
         return cls(value.strip().lower())
 
 
@@ -122,6 +124,8 @@ class IOCType(StrEnum):
     @classmethod
     def from_name(cls, value: str) -> IOCType | IOCTypeName:
         """Resolve a canonical IOC type from wire names or aliases."""
+        if not isinstance(value, str):
+            raise TypeError(f"Expected value to be string-like, got {type(value).__name__}")
         aliases = {
             "domain": cls.DOMAIN,
             "domains": cls.DOMAIN,

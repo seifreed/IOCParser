@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from iocparser.domain.models import (
     IOC,
     DomainValue,
@@ -16,6 +18,7 @@ from iocparser.domain.models import (
     indicator_value_for,
     register_custom_ioc_type,
 )
+from iocparser.domain.values import IndicatorValue
 from iocparser.domain.sources import normalize_url_value
 from iocparser.domain.type_filters import parse_ioc_types
 
@@ -156,6 +159,18 @@ def test_value_objects_canonicalize_expected_values() -> None:
         ).canonical()
         == 'rule Example { meta: author = "me" condition: true }'
     )
+
+
+def test_value_objects_reject_non_string_raw_values() -> None:
+    with pytest.raises(TypeError, match="raw"):
+        IndicatorValue(1)  # type: ignore[arg-type]
+
+
+def test_enum_resolvers_reject_non_string_names() -> None:
+    with pytest.raises(TypeError, match="string-like"):
+        SourceKind.from_name(1)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="string-like"):
+        IOCType.from_name(1)  # type: ignore[arg-type]
 
 
 def test_indicator_value_for_selects_specialized_types() -> None:

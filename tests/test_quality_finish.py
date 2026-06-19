@@ -73,6 +73,7 @@ from iocparser.infrastructure.persistence_distributed_records import _json_int_m
 from iocparser.infrastructure.persistence_distributed_records import (
     _json_object as record_json_object,
 )
+import iocparser.infrastructure.persistence_distributed_records as distributed_records_module
 from iocparser.infrastructure.persistence_migration_runtime import schema_version
 from iocparser.infrastructure.persistence_migration_steps import _coerce_version_row
 from iocparser.infrastructure.persistence_models import DeadLetterJobModel, DistributedJobModel
@@ -442,6 +443,12 @@ def test_persistence_helper_functions_cover_conversion_edges() -> None:
     assert _json_int_map(json.dumps({"a": True, "b": "bad", "c": "-3"})) == {"c": -3}
     assert _json_list("{}") == []
     assert _json_list("{bad") == []
+    original_json_loads = distributed_records_module.json.loads
+    distributed_records_module.json.loads = lambda _raw: {1: "one", "two": "2"}
+    try:
+        assert record_json_object("{}") == {"two": "2"}
+    finally:
+        distributed_records_module.json.loads = original_json_loads
     evidence = _evidence_from_json(
         json.dumps([1, {"excerpt": "x", "line_number": 4, "source": "s"}])
     )

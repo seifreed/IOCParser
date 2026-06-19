@@ -26,7 +26,7 @@ def _json_object(raw_value: str) -> dict[str, object]:
         return {}
     if not isinstance(decoded, dict):
         return {}
-    return {str(name): value for name, value in decoded.items()}
+    return {name: value for name, value in decoded.items() if isinstance(name, str)}
 
 
 def _json_int_map(raw_value: str) -> dict[str, int]:

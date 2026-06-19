@@ -16,7 +16,9 @@ def _require_str(value: object, *, field: str) -> str:
 
 def _normal_ioc_value(value: object) -> str:
     if isinstance(value, dict):
-        return _require_str(value.get("value", ""), field="value")
+        if "value" not in value:
+            raise TypeError("Expected value to be string-like, got missing")
+        return _require_str(value["value"], field="value")
     return _require_str(value, field="value")
 
 

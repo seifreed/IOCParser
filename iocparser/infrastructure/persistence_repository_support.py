@@ -65,6 +65,10 @@ def normalize_ioc_search(value: str | None) -> str:
     return refang_ioc(value or "").strip().lower()
 
 
+def normalize_source_value(kind: str, value: str) -> str:
+    return value.strip() if kind == "url" else value
+
+
 def _dedup_hash(parts: tuple[str, ...]) -> str:
     """Stable hash of an identity tuple, NUL-joined so parts can't run together."""
     return hashlib.sha256("\x00".join(parts).encode("utf-8")).hexdigest()
@@ -86,7 +90,7 @@ def ioc_dedup_hash(
 
 def source_dedup_hash(kind: str, value: str) -> str:
     """Identity hash for a source row (replaces UNIQUE(kind, value))."""
-    return _dedup_hash((kind, value))
+    return _dedup_hash((kind, normalize_source_value(kind, value)))
 
 
 def _row_source_hash(row: Any) -> str:

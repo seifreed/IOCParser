@@ -6,6 +6,8 @@ Tests for SQLite persistence.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -27,6 +29,7 @@ from iocparser.infrastructure.persistence import (
 from iocparser.infrastructure.persistence import (
     SourceModel as Source,
 )
+from iocparser.infrastructure.persistence_repository_support import source_dedup_hash
 
 
 def test_persist_run_sqlite(tmp_path) -> None:
@@ -105,6 +108,47 @@ def test_repositories_reuse_existing_source_and_iocs(tmp_path) -> None:
     assert second_ids == first_ids
     assert second_warning_ids == first_warning_ids
     unit_of_work.close()
+
+
+def test_source_repository_normalizes_legacy_url_values(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-legacy-source.db"
+    unit_of_work = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
+    try:
+        now = datetime.now(UTC)
+        with Session(unit_of_work.engine) as session:
+            legacy_source = Source(
+                kind="url",
+                value=" https://example.test/feed ",
+                value_search="https://example.test/feed",
+                dedup_hash="legacy",
+                original_url=None,
+                normalized_url=None,
+                mime_type=None,
+                input_size=None,
+                content_hash=None,
+                fingerprint=None,
+                first_seen=now,
+                last_seen=now,
+            )
+            session.add(legacy_source)
+            session.commit()
+            legacy_id = legacy_source.id
+
+        source_id = unit_of_work.source_repository.get_or_create(
+            kind="url",
+            value="https://example.test/feed",
+            normalized_url="https://example.test/feed",
+        )
+        unit_of_work.commit()
+
+        with Session(unit_of_work.engine) as session:
+            source = session.execute(select(Source).where(Source.id == legacy_id)).scalar_one()
+    finally:
+        unit_of_work.close()
+
+    assert source_id == legacy_id
+    assert source.value == "https://example.test/feed"
+    assert source.dedup_hash == source_dedup_hash("url", "https://example.test/feed")
 
 
 def test_ioc_repository_refreshes_legacy_defanged_search_value(tmp_path) -> None:

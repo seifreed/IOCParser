@@ -139,7 +139,7 @@ def _payload_fingerprint(payload: Mapping[str, object]) -> str:
         for key, value in payload.items()
         if key not in {HISTORY_ARCHIVE_ID_KEY, HISTORY_ORIGIN_ID_KEY}
     }
-    encoded = json.dumps(filtered_payload, sort_keys=True, separators=(",", ":"), default=str)
+    encoded = json.dumps(filtered_payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 def _select_rows(session: Session, model: HistoryModelType) -> list[dict[str, object]]:

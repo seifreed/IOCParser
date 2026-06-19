@@ -63,6 +63,7 @@ from iocparser.infrastructure.file_readers import MagicTextSourceReader
 from iocparser.infrastructure.http_download import RequestsURLDownloader
 from iocparser.infrastructure.persistence.history.ops import _json_object as history_json_object
 from iocparser.infrastructure.persistence.history.ops import _row_dict
+from iocparser.infrastructure.persistence.history.ops import _payload_fingerprint
 from iocparser.infrastructure.persistence.query import query_runs_page, search_iocs_page
 from iocparser.infrastructure.persistence.query.ops import _coerce_count, _order_run_query_stmt
 from iocparser.infrastructure.persistence_batch import (
@@ -519,6 +520,8 @@ def test_persistence_history_and_page_query_helpers_cover_remaining_branches() -
     assert history_json_object("{bad") == {}
     assert callable(query_runs_page)
     assert callable(search_iocs_page)
+    with pytest.raises(TypeError):
+        _payload_fingerprint({"bad": object()})
 
     now = datetime.now(UTC)
     batch_job = BatchJobModel(

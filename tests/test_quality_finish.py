@@ -307,6 +307,8 @@ def test_cli_output_batch_helpers_cover_stdout_and_default_file() -> None:
         print_batch_report({"error_groups": {1: 1}})
     with pytest.raises(TypeError, match="Expected batch report phase timing keys to be strings"):
         print_batch_report({"phase_timings_ms": {1: 1}})
+    with pytest.raises(TypeError, match="Expected batch report metric keys to be strings"):
+        print_batch_report({"metrics": {1: 1}})
 
     writer = _MemoryWriter()
     save_batch_report({"total": 0}, None, file_writer=writer)

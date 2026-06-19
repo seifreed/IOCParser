@@ -135,6 +135,8 @@ def print_batch_report(report: Mapping[str, object], *, stream: TextIO | None = 
     metrics = report.get("metrics", {})
     if isinstance(metrics, dict) and metrics:
         out.write("Batch metrics" + "\n")
+        if not all(isinstance(key, str) for key in metrics):
+            raise TypeError("Expected batch report metric keys to be strings")
         for name, value in sorted(metrics.items()):
             out.write(f"  {name}\t{value}" + "\n")
 

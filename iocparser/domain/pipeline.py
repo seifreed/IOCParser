@@ -72,6 +72,32 @@ class PipelineJobRequest:
     job_id: str | None = None
     emit_only: bool = False
 
+    def __post_init__(self) -> None:
+        def _require_str(value: object, *, field: str) -> str:
+            if not isinstance(value, str):
+                raise TypeError(f"Expected {field} to be string-like, got {type(value).__name__}")
+            stripped = value.strip()
+            if not stripped:
+                raise TypeError(f"Expected {field} to be non-empty string-like")
+            return stripped
+
+        object.__setattr__(self, "input_kind", _require_str(self.input_kind, field="input_kind"))
+        object.__setattr__(self, "source_value", _require_str(self.source_value, field="source_value"))
+        if self.file_type is not None:
+            object.__setattr__(self, "file_type", _require_str(self.file_type, field="file_type"))
+        if self.db_uri is not None:
+            object.__setattr__(self, "db_uri", _require_str(self.db_uri, field="db_uri"))
+        if self.only is not None:
+            object.__setattr__(self, "only", _require_str(self.only, field="only"))
+        if self.exclude is not None:
+            object.__setattr__(self, "exclude", _require_str(self.exclude, field="exclude"))
+        if self.correlation_id is not None:
+            object.__setattr__(
+                self, "correlation_id", _require_str(self.correlation_id, field="correlation_id")
+            )
+        if self.job_id is not None:
+            object.__setattr__(self, "job_id", _require_str(self.job_id, field="job_id"))
+
 
 @dataclass(frozen=True)
 class PipelineJobResult:

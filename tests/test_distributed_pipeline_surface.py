@@ -80,7 +80,8 @@ def test_domain_distributed_records_and_telemetry_sinks() -> None:
     envelope = _envelope("job-1", idempotency_key="idem-1")
     restored = QueueEnvelope.from_record(envelope.to_record())
     assert restored.request.job_id == "job-1"
-    assert QueueEnvelope.from_record({"request": "bad-payload"}).request.input_kind == ""
+    with pytest.raises(TypeError, match="input_kind"):
+        QueueEnvelope.from_record({"request": "bad-payload"})
 
     job = DistributedJobRecord(
         job_id="job-1",

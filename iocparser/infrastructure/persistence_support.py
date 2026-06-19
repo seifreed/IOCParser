@@ -50,18 +50,22 @@ def _evidence_from_json(raw_value: str) -> tuple[IOCEvidence, ...]:
             continue
         line_number_raw = entry.get("line_number")
         line_number = line_number_raw if isinstance(line_number_raw, int) else None
+        excerpt = entry.get("excerpt")
+        source = entry.get("source")
+        if not isinstance(excerpt, str) or not isinstance(source, str):
+            continue
         evidences.append(
             IOCEvidence(
-                excerpt=str(entry.get("excerpt", "")),
+                excerpt=excerpt,
                 line_number=line_number,
-                source=str(entry.get("source", "")),
+                source=source,
             ),
         )
     return tuple(evidences)
 
 
 def _tags_from_json(raw_value: str) -> tuple[str, ...]:
-    return tuple(str(tag) for tag in _json_list(raw_value or "[]"))
+    return tuple(tag for tag in _json_list(raw_value or "[]") if isinstance(tag, str))
 
 
 def _evidence_records_from_json(raw_value: str) -> tuple[dict[str, object], ...]:

@@ -50,7 +50,7 @@ from iocparser.cli_schema import _history_payload
 from iocparser.client_persistence import _parse_string_filters
 from iocparser.domain.distributed import _int_from_payload
 from iocparser.domain.enums import IOCType, register_custom_ioc_type
-from iocparser.domain.models import IOC, ExtractionOptions, ExtractionResult, PersistedRun
+from iocparser.domain.models import IOC, ExtractionOptions, ExtractionResult, IOCEvidence, PersistedRun
 from iocparser.domain.pipeline import PipelineJobRequest
 from iocparser.errors import DownloadError, ValidationError
 from iocparser.infrastructure.file_readers import MagicTextSourceReader
@@ -79,7 +79,7 @@ from iocparser.infrastructure.persistence_repository_support import (
     finished_at_from_duration,
 )
 from iocparser.infrastructure.persistence_schema import IOCModel, RunIOCModel, RunModel, SourceModel
-from iocparser.infrastructure.persistence_support import _evidence_from_json, _json_list
+from iocparser.infrastructure.persistence_support import _evidence_from_json, _json_list, _tags_from_json
 from iocparser.infrastructure.queue_rabbitmq import _load_queue_record as load_rabbit_queue_record
 from iocparser.infrastructure.queue_records import load_queue_record
 from iocparser.infrastructure.warninglists_matching import WarningListMatchingMixin
@@ -431,6 +431,10 @@ def test_persistence_helper_functions_cover_conversion_edges() -> None:
         json.dumps([1, {"excerpt": "x", "line_number": 4, "source": "s"}])
     )
     assert evidence[0].excerpt == "x"
+    assert _tags_from_json(json.dumps([1, "tag-a", None])) == ("tag-a",)
+    assert _evidence_from_json(json.dumps([{"excerpt": 1, "source": "s"}, {"excerpt": "x", "source": "s"}])) == (
+        IOCEvidence(excerpt="x", line_number=None, source="s"),
+    )
 
     assert _int_metadata_value({"count": "4"}, "count", 0) == 4
     assert _optional_int_metadata_value({"count": "5"}, "count") == 5

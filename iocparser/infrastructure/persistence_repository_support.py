@@ -340,7 +340,7 @@ def tags_from_json(raw: object) -> list[str]:
         return []
     if not isinstance(parsed, list):
         return []
-    return [str(tag) for tag in parsed]
+    return [tag for tag in parsed if isinstance(tag, str)]
 
 
 def rebuild_tags_search(engine: Engine, inspector: Inspector) -> None:

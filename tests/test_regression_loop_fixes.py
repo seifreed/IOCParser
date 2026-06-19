@@ -544,6 +544,11 @@ def test_typed_row_preserves_nullable_retryable() -> None:
     assert typed_row({"is_warning": None})["is_warning"] is False
 
 
+def test_typed_row_rejects_non_boolean_objects() -> None:
+    with pytest.raises(TypeError, match="Expected boolean-compatible value"):
+        typed_row({"is_warning": []})
+
+
 def test_typed_row_trims_padded_datetimes() -> None:
     row = typed_row({"started_at": " 2024-01-01T12:00:00 "})
     assert row["started_at"].isoformat() == "2024-01-01T12:00:00"

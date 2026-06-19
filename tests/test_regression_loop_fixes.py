@@ -33,6 +33,7 @@ from iocparser.infrastructure.file_readers import MagicTextSourceReader
 from iocparser.infrastructure.migration_revisions import rev_0005_fts_metrics
 from iocparser.infrastructure.persistence_support import _evidence_from_json
 from iocparser.infrastructure.persistence.history.row_values import typed_row
+from iocparser.infrastructure.persistence.history.row_values import bool_from_row
 from iocparser.infrastructure.persistence_fts import build_fts_query
 from iocparser.infrastructure.streaming_chunks import read_chunks_with_prefix
 from iocparser.worker_config_support import load_worker_file_values
@@ -637,6 +638,15 @@ def test_typed_row_preserves_nullable_retryable() -> None:
 def test_typed_row_rejects_non_boolean_objects() -> None:
     with pytest.raises(TypeError, match="Expected boolean-compatible value"):
         typed_row({"is_warning": []})
+
+
+def test_bool_from_row_rejects_non_binary_ints() -> None:
+    with pytest.raises(TypeError, match="boolean-compatible"):
+        bool_from_row(2)
+    with pytest.raises(TypeError, match="boolean-compatible"):
+        typed_row({"is_warning": 2})
+    with pytest.raises(TypeError, match="boolean-compatible"):
+        typed_row({"retryable": 2})
 
 
 def test_typed_row_trims_padded_datetimes() -> None:

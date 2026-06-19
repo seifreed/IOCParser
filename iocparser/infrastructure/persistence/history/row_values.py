@@ -39,8 +39,8 @@ def bool_from_row(value: object, *, default: bool = False) -> bool:
         return value.strip().lower() in TRUE_BOOL_VALUES
     if isinstance(value, bool):
         return value
-    if isinstance(value, int):
-        return value != 0
+    if isinstance(value, int) and value in {0, 1}:
+        return bool(value)
     raise TypeError(f"Expected boolean-compatible value, got {type(value).__name__}")
 
 

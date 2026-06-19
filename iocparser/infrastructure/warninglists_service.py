@@ -14,6 +14,12 @@ def _require_str(value: object, *, field: str) -> str:
     return value
 
 
+def _normal_ioc_value(value: object) -> str:
+    if isinstance(value, dict):
+        return _require_str(value.get("value", ""), field="value")
+    return _require_str(value, field="value")
+
+
 class MISPWarningListService(WarningListService):
     """Warning-list adapter backed by MISP warning lists."""
 
@@ -51,7 +57,7 @@ class MISPWarningListService(WarningListService):
 
         for ioc_type, values in normal_iocs.items():
             for value in values:
-                normalized_value = _require_str(value, field="value")
+                normalized_value = _normal_ioc_value(value)
                 key = (ioc_type, normalized_value)
                 if by_key[key]:
                     normal_records.append(by_key[key].pop(0))

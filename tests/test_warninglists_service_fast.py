@@ -89,6 +89,19 @@ class ServiceBackedBadNormalWarningLists:
         return ({"domains": [object()]}, {})
 
 
+class ServiceBackedDictNormalWarningLists:
+    def __init__(self, *, force_update: bool = False) -> None:
+        self.force_update = force_update
+
+    def separate_iocs_by_warnings(
+        self,
+        grouped_iocs: dict[str, list[str | dict[str, str]]],
+    ) -> tuple[dict[str, list[str | dict[str, str]]], dict[str, list[dict[str, str]]]]:
+        assert self.force_update is True
+        del grouped_iocs
+        return ({"domains": [{"value": "safe.example", "file": "note.txt"}]}, {})
+
+
 class _BadRawValue:
     def __init__(self) -> None:
         self.raw = object()
@@ -193,3 +206,17 @@ def test_warninglist_service_rejects_non_string_normal_output() -> None:
             )
     finally:
         warninglists_service_module.MISPWarningLists = original
+
+
+def test_warninglist_service_accepts_dict_normal_output() -> None:
+    original = warninglists_service_module.MISPWarningLists
+    warninglists_service_module.MISPWarningLists = ServiceBackedDictNormalWarningLists
+    try:
+        result = warninglists_service_module.MISPWarningListService().separate(
+            (IOC.from_raw("domains", "safe.example"),),
+            force_update=True,
+        )
+    finally:
+        warninglists_service_module.MISPWarningLists = original
+
+    assert result.grouped_iocs() == {"domains": ["safe.example"]}

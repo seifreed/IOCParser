@@ -74,7 +74,8 @@ def bool_value(value: object, *, default: bool = False) -> bool:
         parsed = parse_bool_token(value)
         if parsed is not None:
             return parsed
-    return default
+        return default
+    raise TypeError(f"Expected boolean-compatible value, got {type(value).__name__}")
 
 
 def _json_dict(path: Path) -> dict[str, object]:

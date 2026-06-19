@@ -198,7 +198,6 @@ def test_batch_report_item_parses_retryable_bool_strings() -> None:
     disabled = _report_item({"url": "https://a.example", "retryable": "false"})
     enabled = _report_item({"url": "https://b.example", "retryable": "yes"})
     unknown = _report_item({"url": "https://c.example", "retryable": "maybe"})
-    invalid = _report_item({"url": "https://d.example", "retryable": ["yes"]})
     invalid_ints = _report_item(
         {"url": "https://e.example", "duration_ms": True, "retry_attempt": "bad"}
     )
@@ -206,9 +205,18 @@ def test_batch_report_item_parses_retryable_bool_strings() -> None:
     assert disabled["retryable"] is False
     assert enabled["retryable"] is True
     assert unknown["retryable"] is False
-    assert invalid["retryable"] is False
     assert invalid_ints["duration_ms"] == 0
     assert invalid_ints["retry_attempt"] == 0
+
+
+def test_batch_report_item_rejects_non_boolean_retryable_lists() -> None:
+    with pytest.raises(TypeError, match="Expected boolean-compatible value"):
+        _report_item({"url": "https://d.example", "retryable": ["yes"]})
+
+
+def test_batch_report_item_rejects_non_boolean_retryable_objects() -> None:
+    with pytest.raises(TypeError, match="Expected boolean-compatible value"):
+        _report_item({"url": "https://f.example", "retryable": object()})
 
 
 def test_batch_report_item_rejects_non_string_error_fields() -> None:

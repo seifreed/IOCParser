@@ -60,7 +60,7 @@ def current_warning_service(enabled: bool) -> WarningListService | None:
 
 
 def ensure_file_exists(file_path: str) -> None:
-    if not Path(file_path).is_file():
+    if not Path(file_path).expanduser().is_file():
         raise FileExistenceError(str(file_path))
 
 
@@ -78,10 +78,11 @@ def extract_file_result(
     exclude: str | None,
     current_warning_service: WarningServiceFactory,
 ) -> ExtractionResult:
-    ensure_file_exists(file_path)
+    normalized_file_path = str(Path(file_path).expanduser())
+    ensure_file_exists(normalized_file_path)
     return extract_from_file(
         ExtractFileInput(
-            file_path=str(file_path),
+            file_path=normalized_file_path,
             options=options(
                 file_type=file_type,
                 check_warnings=check_warnings,

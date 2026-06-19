@@ -174,6 +174,25 @@ def test_resolve_tls_options_rejects_missing_paths_cleanly(tmp_path: object) -> 
         )
 
 
+def test_resolve_tls_options_expands_user_home_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from iocparser.cli_runtime_defaults import resolve_tls_options
+
+    home = tmp_path / "home"
+    home.mkdir()
+    cert = home / "cert.pem"
+    ca_bundle = home / "ca.pem"
+    cert.write_text("cert", encoding="utf-8")
+    ca_bundle.write_text("ca", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(home))
+
+    verify, resolved_cert = resolve_tls_options(
+        argparse.Namespace(tls_verify=True, ca_bundle="~/ca.pem", tls_cert="~/cert.pem")
+    )
+
+    assert verify == str(ca_bundle)
+    assert resolved_cert == str(cert)
+
+
 def test_persisted_option_overrides_parse_bool_strings() -> None:
     render_options = coerce_render_options(None, {"with_context": "false"})
     export_filters = coerce_export_filters(None, {"only_warnings": "false", "only_normal": "0"})
@@ -1419,6 +1438,18 @@ def test_public_rich_extraction_api(tmp_path: Path) -> None:
     text_result = extract_result_from_text("beta.example 198.51.100.10", check_warnings=False)
     assert "ips" in {ioc.ioc_type.value for ioc in text_result.iocs}
     assert text_result.iocs
+
+
+def test_public_rich_extraction_api_expands_user_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    sample = home / "sample.txt"
+    sample.write_text("See https://evil.example/path and alpha.example\n", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(home))
+
+    file_result = extract_result_from_file("~/sample.txt")
+    assert any(ioc.ioc_type.value == "urls" for ioc in file_result.iocs)
+    assert any(ioc.tags for ioc in file_result.iocs)
 
     class OneShotServer(ThreadedHTTPServer):
         path = "/report.txt"

@@ -123,7 +123,7 @@ class MagicTextSourceReader(TextSourceReader):
 
     def read(self, source_path: str, options: ExtractionOptions) -> str:
         """Read text from a local file source."""
-        path = Path(source_path)
+        path = Path(source_path).expanduser()
         if not path.is_file():
             raise SourceNotFoundError(source_path)
         self.validate_file_size(path)

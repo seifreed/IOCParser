@@ -34,9 +34,12 @@ def _validated_tls_file(value: str | None, *, flag: str) -> str | None:
     generic "Unexpected error download <url>", looking like a crash rather than the
     bad-path user error it is.
     """
-    if value is not None and not Path(value).is_file():
+    if value is None:
+        return None
+    expanded = str(Path(value).expanduser())
+    if not Path(expanded).is_file():
         raise ValidationError(TLS_FILE_NOT_FOUND.format(flag=flag, path=value))
-    return value
+    return expanded
 
 
 def resolve_tls_options(args: argparse.Namespace) -> tuple[bool | str, str | None]:

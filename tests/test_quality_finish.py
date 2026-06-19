@@ -24,6 +24,7 @@ from iocparser.adapters.renderers import (
 from iocparser.adapters.renderers import (
     _json_object as renderer_json_object,
 )
+import iocparser.adapters.renderers_json as renderers_json_module
 from iocparser.adapters.renderers_text import format_warning_item
 from iocparser.cli_args_values import int_arg_value
 from iocparser.cli_output import _int_value as batch_int_value
@@ -456,6 +457,12 @@ def test_persistence_helper_functions_cover_conversion_edges() -> None:
         assert record_json_object("{}") == {"two": "2"}
     finally:
         distributed_records_module.json.loads = original_json_loads
+    original_renderer_json_loads = renderers_json_module.json.loads
+    renderers_json_module.json.loads = lambda _raw: {1: "one", "two": "2"}
+    try:
+        assert renderer_json_object("{}") == {"two": "2"}
+    finally:
+        renderers_json_module.json.loads = original_renderer_json_loads
     evidence = _evidence_from_json(
         json.dumps([1, {"excerpt": "x", "line_number": 4, "source": "s"}])
     )

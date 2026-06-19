@@ -175,4 +175,4 @@ def json_object(raw_value: str) -> dict[str, object]:
     decoded: object = json.loads(raw_value)
     if not isinstance(decoded, dict):
         return {}
-    return {str(key): value for key, value in decoded.items()}
+    return {key: value for key, value in decoded.items() if isinstance(key, str)}

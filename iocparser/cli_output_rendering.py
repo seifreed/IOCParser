@@ -121,7 +121,7 @@ def persist_results_request(request: PersistResultsRequest) -> int | None:
         logger.error("Persistence enabled but no database URI provided")
         return None
     metadata = dict(request.source_metadata or {})
-    path = Path(request.source_value)
+    path = Path(request.source_value).expanduser()
     if request.source_kind == "file" and path.is_file():
         try:
             content = path.read_bytes()

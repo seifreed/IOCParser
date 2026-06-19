@@ -2212,6 +2212,37 @@ def test_import_history_remaps_foreign_keys_on_primary_key_collision(tmp_path: P
     assert exported.result.grouped_iocs() == {"domains": ["imported.example"]}
 
 
+def test_persist_results_reads_home_file_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_uri = f"sqlite:///{tmp_path / 'persist-home.sqlite'}"
+    home_dir = tmp_path / "home"
+    home_dir.mkdir()
+    monkeypatch.setenv("HOME", str(home_dir))
+    home_file = home_dir / "input.txt"
+    home_file.write_text("alpha.example", encoding="utf-8")
+
+    persist_results(
+        PersistResultsRequest(
+            config=load_config(True, db_uri, None),
+            source_kind="file",
+            source_value="~/input.txt",
+            normal_iocs={"domains": ["alpha.example"]},
+            warning_iocs={},
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
+            tool_version="5.0.0",
+        )
+    )
+
+    runs = query_persisted_runs(db_uri=db_uri, limit=10)
+    run = runs.items[0]
+    assert run.input_size == home_file.stat().st_size
+    assert run.content_hash
+    assert run.fingerprint == run.content_hash[:16]
+
+
 def test_retry_attempt_for_duplicate_urls_uses_occurrence_order(tmp_path: Path) -> None:
     report_path = tmp_path / "retry-report.json"
     report_path.write_text(

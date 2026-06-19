@@ -14,7 +14,7 @@ class SHA256ContentDigester(ContentDigester):
 
     def digest_file(self, file_path: str) -> str:
         hasher = hashlib.sha256()
-        with Path(file_path).open("rb") as f:
+        with Path(file_path).expanduser().open("rb") as f:
             while True:
                 chunk = f.read(8192)
                 if not chunk:

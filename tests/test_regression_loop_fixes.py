@@ -342,6 +342,20 @@ def test_idempotency_key_for_missing_file_does_not_raise(tmp_path: Path) -> None
     assert key != idempotency_key_for(other, digester=digester)
 
 
+def test_sha256_content_digester_expands_user_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from iocparser.infrastructure.content_digests import SHA256ContentDigester
+
+    home = tmp_path / "home"
+    home.mkdir()
+    sample = home / "sample.txt"
+    sample.write_text("content-addressed", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(home))
+
+    digester = SHA256ContentDigester()
+
+    assert digester.digest_file("~/sample.txt") == digester.digest_file(str(sample))
+
+
 def test_fts_rebuild_indexes_normalized_value_search() -> None:
     """The FTS rebuild on schema upgrade must index value_search, not raw value.
 

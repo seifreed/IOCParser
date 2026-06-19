@@ -303,6 +303,8 @@ def test_cli_output_batch_helpers_cover_stdout_and_default_file() -> None:
         print_batch_report({1: "one"})
     with pytest.raises(TypeError, match="Expected batch report failure keys to be strings"):
         print_batch_report({"failures": {1: "boom"}})
+    with pytest.raises(TypeError, match="Expected batch report failure values to be strings"):
+        print_batch_report({"failures": {"a": object()}})
     with pytest.raises(TypeError, match="Expected batch report error group keys to be strings"):
         print_batch_report({"error_groups": {1: 1}})
     with pytest.raises(TypeError, match="Expected batch report phase timing keys to be strings"):

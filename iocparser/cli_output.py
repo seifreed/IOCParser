@@ -112,7 +112,9 @@ def print_batch_report(report: Mapping[str, object], *, stream: TextIO | None = 
     if isinstance(failures, dict) and failures:
         if not all(isinstance(key, str) for key in failures):
             raise TypeError("Expected batch report failure keys to be strings")
-        for item, error in sorted((key, str(value)) for key, value in failures.items()):
+        if not all(isinstance(value, str) for value in failures.values()):
+            raise TypeError("Expected batch report failure values to be strings")
+        for item, error in sorted(failures.items()):
             out.write(f"  FAIL\t{item}\t{error}" + "\n")
     error_groups = report.get("error_groups", {})
     if isinstance(error_groups, dict) and error_groups:

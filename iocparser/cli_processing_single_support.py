@@ -240,8 +240,9 @@ def process_file_payload(
             input_display=file_arg,
             result=result,
         )
+    normalized_file_arg = str(Path(file_arg).expanduser())
     normal_iocs, warning_iocs, file_result = process_file_func(
-        Path(file_arg),
+        Path(normalized_file_arg),
         request=FileProcessingRequest(
             file_type=context.options.file_type,
             defang=context.options.defang,
@@ -257,7 +258,7 @@ def process_file_payload(
     return SingleInputPayload(
         normal_iocs=normal_iocs,
         warning_iocs=warning_iocs,
-        input_display=file_arg,
+        input_display=normalized_file_arg,
         result=file_result,
     )
 

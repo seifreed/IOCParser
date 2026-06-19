@@ -1324,6 +1324,29 @@ class TestProcessMultipleFilesInput:
                 if Path(file_path).exists():
                     Path(file_path).unlink()
 
+    def test_process_multiple_files_input_expands_user_home(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        home = tmp_path / "home"
+        home.mkdir()
+        sample = home / "sample.txt"
+        sample.write_text("Malware: evil.example.com\n", encoding="utf-8")
+        monkeypatch.setenv("HOME", str(home))
+
+        args = argparse.Namespace(
+            multiple=["~/sample.txt"],
+            parallel=1,
+            type=None,
+            no_defang=False,
+            no_check_warnings=True,
+            force_update=False,
+        )
+
+        _normal_iocs, _warning_iocs, input_display, results = process_multiple_files_input(args)
+
+        assert input_display == "1 files"
+        assert results.entries[0].source_value == str(sample)
+
     def test_process_multiple_files_input_file_not_found(self) -> None:
         """Test process_multiple_files_input raises when a file doesn't exist."""
         args = argparse.Namespace(
@@ -1440,6 +1463,29 @@ class TestProcessSingleInput:
 
         finally:
             temp_path.unlink()
+
+    def test_process_single_input_file_expands_user_home(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        home = tmp_path / "home"
+        home.mkdir()
+        sample = home / "sample.txt"
+        sample.write_text("Single input test: malware-single.com\n", encoding="utf-8")
+        monkeypatch.setenv("HOME", str(home))
+
+        args = argparse.Namespace(
+            file="~/sample.txt",
+            url=None,
+            url_direct=None,
+            type=None,
+            no_defang=False,
+            no_check_warnings=True,
+            force_update=False,
+        )
+
+        _normal_iocs, _warning_iocs, input_display, _result = process_single_input(args)
+
+        assert input_display == str(sample)
 
     def test_process_single_input_file_not_found(self) -> None:
         """Test process_single_input raises when file doesn't exist."""

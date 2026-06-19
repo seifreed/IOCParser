@@ -282,6 +282,7 @@ def process_file_result(
 ) -> ExtractionResult:
     """Extract a file into a rich ExtractionResult (retains per-IOC evidence)."""
     options = request.to_processing_options()
+    file_path = file_path.expanduser()
     if request.streaming:
         return _streaming_result(
             file_path,
@@ -546,7 +547,7 @@ def process_multiple_files_payload(
     reader: TextSourceReader,
     warning_service: WarningListService | None,
 ) -> BatchInputPayload:
-    files = [Path(file_name) for file_name in get_list_arg(args, "multiple")]
+    files = [Path(file_name).expanduser() for file_name in get_list_arg(args, "multiple")]
     for file_path in files:
         if not file_path.exists():
             raise FileExistenceError(str(file_path))
@@ -651,7 +652,7 @@ def process_directory_payload(
     reader: TextSourceReader,
     warning_service: WarningListService | None,
 ) -> BatchInputPayload:
-    directory = Path(get_optional_str_arg(args, "directory") or "")
+    directory = Path(get_optional_str_arg(args, "directory") or "").expanduser()
     if not directory.is_dir():
         raise FileExistenceError(str(directory))
     files = _directory_files(

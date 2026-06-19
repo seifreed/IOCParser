@@ -303,6 +303,8 @@ def test_cli_output_batch_helpers_cover_stdout_and_default_file() -> None:
     writer = _MemoryWriter()
     save_batch_report({"total": 0}, None, file_writer=writer)
     assert writer.writes[0][0] == "iocparser_batch_report.json"
+    with pytest.raises(TypeError, match="Expected batch report keys to be strings"):
+        save_batch_report({1: "one"}, None, file_writer=writer)
     assert batch_int_value([], default=7) == 7
 
 

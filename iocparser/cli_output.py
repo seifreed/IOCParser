@@ -134,7 +134,9 @@ def print_batch_report(report: Mapping[str, object], *, stream: TextIO | None = 
 def save_batch_report(
     report: Mapping[str, object], output_path: str | None, *, file_writer: FileWriter
 ) -> None:
-    payload = {str(key): value for key, value in report.items()}
+    if not all(isinstance(key, str) for key in report):
+        raise TypeError("Expected batch report keys to be strings")
+    payload = dict(report)
     content = json.dumps(payload, indent=2, sort_keys=True)
     if output_path == "-":
         sys.stdout.write(content + "\n")

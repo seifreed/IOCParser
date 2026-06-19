@@ -310,6 +310,22 @@ def test_filesystem_queue_rejects_path_traversal_components(tmp_path: Path) -> N
     assert adapter.pending_count(queue_name="safe") == 1
 
 
+def test_filesystem_queue_materializes_missing_job_id(tmp_path: Path) -> None:
+    adapter = FilesystemQueueAdapter(tmp_path / "queue")
+    envelope = QueueEnvelope(
+        request=PipelineJobRequest(input_kind="text", source_value="anonymous", job_id=None),
+        queue_backend="filesystem",
+        queue_name="jobs",
+    )
+
+    receipt = adapter.enqueue(queue_name="jobs", envelope=envelope)
+    payload = json.loads(Path(receipt.receipt_id).read_text(encoding="utf-8"))
+
+    assert payload["request"]["job_id"] == receipt.message_id
+    assert payload["request"]["correlation_id"] == receipt.message_id
+    assert receipt.message_id
+
+
 def test_filesystem_queue_rejects_external_receipt_paths(tmp_path: Path) -> None:
     adapter = FilesystemQueueAdapter(tmp_path / "queue")
     victim = tmp_path / "victim.txt"

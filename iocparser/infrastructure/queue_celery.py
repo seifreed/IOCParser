@@ -6,6 +6,7 @@ from uuid import uuid4
 from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
 from iocparser.infrastructure.queue_records import (
     import_optional_backend_module,
+    materialize_queue_envelope,
     serialize_queue_record,
 )
 
@@ -46,6 +47,7 @@ class CeleryQueueAdapter:
         self.task_name = task_name
 
     def enqueue(self, *, queue_name: str, envelope: QueueEnvelope) -> QueueReceipt:
+        envelope = materialize_queue_envelope(envelope)
         task_id = str(envelope.request.job_id or uuid4())
         result = self.app.send_task(
             self.task_name,
@@ -64,10 +66,12 @@ class CeleryQueueAdapter:
         del receipt
 
     def requeue(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
+        envelope = materialize_queue_envelope(envelope)
         target_queue = receipt.queue_name or envelope.queue_name
         return self.enqueue(queue_name=target_queue, envelope=envelope)
 
     def dead_letter(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
+        envelope = materialize_queue_envelope(envelope)
         source_queue = receipt.queue_name or envelope.queue_name
         dead_queue = f"{source_queue}.dead"
         return self.enqueue(
@@ -87,4 +91,4 @@ class CeleryQueueAdapter:
 
 def build_celery_task_payload(envelope: QueueEnvelope) -> str:
     """Serialize a queue envelope for external Celery workers."""
-    return serialize_queue_record(envelope)
+    return serialize_queue_record(materialize_queue_envelope(envelope))

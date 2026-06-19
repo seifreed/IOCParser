@@ -11,6 +11,7 @@ from iocparser.infrastructure.logger import get_logger
 from iocparser.infrastructure.queue_records import (
     build_invalid_payload_record,
     import_optional_backend_module,
+    materialize_queue_envelope,
     load_queue_record,
     serialize_queue_record,
 )
@@ -159,6 +160,7 @@ class RabbitMQQueueAdapter:
                 pika = _pika_module()
                 channel = self._channel_for()
                 channel.queue_declare(queue=queue_name, durable=True)
+                envelope = materialize_queue_envelope(envelope)
                 message_id = envelope.request.job_id or str(uuid4())
                 channel.basic_publish(
                     exchange="",
@@ -217,6 +219,7 @@ class RabbitMQQueueAdapter:
     def requeue(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
         with self._lock:
             try:
+                envelope = materialize_queue_envelope(envelope)
                 new_receipt = self.enqueue(queue_name=receipt.queue_name, envelope=envelope)
                 self.ack(receipt)
                 return new_receipt
@@ -229,6 +232,7 @@ class RabbitMQQueueAdapter:
     def dead_letter(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
         with self._lock:
             try:
+                envelope = materialize_queue_envelope(envelope)
                 new_receipt = self.enqueue(
                     queue_name=f"{receipt.queue_name}{self.dead_letter_suffix}",
                     envelope=envelope,

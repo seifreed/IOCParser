@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from importlib import import_module
 from types import ModuleType
 from typing import TYPE_CHECKING, cast
+from uuid import uuid4
 
 from iocparser.errors import IOCParserError
 
@@ -38,6 +40,32 @@ def queue_payload_type_error() -> TypeError:
 def serialize_queue_record(envelope: QueueEnvelope) -> str:
     """Encode a queue envelope to its canonical JSON string (decode: load_queue_record)."""
     return json.dumps(envelope.to_record(), sort_keys=True)
+
+
+def materialize_queue_envelope(envelope: QueueEnvelope) -> QueueEnvelope:
+    from iocparser.domain.pipeline import PipelineJobRequest
+
+    request = envelope.request
+    job_id = getattr(request, "job_id", None) or str(uuid4())
+    correlation_id = getattr(request, "correlation_id", None) or job_id
+    if getattr(request, "job_id", None) == job_id and getattr(request, "correlation_id", None) == correlation_id:
+        return envelope
+    materialized_request = PipelineJobRequest(
+        input_kind=getattr(request, "input_kind"),
+        source_value=getattr(request, "source_value"),
+        file_type=getattr(request, "file_type", None),
+        persist=getattr(request, "persist", False),
+        db_uri=getattr(request, "db_uri", None),
+        check_warnings=getattr(request, "check_warnings", True),
+        force_update=getattr(request, "force_update", False),
+        defang=getattr(request, "defang", True),
+        only=getattr(request, "only", None),
+        exclude=getattr(request, "exclude", None),
+        correlation_id=correlation_id,
+        job_id=job_id,
+        emit_only=getattr(request, "emit_only", False),
+    )
+    return replace(envelope, request=materialized_request)
 
 
 def build_invalid_payload_record(

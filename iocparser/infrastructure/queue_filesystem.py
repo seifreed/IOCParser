@@ -7,7 +7,11 @@ from pathlib import Path
 from uuid import uuid4
 
 from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
-from iocparser.infrastructure.queue_records import load_queue_record, serialize_queue_record
+from iocparser.infrastructure.queue_records import (
+    load_queue_record,
+    materialize_queue_envelope,
+    serialize_queue_record,
+)
 
 INVALID_QUEUE_NAME_ERROR = "Invalid queue name"
 INVALID_RECEIPT_PATH_ERROR = "Invalid filesystem queue receipt"
@@ -43,6 +47,7 @@ class FilesystemQueueAdapter:
         temp_path.rename(target)
 
     def enqueue(self, *, queue_name: str, envelope: QueueEnvelope) -> QueueReceipt:
+        envelope = materialize_queue_envelope(envelope)
         message_id = envelope.request.job_id or str(uuid4())
         queue_dir = self._queue_dir(queue_name, "pending")
         receipt_path = queue_dir / f"{_safe_filename_component(message_id)}-{uuid4().hex}.json"
@@ -85,6 +90,7 @@ class FilesystemQueueAdapter:
         self._receipt_path(receipt).unlink(missing_ok=True)
 
     def requeue(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
+        envelope = materialize_queue_envelope(envelope)
         queue_dir = self._queue_dir(receipt.queue_name, "pending")
         processing_path = self._receipt_path(receipt)
         message_name = _safe_filename_component(envelope.request.job_id or str(uuid4()))
@@ -103,6 +109,7 @@ class FilesystemQueueAdapter:
         )
 
     def dead_letter(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
+        envelope = materialize_queue_envelope(envelope)
         processing_path = self._receipt_path(receipt)
         dead_dir = self._queue_dir(receipt.queue_name, "dead")
         target = dead_dir / processing_path.name

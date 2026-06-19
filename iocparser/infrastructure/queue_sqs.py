@@ -9,6 +9,7 @@ from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
 from iocparser.infrastructure.queue_records import (
     build_invalid_payload_record,
     import_optional_backend_module,
+    materialize_queue_envelope,
     load_queue_record,
     serialize_queue_record,
 )
@@ -75,6 +76,7 @@ class SQSQueueAdapter:
         return self._queue_urls.get(queue_name, self.queue_url)
 
     def _send_envelope(self, *, queue_url: str, envelope: QueueEnvelope) -> str:
+        envelope = materialize_queue_envelope(envelope)
         response = self.client.send_message(
             QueueUrl=queue_url,
             MessageBody=serialize_queue_record(envelope),
@@ -132,6 +134,7 @@ class SQSQueueAdapter:
 
     def requeue(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
         with self._lock:
+            envelope = materialize_queue_envelope(envelope)
             resolved_url = self._resolve_queue_url(receipt.queue_name)
             message_id = self._send_envelope(queue_url=resolved_url, envelope=envelope)
             self.client.delete_message(QueueUrl=resolved_url, ReceiptHandle=receipt.receipt_id)
@@ -163,6 +166,7 @@ class SQSQueueAdapter:
         with self._lock:
             if not self.dead_letter_queue_url:
                 raise RuntimeError(MISSING_DEAD_LETTER_QUEUE_ERROR)
+            envelope = materialize_queue_envelope(envelope)
             target_queue = self.dead_letter_queue_url
             dead_queue_name = f"{receipt.queue_name}.dead"
             response = self.client.send_message(

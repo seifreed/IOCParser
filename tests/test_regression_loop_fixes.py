@@ -25,7 +25,7 @@ from iocparser.domain.models import (
     PersistedRunDiff,
 )
 from iocparser.domain.distributed import DeadLetterRecord, DistributedJobRecord, QueueEnvelope
-from iocparser.domain.pipeline import PipelineErrorInfo, PipelineJobRequest
+from iocparser.domain.pipeline import PipelineErrorInfo, PipelineJobRequest, ResourceLimits
 from iocparser.infrastructure.extraction import IOCExtractor
 from iocparser.infrastructure.file_parser import decode_file_bytes, wrap_binary_stream_for_bom
 from iocparser.infrastructure.file_readers import MagicTextSourceReader
@@ -289,6 +289,17 @@ def test_distributed_records_reject_bool_counters() -> None:
             error=PipelineErrorInfo(code="x", category="y", retryable=False, status="failed", message="z"),
             dead_lettered_at="2026-01-01T00:00:00+00:00",
         )
+
+
+def test_resource_limits_reject_bool_values() -> None:
+    with pytest.raises(TypeError, match="max_workers"):
+        ResourceLimits(max_workers=True)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="max_queue_size"):
+        ResourceLimits(max_queue_size=False)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="max_input_size_bytes"):
+        ResourceLimits(max_input_size_bytes=True)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="max_input_seconds"):
+        ResourceLimits(max_input_seconds=False)  # type: ignore[arg-type]
 
 
 def test_idempotency_key_for_missing_file_does_not_raise(tmp_path: Path) -> None:

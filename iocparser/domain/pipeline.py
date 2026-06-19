@@ -10,6 +10,18 @@ BATCH_REPORT_SCHEMA_VERSION = "1.0"
 PIPELINE_JOB_SCHEMA_VERSION = "1.0"
 
 
+def _require_int(value: object, *, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TypeError(f"Expected {field} to be int, got {type(value).__name__}")
+    return value
+
+
+def _require_number(value: object, *, field: str) -> int | float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TypeError(f"Expected {field} to be numeric, got {type(value).__name__}")
+    return value
+
+
 @dataclass(frozen=True)
 class ResourceLimits:
     """Operational limits for pipeline execution."""
@@ -24,6 +36,38 @@ class ResourceLimits:
     skip_processed: bool = False
 
     def __post_init__(self) -> None:
+        if self.max_input_size_bytes is not None:
+            object.__setattr__(
+                self,
+                "max_input_size_bytes",
+                _require_int(self.max_input_size_bytes, field="max_input_size_bytes"),
+            )
+        if self.max_input_seconds is not None:
+            object.__setattr__(
+                self,
+                "max_input_seconds",
+                _require_number(self.max_input_seconds, field="max_input_seconds"),
+            )
+        if self.memory_limit_bytes is not None:
+            object.__setattr__(
+                self,
+                "memory_limit_bytes",
+                _require_int(self.memory_limit_bytes, field="memory_limit_bytes"),
+            )
+        if self.cpu_seconds is not None:
+            object.__setattr__(
+                self,
+                "cpu_seconds",
+                _require_int(self.cpu_seconds, field="cpu_seconds"),
+            )
+        if self.hard_timeout_seconds is not None:
+            object.__setattr__(
+                self,
+                "hard_timeout_seconds",
+                _require_int(self.hard_timeout_seconds, field="hard_timeout_seconds"),
+            )
+        object.__setattr__(self, "max_workers", _require_int(self.max_workers, field="max_workers"))
+        object.__setattr__(self, "max_queue_size", _require_int(self.max_queue_size, field="max_queue_size"))
         if self.max_input_size_bytes is not None and self.max_input_size_bytes < 0:
             object.__setattr__(self, "max_input_size_bytes", None)
         if self.max_input_seconds is not None and self.max_input_seconds < 0:

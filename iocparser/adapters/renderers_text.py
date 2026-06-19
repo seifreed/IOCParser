@@ -76,4 +76,4 @@ def format_warning_item(warning: dict[str, str] | str) -> list[str]:
         if description:
             lines.append(f"  Description: {_require_str(description, field='description')}")
         return lines
-    return [str(warning)]
+    return [_require_str(warning, field="warning")]

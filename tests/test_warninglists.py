@@ -1528,6 +1528,12 @@ class TestWarningListsDiagnostic:
         with pytest.raises(TypeError, match="name to be string-like"):
             warning_lists._get_relevant_lists("domains", expected_lists=None)
 
+    def test_format_warning_item_rejects_non_string_warning(self):
+        from iocparser.adapters.renderers_text import format_warning_item
+
+        with pytest.raises(TypeError, match="Expected warning to be string"):
+            format_warning_item(object())  # type: ignore[arg-type]
+
     def test_diagnose_value_detection_found(self):
         """Test diagnostic tool when value is found."""
         import io

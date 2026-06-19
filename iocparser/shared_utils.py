@@ -71,13 +71,17 @@ def normalize_tokens(items: Iterable[str]) -> tuple[str, ...]:
 
 
 def normalize_metadata_values(metadata: Mapping[str, object]) -> dict[str, int | str | None]:
-    """Coerce each metadata value to int/str/None, stringifying anything else."""
-    return {
-        key: value
-        if (isinstance(value, int) and not isinstance(value, bool)) or isinstance(value, str) or value is None
-        else str(value)
-        for key, value in metadata.items()
-    }
+    """Coerce each metadata value to int/str/None, rejecting arbitrary objects."""
+    normalized: dict[str, int | str | None] = {}
+    for key, value in metadata.items():
+        if (isinstance(value, int) and not isinstance(value, bool)) or isinstance(value, str) or value is None:
+            normalized[key] = value
+            continue
+        if isinstance(value, bool):
+            normalized[key] = str(value)
+            continue
+        raise TypeError(f"Expected metadata value for {key} to be int/string/None, got {type(value).__name__}")
+    return normalized
 
 
 def parse_string_filters(value: object) -> tuple[str, ...]:

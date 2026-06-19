@@ -287,6 +287,8 @@ def test_cli_rendering_metadata_helpers_accept_strings() -> None:
         "count": 3,
         "name": "x",
     }
+    with pytest.raises(TypeError, match="Expected metadata value"):
+        normalize_metadata_values({"bad": object()})
 
 
 def test_cli_and_schema_integer_helpers_raise_validation_errors() -> None:
@@ -571,8 +573,8 @@ def test_pipeline_worker_private_helpers_cover_remaining_branches() -> None:
 
     adapter = _RunRepositoryAdapter(inner)
     assert adapter.create_run(source_id=1, tool_version="1", options=object(), metadata=None) == 7
-    adapter.create_run(source_id=1, tool_version="1", options=object(), metadata={"x": object()})
-    assert inner.metadata == {"x": str(inner.metadata["x"])}
+    with pytest.raises(TypeError, match="Expected metadata value"):
+        adapter.create_run(source_id=1, tool_version="1", options=object(), metadata={"x": object()})
     adapter.attach_iocs(
         run_id=1, ioc_ids=[1], result=ExtractionResult(iocs=(IOC.from_raw("domains", "a.test"),))
     )

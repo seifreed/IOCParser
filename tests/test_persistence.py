@@ -1037,6 +1037,38 @@ def test_query_service_does_not_wildcard_match_percent_in_legacy_url_source(tmp_
     ).total == 0
 
 
+def test_query_service_matches_canonical_url_against_legacy_trailing_slash_source(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-legacy-url-filter-trailing-slash.sqlite"
+    service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
+    service.persist_multiple_runs(
+        [
+            (
+                "url",
+                "https://example.test/report/",
+                ExtractionResult.from_grouped_payload({"domains": ["example.com"]}, {}),
+            )
+        ],
+        tool_version="5.0.0",
+        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+    )
+
+    checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
+    try:
+        with Session(checker.engine) as session:
+            source = session.execute(select(Source)).scalar_one()
+            source.normalized_url = None
+            session.commit()
+    finally:
+        checker.close()
+
+    assert service.query_runs_page(
+        limit=10, source_kind="url", source_value="https://example.test/report"
+    ).total == 1
+    assert service.search_iocs_page(
+        value="example.com", source_kind="url", source_value="https://example.test/report"
+    ).total == 1
+
+
 def test_query_service_ignores_blank_source_value_filters(tmp_path) -> None:
     db_path = tmp_path / "iocparser-blank-source-value.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")

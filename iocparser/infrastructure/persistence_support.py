@@ -126,6 +126,23 @@ def _url_filter_variants(value: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(variants))
 
 
+def legacy_url_value_clause(value: str) -> ClauseElement:
+    base_value = func.lower(func.trim(SourceModel.value))
+    clauses = [
+        base_value == candidate.lower()
+        for candidate in _url_filter_variants(value)
+    ]
+    clauses.extend(
+        base_value.like(
+            f"{candidate.lower().replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')}{suffix}%",
+            escape="\\",
+        )
+        for candidate in _url_filter_variants(value)
+        for suffix in ("#", "?")
+    )
+    return or_(*clauses) if len(clauses) > 1 else clauses[0]
+
+
 def source_value_clause(*, source_kind: str | None, source_value: str) -> ClauseElement:
     if source_kind is not None and not isinstance(source_kind, str):
         raise TypeError(f"Expected source_kind to be string-like, got {type(source_kind).__name__}")
@@ -138,20 +155,7 @@ def source_value_clause(*, source_kind: str | None, source_value: str) -> Clause
     clauses: list[ClauseElement] = [func.trim(SourceModel.value) == exact_value]
     clauses.extend(func.coalesce(SourceModel.normalized_url, "") == candidate for candidate in _url_filter_variants(exact_value))
     clauses.append(
-        and_(
-            SourceModel.normalized_url.is_(None),
-            or_(
-                func.lower(func.trim(SourceModel.value)) == exact_value.lower(),
-                func.lower(func.trim(SourceModel.value)).like(
-                    f"{exact_value.lower().replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')}#%",
-                    escape="\\",
-                ),
-                func.lower(func.trim(SourceModel.value)).like(
-                    f"{exact_value.lower().replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')}?%",
-                    escape="\\",
-                ),
-            ),
-        )
+        and_(SourceModel.normalized_url.is_(None), legacy_url_value_clause(exact_value))
     )
     return or_(*clauses) if len(clauses) > 1 else clauses[0]
 

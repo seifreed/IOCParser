@@ -48,6 +48,7 @@ from iocparser.infrastructure.persistence_schema import (
 )
 from iocparser.infrastructure.persistence_support import (
     build_summary,
+    legacy_url_value_clause,
     normalized_source_filter,
     prune_runs,
 )
@@ -227,22 +228,7 @@ def _existing_source(session: Session, row: dict[str, object]) -> SourceModel | 
             clauses.append(func.trim(SourceModel.value) == value)
         if normalized_url:
             clauses.append(SourceModel.normalized_url == normalized_url)
-        clauses.append(
-            and_(
-                SourceModel.normalized_url.is_(None),
-                or_(
-                    func.lower(func.trim(SourceModel.value)) == value.lower(),
-                    func.lower(func.trim(SourceModel.value)).like(
-                        f"{value.lower().replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')}#%",
-                        escape="\\",
-                    ),
-                    func.lower(func.trim(SourceModel.value)).like(
-                        f"{value.lower().replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')}?%",
-                        escape="\\",
-                    ),
-                ),
-            )
-        )
+        clauses.append(and_(SourceModel.normalized_url.is_(None), legacy_url_value_clause(value)))
         stmt = stmt.where(or_(*clauses)) if clauses else stmt.where(func.trim(SourceModel.value) == value)
         candidates = session.execute(stmt).scalars().all()
         for candidate in candidates:

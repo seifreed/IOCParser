@@ -48,7 +48,8 @@ def _report_string_value(
     raw_value = payload.get(key, default)
     if not isinstance(raw_value, str):
         raise TypeError(f"Expected {key} to be string, got {type(raw_value).__name__}")
-    return raw_value
+    stripped = raw_value.strip()
+    return stripped or default
 
 
 def _failed_items(items: object) -> list[dict[str, object]]:

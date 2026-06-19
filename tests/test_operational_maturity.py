@@ -1320,6 +1320,40 @@ def test_batch_job_persistence_uses_report_status_and_max_retry_attempt(tmp_path
     assert detail is not None
     assert detail.status == "failed"
     assert detail.retry_attempt == 2
+    failed_items = list_failed_batch_items(db_uri, batch_job_id=batch_job_id)
+    assert failed_items[0].error_type == "unknown"
+    assert failed_items[0].error_message == "timeout"
+
+    whitespace_report = {
+        "total": 1,
+        "successful": 0,
+        "failed": 1,
+        "status": " failed ",
+        "duration_ms": 50,
+        "items": [
+            {
+                "url": "https://whitespace.example",
+                "status": "failed",
+                "error_type": " timeout ",
+                "error": " boom ",
+                "retry_attempt": 1,
+            },
+        ],
+    }
+    whitespace_job_id = persist_batch_job(
+        whitespace_report,
+        config=config,
+        source_kind="url",
+        run_ids=(),
+        effective_config={},
+    )
+    assert whitespace_job_id is not None
+    whitespace_detail = PersistenceClient(db_uri).get_batch_job(batch_job_id=whitespace_job_id)
+    assert whitespace_detail is not None
+    assert whitespace_detail.status == "failed"
+    whitespace_items = list_failed_batch_items(db_uri, batch_job_id=whitespace_job_id)
+    assert whitespace_items[0].error_type == "timeout"
+    assert whitespace_items[0].error_message == "boom"
 
 
 def test_batch_job_persistence_uses_report_phase_timestamps(tmp_path: Path) -> None:

@@ -96,9 +96,8 @@ class DistributedWorkerService:
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception:
-            # Return what was already processed this cycle, not 0. Discarding the count
-            # made run_forever back off as if the queue were empty after a mid-cycle failure.
             logger.exception("Error during worker run_once")
+            raise
         return processed
 
     def run_forever(  # noqa: C901

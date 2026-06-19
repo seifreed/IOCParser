@@ -357,7 +357,7 @@ def test_worker_main_handles_keyboard_interrupt(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_worker_service_survives_thread_exception():
-    """Worker loop must not die when a thread raises an exception."""
+    """Worker loop must surface thread exceptions."""
     calls = [0]
 
     def fail_once(**_kwargs):
@@ -369,7 +369,8 @@ def test_worker_service_survives_thread_exception():
     w = DistributedWorkerService(
         service=svc, queue_name="t", poll_interval_seconds=0.0, max_messages_per_cycle=1
     )
-    assert w.run_forever(max_cycles=2) == 0
+    with pytest.raises(RuntimeError, match="boom"):
+        w.run_forever(max_cycles=2)
 
 
 def test_worker_service_single_worker_sleep_on_empty():
@@ -429,6 +430,18 @@ def test_worker_service_survives_run_once_exception():
         w.run_forever(max_cycles=1)
 
 
+def test_worker_service_propagates_run_once_exceptions():
+    """run_once must not swallow worker failures."""
+    svc = _SimpleNamespace(
+        process_next=lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom"))
+    )
+    w = DistributedWorkerService(
+        service=svc, queue_name="r", poll_interval_seconds=0.0, max_messages_per_cycle=1
+    )
+    with pytest.raises(RuntimeError, match="boom"):
+        w.run_once()
+
+
 def test_worker_service_propagates_keyboard_interrupt_run_once():
     """run_once must propagate KeyboardInterrupt without silencing."""
     svc = _SimpleNamespace(
@@ -473,10 +486,8 @@ def test_worker_service_propagates_keyboard_interrupt_forever():
             w.run_forever(max_cycles=1)
 
 
-def test_run_once_returns_count_processed_before_a_mid_cycle_exception():
-    """Regression: when process_next raises mid-cycle, run_once must report the
-    messages already processed this cycle, not 0 -- otherwise run_forever backs off
-    as if the queue were empty and the throughput total under-counts."""
+def test_run_once_propagates_mid_cycle_exception():
+    """run_once must not hide worker failures."""
     calls = [0]
 
     def process(**_kwargs):
@@ -489,7 +500,8 @@ def test_run_once_returns_count_processed_before_a_mid_cycle_exception():
     w = DistributedWorkerService(
         service=svc, queue_name="t", poll_interval_seconds=0.0, max_messages_per_cycle=5
     )
-    assert w.run_once() == 1
+    with pytest.raises(RuntimeError, match="boom on second message"):
+        w.run_once()
 
 
 def test_run_once_breaks_immediately_when_stop_event_is_set():

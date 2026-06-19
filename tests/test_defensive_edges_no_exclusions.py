@@ -1323,6 +1323,7 @@ def test_strict_coverage_option_and_metadata_edge_helpers() -> None:
         validated_stix_types,
         validated_tag_mode,
     )
+    from iocparser.cli_args_values import validated_stix_types as validated_cli_stix_types
     from iocparser.cli_output_rendering import (
         int_run_metadata_value,
         optional_int_run_metadata_value,
@@ -1335,6 +1336,8 @@ def test_strict_coverage_option_and_metadata_edge_helpers() -> None:
 
     assert bool_option("ON") is True
     assert validated_ioc_type_filter("   ") is None
+    with pytest.raises(ValidationError, match="Invalid IOC type for --stix-types"):
+        validated_cli_stix_types(1)  # type: ignore[arg-type]
     with pytest.raises(ValidationError, match="Invalid ISO date"):
         validated_iso_datetime(1)  # type: ignore[arg-type]
     with pytest.raises(ValidationError, match="Invalid min_severity"):

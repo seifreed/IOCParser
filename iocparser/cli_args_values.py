@@ -28,7 +28,7 @@ INTEGER_VALUE_REQUIRED = "{field_name} requires an integer value"
 INVALID_IOC_TYPE_FILTER = "Invalid IOC type for {flag}: {value}"
 
 
-def validated_stix_types(value: str | None) -> str | None:
+def validated_stix_types(value: object | None) -> str | None:
     """Validate a --stix-types value at the CLI boundary, returning it unchanged.
 
     The STIX renderer parses this string with parse_ioc_types, which raises a bare
@@ -38,6 +38,10 @@ def validated_stix_types(value: str | None) -> str | None:
     """
     if value is None:
         return None
+    if not isinstance(value, str):
+        raise ValidationError(
+            INVALID_IOC_TYPE_FILTER.format(flag="--stix-types", value=value)
+        )
     try:
         parse_ioc_types(value)
     except ValueError as exc:

@@ -1286,6 +1286,28 @@ class TestProcessMultipleFiles:
                 if file_path.exists():
                     file_path.unlink()
 
+    def test_process_multiple_files_expands_user_home(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        home = tmp_path / "home"
+        home.mkdir()
+        sample = home / "sample.txt"
+        sample.write_text("malware-single.com\n", encoding="utf-8")
+        monkeypatch.setenv("HOME", str(home))
+
+        results = process_multiple_files(
+            [Path("~/sample.txt")],
+            file_type="text",
+            defang=False,
+            check_warnings=False,
+            max_workers=1,
+        )
+
+        assert str(sample) in results
+        normal_iocs, warning_iocs = results[str(sample)]
+        assert normal_iocs
+        assert warning_iocs == {}
+
     def test_process_multiple_files_with_error(self) -> None:
         """Test processing multiple files surfaces validation errors."""
         files = []

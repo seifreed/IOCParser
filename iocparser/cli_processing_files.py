@@ -490,6 +490,7 @@ def process_multiple_files(
     warning_service: WarningListService | None,
     request: MultiFileProcessingRequest,
 ) -> BatchResults:
+    file_paths = [path.expanduser() for path in file_paths]
     options = request.to_processing_options()
     duplicate_paths = len({str(path) for path in file_paths}) != len(file_paths)
     if request.streaming:

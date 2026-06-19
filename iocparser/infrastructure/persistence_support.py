@@ -104,6 +104,12 @@ def normalized_source_filter(value: str) -> str:
     return value.strip().lower()
 
 
+def _require_str(value: object, *, field: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"Expected {field} to be string-like, got {type(value).__name__}")
+    return value
+
+
 def normalized_url_filter(value: str) -> str | None:
     normalized = normalize_url_value(value)
     return normalized if normalized is not None else None
@@ -130,8 +136,12 @@ def _url_filter_variants(value: str) -> tuple[str, ...]:
 
 
 def source_value_clause(*, source_kind: str | None, source_value: str) -> ClauseElement:
-    normalized_kind = str(source_kind).strip().lower() if source_kind is not None else ""
-    exact_value = str(source_value).strip()
+    normalized_kind = (
+        normalized_source_filter(_require_str(source_kind, field="source_kind"))
+        if source_kind is not None
+        else ""
+    )
+    exact_value = _require_str(source_value, field="source_value").strip()
     url_variants = _url_filter_variants(exact_value) if normalized_kind == "url" else ()
     if normalized_kind == "url":
         clauses: list[ClauseElement] = [SourceModel.value == exact_value]

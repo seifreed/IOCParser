@@ -80,6 +80,7 @@ from iocparser.infrastructure.persistence_repository_support import (
 )
 from iocparser.infrastructure.persistence_schema import IOCModel, RunIOCModel, RunModel, SourceModel
 from iocparser.infrastructure.persistence_support import _evidence_from_json, _json_list, _tags_from_json
+from iocparser.infrastructure.persistence_support import source_value_clause
 from iocparser.infrastructure.queue_rabbitmq import _load_queue_record as load_rabbit_queue_record
 from iocparser.infrastructure.queue_records import load_queue_record
 from iocparser.infrastructure.warninglists_matching import WarningListMatchingMixin
@@ -439,6 +440,10 @@ def test_persistence_helper_functions_cover_conversion_edges() -> None:
     assert _int_metadata_value({"count": "4"}, "count", 0) == 4
     assert _optional_int_metadata_value({"count": "5"}, "count") == 5
     assert _ioc_type_name("domains") == "domains"
+    with pytest.raises(TypeError, match="source_kind"):
+        source_value_clause(source_kind=1, source_value="x")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="source_value"):
+        source_value_clause(source_kind="url", source_value=1)  # type: ignore[arg-type]
 
 
 def test_persistence_history_and_page_query_helpers_cover_remaining_branches() -> None:

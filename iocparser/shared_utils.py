@@ -84,9 +84,6 @@ def normalize_metadata_values(metadata: Mapping[str, object]) -> dict[str, int |
         if (isinstance(value, int) and not isinstance(value, bool)) or isinstance(value, str) or value is None:
             normalized[key] = value
             continue
-        if isinstance(value, bool):
-            normalized[key] = str(value)
-            continue
         raise TypeError(f"Expected metadata value for {key} to be int/string/None, got {type(value).__name__}")
     return normalized
 

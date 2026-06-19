@@ -301,11 +301,12 @@ def test_cli_rendering_metadata_helpers_accept_strings() -> None:
     metadata = {"duration_ms": "4", "processed_items": "5"}
     assert _int_run_metadata_value(metadata, "processed_items", 0) == 5
     assert _optional_int_run_metadata_value(metadata, "duration_ms") == 4
-    assert normalize_metadata_values({"flag": True, "count": 3, "name": "x"}) == {
-        "flag": "True",
+    assert normalize_metadata_values({"count": 3, "name": "x"}) == {
         "count": 3,
         "name": "x",
     }
+    with pytest.raises(TypeError, match="Expected metadata value for flag"):
+        normalize_metadata_values({"flag": True})
     with pytest.raises(TypeError, match="Expected metadata value"):
         normalize_metadata_values({"bad": object()})
 

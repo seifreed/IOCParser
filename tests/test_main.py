@@ -178,6 +178,13 @@ class TestArgumentHelpers:
         with pytest.raises(ValidationError, match="enabled requires a boolean value"):
             get_bool_arg(args, "enabled")
 
+    def test_get_bool_arg_rejects_non_binary_ints(self) -> None:
+        """Test get_bool_arg rejects integers other than 0 and 1."""
+        args = argparse.Namespace(enabled=2)
+
+        with pytest.raises(ValidationError, match="enabled requires a boolean value"):
+            get_bool_arg(args, "enabled")
+
     def test_get_int_arg_with_value(self) -> None:
         """Test get_int_arg returns integer when attribute exists."""
         args = argparse.Namespace(timeout=30, workers=4)

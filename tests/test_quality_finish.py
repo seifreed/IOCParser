@@ -29,6 +29,7 @@ from iocparser.cli_output import print_batch_report, save_batch_report
 from iocparser.cli_output_rendering import (
     _int_run_metadata_value,
     _optional_int_run_metadata_value,
+    print_warning_lists,
 )
 from iocparser.cli_processing_single import process_single_input
 from iocparser.cli_processing_support import joined_type_filters, plugin_client
@@ -725,6 +726,11 @@ def test_renderers_cover_custom_stix_and_record_helpers() -> None:
     with pytest.raises(TypeError, match="Expected value to be string"):
         format_warning_item({"value": object(), "warning_list": "wl"})
     assert renderer_json_object("[]") == {}
+
+
+def test_print_warning_lists_rejects_non_string_fields() -> None:
+    with pytest.raises(TypeError, match="Expected value to be string"):
+        print_warning_lists({"domains": [{"value": object(), "warning_list": "wl", "description": ""}]})
 
 
 def test_schema_version_accepts_string_rows(tmp_path: Path) -> None:

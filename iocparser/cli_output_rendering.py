@@ -301,6 +301,12 @@ def _write(text: str, stream: TextIO | None = None) -> None:
     (stream if stream is not None else sys.stdout).write(text + "\n")
 
 
+def _require_str(value: object, *, field: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"Expected {field} to be string, got {type(value).__name__}")
+    return value
+
+
 def print_warning_lists(
     warnings: dict[str, list[dict[str, str]]], *, stream: TextIO | None = None
 ) -> None:
@@ -310,11 +316,14 @@ def print_warning_lists(
     for ioc_type, type_warnings in warnings.items():
         _write(f"\n{color_yellow}IOCs of type {ioc_type} with warnings:{style_reset}", stream)
         for warning in type_warnings:
+            value = _require_str(warning["value"], field="value")
+            warning_list = _require_str(warning["warning_list"], field="warning_list")
+            description = _require_str(warning["description"], field="description")
             _write(
-                f"  {color_red}- {warning['value']} - List: {warning['warning_list']}{style_reset}",
+                f"  {color_red}- {value} - List: {warning_list}{style_reset}",
                 stream,
             )
-            _write(f"    {color_yellow}Description: {warning['description']}{style_reset}", stream)
+            _write(f"    {color_yellow}Description: {description}{style_reset}", stream)
 
 
 def display_results(

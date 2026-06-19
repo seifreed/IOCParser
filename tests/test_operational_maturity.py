@@ -2030,6 +2030,23 @@ def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_pa
     assert import_history_raw(db_uri, {"sources": [{"id": 1, "kind": "text", "value": "x"}]})[
         "sources"
     ] == 0
+    assert (
+        import_history_raw(
+            db_uri,
+            {
+                "sources": [
+                    {
+                        "id": 2,
+                        "kind": " ",
+                        "value": "x",
+                        "first_seen": timestamp,
+                        "last_seen": timestamp,
+                    }
+                ]
+            },
+        )["sources"]
+        == 0
+    )
     assert import_history_raw(
         db_uri, {"iocs": [{"id": 1, "ioc_type": None, "value": "x", "is_warning": False}]}
     )["iocs"] == 0
@@ -2042,6 +2059,22 @@ def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_pa
     assert import_history_raw(
         db_uri, {"batch_jobs": [{"id": 1, "source_kind": None, "started_at": None, "finished_at": None}]}
     )["batch_jobs"] == 0
+    assert (
+        import_history_raw(
+            db_uri,
+            {
+                "batch_jobs": [
+                    {
+                        "id": 2,
+                        "source_kind": " ",
+                        "started_at": timestamp,
+                        "finished_at": timestamp,
+                    }
+                ]
+            },
+        )["batch_jobs"]
+        == 0
+    )
     valid_source = {
         "id": 1,
         "kind": "text",

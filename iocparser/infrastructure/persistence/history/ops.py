@@ -324,8 +324,6 @@ def _public_job_id(model: DistributedJobModel | DeadLetterJobModel) -> str:
     if isinstance(original_job_id, str) and original_job_id.strip() and marker is not None:
         return original_job_id
     return model.job_id
-
-
 def _run_ioc_signature(session: Session, *, run_id: int) -> tuple[tuple[int, str, str, str], ...]:
     rows = session.execute(
         select(
@@ -351,8 +349,6 @@ def _run_ioc_signature(session: Session, *, run_id: int) -> tuple[tuple[int, str
         )
         for ioc_id, severity, tags_json, evidence_json in rows
     )
-
-
 def _existing_run(
     session: Session,
     row: dict[str, object],
@@ -404,8 +400,6 @@ def _existing_run(
         ):
             return candidate
     return None
-
-
 def _existing_run_ioc(session: Session, *, run_id: int, ioc_id: int) -> RunIOCModel | None:
     return session.execute(
         select(RunIOCModel).where(RunIOCModel.run_id == run_id, RunIOCModel.ioc_id == ioc_id)
@@ -506,6 +500,8 @@ def _import_sources(session: Session, rows: list[dict[str, object]]) -> tuple[in
         ):
             continue
         kind = normalized_source_filter(str(typed.get("kind", "")))
+        if not kind:
+            continue
         typed["kind"] = kind
         if kind == "url":
             typed["original_url"] = typed.get("original_url") or typed.get("value")
@@ -531,7 +527,6 @@ def _import_sources(session: Session, rows: list[dict[str, object]]) -> tuple[in
         if isinstance(original_id, int):
             source_map[original_id] = existing.id
     return inserted, source_map
-
 def _import_iocs(session: Session, rows: list[dict[str, object]]) -> tuple[int, dict[int, int]]:
     inserted = 0
     ioc_map: dict[int, int] = {}
@@ -584,6 +579,8 @@ def _import_batch_jobs(
         ):
             continue
         typed["source_kind"] = normalized_source_filter(str(typed.get("source_kind", "")))
+        if not typed["source_kind"]:
+            continue
         typed["status"] = _normalized_text(typed.get("status"), default="queued")
         typed["error_summary_json"] = _json_without_import_marker(
             _normalized_text(typed.get("error_summary_json"), default="{}")

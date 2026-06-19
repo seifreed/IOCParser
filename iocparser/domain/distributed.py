@@ -75,6 +75,8 @@ def _require_int(value: object, *, field: str, non_negative: bool = False) -> in
     if non_negative and value < 0:
         raise ValueError(f"Expected {field} to be non-negative")
     return value
+
+
 @dataclass(frozen=True)
 class QueueEnvelope:
     """Machine-readable queue message for distributed processing."""
@@ -89,12 +91,12 @@ class QueueEnvelope:
     submitted_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def __post_init__(self) -> None:
+        queue_backend = _require_str(self.queue_backend, field="queue_backend", non_empty=True).strip().lower()
+        queue_name = _require_str(self.queue_name, field="queue_name", non_empty=True).strip()
         object.__setattr__(
-            self, "queue_backend", _require_str(self.queue_backend, field="queue_backend", non_empty=True)
+            self, "queue_backend", queue_backend
         )
-        object.__setattr__(
-            self, "queue_name", _require_str(self.queue_name, field="queue_name", non_empty=True)
-        )
+        object.__setattr__(self, "queue_name", queue_name)
         object.__setattr__(
             self, "schema_version", _require_str(self.schema_version, field="schema_version", non_empty=True)
         )

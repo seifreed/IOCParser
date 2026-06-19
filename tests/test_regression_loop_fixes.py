@@ -299,6 +299,21 @@ def test_distributed_records_reject_bool_counters() -> None:
         )
 
 
+def test_queue_envelope_normalizes_backend_and_name() -> None:
+    request = PipelineJobRequest(input_kind="text", source_value="x")
+
+    envelope = QueueEnvelope(
+        request=request,
+        queue_backend="  FILESYSTEM  ",
+        queue_name="  default  ",
+    )
+
+    assert envelope.queue_backend == "filesystem"
+    assert envelope.queue_name == "default"
+    assert envelope.to_record()["queue_backend"] == "filesystem"
+    assert envelope.to_record()["queue_name"] == "default"
+
+
 def test_resource_limits_reject_bool_values() -> None:
     with pytest.raises(TypeError, match="max_workers"):
         ResourceLimits(max_workers=True)  # type: ignore[arg-type]

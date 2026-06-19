@@ -9,6 +9,7 @@ import pytest
 
 from iocparser.distributed_pipeline import DistributedPipelineService
 from iocparser.domain.pipeline import PipelineJobRequest
+from iocparser.errors import ValidationError
 from iocparser.infrastructure.queue_filesystem import FilesystemQueueAdapter
 from iocparser.pipeline_worker import PipelineWorker
 from iocparser.worker_config import WorkerServiceConfig
@@ -125,6 +126,14 @@ max_input_seconds = 2.5
     assert config.memory_limit_bytes == 8192
     assert config.max_queue_size == 11
     assert config.skip_processed is True
+
+
+def test_worker_config_rejects_invalid_numeric_ini_values(tmp_path: Path) -> None:
+    config_path = tmp_path / "worker.ini"
+    config_path.write_text("[worker]\nmax_cycles = nope\n", encoding="utf-8")
+
+    with pytest.raises(ValidationError, match=r"worker\.ini"):
+        WorkerServiceConfig.from_sources(str(config_path))
 
 
 def test_worker_config_runtime_section_preserves_network_queue_limits(tmp_path: Path) -> None:

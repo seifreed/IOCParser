@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import configparser
 import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from iocparser.errors import ValidationError
 from iocparser.domain.pipeline import ResourceLimits
 from iocparser.worker_config_support import (
     bool_env,
@@ -75,7 +77,10 @@ class WorkerServiceConfig:
     def from_sources(cls, config_path: str | None = None) -> WorkerServiceConfig:
         """Load worker runtime settings from INI config plus environment overrides."""
         resolved_path = resolve_config_path(config_path)
-        file_values = load_worker_file_values(resolved_path)
+        try:
+            file_values = load_worker_file_values(resolved_path)
+        except (configparser.Error, ValueError) as exc:
+            raise ValidationError(f"Invalid worker config file {resolved_path}: {exc}") from exc
         poll_interval_default = _non_negative_float_or_default(
             float_or(file_values["poll_interval_seconds"], 1.0), 1.0
         )

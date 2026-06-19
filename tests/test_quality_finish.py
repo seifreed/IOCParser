@@ -14,6 +14,7 @@ import pytest
 
 from iocparser import cli_processing_single
 from iocparser.adapters.renderers import (
+    JSONOutputRenderer,
     STIXOutputRenderer,
     TextOutputRenderer,
     _record_dict_list,
@@ -731,6 +732,14 @@ def test_renderers_cover_custom_stix_and_record_helpers() -> None:
 
     with pytest.raises(TypeError, match="Expected raw_value to be string"):
         TextOutputRenderer(include_context=True).render(_BadContextResult(iocs=()))
+    class _BadJsonGroupedResult(ExtractionResult):
+        def canonical_by_type(self) -> dict[object, tuple[object, ...]]:
+            return {"domains": (1,)}
+
+    with pytest.raises(TypeError, match="Expected value to be string"):
+        renderer_json_object(
+            JSONOutputRenderer().render(_BadJsonGroupedResult(iocs=()))
+        )
     assert _record_string_list({"tags": "bad"}, "tags") == ()
     assert _record_dict_list({"evidence": "bad"}, "evidence") == []
     with pytest.raises(TypeError, match="Expected tags entries to be string"):

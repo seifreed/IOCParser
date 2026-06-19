@@ -15,6 +15,12 @@ from iocparser.rendering_support import (
 )
 
 
+def _require_str(value: object, *, field: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"Expected {field} to be string, got {type(value).__name__}")
+    return value
+
+
 class JSONOutputRenderer(OutputRenderer):
     """Render extraction results as JSON."""
 
@@ -34,11 +40,7 @@ class JSONOutputRenderer(OutputRenderer):
             "total_count": result.total_count(),
         }
         for key, values in grouped.items():
-            payload[key] = (
-                sorted(str(v) for v in values)
-                if values and all(isinstance(v, str) for v in values)
-                else list(values)
-            )
+            payload[key] = sorted(_require_str(v, field="value") for v in values)
         if warnings:
             payload["warning_list_matches"] = warnings
         return serialize_pretty_json(payload)

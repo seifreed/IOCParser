@@ -37,6 +37,7 @@ from iocparser.infrastructure.persistence.history.row_values import bool_from_ro
 from iocparser.infrastructure.persistence.query.ops import _coerce_count
 from iocparser.infrastructure.persistence_migration_steps import _coerce_version_row
 from iocparser.infrastructure.persistence_fts import build_fts_query
+from iocparser.infrastructure.persistence.history.ops import _json_object
 from iocparser.infrastructure.streaming_chunks import read_chunks_with_prefix
 from iocparser.pipeline_worker_support import extract_result, prepare_input
 from iocparser.worker_config_support import load_worker_file_values
@@ -385,6 +386,13 @@ def test_worker_extract_result_expands_home_file_path(
 
     assert client.seen_path == str(sample)
     assert result.grouped_iocs() == {"domains": ["worker.example"]}
+
+
+def test_history_json_object_rejects_invalid_payloads() -> None:
+    with pytest.raises(ValueError, match="Invalid JSON object"):
+        _json_object("{bad")
+    with pytest.raises(ValueError, match="Expected JSON object"):
+        _json_object("[]")
 
 
 def test_fts_rebuild_indexes_normalized_value_search() -> None:

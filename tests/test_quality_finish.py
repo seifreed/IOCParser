@@ -555,8 +555,10 @@ def test_persistence_helper_functions_cover_conversion_edges() -> None:
 
 
 def test_persistence_history_and_page_query_helpers_cover_remaining_branches() -> None:
-    assert history_json_object("[]") == {}
-    assert history_json_object("{bad") == {}
+    with pytest.raises(ValueError, match="Expected JSON object"):
+        history_json_object("[]")
+    with pytest.raises(ValueError, match="Invalid JSON object"):
+        history_json_object("{bad")
     assert callable(query_runs_page)
     assert callable(search_iocs_page)
     with pytest.raises(TypeError):

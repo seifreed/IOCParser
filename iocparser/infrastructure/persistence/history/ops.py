@@ -111,10 +111,10 @@ def _normalized_ioc_type(value: str) -> str:
 def _json_object(raw_value: str) -> dict[str, object]:
     try:
         decoded: object = json.loads(raw_value or "{}")
-    except json.JSONDecodeError:
-        return {}
+    except json.JSONDecodeError as exc:
+        raise ValueError("Invalid JSON object") from exc
     if not isinstance(decoded, dict):
-        return {}
+        raise ValueError("Expected JSON object")
     return _string_key_mapping(decoded)
 
 def _is_int_like(value: object) -> bool:

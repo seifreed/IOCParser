@@ -153,7 +153,7 @@ class FileParser(ABC):
         Args:
             file_path: Path to the file to parse
         """
-        self.file_path = file_path
+        self.file_path = file_path if _is_remote_source(file_path) else str(Path(file_path).expanduser())
 
         # Verify the file exists if it's not a URL
         if not _is_remote_source(file_path) and not Path(self.file_path).is_file():

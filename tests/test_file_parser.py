@@ -264,6 +264,19 @@ class TestPDFParser:
 
         assert str(non_existent_path) in str(exc_info.value)
 
+    def test_pdf_parser_expands_user_home_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        home = tmp_path / "home"
+        home.mkdir()
+        pdf_path = home / "sample.pdf"
+        create_minimal_pdf(pdf_path, "example.com")
+        monkeypatch.setenv("HOME", str(home))
+
+        parser = PDFParser("~/sample.pdf")
+
+        assert parser.file_path == str(pdf_path)
+
     def test_pdf_parser_invalid_pdf_file(self, tmp_path: Path) -> None:
         """
         Test PDFParser raises PDFProcessingError for corrupted PDF.
@@ -503,6 +516,19 @@ class TestHTMLParser:
         with pytest.raises(FileExistenceError):
             HTMLParser(str(non_existent_path))
 
+    def test_html_parser_expands_user_home_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        home = tmp_path / "home"
+        home.mkdir()
+        html_path = home / "sample.html"
+        html_path.write_text("<html><body>x</body></html>", encoding="utf-8")
+        monkeypatch.setenv("HOME", str(home))
+
+        parser = HTMLParser("~/sample.html")
+
+        assert parser.file_path == str(html_path)
+
     def test_html_parser_url_skips_file_existence_check(self) -> None:
         """
         Test that HTMLParser doesn't validate file existence for URLs.
@@ -517,6 +543,19 @@ class TestHTMLParser:
 
         # Assert: Parser should be created successfully
         assert parser.file_path == test_url
+
+    def test_xml_parser_expands_user_home_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        home = tmp_path / "home"
+        home.mkdir()
+        xml_path = home / "sample.xml"
+        xml_path.write_text("<root>x</root>", encoding="utf-8")
+        monkeypatch.setenv("HOME", str(home))
+
+        parser = XMLParser("~/sample.xml")
+
+        assert parser.file_path == str(xml_path)
 
     def test_html_parser_invalid_html_local_file(self, tmp_path: Path) -> None:
         """

@@ -29,7 +29,7 @@ def get_output_filename(
                 base_name += "_" + path_parts[-1]
         base_name = re.sub(r"[^\w\-\.]", "_", base_name)
     else:
-        base_name = Path(input_source).stem
+        base_name = Path(input_source).expanduser().stem
 
     if len(base_name) > MAX_FILENAME_LENGTH:
         base_name = base_name[:MAX_FILENAME_LENGTH]

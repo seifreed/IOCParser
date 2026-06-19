@@ -632,6 +632,16 @@ class TestGetOutputFilename:
         result = get_output_filename("/path/to/document.html")
         assert result == "document_iocs.txt"
 
+    def test_get_output_filename_expands_user_home(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test output filename generation expands user-home paths."""
+        home = tmp_path / "home"
+        home.mkdir()
+        monkeypatch.setenv("HOME", str(home))
+        result = get_output_filename("~/sample.txt")
+        assert result == "sample_iocs.txt"
+
     def test_get_output_filename_json_format(self) -> None:
         """Test output filename generation with JSON format."""
         result = get_output_filename("data.txt", is_json=True)

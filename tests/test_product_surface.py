@@ -211,6 +211,11 @@ def test_batch_report_item_parses_retryable_bool_strings() -> None:
     assert invalid_ints["retry_attempt"] == 0
 
 
+def test_batch_report_item_rejects_non_string_error_fields() -> None:
+    with pytest.raises(TypeError, match="Expected status to be string"):
+        _report_item({"url": "https://bad.example", "status": object()})
+
+
 def test_retry_report_ignores_non_string_urls(tmp_path: Path) -> None:
     report_path = tmp_path / "bad-url-report.json"
     report_path.write_text(

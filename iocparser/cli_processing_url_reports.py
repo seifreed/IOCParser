@@ -247,24 +247,29 @@ def build_batch_report(context: BatchReportContext) -> BatchReport:
 
 
 def _set_batch_item_string(item: BatchItemReport, key: str, value: object) -> bool:
+    def require_string(field: str) -> str:
+        if not isinstance(value, str):
+            raise TypeError(f"Expected {field} to be string, got {type(value).__name__}")
+        return value
+
     if key == "url":
         if isinstance(value, str):
             item["url"] = value
         return True
     if key == "status":
-        item["status"] = str(value)
+        item["status"] = require_string("status")
         return True
     if key == "error":
-        item["error"] = str(value)
+        item["error"] = require_string("error")
         return True
     if key == "error_type":
-        item["error_type"] = str(value)
+        item["error_type"] = require_string("error_type")
         return True
     if key == "error_code":
-        item["error_code"] = str(value)
+        item["error_code"] = require_string("error_code")
         return True
     if key == "error_category":
-        item["error_category"] = str(value)
+        item["error_category"] = require_string("error_category")
         return True
     return False
 

@@ -28,6 +28,12 @@ IOCValue = str | int | float | bool | None
 logger = get_logger("iocparser.infrastructure.warninglists")
 
 
+def _require_str(value: object, *, field: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"Expected {field} to be string-like, got {type(value).__name__}")
+    return value
+
+
 class WarningListDiagnosticsMixin(ABC):
     """Diagnostic helpers for warning list matching."""
 
@@ -113,8 +119,8 @@ class WarningListDiagnosticsMixin(ABC):
         vals: list[IOCValue],
     ) -> None:
         """Log the result of checking a value against a warning list."""
-        name = warning_list.get("name", list_id)
-        list_type = warning_list.get("type", "string")
+        name = _require_str(warning_list.get("name", list_id), field="name")
+        list_type = _require_str(warning_list.get("type", "string"), field="type")
         matching_attrs = warning_list.get("matching_attributes", [])
 
         logger.info("\nChecking list: %s", name)
@@ -122,11 +128,10 @@ class WarningListDiagnosticsMixin(ABC):
         logger.info("  Matching attributes: %s", matching_attrs)
         logger.info("  Number of values: %s", len(vals))
 
-        list_type_str = str(list_type) if list_type is not None else "string"
-        if self._check_value_in_list(clean_val, vals, list_type_str):
+        if self._check_value_in_list(clean_val, vals, list_type):
             logger.info("  ✓ VALUE FOUND IN THIS LIST")
             if list_type in ("string", "hostname"):
-                self._log_matched_value(clean_val, vals, list_type_str)
+                self._log_matched_value(clean_val, vals, list_type)
         else:
             logger.info("  ✗ Value not in this list")
             if vals:
@@ -140,10 +145,8 @@ class WarningListDiagnosticsMixin(ABC):
         """Find relevant lists for diagnostics."""
         relevant_lists: list[tuple[str, WarningListDict]] = []
         for list_id, warning_list in self.warning_lists.items():
-            name_val = warning_list.get("name", "")
-            desc_val = warning_list.get("description", "")
-            name = str(name_val) if name_val is not None else ""
-            description = str(desc_val) if desc_val is not None else ""
+            name = _require_str(warning_list.get("name", ""), field="name")
+            description = _require_str(warning_list.get("description", ""), field="description")
 
             is_relevant = self._is_list_relevant_for_expected(
                 name, description, expected_lists
@@ -164,7 +167,10 @@ class WarningListDiagnosticsMixin(ABC):
         """Return normalized values list for a warning list."""
         values_raw = warning_list.get("list", [])
         if isinstance(values_raw, list):
-            return [str(v) if v is not None else None for v in values_raw]
+            return [
+                _require_str(v, field="warning list entry") if v is not None else None
+                for v in values_raw
+            ]
         return []
 
     def diagnose_value_detection(

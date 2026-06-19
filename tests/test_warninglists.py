@@ -1507,6 +1507,27 @@ class TestWarningListsAdditionalEdgeCases:
 class TestWarningListsDiagnostic:
     """Test diagnose_value_detection functionality."""
 
+    def test_warninglist_diagnostics_reject_non_string_entries(self):
+        warning_lists = make_warning_lists()
+
+        with pytest.raises(TypeError, match="warning list entry to be string-like"):
+            warning_lists._get_warning_list_values({"list": [object()]})
+
+    def test_warninglist_diagnostics_reject_non_string_metadata(self):
+        warning_lists = make_warning_lists()
+        warning_lists.warning_lists = {
+            "bad-meta": {
+                "name": object(),
+                "description": object(),
+                "type": "string",
+                "matching_attributes": ["domain"],
+                "list": ["example.com"],
+            }
+        }
+
+        with pytest.raises(TypeError, match="name to be string-like"):
+            warning_lists._get_relevant_lists("domains", expected_lists=None)
+
     def test_diagnose_value_detection_found(self):
         """Test diagnostic tool when value is found."""
         import io

@@ -224,6 +224,11 @@ def test_batch_report_item_rejects_non_string_error_fields() -> None:
         _report_item({"url": "https://bad.example", "status": object()})
 
 
+def test_batch_report_item_ignores_non_string_keys() -> None:
+    item = _report_item({1: "one", "url": "https://ok.example", "status": "failed"})
+    assert item == {"url": "https://ok.example", "status": "failed"}
+
+
 def test_retry_report_ignores_non_string_urls(tmp_path: Path) -> None:
     report_path = tmp_path / "bad-url-report.json"
     report_path.write_text(

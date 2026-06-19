@@ -103,7 +103,9 @@ def _report_items(payload: dict[str, object]) -> list[BatchItemReport]:
 def _report_item(entry: dict[object, object]) -> BatchItemReport:
     item: BatchItemReport = {}
     for key, value in entry.items():
-        key_str = str(key)
+        if not isinstance(key, str):
+            continue
+        key_str = key
         if _set_batch_item_string(item, key_str, value):
             continue
         if _set_batch_item_int(item, key_str, value):

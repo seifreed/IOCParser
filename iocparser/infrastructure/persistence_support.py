@@ -99,58 +99,42 @@ def parse_datetime(value: str | None) -> datetime | None:
         parsed = parsed.astimezone(UTC).replace(tzinfo=None)
     return parsed
 
-
 def normalized_source_filter(value: str) -> str:
     return value.strip().lower()
 
-
-def _require_str(value: object, *, field: str) -> str:
-    if not isinstance(value, str):
-        raise TypeError(f"Expected {field} to be string-like, got {type(value).__name__}")
-    return value
-
-
 def normalized_url_filter(value: str) -> str | None:
-    normalized = normalize_url_value(value)
-    return normalized if normalized is not None else None
-
+    return normalize_url_value(value)
 
 def _url_filter_variants(value: str) -> tuple[str, ...]:
-    variants: list[str] = []
-    normalized = normalized_url_filter(value)
+    normalized = normalize_url_value(value)
     if normalized is None:
         return ()
-    variants.append(normalized)
     parsed = urlsplit(normalized)
-    if parsed.query or parsed.fragment:
-        return tuple(dict.fromkeys(variant for variant in variants if variant))
-    if parsed.path.endswith("/") and parsed.path != "/":
-        variants.append(urlunsplit(parsed._replace(path=parsed.path.rstrip("/"))))
-    elif parsed.path == "/":
-        variants.append(urlunsplit(parsed._replace(path="")))
-    elif parsed.path:
-        variants.append(urlunsplit(parsed._replace(path=f"{parsed.path}/")))
-    else:
-        variants.append(urlunsplit(parsed._replace(path="/")))
-    return tuple(dict.fromkeys(variant for variant in variants if variant))
+    variants = [normalized]
+    if not parsed.query and not parsed.fragment:
+        if parsed.path.endswith("/") and parsed.path != "/":
+            variants.append(urlunsplit(parsed._replace(path=parsed.path.rstrip("/"))))
+        elif parsed.path == "/":
+            variants.append(urlunsplit(parsed._replace(path="")))
+        elif parsed.path:
+            variants.append(urlunsplit(parsed._replace(path=f"{parsed.path}/")))
+        else:
+            variants.append(urlunsplit(parsed._replace(path="/")))
+    return tuple(dict.fromkeys(variants))
 
 
 def source_value_clause(*, source_kind: str | None, source_value: str) -> ClauseElement:
-    normalized_kind = (
-        normalized_source_filter(_require_str(source_kind, field="source_kind"))
-        if source_kind is not None
-        else ""
-    )
-    exact_value = _require_str(source_value, field="source_value").strip()
-    url_variants = _url_filter_variants(exact_value) if normalized_kind == "url" else ()
-    if normalized_kind == "url":
-        clauses: list[ClauseElement] = [SourceModel.value == exact_value]
-        clauses.extend(
-            func.coalesce(SourceModel.normalized_url, "") == candidate
-            for candidate in (url_variants or ())
-        )
-        return or_(*clauses) if len(clauses) > 1 else clauses[0]
-    return SourceModel.value == exact_value
+    if source_kind is not None and not isinstance(source_kind, str):
+        raise TypeError(f"Expected source_kind to be string-like, got {type(source_kind).__name__}")
+    if not isinstance(source_value, str):
+        raise TypeError(f"Expected source_value to be string-like, got {type(source_value).__name__}")
+    normalized_kind = source_kind.strip().lower() if source_kind is not None else ""
+    exact_value = source_value.strip()
+    if normalized_kind != "url":
+        return SourceModel.value == exact_value
+    clauses: list[ClauseElement] = [SourceModel.value == exact_value]
+    clauses.extend(func.coalesce(SourceModel.normalized_url, "") == candidate for candidate in _url_filter_variants(exact_value))
+    return or_(*clauses) if len(clauses) > 1 else clauses[0]
 
 
 def build_summary(session: Session, run: RunModel) -> PersistedRunSummary:

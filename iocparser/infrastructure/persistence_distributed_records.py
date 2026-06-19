@@ -22,10 +22,10 @@ def to_iso(value: datetime | None) -> str | None:
 def _json_object(raw_value: str) -> dict[str, object]:
     try:
         decoded = cast("object", json.loads(raw_value or "{}"))
-    except json.JSONDecodeError:
-        return {}
+    except json.JSONDecodeError as exc:
+        raise ValueError("Invalid JSON object") from exc
     if not isinstance(decoded, dict):
-        return {}
+        raise ValueError("Expected JSON object")
     return {name: value for name, value in decoded.items() if isinstance(name, str)}
 
 

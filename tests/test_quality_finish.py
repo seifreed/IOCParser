@@ -512,8 +512,10 @@ def test_persistence_helper_functions_cover_conversion_edges() -> None:
     downloader.last_download_metadata = {1: "one", "two": 2}
     assert downloader.download_metadata() == {"two": 2}
 
-    assert record_json_object("[]") == {}
-    assert record_json_object("{bad") == {}
+    with pytest.raises(ValueError, match="Expected JSON object"):
+        record_json_object("[]")
+    with pytest.raises(ValueError, match="Invalid JSON object"):
+        record_json_object("{bad")
     assert _json_int_map(json.dumps({"a": "2"})) == {"a": 2}
     assert _json_int_map(json.dumps({"a": True, "b": "bad", "c": "-3"})) == {"c": -3}
     assert _json_list("{}") == []

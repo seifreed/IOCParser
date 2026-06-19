@@ -25,7 +25,13 @@ from iocparser.domain.models import (
     PersistedRunDiff,
     IOCEvidence,
 )
-from iocparser.domain.distributed import DeadLetterRecord, DistributedJobRecord, QueueEnvelope
+from iocparser.domain.distributed import (
+    DeadLetterRecord,
+    DistributedJobRecord,
+    QueueEnvelope,
+    QueueReceipt,
+    TelemetryEvent,
+)
 from iocparser.domain.pipeline import PipelineErrorInfo, PipelineJobRequest, ResourceLimits
 from iocparser.infrastructure.extraction import IOCExtractor
 from iocparser.infrastructure.file_parser import decode_file_bytes, wrap_binary_stream_for_bom
@@ -312,6 +318,55 @@ def test_queue_envelope_normalizes_backend_and_name() -> None:
     assert envelope.queue_name == "default"
     assert envelope.to_record()["queue_backend"] == "filesystem"
     assert envelope.to_record()["queue_name"] == "default"
+
+
+def test_distributed_queue_records_normalize_backend_and_name() -> None:
+    error = PipelineErrorInfo(code="x", category="y", retryable=False, status="failed", message="z")
+
+    receipt = QueueReceipt("  FILESYSTEM  ", "  jobs  ", " receipt ", " message ")
+    record = DistributedJobRecord(
+        job_id="job",
+        correlation_id="corr",
+        queue_backend="  FILESYSTEM  ",
+        queue_name="  jobs  ",
+        input_kind="text",
+        source_value="x",
+        status="queued",
+        attempts=0,
+        max_attempts=3,
+        submitted_at=" 2026-01-01T00:00:00+00:00 ",
+    )
+    dead = DeadLetterRecord(
+        job_id="job",
+        correlation_id="corr",
+        queue_backend="  FILESYSTEM  ",
+        queue_name="  jobs  ",
+        source_value="x",
+        attempts=1,
+        max_attempts=3,
+        error=error,
+        dead_lettered_at=" 2026-01-01T00:00:00+00:00 ",
+    )
+    event = TelemetryEvent(
+        name="queued",
+        job_id="job",
+        correlation_id="corr",
+        queue_backend="  FILESYSTEM  ",
+        queue_name="  jobs  ",
+        emitted_at=" 2026-01-01T00:00:00+00:00 ",
+    )
+
+    assert receipt.queue_backend == "filesystem"
+    assert receipt.queue_name == "jobs"
+    assert record.queue_backend == "filesystem"
+    assert record.queue_name == "jobs"
+    assert record.submitted_at == "2026-01-01T00:00:00+00:00"
+    assert dead.queue_backend == "filesystem"
+    assert dead.queue_name == "jobs"
+    assert dead.dead_lettered_at == "2026-01-01T00:00:00+00:00"
+    assert event.queue_backend == "filesystem"
+    assert event.queue_name == "jobs"
+    assert event.emitted_at == "2026-01-01T00:00:00+00:00"
 
 
 def test_resource_limits_reject_bool_values() -> None:

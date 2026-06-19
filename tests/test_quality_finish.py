@@ -88,7 +88,13 @@ from iocparser.infrastructure.persistence_repository_support import (
     string_metadata_value,
 )
 from iocparser.infrastructure.persistence_schema import IOCModel, RunIOCModel, RunModel, SourceModel
-from iocparser.infrastructure.persistence_support import _evidence_from_json, _json_list, _tags_from_json
+from iocparser.infrastructure.persistence_support import (
+    _evidence_from_json,
+    _evidence_records_from_json,
+    _json_list,
+    _tags_from_json,
+)
+import iocparser.infrastructure.persistence_support as persistence_support_module
 from iocparser.infrastructure.persistence_support import source_value_clause
 from iocparser.infrastructure.queue_rabbitmq import _load_queue_record as load_rabbit_queue_record
 from iocparser.infrastructure.queue_records import load_queue_record
@@ -492,6 +498,12 @@ def test_persistence_helper_functions_cover_conversion_edges() -> None:
     assert _evidence_from_json(json.dumps([{"excerpt": 1, "source": "s"}, {"excerpt": "x", "source": "s"}])) == (
         IOCEvidence(excerpt="x", line_number=None, source="s"),
     )
+    original_json_loads = persistence_support_module.json.loads
+    persistence_support_module.json.loads = lambda _raw: [{1: "one", "excerpt": "x", "source": "s"}]
+    try:
+        assert _evidence_records_from_json("[]") == ({"excerpt": "x", "source": "s"},)
+    finally:
+        persistence_support_module.json.loads = original_json_loads
 
     assert _int_metadata_value({"count": "4"}, "count", 0) == 4
     assert _optional_int_metadata_value({"count": "5"}, "count") == 5

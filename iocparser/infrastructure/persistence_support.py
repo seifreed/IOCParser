@@ -72,7 +72,7 @@ def _evidence_records_from_json(raw_value: str) -> tuple[dict[str, object], ...]
     records: list[dict[str, object]] = []
     for entry in _json_list(raw_value or "[]"):
         if isinstance(entry, dict):
-            records.append({str(key): value for key, value in entry.items()})
+            records.append({key: value for key, value in entry.items() if isinstance(key, str)})
     return tuple(records)
 
 

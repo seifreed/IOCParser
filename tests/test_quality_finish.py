@@ -85,6 +85,7 @@ from iocparser.infrastructure.persistence_repository_support import (
     _ioc_type_name,
     _optional_int_metadata_value,
     finished_at_from_duration,
+    string_metadata_value,
 )
 from iocparser.infrastructure.persistence_schema import IOCModel, RunIOCModel, RunModel, SourceModel
 from iocparser.infrastructure.persistence_support import _evidence_from_json, _json_list, _tags_from_json
@@ -309,6 +310,13 @@ def test_cli_rendering_metadata_helpers_accept_strings() -> None:
         normalize_metadata_values({"flag": True})
     with pytest.raises(TypeError, match="Expected metadata value"):
         normalize_metadata_values({"bad": object()})
+
+
+def test_string_metadata_value_rejects_non_strings() -> None:
+    assert string_metadata_value({"status": "ok"}, "status", "success") == "ok"
+    assert string_metadata_value({}, "status", "success") == "success"
+    with pytest.raises(TypeError, match="Expected status to be string"):
+        string_metadata_value({"status": 1}, "status", "success")
 
 
 def test_normalize_tokens_rejects_non_string_items() -> None:

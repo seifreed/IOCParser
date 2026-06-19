@@ -1323,6 +1323,14 @@ def test_batch_job_persistence_uses_report_status_and_max_retry_attempt(tmp_path
     failed_items = list_failed_batch_items(db_uri, batch_job_id=batch_job_id)
     assert failed_items[0].error_type == "unknown"
     assert failed_items[0].error_message == "timeout"
+    with pytest.raises(TypeError, match="Expected source_kind to be non-empty string"):
+        persist_batch_job(
+            failed_only_report,
+            config=config,
+            source_kind=" ",
+            run_ids=(),
+            effective_config={},
+        )
 
     whitespace_report = {
         "total": 1,

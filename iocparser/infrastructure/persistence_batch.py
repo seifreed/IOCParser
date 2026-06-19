@@ -110,6 +110,8 @@ def create_batch_job(
     config: dict[str, object] | None = None,
 ) -> int:
     """Persist a batch job aggregate and attach its runs and failures."""
+    if not isinstance(source_kind, str) or not source_kind.strip():
+        raise TypeError("Expected source_kind to be non-empty string")
     items = report.get("items", [])
     failures = _failed_items(items)
     retry_attempt = _batch_retry_attempt(items)

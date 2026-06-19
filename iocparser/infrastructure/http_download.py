@@ -271,7 +271,7 @@ class RequestsURLDownloader(URLDownloader):
         """Return normalized metadata captured during the last download."""
         if self.last_download_metadata is None:
             return {}
-        return {str(name): value for name, value in self.last_download_metadata.items()}
+        return {name: value for name, value in self.last_download_metadata.items() if isinstance(name, str)}
 
     def _respect_rate_limit(self) -> None:
         if self.rate_limit_delay <= 0:

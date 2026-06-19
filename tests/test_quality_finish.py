@@ -440,6 +440,10 @@ def test_persistence_helper_functions_cover_conversion_edges() -> None:
     with pytest.raises(TypeError):
         _int_report_value({"count": []}, "count")
 
+    downloader = RequestsURLDownloader()
+    downloader.last_download_metadata = {1: "one", "two": 2}
+    assert downloader.download_metadata() == {"two": 2}
+
     assert record_json_object("[]") == {}
     assert record_json_object("{bad") == {}
     assert _json_int_map(json.dumps({"a": "2"})) == {"a": 2}

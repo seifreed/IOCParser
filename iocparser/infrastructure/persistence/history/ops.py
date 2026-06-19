@@ -275,7 +275,6 @@ def _existing_ioc(session: Session, row: dict[str, object]) -> IOCModel | None:
         )
     ).scalar_one_or_none()
 
-
 def _same_origin_archive(session: Session, payload: dict[str, object]) -> bool:
     raw_origin_id = payload.get(HISTORY_ORIGIN_ID_KEY)
     if not isinstance(raw_origin_id, str) or not raw_origin_id.strip():
@@ -699,6 +698,8 @@ def _import_runs(
         ):
             continue
         typed["tool_version"] = str(typed.get("tool_version", "")).strip()
+        if not typed["tool_version"]:
+            continue
         typed["status"] = _normalized_text(typed.get("status"), default="success")
         typed["error_message"] = _normalized_text(typed.get("error_message"), default="")
         original_batch_id = typed.get("batch_job_id")

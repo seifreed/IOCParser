@@ -2042,6 +2042,24 @@ def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_pa
     assert query_persisted_runs(db_uri=db_uri, limit=10).items[0].error_message == ""
     assert (
         import_history_raw(
+            f"sqlite:///{tmp_path / 'history-empty-tool-version.sqlite'}",
+            {
+                "sources": [valid_source],
+                "runs": [
+                    {
+                        "id": 1,
+                        "source_id": 1,
+                        "started_at": timestamp,
+                        "finished_at": timestamp,
+                        "tool_version": " ",
+                    }
+                ],
+            },
+        )["runs"]
+        == 0
+    )
+    assert (
+        import_history_raw(
             db_uri,
             {
                 "batch_jobs": [valid_batch],

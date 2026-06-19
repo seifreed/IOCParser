@@ -69,8 +69,6 @@ def _require_str(value: object, *, field: str) -> str:
     if not isinstance(value, str):
         raise TypeError(f"Expected {field} to be string-like, got {type(value).__name__}")
     return value
-
-
 @dataclass(frozen=True)
 class IOCEvidence:
     """Context snippet showing where an IOC was found."""
@@ -79,7 +77,13 @@ class IOCEvidence:
     line_number: int | None = None
     source: str = ""
 
-
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "excerpt", _require_str(self.excerpt, field="excerpt"))
+        if self.line_number is not None and (
+            isinstance(self.line_number, bool) or not isinstance(self.line_number, int)
+        ):
+            raise TypeError(f"Expected line_number to be int-like, got {type(self.line_number).__name__}")
+        object.__setattr__(self, "source", _require_str(self.source, field="source"))
 @dataclass(frozen=True)
 class IOC:
     """Normalized IOC value object."""
@@ -133,8 +137,6 @@ class IOC:
                 for evidence in self.evidence
             ],
         }
-
-
 @dataclass(frozen=True)
 class WarningMatch:
     """IOC entry associated with a warning list."""
@@ -149,8 +151,6 @@ class WarningMatch:
         record["warning_list"] = self.warning_list
         record["description"] = self.description
         return record
-
-
 @dataclass(frozen=True)
 class ExtractionResult:
     """Normalized extraction output shared by application and adapters."""

@@ -23,6 +23,7 @@ from iocparser.domain.models import (
     ExtractionResult,
     IOCType,
     PersistedRunDiff,
+    IOCEvidence,
 )
 from iocparser.domain.distributed import DeadLetterRecord, DistributedJobRecord, QueueEnvelope
 from iocparser.domain.pipeline import PipelineErrorInfo, PipelineJobRequest, ResourceLimits
@@ -306,6 +307,11 @@ def test_resource_limits_reject_bool_values() -> None:
 def test_evidence_json_rejects_bool_line_numbers() -> None:
     with pytest.raises(TypeError, match="line_number"):
         _evidence_from_json(json.dumps([{"excerpt": "x", "line_number": True, "source": "s"}]))
+
+
+def test_ioc_evidence_rejects_bool_line_number() -> None:
+    with pytest.raises(TypeError, match="line_number"):
+        IOCEvidence(excerpt="x", line_number=True, source="s")  # type: ignore[arg-type]
 
 
 def test_idempotency_key_for_missing_file_does_not_raise(tmp_path: Path) -> None:

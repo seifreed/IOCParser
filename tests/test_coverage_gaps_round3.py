@@ -240,6 +240,28 @@ class TestPluginEntryPointLoading:
         _register_discovered_ioc_types()
         _ioc_type_registry.pop("_invalid_bt", None)
 
+    def test_register_discovered_ioc_types_rejects_non_string_alias_items(self) -> None:
+        from iocparser.domain import enums as enums_module
+        from iocparser.plugins import (
+            _ioc_type_registry,
+            _register_discovered_ioc_types,
+            custom_ioc_types,
+            register_ioc_type_plugin,
+        )
+
+        register_ioc_type_plugin(
+            "_bad_alias_plugin",
+            lambda: {"name": "_bad_alias_type", "base_type": "urls", "aliases": ("ok", 123)},
+        )
+        try:
+            _register_discovered_ioc_types()
+            assert "_bad_alias_type" not in custom_ioc_types()
+        finally:
+            _ioc_type_registry.pop("_bad_alias_plugin", None)
+            enums_module._custom_ioc_types.pop("_bad_alias_type", None)
+            enums_module._custom_ioc_aliases.pop("ok", None)
+            enums_module._custom_ioc_aliases.pop("123", None)
+
     def test_builtin_renderer_override_warning(self) -> None:
         from iocparser.plugins import (
             _BUILTIN_RENDERER_NAMES,

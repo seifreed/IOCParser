@@ -198,7 +198,12 @@ def custom_ioc_types() -> tuple[str, ...]:
 def _string_tuple(value: object) -> tuple[str, ...]:
     if not isinstance(value, (list, tuple)):
         return ()
-    return tuple(str(item) for item in value)
+    items: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise TypeError(f"Expected string values, got {type(item).__name__}")
+        items.append(item)
+    return tuple(items)
 
 
 def _load_group[FactoryT](

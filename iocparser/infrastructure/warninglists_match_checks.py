@@ -39,10 +39,28 @@ def check_regex_type(get_logger: Callable[[], Logger], value: str, values: list[
         if regex_pattern is None:
             continue
         pattern_text = _require_str(regex_pattern, field="regex pattern")
-        if not pattern_text.strip():
+        pattern_text = pattern_text.strip()
+        if not pattern_text:
             continue
+        pattern = pattern_text
+        flags = re.IGNORECASE
+        if pattern_text.startswith("/") and pattern_text.count("/") >= 2:
+            closing = pattern_text.rfind("/")
+            body = pattern_text[1:closing]
+            flags_text = pattern_text[closing + 1 :]
+            if body and (not flags_text or flags_text.isalpha()):
+                pattern = body
+                for flag in flags_text.lower():
+                    if flag == "g":
+                        continue
+                    if flag == "m":
+                        flags |= re.MULTILINE
+                    elif flag == "s":
+                        flags |= re.DOTALL
+                    elif flag == "x":
+                        flags |= re.VERBOSE
         try:
-            if re.search(pattern_text, value, re.IGNORECASE):
+            if re.search(pattern, value, flags):
                 return True
         except (re.error, TypeError):
             get_logger().debug("Invalid regex pattern: %s", regex_pattern)

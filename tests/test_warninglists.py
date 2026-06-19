@@ -187,11 +187,13 @@ class TestMISPWarningLists:
         warning_lists = make_warning_lists()
 
         values = [r".*\.google\.com$", r"^192\.168\.\d+\.\d+$"]
+        slash_values = [r"/^security\@.*\..*$/i"]
 
         # Regex match
         assert warning_lists._check_value_in_list("mail.google.com", values, "regex")
         assert warning_lists._check_value_in_list("192.168.1.1", values, "regex")
         assert warning_lists._check_value_in_list(" mail.google.com ", values, "regex")
+        assert warning_lists._check_value_in_list("security@example.com", slash_values, "regex")
 
         # No match
         assert not warning_lists._check_value_in_list("google.net", values, "regex")

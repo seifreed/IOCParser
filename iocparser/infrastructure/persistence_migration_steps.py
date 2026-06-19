@@ -51,6 +51,8 @@ def _column_names(inspector: Inspector, table_name: str) -> set[str]:
 def _coerce_version_row(row: object | None) -> int:
     if row is None:
         return 0
+    if isinstance(row, bool):
+        raise TypeError(f"Expected schema version row to be int-like, got {type(row).__name__}")
     if isinstance(row, int):
         return row
     if isinstance(row, str):

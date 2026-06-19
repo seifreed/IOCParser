@@ -290,6 +290,8 @@ def _apply_search_backend(
     )
 
 def _coerce_count(value: object) -> int:
+    if isinstance(value, bool):
+        raise TypeError(f"Expected count to be int-compatible, got {type(value).__name__}")
     if isinstance(value, int):
         return value
     if isinstance(value, str):

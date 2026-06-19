@@ -34,6 +34,8 @@ from iocparser.infrastructure.migration_revisions import rev_0005_fts_metrics
 from iocparser.infrastructure.persistence_support import _evidence_from_json
 from iocparser.infrastructure.persistence.history.row_values import typed_row
 from iocparser.infrastructure.persistence.history.row_values import bool_from_row
+from iocparser.infrastructure.persistence.query.ops import _coerce_count
+from iocparser.infrastructure.persistence_migration_steps import _coerce_version_row
 from iocparser.infrastructure.persistence_fts import build_fts_query
 from iocparser.infrastructure.streaming_chunks import read_chunks_with_prefix
 from iocparser.worker_config_support import load_worker_file_values
@@ -647,6 +649,13 @@ def test_bool_from_row_rejects_non_binary_ints() -> None:
         typed_row({"is_warning": 2})
     with pytest.raises(TypeError, match="boolean-compatible"):
         typed_row({"retryable": 2})
+
+
+def test_count_and_schema_version_reject_bool_ints() -> None:
+    with pytest.raises(TypeError, match="count"):
+        _coerce_count(True)
+    with pytest.raises(TypeError, match="schema version"):
+        _coerce_version_row(True)
 
 
 def test_typed_row_trims_padded_datetimes() -> None:

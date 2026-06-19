@@ -59,7 +59,7 @@ class MISPWarningListService(WarningListService):
 
         for ioc_type, warning_values in warning_iocs.items():
             for warning in warning_values:
-                value = warning.get("value", "")
+                value = _require_str(warning.get("value", ""), field="value")
                 if not value:
                     continue
                 key = (ioc_type, value)
@@ -81,8 +81,8 @@ class MISPWarningListService(WarningListService):
                 warnings.append(
                     WarningMatch(
                         ioc=matched_ioc,
-                        warning_list=warning.get("warning_list", "") or "",
-                        description=warning.get("description", "") or "",
+                        warning_list=_require_str(warning.get("warning_list", ""), field="warning_list"),
+                        description=_require_str(warning.get("description", ""), field="description"),
                     ),
                 )
         return ExtractionResult(iocs=tuple(normal_records), warnings=tuple(warnings))

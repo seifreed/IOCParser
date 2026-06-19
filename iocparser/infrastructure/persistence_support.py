@@ -4,7 +4,7 @@ import json
 from datetime import UTC, datetime
 from urllib.parse import urlsplit, urlunsplit
 
-from sqlalchemy import ClauseElement, Select, and_, delete, func, or_, select
+from sqlalchemy import ClauseElement, Select, and_, delete, false, func, or_, select
 from sqlalchemy.orm import Session
 
 from iocparser.domain.models import (
@@ -140,7 +140,7 @@ def legacy_url_value_clause(value: str) -> ClauseElement:
         for candidate in _url_filter_variants(value)
         for suffix in ("#", "?")
     )
-    return or_(*clauses) if len(clauses) > 1 else clauses[0]
+    return or_(*clauses) if clauses else false()
 
 
 def source_value_clause(*, source_kind: str | None, source_value: str) -> ClauseElement:

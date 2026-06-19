@@ -940,6 +940,25 @@ def test_query_service_matches_legacy_padded_url_sources_without_normalized_url(
     ).total == 1
 
 
+def test_query_service_handles_invalid_url_source_value_without_crashing(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-invalid-url-filter.sqlite"
+    service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
+    service.persist_multiple_runs(
+        [
+            (
+                "url",
+                "not a url",
+                ExtractionResult.from_grouped_payload({"domains": ["example.com"]}, {}),
+            )
+        ],
+        tool_version="5.0.0",
+        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+    )
+
+    assert service.query_runs_page(limit=10, source_kind="url", source_value="not a url").total == 1
+    assert service.search_iocs_page(value="example.com", source_kind="url", source_value="not a url").total == 1
+
+
 def test_query_service_matches_canonical_url_against_legacy_blank_normalized_url_source(tmp_path) -> None:
     db_path = tmp_path / "iocparser-legacy-url-filter-blank-normalized.sqlite"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")

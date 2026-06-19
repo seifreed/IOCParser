@@ -173,6 +173,13 @@ def test_enum_resolvers_reject_non_string_names() -> None:
         IOCType.from_name(1)  # type: ignore[arg-type]
 
 
+def test_grouped_payload_rejects_non_string_values() -> None:
+    with pytest.raises(TypeError, match="value"):
+        ExtractionResult.from_grouped_payload({"domains": [1]}, {})
+    with pytest.raises(TypeError, match="value"):
+        ExtractionResult.from_grouped_payload({}, {"domains": [{"value": 1}]})
+
+
 def test_indicator_value_for_selects_specialized_types() -> None:
     assert type(indicator_value_for(IOCType.DOMAIN, "example.com")).__name__ == "DomainValue"
     assert type(indicator_value_for(IOCType.URL, "https://example.com")).__name__ == "UrlValue"

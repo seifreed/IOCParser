@@ -170,16 +170,16 @@ class ExtractionResult:
 
         for ioc_type, values in normal_iocs.items():
             for value in values:
-                normalized = value.get("value") if isinstance(value, dict) else str(value)
+                normalized = value.get("value") if isinstance(value, dict) else value
                 if normalized:
-                    iocs.append(IOC.from_raw(ioc_type, normalized))
+                    iocs.append(IOC.from_raw(ioc_type, _require_str(normalized, field="value")))
 
         for ioc_type, warning_values in warning_iocs.items():
             for warning in warning_values:
                 warning_value = warning.get("value")
                 if not warning_value:
                     continue
-                value_str = str(warning_value)
+                value_str = _require_str(warning_value, field="value")
                 severity, tags = classify_ioc(IOCType.from_name(ioc_type), is_warning=True)
                 warnings.append(
                     WarningMatch(

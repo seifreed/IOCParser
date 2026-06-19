@@ -836,6 +836,90 @@ def test_job_record_preserves_error_with_empty_message() -> None:
     assert record.last_error.message == ""
 
 
+def test_persisted_view_models_reject_non_string_fields() -> None:
+    from datetime import datetime
+
+    from iocparser.domain.jobs import BatchDashboard, BatchDashboardWindow, BatchJobDetail, BatchJobSummary, FailedBatchItem
+    from iocparser.domain.persisted import PersistedRunQueryHit, PersistedRunSummary
+
+    now = datetime.now()
+    with pytest.raises(TypeError, match="source_kind"):
+        PersistedRunSummary(
+            run_id=1,
+            source_kind=1,  # type: ignore[arg-type]
+            source_value="x",
+            tool_version="1.0",
+            started_at=now,
+            finished_at=now,
+        )
+    with pytest.raises(TypeError, match="value"):
+        PersistedRunQueryHit(
+            run_id=1,
+            source_kind="domains",
+            source_value="x",
+            ioc_type="domains",
+            value=1,  # type: ignore[arg-type]
+            is_warning=False,
+        )
+    with pytest.raises(TypeError, match="source_value"):
+        FailedBatchItem(
+            batch_job_id=1,
+            source_value=1,  # type: ignore[arg-type]
+            error_type="parse",
+            error_message="bad",
+            retry_attempt=0,
+            created_at=now,
+        )
+    with pytest.raises(TypeError, match="status"):
+        BatchJobSummary(
+            batch_job_id=1,
+            source_kind="text",
+            started_at=now,
+            finished_at=now,
+            total_inputs=1,
+            successful_inputs=1,
+            failed_inputs=0,
+            retry_attempt=0,
+            status=1,  # type: ignore[arg-type]
+            error_summary={},
+        )
+    with pytest.raises(TypeError, match="started_at"):
+        BatchDashboardWindow(
+            started_at=1,  # type: ignore[arg-type]
+            total_jobs=1,
+            failed_jobs=0,
+            partial_jobs=0,
+            failure_rate=0.0,
+            average_duration_ms=1,
+        )
+    with pytest.raises(TypeError, match="group_by"):
+        BatchDashboard(
+            lookback_hours=1,
+            group_by=1,  # type: ignore[arg-type]
+            total_jobs=1,
+            failed_jobs=0,
+            partial_jobs=0,
+            failure_rate=0.0,
+            alerts=(),
+            windows=(),
+        )
+    with pytest.raises(TypeError, match="status"):
+        BatchJobDetail(
+            batch_job_id=1,
+            source_kind="text",
+            status=1,  # type: ignore[arg-type]
+            started_at=now,
+            finished_at=now,
+            total_inputs=1,
+            successful_inputs=1,
+            failed_inputs=0,
+            retry_attempt=0,
+            error_summary={},
+            effective_config={},
+            metrics={},
+        )
+
+
 def test_cli_search_normalizes_ioc_type_and_severity() -> None:
     """The CLI search filters must be normalized like the API/diff handlers.
 

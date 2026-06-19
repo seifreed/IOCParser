@@ -9,6 +9,17 @@ from iocparser.domain.pipeline import RESULT_SCHEMA_VERSION
 from iocparser.domain.results import ExtractionResult
 
 
+def _require_str(value: object, *, field: str, non_empty: bool = False) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"Expected {field} to be string-like, got {type(value).__name__}")
+    if non_empty:
+        stripped = value.strip()
+        if not stripped:
+            raise TypeError(f"Expected {field} to be non-empty string-like")
+        return stripped
+    return value
+
+
 @dataclass(frozen=True)
 class PersistedRunSummary:
     """Summary record for a persisted extraction run."""
@@ -35,6 +46,22 @@ class PersistedRunSummary:
     partial_error_count: int = 0
     status: str = "success"
     error_message: str = ""
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "source_kind", _require_str(self.source_kind, field="source_kind", non_empty=True))
+        object.__setattr__(self, "source_value", _require_str(self.source_value, field="source_value", non_empty=True))
+        object.__setattr__(self, "tool_version", _require_str(self.tool_version, field="tool_version", non_empty=True))
+        object.__setattr__(self, "status", _require_str(self.status, field="status", non_empty=True))
+        if self.original_url is not None:
+            object.__setattr__(self, "original_url", _require_str(self.original_url, field="original_url"))
+        if self.normalized_url is not None:
+            object.__setattr__(self, "normalized_url", _require_str(self.normalized_url, field="normalized_url"))
+        if self.mime_type is not None:
+            object.__setattr__(self, "mime_type", _require_str(self.mime_type, field="mime_type"))
+        if self.content_hash is not None:
+            object.__setattr__(self, "content_hash", _require_str(self.content_hash, field="content_hash"))
+        if self.fingerprint is not None:
+            object.__setattr__(self, "fingerprint", _require_str(self.fingerprint, field="fingerprint"))
 
     def to_record(self) -> dict[str, object]:
         """Serialize the summary into a structured record."""
@@ -77,6 +104,14 @@ class PersistedRunQueryHit:
     severity: str = ""
     tags: tuple[str, ...] = ()
     evidence: tuple[dict[str, object], ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "source_kind", _require_str(self.source_kind, field="source_kind", non_empty=True))
+        object.__setattr__(self, "source_value", _require_str(self.source_value, field="source_value", non_empty=True))
+        object.__setattr__(self, "ioc_type", _require_str(self.ioc_type, field="ioc_type", non_empty=True))
+        object.__setattr__(self, "value", _require_str(self.value, field="value", non_empty=True))
+        if self.severity is not None:
+            object.__setattr__(self, "severity", _require_str(self.severity, field="severity"))
 
     def to_record(self) -> dict[str, object]:
         """Serialize the query hit into a structured record."""

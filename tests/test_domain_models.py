@@ -202,6 +202,25 @@ def test_ioc_and_source_build_from_raw_inputs() -> None:
     assert ioc.canonical_value() == "example.com"
 
 
+def test_source_from_raw_trims_optional_url_metadata() -> None:
+    source = Source.from_raw(
+        "url",
+        " https://example.test/feed ",
+        original_url=" HTTPS://Example.TEST/feed#frag ",
+        normalized_url=" HTTPS://Example.TEST/feed#frag ",
+        mime_type=" text/plain ",
+        content_hash=" abc123 ",
+        fingerprint=" def456 ",
+    )
+
+    assert source.value == " https://example.test/feed "
+    assert source.original_url == "HTTPS://Example.TEST/feed#frag"
+    assert source.normalized_url == "https://example.test/feed"
+    assert source.mime_type == "text/plain"
+    assert source.content_hash == "abc123"
+    assert source.fingerprint == "def456"
+
+
 def test_source_and_ioc_from_raw_reject_non_string_values() -> None:
     import pytest
 

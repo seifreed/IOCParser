@@ -1101,7 +1101,9 @@ def test_migration_revision_history_and_validation(tmp_path: Path) -> None:
         broken_engine.dispose()
 
 
-def test_history_export_import_compact_and_retain(tmp_path: Path) -> None:
+def test_history_export_import_compact_and_retain(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     source_db = f"sqlite:///{tmp_path / 'source.sqlite'}"
     _persist_result(
         source_db, source_value="failed.txt", ioc_value="failed.example", status="failed"
@@ -1117,6 +1119,15 @@ def test_history_export_import_compact_and_retain(tmp_path: Path) -> None:
         f"sqlite:///{tmp_path / 'restored_again.sqlite'}", archive_path
     )
     assert restored_counts["runs"] >= 1
+    home_dir = tmp_path / "home"
+    home_dir.mkdir()
+    monkeypatch.setenv("HOME", str(home_dir))
+    expanded_archive = archive_history(restored_db, "~/archive-expanded.json")
+    assert Path(expanded_archive) == home_dir / "archive-expanded.json"
+    expanded_counts = restore_history(
+        f"sqlite:///{tmp_path / 'restored_home.sqlite'}", "~/archive-expanded.json"
+    )
+    assert expanded_counts["runs"] >= 1
     compact_persisted_history(db_uri=restored_db)
     affected = retain_persisted_history(db_uri=restored_db, days=0, statuses="failed")
     assert affected >= 1

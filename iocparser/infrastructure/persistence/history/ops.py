@@ -1149,13 +1149,13 @@ def import_history(db_uri: str, payload: dict[str, object]) -> dict[str, int]:
         session.commit()
         return counts
 def archive_history(db_uri: str, output_path: str) -> str:
-    path = Path(output_path)
+    path = Path(output_path).expanduser()
     path.write_text(json.dumps(export_history(db_uri), indent=2, sort_keys=True), encoding="utf-8")
     return str(path)
 
 def restore_history(db_uri: str, archive_path: str) -> dict[str, int]:
     try:
-        payload: object = json.loads(Path(archive_path).read_text(encoding="utf-8"))
+        payload: object = json.loads(Path(archive_path).expanduser().read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         raise TypeError(INVALID_HISTORY_ARCHIVE) from exc
     if not isinstance(payload, dict):

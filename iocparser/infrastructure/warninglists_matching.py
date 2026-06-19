@@ -43,6 +43,12 @@ from iocparser.infrastructure.warninglists_types import (
 logger = get_logger("iocparser.infrastructure.warninglists")
 
 
+def _require_str(value: object, *, field: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"Expected {field} to be string, got {type(value).__name__}")
+    return value
+
+
 class WarningListMatchingMixin:
     """Value matching and IOC separation support for warning lists."""
 
@@ -89,8 +95,8 @@ class WarningListMatchingMixin:
         list_id: str,
     ) -> dict[str, str]:
         return {
-            "name": str(warning_list.get("name", list_id)),
-            "description": str(warning_list.get("description", "")),
+            "name": _require_str(warning_list.get("name", list_id), field="name"),
+            "description": _require_str(warning_list.get("description", ""), field="description"),
         }
 
     def _get_misp_types_for_ioc(self, ioc_type: str) -> list[str]:
@@ -126,8 +132,7 @@ class WarningListMatchingMixin:
         warning_list: WarningListDict,
         list_id: str,
     ) -> dict[str, str] | None:
-        type_val = warning_list.get("type", "string")
-        list_type = str(type_val) if type_val is not None else "string"
+        list_type = _require_str(warning_list.get("type", "string"), field="type")
         values_val = warning_list.get("list", [])
         if isinstance(values_val, list):
             values: list[IOCValue] = [str(v) if v is not None else None for v in values_val]

@@ -868,6 +868,39 @@ class TestWarningListsGetWarnings:
         with pytest.raises(TypeError, match="Expected value to be string"):
             warning_lists.get_warnings_for_iocs({"domains": [{"value": object()}]})
 
+    def test_check_value_rejects_non_string_warning_metadata(self):
+        """Malformed warning-list metadata should fail instead of being stringified."""
+        warning_lists = make_warning_lists()
+        warning_lists.warning_lists = {
+            "bad-list": {
+                "name": object(),
+                "description": object(),
+                "type": "string",
+                "matching_attributes": ["domain"],
+                "list": ["example.com"],
+            }
+        }
+        warning_lists._preprocess_lists()
+
+        with pytest.raises(TypeError, match="Expected name to be string"):
+            warning_lists.check_value("example.com", "domains")
+
+    def test_preprocess_rejects_non_string_warning_type(self):
+        """Malformed warning-list types should fail instead of being stringified."""
+        warning_lists = make_warning_lists()
+        warning_lists.warning_lists = {
+            "bad-list": {
+                "name": "Bad List",
+                "description": "Bad type",
+                "type": object(),
+                "matching_attributes": ["domain"],
+                "list": ["example.com"],
+            }
+        }
+
+        with pytest.raises(TypeError, match="Expected type to be string"):
+            warning_lists._preprocess_lists()
+
     def test_get_warnings_for_iocs_empty_input(self):
         """Test getting warnings with empty input."""
         warning_lists = make_warning_lists()

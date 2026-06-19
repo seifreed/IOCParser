@@ -19,6 +19,12 @@ from iocparser.infrastructure.warninglists_types import (
 logger = get_logger("iocparser.infrastructure.warninglists")
 
 
+def _require_str(value: object, *, field: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"Expected {field} to be string, got {type(value).__name__}")
+    return value
+
+
 class WarningListPreprocessMixin:
     """Preprocessing helpers for optimized warning-list lookups."""
 
@@ -161,7 +167,7 @@ class WarningListPreprocessMixin:
         current_logger.info("Pre-processing warning lists for optimized lookups...")
         self._clear_preprocessed_data()
         for list_id, warning_list in self.warning_lists.items():
-            list_type = str(warning_list.get("type", "string"))
+            list_type = _require_str(warning_list.get("type", "string"), field="type")
             values_val = warning_list.get("list", [])
             if not isinstance(values_val, list):
                 continue

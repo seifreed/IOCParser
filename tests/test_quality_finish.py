@@ -50,6 +50,7 @@ from iocparser.cli_processing_urls import (
 from iocparser.cli_processing_urls import (
     _plugin_client as url_plugin_client,
 )
+import iocparser.cli_processing_url_reports as url_reports_module
 from iocparser.cli_runtime import _optional_float_arg
 from iocparser.cli_schema import _history_payload
 from iocparser.client_persistence import _parse_string_filters
@@ -217,6 +218,17 @@ def test_cli_processing_url_helper_parsing_and_plugin_builder() -> None:
         assert _json_dict(payload_path) == {}
     finally:
         payload_path.unlink()
+    original_url_report_loads = url_reports_module.loads
+    url_reports_module.loads = lambda _raw: {1: "one", "two": "2", "metadata": {3: "three"}}
+    try:
+        payload_path = Path("tmp-url-report.json")
+        payload_path.write_text("{}", encoding="utf-8")
+        try:
+            assert _json_dict(payload_path) == {"two": "2", "metadata": {}}
+        finally:
+            payload_path.unlink()
+    finally:
+        url_reports_module.loads = original_url_report_loads
 
     entry = _report_item(
         {

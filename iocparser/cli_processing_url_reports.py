@@ -82,7 +82,15 @@ def _json_dict(path: Path) -> dict[str, object]:
     payload: object = loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         return {}
-    return {str(key): value for key, value in payload.items()}
+    normalized: dict[str, object] = {}
+    for key, value in payload.items():
+        if not isinstance(key, str):
+            continue
+        if key == "metadata" and isinstance(value, dict):
+            normalized[key] = {name: data for name, data in value.items() if isinstance(name, str)}
+            continue
+        normalized[key] = value
+    return normalized
 
 
 def _report_items(payload: dict[str, object]) -> list[BatchItemReport]:
@@ -104,7 +112,7 @@ def _report_item(entry: dict[object, object]) -> BatchItemReport:
             item["retryable"] = bool_value(value)
             continue
         if key_str == "metadata" and isinstance(value, dict):
-            item["metadata"] = {str(name): data for name, data in value.items()}
+            item["metadata"] = {name: data for name, data in value.items() if isinstance(name, str)}
     return item
 
 

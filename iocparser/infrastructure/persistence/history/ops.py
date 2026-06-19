@@ -233,7 +233,7 @@ def _source_identity(row: dict[str, object]) -> tuple[object, ...]:
 def _existing_source(session: Session, row: dict[str, object]) -> SourceModel | None:
     identity = _source_identity(row)
     if identity[0] == "url":
-        value = str(row.get("value", ""))
+        value = str(row.get("value", "")).strip()
         normalized_url = str(identity[1])
         stmt = select(SourceModel).where(SourceModel.kind == "url")
         clauses = []

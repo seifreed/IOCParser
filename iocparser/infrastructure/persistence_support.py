@@ -4,7 +4,7 @@ import json
 from datetime import UTC, datetime
 from urllib.parse import urlsplit, urlunsplit
 
-from sqlalchemy import ClauseElement, Select, delete, func, or_, select
+from sqlalchemy import ClauseElement, Select, and_, delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from iocparser.domain.models import (
@@ -137,6 +137,12 @@ def source_value_clause(*, source_kind: str | None, source_value: str) -> Clause
         return SourceModel.value == exact_value
     clauses: list[ClauseElement] = [func.trim(SourceModel.value) == exact_value]
     clauses.extend(func.coalesce(SourceModel.normalized_url, "") == candidate for candidate in _url_filter_variants(exact_value))
+    clauses.append(
+        and_(
+            SourceModel.normalized_url.is_(None),
+            func.lower(func.trim(SourceModel.value)).like(f"{exact_value.lower()}%"),
+        )
+    )
     return or_(*clauses) if len(clauses) > 1 else clauses[0]
 
 

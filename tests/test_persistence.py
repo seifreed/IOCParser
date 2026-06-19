@@ -425,6 +425,61 @@ def test_import_history_matches_existing_padded_url_sources_without_normalized_u
     assert len(sources) == 1
 
 
+def test_import_history_matches_canonical_url_against_legacy_uppercase_source(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-import-url-source-canonical-legacy.db"
+    service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
+    options = PersistOptions(
+        defang=False,
+        check_warnings=False,
+        force_update=False,
+        output_format="json",
+    )
+    service.persist_multiple_runs(
+        [
+            (
+                "url",
+                "https://example.test/report",
+                ExtractionResult.from_grouped_payload({"domains": ["existing.example"]}, {}),
+            )
+        ],
+        tool_version="5.0.0",
+        options=options,
+    )
+    checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
+    try:
+        with Session(checker.engine) as session:
+            source = session.execute(select(Source)).scalar_one()
+            source.value = " HTTPS://Example.TEST/report#section "
+            source.normalized_url = None
+            session.commit()
+    finally:
+        checker.close()
+    timestamp = "2026-05-13T00:00:00"
+    payload: dict[str, object] = {
+        "sources": [
+            {
+                "id": 99,
+                "kind": "url",
+                "value": "https://example.test/report",
+                "value_search": "https://example.test/report",
+                "original_url": "https://example.test/report",
+                "first_seen": timestamp,
+                "last_seen": timestamp,
+            }
+        ]
+    }
+
+    counts = service.import_history(payload)
+
+    checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
+    with Session(checker.engine) as session:
+        sources = session.execute(select(Source)).scalars().all()
+    checker.close()
+
+    assert counts["sources"] == 0
+    assert len(sources) == 1
+
+
 def test_import_history_trims_replayed_source_kind_identity(tmp_path) -> None:
     db_path = tmp_path / "iocparser-import-source-kind.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
@@ -882,6 +937,39 @@ def test_query_service_matches_legacy_padded_url_sources_without_normalized_url(
     ).total == 1
     assert service.search_iocs_page(
         value="example.com", source_kind=" url ", source_value=" HTTPS://Example.TEST/report#frag "
+    ).total == 1
+
+
+def test_query_service_matches_canonical_url_against_legacy_uppercase_source(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-legacy-url-filter-canonical.db"
+    service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
+    service.persist_multiple_runs(
+        [
+            (
+                "url",
+                "https://example.test/report",
+                ExtractionResult.from_grouped_payload({"domains": ["example.com"]}, {}),
+            )
+        ],
+        tool_version="5.0.0",
+        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+    )
+
+    checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
+    try:
+        with Session(checker.engine) as session:
+            source = session.execute(select(Source)).scalar_one()
+            source.value = " HTTPS://Example.TEST/report#section "
+            source.normalized_url = None
+            session.commit()
+    finally:
+        checker.close()
+
+    assert service.query_runs_page(
+        limit=10, source_kind="url", source_value="https://example.test/report"
+    ).total == 1
+    assert service.search_iocs_page(
+        value="example.com", source_kind="url", source_value="https://example.test/report"
     ).total == 1
 
 

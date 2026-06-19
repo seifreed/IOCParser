@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
-from sqlalchemy import func, inspect, or_, select, text
+from sqlalchemy import and_, func, inspect, or_, select, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 
@@ -54,7 +54,6 @@ from iocparser.infrastructure.persistence_support import (
 from iocparser.infrastructure.persistence_uow import create_engine_for_uri
 
 _typed_row = typed_row
-
 @contextmanager
 def _managed_session(db_uri: str) -> Iterator[Session]:
     """Create, migrate, and safely dispose a SQLAlchemy engine, yielding a Session."""
@@ -65,7 +64,6 @@ def _managed_session(db_uri: str) -> Iterator[Session]:
             yield session
     finally:
         engine.dispose()
-
 @contextmanager
 def _managed_connection(db_uri: str) -> Iterator[Connection]:
     """Create, migrate, and safely dispose a SQLAlchemy engine, yielding a Connection."""
@@ -76,7 +74,6 @@ def _managed_connection(db_uri: str) -> Iterator[Connection]:
             yield connection
     finally:
         engine.dispose()
-
 INVALID_HISTORY_ARCHIVE = "invalid history archive"
 AMBIGUOUS_LEGACY_HISTORY_ARCHIVE = "ambiguous legacy history archive"
 HISTORY_ARCHIVE_ID_KEY = "__history_archive_id__"
@@ -116,7 +113,6 @@ def _json_object(raw_value: str) -> dict[str, object]:
     if not isinstance(decoded, dict):
         raise ValueError("Expected JSON object")
     return _string_key_mapping(decoded)
-
 def _is_int_like(value: object) -> bool:
     if isinstance(value, bool):
         return False
@@ -241,6 +237,12 @@ def _existing_source(session: Session, row: dict[str, object]) -> SourceModel | 
             clauses.append(func.trim(SourceModel.value) == value)
         if normalized_url:
             clauses.append(SourceModel.normalized_url == normalized_url)
+        clauses.append(
+            and_(
+                SourceModel.normalized_url.is_(None),
+                func.lower(func.trim(SourceModel.value)).like(f"{value.lower()}%"),
+            )
+        )
         stmt = stmt.where(or_(*clauses)) if clauses else stmt.where(func.trim(SourceModel.value) == value)
         candidates = session.execute(stmt).scalars().all()
         for candidate in candidates:

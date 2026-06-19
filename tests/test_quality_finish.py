@@ -22,6 +22,7 @@ from iocparser.adapters.renderers import (
 from iocparser.adapters.renderers import (
     _json_object as renderer_json_object,
 )
+from iocparser.adapters.renderers_text import format_warning_item
 from iocparser.cli_args_values import int_arg_value
 from iocparser.cli_output import _int_value as batch_int_value
 from iocparser.cli_output import print_batch_report, save_batch_report
@@ -721,6 +722,8 @@ def test_renderers_cover_custom_stix_and_record_helpers() -> None:
     assert _record_dict_list({"evidence": "bad"}, "evidence") == []
     with pytest.raises(TypeError, match="Expected tags entries to be string"):
         _record_string_list({"tags": [1]}, "tags")
+    with pytest.raises(TypeError, match="Expected value to be string"):
+        format_warning_item({"value": object(), "warning_list": "wl"})
     assert renderer_json_object("[]") == {}
 
 

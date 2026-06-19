@@ -13,6 +13,12 @@ from iocparser.rendering_support import (
 from iocparser.shared_utils import refang_ioc
 
 
+def _require_str(value: object, *, field: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"Expected {field} to be string, got {type(value).__name__}")
+    return value
+
+
 class TextOutputRenderer(OutputRenderer):
     """Render extraction results as plain text."""
 
@@ -63,8 +69,11 @@ class TextOutputRenderer(OutputRenderer):
 
 def format_warning_item(warning: dict[str, str] | str) -> list[str]:
     if isinstance(warning, dict):
-        lines = [f"{warning['value']} - *{warning['warning_list']}*"]
-        if warning.get("description"):
-            lines.append(f"  Description: {warning['description']}")
+        value = _require_str(warning["value"], field="value")
+        warning_list = _require_str(warning["warning_list"], field="warning_list")
+        lines = [f"{value} - *{warning_list}*"]
+        description = warning.get("description")
+        if description:
+            lines.append(f"  Description: {_require_str(description, field='description')}")
         return lines
     return [str(warning)]

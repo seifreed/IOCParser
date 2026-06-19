@@ -542,6 +542,8 @@ def _import_iocs(session: Session, rows: list[dict[str, object]]) -> tuple[int, 
         ioc_type = _normalized_ioc_type(str(typed.get("ioc_type", "")))
         typed["ioc_type"] = ioc_type
         typed["value"] = str(typed.get("value", "")).strip()
+        if not typed["value"]:
+            continue
         typed["warning_list"] = str(typed.get("warning_list", "")).strip()
         typed["warning_description"] = str(typed.get("warning_description", "")).strip()
         search_value = normalize_ioc_search(str(typed.get("value", "")))
@@ -566,7 +568,6 @@ def _import_iocs(session: Session, rows: list[dict[str, object]]) -> tuple[int, 
         if isinstance(original_id, int):
             ioc_map[original_id] = existing.id
     return inserted, ioc_map
-
 def _import_batch_jobs(
     session: Session,
     rows: list[dict[str, object]],

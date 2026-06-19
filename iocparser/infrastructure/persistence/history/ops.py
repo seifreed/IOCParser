@@ -499,7 +499,7 @@ def _import_sources(session: Session, rows: list[dict[str, object]]) -> tuple[in
         if kind == "url":
             typed["value"] = str(typed.get("value", "")).strip()
             typed["original_url"] = typed.get("original_url") or typed.get("value")
-            typed["normalized_url"] = _source_identity(typed)[1]
+            typed["normalized_url"] = normalize_url_value(str(typed.get("normalized_url", ""))) or normalize_url_value(str(typed.get("value", "")))
         typed["dedup_hash"] = source_dedup_hash(
             kind, str(typed.get("value", ""))
         )

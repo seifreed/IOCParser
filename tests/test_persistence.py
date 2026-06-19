@@ -480,6 +480,34 @@ def test_import_history_matches_canonical_url_against_legacy_uppercase_source(tm
     assert len(sources) == 1
 
 
+def test_import_history_leaves_invalid_url_normalized_url_empty(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-import-url-invalid-normalized.sqlite"
+    service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
+    payload: dict[str, object] = {
+        "sources": [
+            {
+                "id": 1,
+                "kind": "url",
+                "value": "not a url",
+                "first_seen": "2026-05-13T00:00:00",
+                "last_seen": "2026-05-13T00:00:00",
+            }
+        ]
+    }
+
+    counts = service.import_history(payload)
+
+    checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
+    try:
+        with Session(checker.engine) as session:
+            source = session.execute(select(Source)).scalar_one()
+    finally:
+        checker.close()
+
+    assert counts["sources"] == 1
+    assert source.normalized_url is None
+
+
 def test_import_history_trims_replayed_source_kind_identity(tmp_path) -> None:
     db_path = tmp_path / "iocparser-import-source-kind.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")

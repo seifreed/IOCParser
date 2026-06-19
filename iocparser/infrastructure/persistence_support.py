@@ -140,7 +140,11 @@ def source_value_clause(*, source_kind: str | None, source_value: str) -> Clause
     clauses.append(
         and_(
             SourceModel.normalized_url.is_(None),
-            func.lower(func.trim(SourceModel.value)).like(f"{exact_value.lower()}%"),
+            or_(
+                func.lower(func.trim(SourceModel.value)) == exact_value.lower(),
+                func.lower(func.trim(SourceModel.value)).like(f"{exact_value.lower()}#%"),
+                func.lower(func.trim(SourceModel.value)).like(f"{exact_value.lower()}?%"),
+            ),
         )
     )
     return or_(*clauses) if len(clauses) > 1 else clauses[0]

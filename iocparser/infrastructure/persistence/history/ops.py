@@ -122,13 +122,9 @@ def _is_int_like(value: object) -> bool:
         stripped = value.lstrip("-")
         return stripped.isdigit() and len(stripped) > 0
     return False
-
-
 def _json_int_map(raw_value: str) -> dict[str, int]:
     decoded = _json_object(raw_value)
     return {key: int(value) for key, value in decoded.items() if _is_int_like(value)}  # type: ignore[call-overload]
-
-
 def _payload_fingerprint(payload: Mapping[str, object]) -> str:
     filtered_payload = {
         key: value
@@ -240,7 +236,11 @@ def _existing_source(session: Session, row: dict[str, object]) -> SourceModel | 
         clauses.append(
             and_(
                 SourceModel.normalized_url.is_(None),
-                func.lower(func.trim(SourceModel.value)).like(f"{value.lower()}%"),
+                or_(
+                    func.lower(func.trim(SourceModel.value)) == value.lower(),
+                    func.lower(func.trim(SourceModel.value)).like(f"{value.lower()}#%"),
+                    func.lower(func.trim(SourceModel.value)).like(f"{value.lower()}?%"),
+                ),
             )
         )
         stmt = stmt.where(or_(*clauses)) if clauses else stmt.where(func.trim(SourceModel.value) == value)

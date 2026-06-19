@@ -190,5 +190,5 @@ def record_dict_list(record: dict[str, object], key: str) -> list[dict[str, obje
 def json_object(raw_value: str) -> dict[str, object]:
     decoded: object = json.loads(raw_value)
     if not isinstance(decoded, dict):
-        return {}
+        raise ValueError("Expected JSON object")
     return {key: value for key, value in decoded.items() if isinstance(key, str)}

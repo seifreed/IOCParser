@@ -904,7 +904,8 @@ def test_renderers_cover_custom_stix_and_record_helpers() -> None:
         _record_string_list({"tags": [1]}, "tags")
     with pytest.raises(TypeError, match="Expected value to be string"):
         format_warning_item({"value": object(), "warning_list": "wl"})
-    assert renderer_json_object("[]") == {}
+    with pytest.raises(ValueError, match="Expected JSON object"):
+        renderer_json_object("[]")
 
 
 def test_print_warning_lists_rejects_non_string_fields() -> None:

@@ -337,6 +337,7 @@ def test_cli_rendering_metadata_helpers_accept_strings() -> None:
 
 def test_string_metadata_value_rejects_non_strings() -> None:
     assert string_metadata_value({"status": "ok"}, "status", "success") == "ok"
+    assert string_metadata_value({"status": " ok "}, "status", "success") == "ok"
     assert string_metadata_value({}, "status", "success") == "success"
     with pytest.raises(TypeError, match="Expected status to be string"):
         string_metadata_value({"status": 1}, "status", "success")

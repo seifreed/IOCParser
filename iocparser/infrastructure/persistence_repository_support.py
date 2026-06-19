@@ -241,7 +241,8 @@ def string_metadata_value(metadata: dict[str, int | str | None], key: str, defau
         return default
     if not isinstance(raw_value, str):
         raise TypeError(f"Expected {key} to be string, got {type(raw_value).__name__}")
-    return raw_value
+    stripped = raw_value.strip()
+    return stripped or default
 
 
 class IndicatorValueLike(Protocol):

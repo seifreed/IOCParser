@@ -33,9 +33,9 @@ class TextOutputRenderer(OutputRenderer):
         context_map: dict[tuple[str, str], list[str]] = {}
         if self.include_context:
             for record in result.to_records():
-                raw_val = str(record["raw_value"])
-                canonical_val = str(record.get("value", raw_val))
-                section = str(record["type"])
+                raw_val = _require_str(record["raw_value"], field="raw_value")
+                canonical_val = _require_str(record.get("value", raw_val), field="value")
+                section = _require_str(record["type"], field="type")
                 evidence_items = record.get("evidence", ())
                 if not isinstance(evidence_items, list):
                     continue

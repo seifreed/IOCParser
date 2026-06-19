@@ -719,6 +719,12 @@ def test_renderers_cover_custom_stix_and_record_helpers() -> None:
 
     weird_result = _WeirdContextResult(iocs=(IOC.from_raw("domains", "ctx.test"),))
     assert "ctx.test" in TextOutputRenderer(include_context=True).render(weird_result)
+    class _BadContextResult(ExtractionResult):
+        def to_records(self) -> list[dict[str, object]]:
+            return [{"type": "domains", "raw_value": object(), "value": "ctx.test", "evidence": []}]
+
+    with pytest.raises(TypeError, match="Expected raw_value to be string"):
+        TextOutputRenderer(include_context=True).render(_BadContextResult(iocs=()))
     assert _record_string_list({"tags": "bad"}, "tags") == ()
     assert _record_dict_list({"evidence": "bad"}, "evidence") == []
     with pytest.raises(TypeError, match="Expected tags entries to be string"):

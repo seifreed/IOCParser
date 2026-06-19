@@ -15,6 +15,7 @@ from iocparser.infrastructure.persistence_repository_support import (
     source_dedup_hash,
 )
 from iocparser.domain.sources import normalize_url_value
+from iocparser.infrastructure.persistence_support import normalized_source_filter
 from iocparser.interfaces.ports import SourceRepository
 
 
@@ -42,6 +43,7 @@ class SQLAlchemySourceRepository(SourceRepository):
         content_hash: str | None = None,
         fingerprint: str | None = None,
     ) -> int:
+        kind = normalized_source_filter(kind)
         value = normalize_source_value(kind, value)
         original_url = _strip_optional(original_url)
         normalized_url = _strip_optional(normalized_url)

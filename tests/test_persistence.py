@@ -165,6 +165,19 @@ def test_source_repository_reuses_legacy_spaced_non_url_value(tmp_path) -> None:
     assert source.value == " sample.txt "
 
 
+def test_source_repository_trims_source_kind_variants(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-source-kind-variant.db"
+    unit_of_work = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
+    try:
+        first_id = unit_of_work.source_repository.get_or_create(kind="FILE", value="sample.txt")
+        second_id = unit_of_work.source_repository.get_or_create(kind=" file ", value="sample.txt")
+        unit_of_work.commit()
+    finally:
+        unit_of_work.close()
+
+    assert second_id == first_id
+
+
 def test_source_repository_normalizes_legacy_url_values(tmp_path) -> None:
     db_path = tmp_path / "iocparser-legacy-source.db"
     unit_of_work = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")

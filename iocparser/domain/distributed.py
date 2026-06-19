@@ -77,6 +77,24 @@ class QueueEnvelope:
     submitted_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def __post_init__(self) -> None:
+        def _require_str(value: object, *, field: str) -> str:
+            if not isinstance(value, str):
+                raise TypeError(f"Expected {field} to be string-like, got {type(value).__name__}")
+            stripped = value.strip()
+            if not stripped:
+                raise TypeError(f"Expected {field} to be non-empty string-like")
+            return stripped
+
+        object.__setattr__(self, "queue_backend", _require_str(self.queue_backend, field="queue_backend"))
+        object.__setattr__(self, "queue_name", _require_str(self.queue_name, field="queue_name"))
+        object.__setattr__(self, "schema_version", _require_str(self.schema_version, field="schema_version"))
+        object.__setattr__(self, "submitted_at", _require_str(self.submitted_at, field="submitted_at"))
+        if self.idempotency_key is not None:
+            object.__setattr__(
+                self,
+                "idempotency_key",
+                _require_str(self.idempotency_key, field="idempotency_key"),
+            )
         if self.attempts < 0:
             raise _invalid_retry_counter_value(key="attempts")
         if self.max_attempts <= 0:
@@ -141,15 +159,15 @@ class QueueEnvelope:
                 else None,
                 emit_only=_bool_from_payload(request_payload, "emit_only", False),
             ),
-            queue_backend=str(payload.get("queue_backend", "filesystem")),
-            queue_name=str(payload.get("queue_name", "default")),
+            queue_backend=payload.get("queue_backend", "filesystem"),
+            queue_name=payload.get("queue_name", "default"),
             attempts=_int_from_payload(payload, "attempts", 0),
             max_attempts=_int_from_payload(payload, "max_attempts", 3),
-            idempotency_key=str(payload["idempotency_key"])
+            idempotency_key=payload["idempotency_key"]
             if payload.get("idempotency_key") is not None
             else None,
-            schema_version=str(payload.get("schema_version", PIPELINE_JOB_SCHEMA_VERSION)),
-            submitted_at=str(payload.get("submitted_at", datetime.now(UTC).isoformat())),
+            schema_version=payload.get("schema_version", PIPELINE_JOB_SCHEMA_VERSION),
+            submitted_at=payload.get("submitted_at", datetime.now(UTC).isoformat()),
         )
 
 

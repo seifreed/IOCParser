@@ -82,6 +82,18 @@ def test_domain_distributed_records_and_telemetry_sinks() -> None:
     assert restored.request.job_id == "job-1"
     with pytest.raises(TypeError, match="input_kind"):
         QueueEnvelope.from_record({"request": "bad-payload"})
+    with pytest.raises(TypeError, match="queue_backend"):
+        QueueEnvelope(
+            request=envelope.request,
+            queue_backend=1,  # type: ignore[arg-type]
+            queue_name="jobs",
+        )
+    with pytest.raises(TypeError, match="queue_name"):
+        QueueEnvelope(
+            request=envelope.request,
+            queue_backend="filesystem",
+            queue_name=1,  # type: ignore[arg-type]
+        )
 
     job = DistributedJobRecord(
         job_id="job-1",

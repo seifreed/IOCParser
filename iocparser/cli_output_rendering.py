@@ -111,7 +111,10 @@ def optional_str_run_metadata_value(
     raw_value = run_metadata.get(key)
     if raw_value is None:
         return None
-    return str(raw_value)
+    if not isinstance(raw_value, str):
+        return str(raw_value)
+    stripped = raw_value.strip()
+    return stripped or None
 
 
 def persist_results_request(request: PersistResultsRequest) -> int | None:

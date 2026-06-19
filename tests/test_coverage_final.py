@@ -382,4 +382,5 @@ class TestCliPersistenceIntCoercion:
         from iocparser.cli_output_rendering import optional_str_run_metadata_value
 
         assert optional_str_run_metadata_value({"k": 42}, "k") == "42"
+        assert optional_str_run_metadata_value({"k": " ok "}, "k") == "ok"
         assert optional_str_run_metadata_value({"k": None}, "k") is None

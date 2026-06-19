@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from iocparser.infrastructure.warninglists_types import normalized_warning_list_text
 from tests.test_warninglists_offline import (
     GOOD_BAD_DOMAIN_PAYLOADS,
     OfflineWarningLists,
@@ -195,6 +196,10 @@ class TestMISPWarningLists:
         # No match
         assert not warning_lists._check_value_in_list("google.net", values, "regex")
         assert not warning_lists._check_value_in_list("10.0.0.1", values, "regex")
+
+    def test_warning_list_text_helpers_reject_non_string_entries(self):
+        with pytest.raises(TypeError, match="string-like"):
+            normalized_warning_list_text(None, list_type="string")  # type: ignore[arg-type]
 
     def test_check_value_in_list_cidr(self):
         """Test CIDR type list checking through the generic dispatcher."""

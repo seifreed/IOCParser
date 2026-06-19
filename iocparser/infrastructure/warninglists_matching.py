@@ -149,7 +149,16 @@ class WarningListMatchingMixin:
         matching_attrs = warning_list.get("matching_attributes")
         if not isinstance(matching_attrs, list):
             return []
-        names = (matching_attribute_name(attr) for attr in matching_attrs)
+        def _names() -> list[str]:
+            names: list[str] = []
+            for attr in matching_attrs:
+                try:
+                    names.append(matching_attribute_name(attr))
+                except TypeError:
+                    continue
+            return names
+
+        names = _names()
         return [name for name in names if name.strip()]
 
     def _get_unscoped_list_ids(self) -> list[str]:

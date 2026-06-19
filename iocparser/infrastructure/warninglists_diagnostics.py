@@ -89,12 +89,13 @@ class WarningListDiagnosticsMixin(ABC):
             return True
         if not matching_attributes:
             return False
-        attrs = {
-            token
-            for attr in matching_attributes
-            for token in re.split(r"[|\-_ /]", matching_attribute_name(attr).lower())
-            if token
-        }
+        attrs: set[str] = set()
+        for attr in matching_attributes:
+            try:
+                attr_value = matching_attribute_name(attr).lower()
+            except TypeError:
+                continue
+            attrs.update(token for token in re.split(r"[|\-_ /]", attr_value) if token)
         return any(keyword in attrs for keyword in self.TYPE_KEYWORDS[ioc_type])
 
     def _log_matched_value(self, clean_val: str, vals: list[IOCValue], list_type: str) -> None:

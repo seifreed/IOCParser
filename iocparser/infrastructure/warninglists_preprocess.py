@@ -144,7 +144,10 @@ class WarningListPreprocessMixin:
         if not isinstance(matching_attrs, list):
             return
         for attr in matching_attrs:
-            attr_lower = matching_attribute_name(attr).lower()
+            try:
+                attr_lower = matching_attribute_name(attr).lower()
+            except TypeError:
+                continue
             attr_parts = set(re.split(r"[|\-_ /]", attr_lower))
             for keyword, ioc_type in self.IOC_TYPE_MAPPING.items():
                 if keyword == attr_lower or keyword in attr_parts:

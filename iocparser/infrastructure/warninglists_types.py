@@ -18,13 +18,18 @@ def matching_attribute_name(attr: WarningListEntry) -> str:
     if isinstance(attr, str):
         return attr
     if isinstance(attr, dict):
-        return str(attr.get("name", ""))
-    return str(attr)
+        name = attr.get("name", "")
+        if isinstance(name, str):
+            return name
+        raise TypeError(f"Expected matching attribute name to be string-like, got {type(name).__name__}")
+    raise TypeError(f"Expected matching attribute to be string-like, got {type(attr).__name__}")
 
 
 def normalized_warning_list_text(value: WarningListEntry, *, list_type: str) -> str:
     """Normalize warning-list text entries for exact/string-style matching."""
-    text = str(value).strip()
+    if not isinstance(value, str):
+        raise TypeError(f"Expected warning-list entry to be string-like, got {type(value).__name__}")
+    text = value.strip()
     if list_type == "hostname":
         text = text.rstrip("\\")
     return text.lower()

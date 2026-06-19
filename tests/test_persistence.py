@@ -129,6 +129,42 @@ def test_source_repository_preserves_non_url_whitespace(tmp_path) -> None:
     assert source.value == " sample.txt "
 
 
+def test_source_repository_reuses_legacy_spaced_non_url_value(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-source-legacy-file.db"
+    unit_of_work = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
+    try:
+        now = datetime.now(UTC)
+        with Session(unit_of_work.engine) as session:
+            legacy_source = Source(
+                kind="file",
+                value=" sample.txt ",
+                value_search="sample.txt",
+                dedup_hash="legacy",
+                original_url=None,
+                normalized_url=None,
+                mime_type=None,
+                input_size=None,
+                content_hash=None,
+                fingerprint=None,
+                first_seen=now,
+                last_seen=now,
+            )
+            session.add(legacy_source)
+            session.commit()
+            legacy_id = legacy_source.id
+
+        source_id = unit_of_work.source_repository.get_or_create(kind="file", value="sample.txt")
+        unit_of_work.commit()
+
+        with Session(unit_of_work.engine) as session:
+            source = session.execute(select(Source).where(Source.id == legacy_id)).scalar_one()
+    finally:
+        unit_of_work.close()
+
+    assert source_id == legacy_id
+    assert source.value == " sample.txt "
+
+
 def test_source_repository_normalizes_legacy_url_values(tmp_path) -> None:
     db_path = tmp_path / "iocparser-legacy-source.db"
     unit_of_work = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")

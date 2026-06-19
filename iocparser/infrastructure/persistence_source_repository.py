@@ -62,7 +62,7 @@ class SQLAlchemySourceRepository(SourceRepository):
             else:
                 stmt = stmt.where(func.trim(SourceModel.value) == value)
         else:
-            stmt = stmt.where(SourceModel.value == value)
+            stmt = stmt.where(func.trim(SourceModel.value) == value)
         source_rows: list[SourceModel] = self.session.execute(stmt).scalars().all()
         source = next(
             (
@@ -104,7 +104,7 @@ class SQLAlchemySourceRepository(SourceRepository):
         )
         refetch_stmt = select(SOURCE_MODEL).where(
             SourceModel.kind == kind,
-            func.trim(SourceModel.value) == value if kind == "url" else SourceModel.value == value,
+            func.trim(SourceModel.value) == value,
         )
 
         def _on_conflict(existing: SourceModel) -> int:

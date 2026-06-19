@@ -151,6 +151,34 @@ def test_source_repository_normalizes_legacy_url_values(tmp_path) -> None:
     assert source.dedup_hash == source_dedup_hash("url", "https://example.test/feed")
 
 
+def test_source_repository_trims_optional_url_metadata_on_direct_use(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-source-repo-direct-url.db"
+    unit_of_work = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
+    try:
+        source_id = unit_of_work.source_repository.get_or_create(
+            kind="url",
+            value=" https://example.test/feed ",
+            original_url=" HTTPS://Example.TEST/feed#frag ",
+            normalized_url=" HTTPS://Example.TEST/feed#frag ",
+            mime_type=" text/plain ",
+            content_hash=" abc123 ",
+            fingerprint=" def456 ",
+        )
+        unit_of_work.commit()
+
+        with Session(unit_of_work.engine) as session:
+            source = session.execute(select(Source).where(Source.id == source_id)).scalar_one()
+    finally:
+        unit_of_work.close()
+
+    assert source.value == "https://example.test/feed"
+    assert source.original_url == "HTTPS://Example.TEST/feed#frag"
+    assert source.normalized_url == "HTTPS://Example.TEST/feed#frag"
+    assert source.mime_type == "text/plain"
+    assert source.content_hash == "abc123"
+    assert source.fingerprint == "def456"
+
+
 def test_ioc_repository_refreshes_legacy_defanged_search_value(tmp_path) -> None:
     db_path = tmp_path / "iocparser-legacy-search.db"
     unit_of_work = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")

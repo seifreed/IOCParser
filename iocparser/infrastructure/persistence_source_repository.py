@@ -17,6 +17,13 @@ from iocparser.infrastructure.persistence_repository_support import (
 from iocparser.interfaces.ports import SourceRepository
 
 
+def _strip_optional(value: str | None) -> str | None:
+    if not isinstance(value, str):
+        return value
+    stripped = value.strip()
+    return stripped or None
+
+
 class SQLAlchemySourceRepository(SourceRepository):
     def __init__(self, session: Session) -> None:
         self.session = session
@@ -60,6 +67,11 @@ class SQLAlchemySourceRepository(SourceRepository):
         if source is None:
             source = source_rows[0] if source_rows else None
         now = datetime.now(UTC)
+        original_url = _strip_optional(original_url)
+        normalized_url = _strip_optional(normalized_url)
+        mime_type = _strip_optional(mime_type)
+        content_hash = _strip_optional(content_hash)
+        fingerprint = _strip_optional(fingerprint)
         if source is not None:
             source.last_seen = now
             if kind == "url":

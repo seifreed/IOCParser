@@ -76,6 +76,19 @@ class ServiceBackedBadWarningLists:
         return ({}, {"domains": [{"value": object(), "warning_list": "Known Good", "description": ""}]})
 
 
+class ServiceBackedBadNormalWarningLists:
+    def __init__(self, *, force_update: bool = False) -> None:
+        self.force_update = force_update
+
+    def separate_iocs_by_warnings(
+        self,
+        grouped_iocs: dict[str, list[str | dict[str, str]]],
+    ) -> tuple[dict[str, list[str | dict[str, str]]], dict[str, list[dict[str, str]]]]:
+        assert self.force_update is True
+        del grouped_iocs
+        return ({"domains": [object()]}, {})
+
+
 class _BadRawValue:
     def __init__(self) -> None:
         self.raw = object()
@@ -159,6 +172,19 @@ def test_warninglist_service_rejects_non_string_raw_values() -> None:
 def test_warninglist_service_rejects_non_string_warning_output() -> None:
     original = warninglists_service_module.MISPWarningLists
     warninglists_service_module.MISPWarningLists = ServiceBackedBadWarningLists
+    try:
+        with pytest.raises(TypeError, match="Expected value to be string-like"):
+            warninglists_service_module.MISPWarningListService().separate(
+                (IOC.from_raw("domains", "safe.example"),),
+                force_update=True,
+            )
+    finally:
+        warninglists_service_module.MISPWarningLists = original
+
+
+def test_warninglist_service_rejects_non_string_normal_output() -> None:
+    original = warninglists_service_module.MISPWarningLists
+    warninglists_service_module.MISPWarningLists = ServiceBackedBadNormalWarningLists
     try:
         with pytest.raises(TypeError, match="Expected value to be string-like"):
             warninglists_service_module.MISPWarningListService().separate(

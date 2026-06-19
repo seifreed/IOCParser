@@ -51,11 +51,12 @@ class MISPWarningListService(WarningListService):
 
         for ioc_type, values in normal_iocs.items():
             for value in values:
-                key = (ioc_type, str(value))
+                normalized_value = _require_str(value, field="value")
+                key = (ioc_type, normalized_value)
                 if by_key[key]:
                     normal_records.append(by_key[key].pop(0))
                 else:
-                    normal_records.append(IOC.from_raw(ioc_type, str(value)))
+                    normal_records.append(IOC.from_raw(ioc_type, normalized_value))
 
         for ioc_type, warning_values in warning_iocs.items():
             for warning in warning_values:

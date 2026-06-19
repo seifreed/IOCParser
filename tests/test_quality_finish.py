@@ -14,6 +14,7 @@ import pytest
 
 from iocparser import cli_processing_single
 from iocparser.adapters.renderers import (
+    CSVOutputRenderer,
     JSONOutputRenderer,
     STIXOutputRenderer,
     TextOutputRenderer,
@@ -740,6 +741,23 @@ def test_renderers_cover_custom_stix_and_record_helpers() -> None:
         renderer_json_object(
             JSONOutputRenderer().render(_BadJsonGroupedResult(iocs=()))
         )
+    class _BadCsvResult(ExtractionResult):
+        def to_records(self) -> list[dict[str, object]]:
+            return [
+                {
+                    "type": "domains",
+                    "value": "ctx.test",
+                    "raw_value": "ctx.test",
+                    "severity": "medium",
+                    "tags": [],
+                    "warning_list": object(),
+                    "description": "",
+                    "evidence": [],
+                }
+            ]
+
+    with pytest.raises(TypeError, match="Expected warning_list to be string"):
+        CSVOutputRenderer().render(_BadCsvResult(iocs=()))
     assert _record_string_list({"tags": "bad"}, "tags") == ()
     assert _record_dict_list({"evidence": "bad"}, "evidence") == []
     with pytest.raises(TypeError, match="Expected tags entries to be string"):

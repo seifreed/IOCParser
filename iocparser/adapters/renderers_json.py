@@ -21,6 +21,19 @@ def _require_str(value: object, *, field: str) -> str:
     return value
 
 
+def _csv_field(record: dict[str, object], field: str) -> str:
+    if field not in record:
+        raise TypeError(f"Expected {field} to be string, got missing")
+    return _require_str(record[field], field=field)
+
+
+def _csv_optional_field(record: dict[str, object], field: str) -> str:
+    value = record.get(field, "")
+    if value == "":
+        return ""
+    return _require_str(value, field=field)
+
+
 class JSONOutputRenderer(OutputRenderer):
     """Render extraction results as JSON."""
 
@@ -102,13 +115,13 @@ class CSVOutputRenderer(OutputRenderer):
             writer.writerow(
                 {
                     "schema_version": RESULT_SCHEMA_VERSION,
-                    "type": str(record.get("type", "")),
-                    "value": _csv_safe(str(record.get("value", ""))),
-                    "raw_value": _csv_safe(str(record.get("raw_value", ""))),
-                    "severity": str(record.get("severity", "")),
+                    "type": _csv_field(record, "type"),
+                    "value": _csv_safe(_csv_field(record, "value")),
+                    "raw_value": _csv_safe(_csv_field(record, "raw_value")),
+                    "severity": _csv_field(record, "severity"),
                     "tags": _csv_safe(",".join(record_string_list(record, "tags"))),
-                    "warning_list": _csv_safe(str(record.get("warning_list", ""))),
-                    "description": _csv_safe(str(record.get("description", ""))),
+                    "warning_list": _csv_safe(_csv_optional_field(record, "warning_list")),
+                    "description": _csv_safe(_csv_optional_field(record, "description")),
                     "line_numbers": line_numbers,
                     "evidence": _csv_safe(evidence_text),
                 }

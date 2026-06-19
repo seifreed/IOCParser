@@ -225,6 +225,14 @@ class TestMISPWarningLists:
         assert warning_lists._check_string_type("google.com", [" google.com "])
         assert not warning_lists._check_string_type("amazon.com", values)
 
+    def test_check_string_and_substring_type_reject_non_string_values(self):
+        warning_lists = make_warning_lists()
+
+        with pytest.raises(TypeError, match="string-like"):
+            warning_lists._check_string_type("google.com", [object()])  # type: ignore[list-item]
+        with pytest.raises(TypeError, match="string-like"):
+            warning_lists._check_substring_type("google.com", [object()])  # type: ignore[list-item]
+
     def test_get_logger_falls_back_to_module_logger(self):
         """Test logger fallback when instance logger is missing."""
         warning_lists = make_warning_lists()

@@ -9,7 +9,9 @@ from iocparser.infrastructure.warninglists_types import IOCValue, normalized_war
 
 
 def check_string_type(value: str, values: list[IOCValue]) -> bool:
-    return value.strip().lower() in [str(v).strip().lower() for v in values if v is not None]
+    return value.strip().lower() in [
+        normalized_warning_list_text(v, list_type="string") for v in values if v is not None
+    ]
 
 
 def check_substring_type(value: str, values: list[IOCValue]) -> bool:
@@ -17,7 +19,7 @@ def check_substring_type(value: str, values: list[IOCValue]) -> bool:
     for list_value in values:
         if list_value is None:
             continue
-        list_value_str = str(list_value).strip().lower()
+        list_value_str = normalized_warning_list_text(list_value, list_type="string")
         if not list_value_str:
             continue
         if list_value_str in value_lower:

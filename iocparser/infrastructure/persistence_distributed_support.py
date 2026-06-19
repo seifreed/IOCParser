@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from dataclasses import replace
 from uuid import uuid4
 from typing import TypedDict
 
@@ -128,6 +129,9 @@ def build_new_job(*, envelope: QueueEnvelope, receipt_id: str) -> DistributedJob
     now = datetime.now(UTC)
     job_id = envelope.request.job_id or str(uuid4())
     correlation_id = envelope.request.correlation_id or job_id
+    request = envelope.request
+    if request.job_id != job_id or request.correlation_id != correlation_id:
+        request = replace(request, job_id=job_id, correlation_id=correlation_id)
     return DistributedJobModel(
         job_id=job_id,
         correlation_id=correlation_id,
@@ -140,7 +144,7 @@ def build_new_job(*, envelope: QueueEnvelope, receipt_id: str) -> DistributedJob
         attempts=envelope.attempts,
         max_attempts=envelope.max_attempts,
         receipt_id=receipt_id,
-        payload_json=serialize_queue_record(envelope),
+        payload_json=serialize_queue_record(replace(envelope, request=request)),
         submitted_at=now,
     )
 

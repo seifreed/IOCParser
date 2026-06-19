@@ -1438,6 +1438,9 @@ def test_strict_coverage_infrastructure_edge_helpers(tmp_path) -> None:
     job = build_new_job(envelope=envelope, receipt_id="receipt")
     assert job.job_id
     assert job.correlation_id == job.job_id
+    payload = json.loads(job.payload_json)
+    assert payload["request"]["job_id"] == job.job_id
+    assert payload["request"]["correlation_id"] == job.correlation_id
 
 
 def test_history_import_updates_stale_ioc_search_value(tmp_path) -> None:

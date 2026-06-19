@@ -2942,6 +2942,20 @@ def test_persist_failed_batch_items_creates_failed_runs(tmp_path: Path) -> None:
     assert "None" not in {item.source_value for item in query_persisted_runs(db_uri=db_uri).items}
 
 
+def test_persist_failed_batch_items_rejects_non_string_error_messages(tmp_path: Path) -> None:
+    db_uri = f"sqlite:///{tmp_path / 'failed-batch-error.sqlite'}"
+    config = load_config(cli_persist=True, cli_db_uri=db_uri, cli_config_path=None)
+
+    with pytest.raises(TypeError, match="Expected error to be string"):
+        persist_failed_batch_items(
+            {"items": [{"url": "https://bad.example", "status": "failed", "error": object()}]},
+            config=config,
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
+        )
+
+
 def test_persist_failed_batch_items_defaults_invalid_duration_metadata(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'failed-batch-invalid-duration.sqlite'}"
     config = load_config(cli_persist=True, cli_db_uri=db_uri, cli_config_path=None)

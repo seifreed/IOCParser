@@ -223,7 +223,7 @@ def _failed_item_run_metadata(
         "failed_items": 1,
         "partial_error_count": 1,
         "status": "failed",
-        "error_message": str(item.get("error", fallback_str(fallback, "error_message", ""))),
+        "error_message": fallback_str(item, "error", fallback_str(fallback, "error_message", "")),
     }
 
 
@@ -238,7 +238,11 @@ def fallback_str(metadata: Mapping[str, int | str | None] | None, key: str, defa
     if metadata is None:
         return default
     value = metadata.get(key)
-    return default if value is None else str(value)
+    if value is None:
+        return default
+    if not isinstance(value, str):
+        raise TypeError(f"Expected {key} to be string, got {type(value).__name__}")
+    return value
 
 
 def persist_batch_job(

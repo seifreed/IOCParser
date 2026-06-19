@@ -9,7 +9,7 @@ import pytest
 
 from iocparser.distributed_pipeline import DistributedPipelineService
 from iocparser.domain.pipeline import PipelineJobRequest
-from iocparser.errors import ValidationError
+from iocparser.errors import SourceNotFoundError, ValidationError
 from iocparser.infrastructure.queue_filesystem import FilesystemQueueAdapter
 from iocparser.pipeline_worker import PipelineWorker
 from iocparser.worker_config import WorkerServiceConfig
@@ -134,6 +134,13 @@ def test_worker_config_rejects_invalid_numeric_ini_values(tmp_path: Path) -> Non
 
     with pytest.raises(ValidationError, match=r"worker\.ini"):
         WorkerServiceConfig.from_sources(str(config_path))
+
+
+def test_worker_config_rejects_missing_explicit_config_path(tmp_path: Path) -> None:
+    missing = tmp_path / "missing.ini"
+
+    with pytest.raises(SourceNotFoundError, match=r"missing\.ini"):
+        WorkerServiceConfig.from_sources(str(missing))
 
 
 def test_worker_config_runtime_section_preserves_network_queue_limits(tmp_path: Path) -> None:

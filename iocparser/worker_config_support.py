@@ -4,6 +4,7 @@ import os
 from configparser import ConfigParser
 from pathlib import Path
 
+from iocparser.errors import SourceNotFoundError
 from iocparser.runtime_config import find_default_config_paths, load_ini_sections
 from iocparser.shared_utils import FALSE_BOOL_VALUES, TRUE_BOOL_VALUES
 
@@ -111,12 +112,22 @@ def bool_env(name: str, default: bool = False) -> bool:
 
 
 def resolve_config_path(config_path: str | None) -> Path | None:
-    chosen = config_path or os.environ.get("IOCPARSER_CONFIG")
+    if config_path is not None:
+        chosen = config_path.strip()
+        if not chosen:
+            return None
+        candidate = Path(chosen)
+        if not candidate.exists():
+            raise SourceNotFoundError(str(candidate))
+        return candidate
+    chosen = os.environ.get("IOCPARSER_CONFIG")
     if isinstance(chosen, str):
         chosen = chosen.strip()
     if chosen:
         candidate = Path(chosen)
-        return candidate if candidate.exists() else None
+        if not candidate.exists():
+            raise SourceNotFoundError(str(candidate))
+        return candidate
     for candidate in find_default_config_paths():
         if candidate.exists():
             return candidate

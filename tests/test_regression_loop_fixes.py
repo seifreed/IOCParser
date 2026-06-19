@@ -224,6 +224,23 @@ def test_pipeline_job_request_rejects_non_string_inputs() -> None:
         PipelineJobRequest(input_kind="file", source_value="x", file_type=1)  # type: ignore[arg-type]
 
 
+def test_pipeline_job_request_rejects_non_bool_flags() -> None:
+    with pytest.raises(TypeError, match="persist"):
+        PipelineJobRequest(input_kind="text", source_value="x", persist=None)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="check_warnings"):
+        PipelineJobRequest(
+            input_kind="text", source_value="x", check_warnings=None  # type: ignore[arg-type]
+        )
+    with pytest.raises(TypeError, match="force_update"):
+        PipelineJobRequest(
+            input_kind="text", source_value="x", force_update=1  # type: ignore[arg-type]
+        )
+    with pytest.raises(TypeError, match="defang"):
+        PipelineJobRequest(input_kind="text", source_value="x", defang="no")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="emit_only"):
+        PipelineJobRequest(input_kind="text", source_value="x", emit_only=None)  # type: ignore[arg-type]
+
+
 def test_idempotency_key_for_missing_file_does_not_raise(tmp_path: Path) -> None:
     """Submitting a file job for a missing file must not crash on the idempotency digest.
 

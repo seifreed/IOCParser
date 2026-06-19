@@ -81,12 +81,25 @@ class PipelineJobRequest:
                 raise TypeError(f"Expected {field} to be non-empty string-like")
             return stripped
 
+        def _require_bool(value: object, *, field: str) -> bool:
+            if not isinstance(value, bool):
+                raise TypeError(f"Expected {field} to be bool, got {type(value).__name__}")
+            return value
+
         object.__setattr__(self, "input_kind", _require_str(self.input_kind, field="input_kind"))
         object.__setattr__(self, "source_value", _require_str(self.source_value, field="source_value"))
         if self.file_type is not None:
             object.__setattr__(self, "file_type", _require_str(self.file_type, field="file_type"))
         if self.db_uri is not None:
             object.__setattr__(self, "db_uri", _require_str(self.db_uri, field="db_uri"))
+        object.__setattr__(self, "persist", _require_bool(self.persist, field="persist"))
+        object.__setattr__(
+            self, "check_warnings", _require_bool(self.check_warnings, field="check_warnings")
+        )
+        object.__setattr__(
+            self, "force_update", _require_bool(self.force_update, field="force_update")
+        )
+        object.__setattr__(self, "defang", _require_bool(self.defang, field="defang"))
         if self.only is not None:
             object.__setattr__(self, "only", _require_str(self.only, field="only"))
         if self.exclude is not None:
@@ -97,6 +110,7 @@ class PipelineJobRequest:
             )
         if self.job_id is not None:
             object.__setattr__(self, "job_id", _require_str(self.job_id, field="job_id"))
+        object.__setattr__(self, "emit_only", _require_bool(self.emit_only, field="emit_only"))
 
 
 @dataclass(frozen=True)

@@ -861,6 +861,13 @@ class TestWarningListsGetWarnings:
         assert warnings["md5"][0]["value"] == "5f4dcc3b5aa765d61d8327deb882cf99"
         assert warnings["md5"][0]["warning_list"] == "Known Hashes"
 
+    def test_get_warnings_for_iocs_rejects_non_string_dict_values(self):
+        """Malformed IOC dict values should fail instead of being stringified."""
+        warning_lists = make_warning_lists()
+
+        with pytest.raises(TypeError, match="Expected value to be string"):
+            warning_lists.get_warnings_for_iocs({"domains": [{"value": object()}]})
+
     def test_get_warnings_for_iocs_empty_input(self):
         """Test getting warnings with empty input."""
         warning_lists = make_warning_lists()

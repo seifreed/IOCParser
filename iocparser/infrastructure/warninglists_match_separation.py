@@ -4,11 +4,17 @@ from collections.abc import Callable
 from logging import Logger
 
 
+def _require_str(value: object, *, field: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"Expected {field} to be string, got {type(value).__name__}")
+    return value
+
+
 def extract_ioc_value(ioc: str | dict[str, str]) -> str:
     """Return an IOC's string value, unwrapping the ``value`` key of dict IOCs."""
     if isinstance(ioc, dict) and "value" in ioc:
-        return str(ioc["value"])
-    return str(ioc)
+        return _require_str(ioc["value"], field="value")
+    return _require_str(ioc, field="value")
 
 
 def get_warnings_for_iocs(

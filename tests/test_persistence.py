@@ -110,17 +110,23 @@ def test_repositories_reuse_existing_source_and_iocs(tmp_path) -> None:
     unit_of_work.close()
 
 
-def test_source_repository_trims_non_url_values_for_reuse(tmp_path) -> None:
-    db_path = tmp_path / "iocparser-source-reuse-spaces.db"
+def test_source_repository_preserves_non_url_whitespace(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-source-preserve-spaces.db"
     unit_of_work = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
     try:
-        first_id = unit_of_work.source_repository.get_or_create(kind="file", value=" sample.txt ")
-        second_id = unit_of_work.source_repository.get_or_create(kind="file", value="sample.txt")
+        source_id = unit_of_work.source_repository.get_or_create(kind="file", value=" sample.txt ")
         unit_of_work.commit()
     finally:
         unit_of_work.close()
 
-    assert second_id == first_id
+    checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
+    try:
+        with Session(checker.engine) as session:
+            source = session.execute(select(Source).where(Source.id == source_id)).scalar_one()
+    finally:
+        checker.close()
+
+    assert source.value == " sample.txt "
 
 
 def test_source_repository_normalizes_legacy_url_values(tmp_path) -> None:

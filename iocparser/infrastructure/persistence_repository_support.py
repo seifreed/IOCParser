@@ -66,7 +66,7 @@ def normalize_ioc_search(value: str | None) -> str:
 
 
 def normalize_source_value(kind: str, value: str) -> str:
-    return value.strip()
+    return value.strip() if kind == "url" else value
 
 
 def _dedup_hash(parts: tuple[str, ...]) -> str:

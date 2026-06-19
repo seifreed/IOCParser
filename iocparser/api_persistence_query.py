@@ -243,18 +243,26 @@ def _validated_choice(value: str, *, valid: AbstractSet[str], error: str) -> str
     return normalized
 
 
-def validated_min_severity(value: str | None) -> str | None:
+def _require_str(value: object, *, field: str) -> str:
+    if not isinstance(value, str):
+        raise ValidationError(f"Invalid {field}: {value}")
+    return value
+
+
+def validated_min_severity(value: object | None) -> str | None:
     if value is None:
         return None
+    value = _require_str(value, field="min_severity")
     stripped = value.strip()
     if not stripped:
         return None
     return _validated_choice(stripped, valid=VALID_SEVERITIES, error=INVALID_MIN_SEVERITY_ERROR)
 
 
-def validated_ioc_type_filter(value: str | None) -> str | None:
+def validated_ioc_type_filter(value: object | None) -> str | None:
     if value is None:
         return None
+    value = _require_str(value, field="ioc_type")
     normalized = value.strip()
     if not normalized:
         return None
@@ -285,9 +293,10 @@ def validated_ioc_type_filters(value: object | None) -> tuple[str, ...]:
     return tuple(dict.fromkeys(normalized))
 
 
-def validated_stix_types(value: str | None) -> str | None:
+def validated_stix_types(value: object | None) -> str | None:
     if value is None:
         return None
+    value = _require_str(value, field="stix_types")
     stripped = value.strip()
     if not stripped:
         return None
@@ -298,19 +307,23 @@ def validated_stix_types(value: str | None) -> str | None:
     return stripped
 
 
-def validated_tag_mode(value: str) -> str:
+def validated_tag_mode(value: object) -> str:
+    value = _require_str(value, field="tag_mode")
     return _validated_choice(value, valid=VALID_TAG_MODES, error=INVALID_TAG_MODE_ERROR)
 
 
-def validated_run_sort(value: str) -> str:
+def validated_run_sort(value: object) -> str:
+    value = _require_str(value, field="sort_by")
     return _validated_choice(value, valid=VALID_RUN_SORT_VALUES, error=INVALID_SORT_BY_ERROR)
 
 
-def validated_search_sort(value: str) -> str:
+def validated_search_sort(value: object) -> str:
+    value = _require_str(value, field="sort_by")
     return _validated_choice(value, valid=VALID_SEARCH_SORT_VALUES, error=INVALID_SORT_BY_ERROR)
 
 
-def validated_search_backend(value: str) -> str:
+def validated_search_backend(value: object) -> str:
+    value = _require_str(value, field="search_backend")
     return _validated_choice(value, valid=VALID_SEARCH_BACKENDS, error=INVALID_SEARCH_BACKEND_ERROR)
 
 

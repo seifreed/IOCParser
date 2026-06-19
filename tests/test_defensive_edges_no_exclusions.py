@@ -1310,7 +1310,16 @@ def test_history_import_skip_and_same_origin_batch_paths() -> None:
 
 
 def test_strict_coverage_option_and_metadata_edge_helpers() -> None:
-    from iocparser.api_persistence_query import bool_option, validated_ioc_type_filter
+    from iocparser.api_persistence_query import (
+        bool_option,
+        validated_ioc_type_filter,
+        validated_min_severity,
+        validated_run_sort,
+        validated_search_backend,
+        validated_search_sort,
+        validated_stix_types,
+        validated_tag_mode,
+    )
     from iocparser.cli_output_rendering import (
         int_run_metadata_value,
         optional_int_run_metadata_value,
@@ -1323,6 +1332,20 @@ def test_strict_coverage_option_and_metadata_edge_helpers() -> None:
 
     assert bool_option("ON") is True
     assert validated_ioc_type_filter("   ") is None
+    with pytest.raises(ValidationError, match="Invalid min_severity"):
+        validated_min_severity(1)  # type: ignore[arg-type]
+    with pytest.raises(ValidationError, match="Invalid ioc_type"):
+        validated_ioc_type_filter(1)  # type: ignore[arg-type]
+    with pytest.raises(ValidationError, match="Invalid stix_types"):
+        validated_stix_types(1)  # type: ignore[arg-type]
+    with pytest.raises(ValidationError, match="Invalid tag_mode"):
+        validated_tag_mode(1)  # type: ignore[arg-type]
+    with pytest.raises(ValidationError, match="Invalid sort_by"):
+        validated_run_sort(1)  # type: ignore[arg-type]
+    with pytest.raises(ValidationError, match="Invalid sort_by"):
+        validated_search_sort(1)  # type: ignore[arg-type]
+    with pytest.raises(ValidationError, match="Invalid search_backend"):
+        validated_search_backend(1)  # type: ignore[arg-type]
     assert int_run_metadata_value({"items": "   "}, "items", 3) == 3
     assert optional_int_run_metadata_value({"duration": True}, "duration") is None
     assert optional_int_run_metadata_value({"duration": "   "}, "duration") is None

@@ -854,6 +854,34 @@ def test_query_service_trims_source_kind_filters(tmp_path) -> None:
     assert service.search_iocs_page(value="example.com", source_kind=" file ").total == 1
 
 
+def test_query_service_matches_legacy_spaced_non_url_source_values(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-legacy-nonurl-query.db"
+    service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
+    service.persist_multiple_runs(
+        [
+            (
+                "file",
+                "sample.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["example.com"]}, {}),
+            )
+        ],
+        tool_version="5.0.0",
+        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+    )
+
+    checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
+    try:
+        with Session(checker.engine) as session:
+            source = session.execute(select(Source)).scalar_one()
+            source.value = " sample.txt "
+            session.commit()
+    finally:
+        checker.close()
+
+    assert service.query_runs_page(limit=10, source_value="sample.txt").total == 1
+    assert service.search_iocs_page(value="example.com", source_value="sample.txt").total == 1
+
+
 def test_query_persisted_runs_honors_source_kind_filters(tmp_path) -> None:
     db_path = tmp_path / "iocparser-source-kind-api.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")

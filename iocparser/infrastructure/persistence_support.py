@@ -151,7 +151,7 @@ def source_value_clause(*, source_kind: str | None, source_value: str) -> Clause
     normalized_kind = source_kind.strip().lower() if source_kind is not None else ""
     exact_value = source_value.strip()
     if normalized_kind != "url":
-        return SourceModel.value == exact_value
+        return func.trim(SourceModel.value) == exact_value
     clauses: list[ClauseElement] = [func.trim(SourceModel.value) == exact_value]
     clauses.extend(func.coalesce(SourceModel.normalized_url, "") == candidate for candidate in _url_filter_variants(exact_value))
     clauses.append(

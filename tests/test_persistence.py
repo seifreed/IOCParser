@@ -370,6 +370,61 @@ def test_import_history_matches_existing_url_sources_without_normalized_url(tmp_
     assert len(sources) == 1
 
 
+def test_import_history_matches_existing_padded_url_sources_without_normalized_url(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-import-url-source-padded.db"
+    service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
+    options = PersistOptions(
+        defang=False,
+        check_warnings=False,
+        force_update=False,
+        output_format="json",
+    )
+    service.persist_multiple_runs(
+        [
+            (
+                "url",
+                "https://example.test/report",
+                ExtractionResult.from_grouped_payload({"domains": ["existing.example"]}, {}),
+            )
+        ],
+        tool_version="5.0.0",
+        options=options,
+    )
+    checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
+    try:
+        with Session(checker.engine) as session:
+            source = session.execute(select(Source)).scalar_one()
+            source.value = " HTTPS://Example.TEST/report#section "
+            source.normalized_url = None
+            session.commit()
+    finally:
+        checker.close()
+    timestamp = "2026-05-13T00:00:00"
+    payload: dict[str, object] = {
+        "sources": [
+            {
+                "id": 99,
+                "kind": "url",
+                "value": " HTTPS://Example.TEST/report#section ",
+                "value_search": "https://example.test/report#section",
+                "original_url": "HTTPS://Example.TEST/report#section",
+                "first_seen": timestamp,
+                "last_seen": timestamp,
+            }
+        ]
+    }
+
+    counts = service.import_history(payload)
+
+    checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
+    with Session(checker.engine) as session:
+        sources = session.execute(select(Source)).scalars().all()
+    checker.close()
+
+    assert counts["sources"] == 0
+    assert len(sources) == 1
+
+
 def test_import_history_trims_replayed_source_kind_identity(tmp_path) -> None:
     db_path = tmp_path / "iocparser-import-source-kind.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")

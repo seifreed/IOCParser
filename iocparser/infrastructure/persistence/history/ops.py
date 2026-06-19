@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
-from sqlalchemy import inspect, or_, select, text
+from sqlalchemy import func, inspect, or_, select, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 
@@ -238,10 +238,10 @@ def _existing_source(session: Session, row: dict[str, object]) -> SourceModel | 
         stmt = select(SourceModel).where(SourceModel.kind == "url")
         clauses = []
         if value:
-            clauses.append(SourceModel.value == value)
+            clauses.append(func.trim(SourceModel.value) == value)
         if normalized_url:
             clauses.append(SourceModel.normalized_url == normalized_url)
-        stmt = stmt.where(or_(*clauses)) if clauses else stmt.where(SourceModel.value == value)
+        stmt = stmt.where(or_(*clauses)) if clauses else stmt.where(func.trim(SourceModel.value) == value)
         candidates = session.execute(stmt).scalars().all()
         for candidate in candidates:
             candidate_identity = _source_identity(

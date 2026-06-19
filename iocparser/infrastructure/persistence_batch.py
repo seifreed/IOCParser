@@ -53,7 +53,7 @@ def _report_string_value(
 
 def _failed_items(items: object) -> list[dict[str, object]]:
     if not isinstance(items, list):
-        return []
+        raise TypeError(f"Expected items to be list, got {type(items).__name__}")
     failed: list[dict[str, object]] = []
     for item in items:
         if isinstance(item, dict) and _report_string_value(item, "status").lower() == "failed":

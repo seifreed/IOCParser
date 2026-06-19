@@ -502,7 +502,8 @@ def test_persistence_helper_functions_cover_conversion_edges() -> None:
     assert _optional_int_metadata_value({"count": True}, "count") is None
     assert _optional_int_metadata_value({"count": "bad"}, "count") is None
     assert _optional_int_metadata_value({"count": -5}, "count") is None
-    assert _failed_items("bad") == []
+    with pytest.raises(TypeError, match="Expected items to be list"):
+        _failed_items("bad")
     assert _dict_report_value({"data": {1: "one", "two": 2}}, "data") == {"two": 2}
     assert _failed_items([{1: "one", "status": "failed"}]) == [{"status": "failed"}]
     with pytest.raises(TypeError):

@@ -38,6 +38,7 @@ from iocparser.infrastructure.persistence.query.ops import _coerce_count
 from iocparser.infrastructure.persistence_migration_steps import _coerce_version_row
 from iocparser.infrastructure.persistence_fts import build_fts_query
 from iocparser.infrastructure.streaming_chunks import read_chunks_with_prefix
+from iocparser.pipeline_worker_support import extract_result, prepare_input
 from iocparser.worker_config_support import load_worker_file_values
 
 
@@ -354,6 +355,36 @@ def test_sha256_content_digester_expands_user_home(tmp_path: Path, monkeypatch: 
     digester = SHA256ContentDigester()
 
     assert digester.digest_file("~/sample.txt") == digester.digest_file(str(sample))
+
+
+def test_worker_extract_result_expands_home_file_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from iocparser.domain.pipeline import ResourceLimits
+
+    home = tmp_path / "home"
+    home.mkdir()
+    sample = home / "sample.txt"
+    sample.write_text("worker input", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(home))
+
+    class FakeClient:
+        def __init__(self) -> None:
+            self.seen_path: str | None = None
+            self.downloader = object()
+
+        def extract_result_from_file(self, file_path: str, **kwargs: object) -> ExtractionResult:
+            del kwargs
+            self.seen_path = file_path
+            return ExtractionResult.from_grouped_payload({"domains": ["worker.example"]}, {})
+
+    client = FakeClient()
+    request = PipelineJobRequest(input_kind="file", source_value="~/sample.txt")
+    prepared = prepare_input(client=client, limits=ResourceLimits(), request=request)
+    result = extract_result(client=client, request=request, prepared=prepared)
+
+    assert client.seen_path == str(sample)
+    assert result.grouped_iocs() == {"domains": ["worker.example"]}
 
 
 def test_fts_rebuild_indexes_normalized_value_search() -> None:

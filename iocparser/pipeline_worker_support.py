@@ -432,7 +432,7 @@ def extract_result(
         )
     if request.input_kind == "file":
         return client.extract_result_from_file(
-            request.source_value,
+            str(Path(request.source_value).expanduser()),
             file_type=request.file_type,
             check_warnings=request.check_warnings,
             force_update=request.force_update,

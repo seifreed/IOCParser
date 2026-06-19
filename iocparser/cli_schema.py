@@ -57,7 +57,7 @@ def _history_payload(path: str) -> dict[str, object]:
     # A missing/unreadable archive is user error (typo'd path, bad JSON); report it
     # cleanly rather than letting the raw OSError/JSONDecodeError reach the top-level
     # handler as an "unexpected error" stack trace.
-    archive = Path(path)
+    archive = Path(path).expanduser()
     if not archive.is_file():
         raise ValidationError(HISTORY_FILE_NOT_FOUND.format(path=path))
     try:

@@ -393,6 +393,16 @@ def test_history_payload_reports_missing_and_unreadable_files_cleanly(tmp_path: 
         _history_payload(str(malformed))
 
 
+def test_history_payload_expands_user_home_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    payload_path = home / "history.json"
+    payload_path.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(home))
+
+    assert _history_payload("~/history.json") == {}
+
+
 def test_runtime_and_worker_config_support_helpers_cover_error_branches(tmp_path: Path) -> None:
     os_environ = sys.modules["os"].environ
     previous = {

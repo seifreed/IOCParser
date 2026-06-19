@@ -117,6 +117,7 @@ def _failed_batch_item_matches_retry_filters(
 
 
 def _load_valid_batch_report_payload(report_path: Path) -> dict[str, object]:
+    report_path = report_path.expanduser()
     if not report_path.is_file():
         raise FileExistenceError(str(report_path))
     try:
@@ -280,7 +281,7 @@ def _load_batch_urls(
     input_load_started = time.perf_counter()
     if retry_report:
         urls = _failed_urls_from_report(
-            Path(retry_report),
+            Path(retry_report).expanduser(),
             error_type_filter=get_optional_str_arg(args, "retry_error_type"),
             error_substring=get_optional_str_arg(args, "retry_error_contains"),
         )
@@ -296,7 +297,7 @@ def _load_batch_urls(
         )
         input_label = f"retried batch {retry_batch_job}"
     else:
-        url_file = Path(get_optional_str_arg(args, "url_file") or "")
+        url_file = Path(get_optional_str_arg(args, "url_file") or "").expanduser()
         if not url_file.is_file():
             raise FileExistenceError(str(url_file))
         urls = [

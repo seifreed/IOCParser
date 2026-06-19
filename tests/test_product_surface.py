@@ -715,6 +715,32 @@ def test_retry_report_attempts_follow_filtered_failed_items(tmp_path: Path) -> N
     assert report["items"][0]["retry_attempt"] == 6
 
 
+def test_retry_report_expands_user_home_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    report_path = tmp_path / "home" / "report.json"
+    report_path.parent.mkdir()
+    report_path.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {
+                        "url": "https://retry-home.example/path",
+                        "status": "failed",
+                        "error": "timeout waiting",
+                        "error_type": "IOCTimeoutError",
+                        "retry_attempt": 2,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("HOME", str(report_path.parent))
+
+    urls = _failed_urls_from_report(Path("~/report.json"))
+
+    assert urls == ["https://retry-home.example/path"]
+
+
 def test_retry_batch_job_attempts_follow_filtered_failed_items(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'filtered-retry-batch.sqlite'}"
     config = load_config(cli_persist=True, cli_db_uri=db_uri, cli_config_path=None)

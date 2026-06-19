@@ -223,10 +223,11 @@ def process_file_payload(
     context: SingleInputContext,
     process_file_func: ProcessFileFunc,
 ) -> SingleInputPayload:
+    normalized_file_arg = str(Path(file_arg).expanduser())
     if context.configured_plugin_client is not None and not get_bool_arg(context.args, "streaming"):
         only, exclude = joined_type_filters(context.processing_options)
         result = context.configured_plugin_client.extract_result_from_file(
-            file_arg,
+            normalized_file_arg,
             file_type=context.options.file_type,
             check_warnings=context.options.check_warnings,
             force_update=context.options.force_update,
@@ -237,10 +238,9 @@ def process_file_payload(
         return SingleInputPayload(
             normal_iocs=result.grouped_iocs(),
             warning_iocs=result.grouped_warnings(),
-            input_display=file_arg,
+            input_display=normalized_file_arg,
             result=result,
         )
-    normalized_file_arg = str(Path(file_arg).expanduser())
     normal_iocs, warning_iocs, file_result = process_file_func(
         Path(normalized_file_arg),
         request=FileProcessingRequest(

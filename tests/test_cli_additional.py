@@ -10,10 +10,11 @@ import pytest
 
 import iocparser.cli as cli_module
 import iocparser.cli_output_rendering as cli_output_rendering_module
+import iocparser.cli_processing_single_support as cli_processing_single_support_module
 from iocparser.cli import handle_misp_init, process_single_input, save_output
 from iocparser.cli_output import PersistResultsRequest, persist_results
 from iocparser.config import AppConfig
-from iocparser.domain.models import PersistOptions
+from iocparser.domain.models import ExtractionResult, PersistOptions
 from tests.http_server_helpers import LocalHTTPTextServer
 
 
@@ -36,6 +37,59 @@ def test_process_single_input_with_real_url_server() -> None:
     assert normal_iocs == {"urls": ["https://from-server.example/path"]}
     assert warning_iocs == {}
     assert input_display == args.url
+
+
+def test_process_single_input_file_expands_user_home_for_plugin_client(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    sample = home / "sample.txt"
+    sample.write_text("IOC URL: https://plugin.example/path\n", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(home))
+
+    class FakePluginClient:
+        def __init__(self) -> None:
+            self.seen_path: str | None = None
+
+        def extract_result_from_file(
+            self,
+            file_path: str,
+            *,
+            file_type: str | None,
+            check_warnings: bool,
+            force_update: bool,
+            defang: bool,
+            only: str | None,
+            exclude: str | None,
+        ) -> object:
+            del file_type, check_warnings, force_update, defang, only, exclude
+            self.seen_path = file_path
+            return ExtractionResult.from_grouped_payload(
+                {"urls": ["https://plugin.example/path"]}, {}
+            )
+
+    fake_client = FakePluginClient()
+    monkeypatch.setattr(
+        cli_processing_single_support_module,
+        "plugin_client",
+        lambda *args, **kwargs: fake_client,
+    )
+
+    args = argparse.Namespace(
+        file="~/sample.txt",
+        url=None,
+        url_direct=None,
+        type=None,
+        no_defang=False,
+        no_check_warnings=True,
+        force_update=False,
+    )
+
+    _normal_iocs, _warning_iocs, input_display, _result = process_single_input(args)
+
+    assert fake_client.seen_path == str(sample)
+    assert input_display == str(sample)
 
 
 def test_save_output_stix_format_to_file(tmp_path: Path) -> None:

@@ -13,6 +13,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
@@ -429,6 +430,39 @@ class TestBatchJobReportParsing:
         )
         session.commit()
         assert isinstance(batch_id, int)
+        session.close()
+        engine.dispose()
+
+    def test_create_batch_job_rejects_non_string_failed_item_fields(self, tmp_path: Path) -> None:
+        from iocparser.infrastructure.persistence_batch import create_batch_job
+
+        db_uri = fresh_db(tmp_path, "batch-invalid.db")
+        engine = create_engine(db_uri, future=True)
+        session = Session(engine)
+
+        report = {
+            "total": 1,
+            "successful": 0,
+            "failed": 1,
+            "status": "failed",
+            "items": [
+                {
+                    "url": "https://c.com",
+                    "status": "failed",
+                    "error": object(),
+                    "error_type": "HTTPError",
+                }
+            ],
+        }
+
+        with pytest.raises(TypeError, match="Expected error to be string"):
+            create_batch_job(
+                session,
+                source_kind="url",
+                run_ids=(),
+                report=report,
+                config={},
+            )
         session.close()
         engine.dispose()
 

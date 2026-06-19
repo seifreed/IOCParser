@@ -40,12 +40,21 @@ def _dict_report_value(payload: dict[str, object], key: str) -> dict[str, object
     return {}
 
 
+def _report_string_value(
+    payload: dict[str, object], key: str, default: str = ""
+) -> str:
+    raw_value = payload.get(key, default)
+    if not isinstance(raw_value, str):
+        raise TypeError(f"Expected {key} to be string, got {type(raw_value).__name__}")
+    return raw_value
+
+
 def _failed_items(items: object) -> list[dict[str, object]]:
     if not isinstance(items, list):
         return []
     failed: list[dict[str, object]] = []
     for item in items:
-        if isinstance(item, dict) and str(item.get("status", "")).lower() == "failed":
+        if isinstance(item, dict) and _report_string_value(item, "status").lower() == "failed":
             failed.append({str(name): value for name, value in item.items()})
     return failed
 
@@ -103,9 +112,7 @@ def create_batch_job(
     retry_attempt = _batch_retry_attempt(items)
     duration_ms = _int_report_value(report, "duration_ms", 0)
     started_at, finished_at = _batch_timestamps(report, duration_ms=duration_ms)
-    error_summary: Counter[str] = Counter(
-        str(item.get("error_type", "unknown")) for item in failures
-    )
+    error_summary: Counter[str] = Counter(_report_string_value(item, "error_type", "unknown") for item in failures)
     metrics = _dict_report_value(report, "metrics")
     serialized_config = dict(config) if config is not None else {}
     serialized_error_summary: dict[str, int] = dict(sorted(error_summary.items()))
@@ -137,8 +144,8 @@ def create_batch_job(
             FailedBatchItemModel(
                 batch_job_id=job.id,
                 source_value=source_value,
-                error_type=str(item.get("error_type", "unknown")),
-                error_message=str(item.get("error", "")),
+                error_type=_report_string_value(item, "error_type", "unknown"),
+                error_message=_report_string_value(item, "error"),
                 retry_attempt=_int_report_value(item, "retry_attempt", 0),
                 created_at=finished_at,
             ),

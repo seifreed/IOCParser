@@ -238,6 +238,12 @@ class TestArgumentHelpers:
         assert result == ["item1", "item2", "item3"]
         assert isinstance(result, list)
 
+    def test_get_list_arg_strips_list_items(self) -> None:
+        args = argparse.Namespace(items=["  item1  ", "item2", "  "])
+
+        result = get_list_arg(args, "items")
+        assert result == ["item1", "item2"]
+
     def test_get_list_arg_with_single_value(self) -> None:
         """Test get_list_arg converts single value to single-item list."""
         args = argparse.Namespace(file="single.txt")

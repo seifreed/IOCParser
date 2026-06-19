@@ -1312,6 +1312,7 @@ def test_history_import_skip_and_same_origin_batch_paths() -> None:
 def test_strict_coverage_option_and_metadata_edge_helpers() -> None:
     from iocparser.api_persistence_query import (
         bool_option,
+        validated_iso_datetime,
         validated_non_negative_days,
         validated_ioc_type_filter,
         validated_required_id,
@@ -1334,6 +1335,8 @@ def test_strict_coverage_option_and_metadata_edge_helpers() -> None:
 
     assert bool_option("ON") is True
     assert validated_ioc_type_filter("   ") is None
+    with pytest.raises(ValidationError, match="Invalid ISO date"):
+        validated_iso_datetime(1)  # type: ignore[arg-type]
     with pytest.raises(ValidationError, match="Invalid min_severity"):
         validated_min_severity(1)  # type: ignore[arg-type]
     with pytest.raises(ValidationError, match="Invalid ioc_type"):

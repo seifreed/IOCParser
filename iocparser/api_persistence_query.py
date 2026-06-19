@@ -221,9 +221,11 @@ def search_input(value: str, options: SearchPersistedIOCOptions) -> SearchPersis
     )
 
 
-def validated_iso_datetime(value: str | None) -> str | None:
+def validated_iso_datetime(value: object | None) -> str | None:
     if value is None:
         return None
+    if not isinstance(value, str):
+        raise ValidationError(INVALID_DATE_ERROR.format(value=value))
     stripped = value.strip()
     if not stripped:
         return None

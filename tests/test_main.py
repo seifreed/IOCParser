@@ -161,11 +161,12 @@ class TestArgumentHelpers:
 
         assert get_bool_arg(args, "nonexistent") is False
 
-    def test_get_bool_arg_unknown_string_is_false(self) -> None:
-        """Test get_bool_arg does not treat unknown strings as enabled flags."""
+    def test_get_bool_arg_unknown_string_is_rejected(self) -> None:
+        """Test get_bool_arg rejects unknown strings instead of guessing."""
         args = argparse.Namespace(enabled="maybe")
 
-        assert get_bool_arg(args, "enabled") is False
+        with pytest.raises(ValidationError, match="enabled requires a boolean value"):
+            get_bool_arg(args, "enabled")
 
     def test_get_bool_arg_rejects_non_boolean_objects(self) -> None:
         """Test get_bool_arg rejects arbitrary objects instead of coercing truthiness."""

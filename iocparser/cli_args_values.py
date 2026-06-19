@@ -109,7 +109,9 @@ def get_bool_arg(args: argparse.Namespace, name: str, default: bool = False) -> 
         return value
     if isinstance(value, str):
         parsed = parse_bool_token(value)
-        return parsed if parsed is not None else False
+        if parsed is None:
+            raise ValidationError(BOOLEAN_VALUE_REQUIRED.format(field_name=name))
+        return parsed
     if isinstance(value, int) and value in {0, 1}:
         return bool(value)
     raise ValidationError(BOOLEAN_VALUE_REQUIRED.format(field_name=name))

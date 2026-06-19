@@ -34,6 +34,15 @@ def _csv_optional_field(record: dict[str, object], field: str) -> str:
     return _require_str(value, field=field)
 
 
+def _csv_warning_field(record: dict[str, object], field: str) -> str:
+    has_warning_shape = "warning_list" in record or "description" in record
+    if not has_warning_shape and field not in record:
+        return ""
+    if field not in record:
+        raise TypeError(f"Expected {field} to be string, got missing")
+    return _require_str(record[field], field=field)
+
+
 class JSONOutputRenderer(OutputRenderer):
     """Render extraction results as JSON."""
 
@@ -120,8 +129,8 @@ class CSVOutputRenderer(OutputRenderer):
                     "raw_value": _csv_safe(_csv_field(record, "raw_value")),
                     "severity": _csv_field(record, "severity"),
                     "tags": _csv_safe(",".join(record_string_list(record, "tags"))),
-                    "warning_list": _csv_safe(_csv_optional_field(record, "warning_list")),
-                    "description": _csv_safe(_csv_optional_field(record, "description")),
+                    "warning_list": _csv_safe(_csv_warning_field(record, "warning_list")),
+                    "description": _csv_safe(_csv_warning_field(record, "description")),
                     "line_numbers": line_numbers,
                     "evidence": _csv_safe(evidence_text),
                 }

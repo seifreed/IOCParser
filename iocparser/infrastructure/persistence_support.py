@@ -49,6 +49,8 @@ def _evidence_from_json(raw_value: str) -> tuple[IOCEvidence, ...]:
         if not isinstance(entry, dict):
             continue
         line_number_raw = entry.get("line_number")
+        if isinstance(line_number_raw, bool):
+            raise TypeError(f"Expected line_number to be int, got {type(line_number_raw).__name__}")
         line_number = line_number_raw if isinstance(line_number_raw, int) else None
         excerpt = entry.get("excerpt")
         source = entry.get("source")

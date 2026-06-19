@@ -30,6 +30,7 @@ from iocparser.infrastructure.extraction import IOCExtractor
 from iocparser.infrastructure.file_parser import decode_file_bytes, wrap_binary_stream_for_bom
 from iocparser.infrastructure.file_readers import MagicTextSourceReader
 from iocparser.infrastructure.migration_revisions import rev_0005_fts_metrics
+from iocparser.infrastructure.persistence_support import _evidence_from_json
 from iocparser.infrastructure.persistence.history.row_values import typed_row
 from iocparser.infrastructure.persistence_fts import build_fts_query
 from iocparser.infrastructure.streaming_chunks import read_chunks_with_prefix
@@ -300,6 +301,11 @@ def test_resource_limits_reject_bool_values() -> None:
         ResourceLimits(max_input_size_bytes=True)  # type: ignore[arg-type]
     with pytest.raises(TypeError, match="max_input_seconds"):
         ResourceLimits(max_input_seconds=False)  # type: ignore[arg-type]
+
+
+def test_evidence_json_rejects_bool_line_numbers() -> None:
+    with pytest.raises(TypeError, match="line_number"):
+        _evidence_from_json(json.dumps([{"excerpt": "x", "line_number": True, "source": "s"}]))
 
 
 def test_idempotency_key_for_missing_file_does_not_raise(tmp_path: Path) -> None:

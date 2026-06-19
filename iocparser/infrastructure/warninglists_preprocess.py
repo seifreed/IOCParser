@@ -118,7 +118,7 @@ class WarningListPreprocessMixin:
         for pattern in values_val:
             if pattern is None:
                 continue
-            pattern_str = str(pattern)
+            pattern_str = _require_str(pattern, field="regex pattern")
             normalized_pattern, pattern_flags = self._normalize_regex_pattern(pattern_str)
             if not self._is_safe_regex(normalized_pattern):
                 self._get_logger().warning(
@@ -137,7 +137,7 @@ class WarningListPreprocessMixin:
         for cidr_value in values_val:
             if cidr_value is None:
                 continue
-            cidr_text = str(cidr_value).strip()
+            cidr_text = _require_str(cidr_value, field="cidr entry").strip()
             try:
                 networks.append(ipaddress.ip_network(cidr_text, strict=False))
             except (ValueError, ipaddress.AddressValueError):

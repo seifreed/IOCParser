@@ -901,6 +901,34 @@ class TestWarningListsGetWarnings:
         with pytest.raises(TypeError, match="Expected type to be string"):
             warning_lists._preprocess_lists()
 
+    def test_preprocess_rejects_non_string_regex_and_cidr_entries(self):
+        """Regex and CIDR entries should fail fast instead of being stringified."""
+        warning_lists = make_warning_lists()
+        warning_lists.warning_lists = {
+            "bad-regex": {
+                "name": "Bad Regex",
+                "description": "Bad regex entry",
+                "type": "regex",
+                "matching_attributes": ["domain"],
+                "list": [object()],
+            }
+        }
+        with pytest.raises(TypeError, match="Expected regex pattern to be string"):
+            warning_lists._preprocess_lists()
+
+        warning_lists = make_warning_lists()
+        warning_lists.warning_lists = {
+            "bad-cidr": {
+                "name": "Bad CIDR",
+                "description": "Bad cidr entry",
+                "type": "cidr",
+                "matching_attributes": ["ip-src"],
+                "list": [object()],
+            }
+        }
+        with pytest.raises(TypeError, match="Expected cidr entry to be string"):
+            warning_lists._preprocess_lists()
+
     def test_get_warnings_for_iocs_empty_input(self):
         """Test getting warnings with empty input."""
         warning_lists = make_warning_lists()

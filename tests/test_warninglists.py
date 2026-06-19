@@ -937,6 +937,26 @@ class TestWarningListsGetWarnings:
         with pytest.raises(TypeError, match="Expected cidr entry to be string"):
             warning_lists._preprocess_lists()
 
+    def test_substring_matching_rejects_non_string_entries(self):
+        warning_lists = make_warning_lists()
+        warning_lists.warning_lists = {
+            "bad-substring": {
+                "name": "Bad Substring",
+                "description": "Bad substring entry",
+                "type": "substring",
+                "matching_attributes": ["domain"],
+                "list": [object()],
+            }
+        }
+
+        with pytest.raises(TypeError, match="Expected warning list entry to be string"):
+            warning_lists._check_against_warning_list(
+                "example.com",
+                None,
+                warning_lists.warning_lists["bad-substring"],
+                "bad-substring",
+            )
+
     def test_get_warnings_for_iocs_empty_input(self):
         """Test getting warnings with empty input."""
         warning_lists = make_warning_lists()

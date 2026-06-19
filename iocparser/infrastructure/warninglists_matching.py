@@ -135,7 +135,10 @@ class WarningListMatchingMixin:
         list_type = _require_str(warning_list.get("type", "string"), field="type")
         values_val = warning_list.get("list", [])
         if isinstance(values_val, list):
-            values: list[IOCValue] = [str(v) if v is not None else None for v in values_val]
+            values: list[IOCValue] = [
+                _require_str(v, field="warning list entry") if v is not None else None
+                for v in values_val
+            ]
         else:
             values = []
         if self._check_value_in_list(clean_value, values, list_type):

@@ -8,6 +8,7 @@ from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, selec
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from iocparser.infrastructure.persistence_schema import Base, RunModel
+from iocparser.infrastructure.persistence_support import normalized_source_filter
 
 
 def _invalid_report_int_error(*, key: str, raw_value: object) -> TypeError:
@@ -112,6 +113,7 @@ def create_batch_job(
     """Persist a batch job aggregate and attach its runs and failures."""
     if not isinstance(source_kind, str) or not source_kind.strip():
         raise TypeError("Expected source_kind to be non-empty string")
+    source_kind = normalized_source_filter(source_kind)
     items = report.get("items", [])
     failures = _failed_items(items)
     retry_attempt = _batch_retry_attempt(items)

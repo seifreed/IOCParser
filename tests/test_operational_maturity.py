@@ -1310,7 +1310,7 @@ def test_batch_job_persistence_uses_report_status_and_max_retry_attempt(tmp_path
     batch_job_id = persist_batch_job(
         failed_only_report,
         config=config,
-        source_kind="url",
+        source_kind=" URL ",
         run_ids=(101, 102),
         effective_config={},
     )
@@ -1318,6 +1318,7 @@ def test_batch_job_persistence_uses_report_status_and_max_retry_attempt(tmp_path
 
     detail = PersistenceClient(db_uri).get_batch_job(batch_job_id=batch_job_id)
     assert detail is not None
+    assert detail.source_kind == "url"
     assert detail.status == "failed"
     assert detail.retry_attempt == 2
     failed_items = list_failed_batch_items(db_uri, batch_job_id=batch_job_id)

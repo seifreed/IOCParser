@@ -76,17 +76,18 @@ class Source:
         """Build a Source from wire values."""
         source_kind = SourceKind.from_name(_require_str(kind, field="kind"))
         raw_value = _require_str(value, field="value")
+        normalized_value = raw_value.strip() if source_kind is SourceKind.URL else raw_value
         original = _strip_optional(original_url)
         normalized = _strip_optional(normalized_url)
         mime_type = _strip_optional(mime_type)
         content_hash = _strip_optional(content_hash)
         fingerprint = _strip_optional(fingerprint)
         if source_kind is SourceKind.URL:
-            original = original or raw_value.strip()
-            normalized = normalize_url_value(normalized) or normalize_url_value(raw_value)
+            original = original or normalized_value
+            normalized = normalize_url_value(normalized) or normalize_url_value(normalized_value)
         return cls(
             kind=source_kind,
-            value=raw_value,
+            value=normalized_value,
             original_url=original,
             normalized_url=normalized,
             mime_type=mime_type,

@@ -213,7 +213,7 @@ def test_source_from_raw_trims_optional_url_metadata() -> None:
         fingerprint=" def456 ",
     )
 
-    assert source.value == " https://example.test/feed "
+    assert source.value == "https://example.test/feed"
     assert source.original_url == "HTTPS://Example.TEST/feed#frag"
     assert source.normalized_url == "https://example.test/feed"
     assert source.mime_type == "text/plain"

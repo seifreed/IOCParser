@@ -73,13 +73,13 @@ def job_record(model: DistributedJobModel) -> DistributedJobRecord:
             message=model.last_error_message or "",
         )
     return DistributedJobRecord(
-        job_id=_public_job_id(model),
-        correlation_id=model.correlation_id,
-        queue_backend=model.queue_backend,
-        queue_name=model.queue_name,
-        input_kind=model.input_kind,
-        source_value=model.source_value,
-        status=model.status,
+        job_id=_public_job_id(model) or "",
+        correlation_id=model.correlation_id or "",
+        queue_backend=model.queue_backend or "",
+        queue_name=model.queue_name or "",
+        input_kind=model.input_kind or "",
+        source_value=model.source_value or "",
+        status=model.status or "",
         attempts=model.attempts,
         max_attempts=model.max_attempts,
         idempotency_key=model.idempotency_key,
@@ -99,11 +99,11 @@ def job_record(model: DistributedJobModel) -> DistributedJobRecord:
 
 def dead_letter_record(model: DeadLetterJobModel) -> DeadLetterRecord:
     return DeadLetterRecord(
-        job_id=_public_job_id(model),
-        correlation_id=model.correlation_id,
-        queue_backend=model.queue_backend,
-        queue_name=model.queue_name,
-        source_value=model.source_value,
+        job_id=_public_job_id(model) or "",
+        correlation_id=model.correlation_id or "",
+        queue_backend=model.queue_backend or "",
+        queue_name=model.queue_name or "",
+        source_value=model.source_value or "",
         attempts=model.attempts,
         max_attempts=model.max_attempts,
         error=PipelineErrorInfo(

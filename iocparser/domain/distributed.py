@@ -11,7 +11,6 @@ from iocparser.domain.pipeline import (
 from iocparser.shared_utils import parse_bool_token
 
 DISTRIBUTED_JOB_SCHEMA_VERSION = "1.0"
-
 JOB_STATUS_QUEUED = "queued"
 JOB_STATUS_RUNNING = "running"
 JOB_STATUS_COMPLETED = "completed"
@@ -63,6 +62,16 @@ def _bool_from_payload(payload: dict[str, object], key: str, default: bool) -> b
     raise _invalid_bool_payload_value(key=key, raw_value=raw_value)
 
 
+def _require_str(value: object, *, field: str, non_empty: bool = False) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"Expected {field} to be string-like, got {type(value).__name__}")
+    if non_empty:
+        stripped = value.strip()
+        if not stripped:
+            raise TypeError(f"Expected {field} to be non-empty string-like")
+        return stripped
+    return value
+
 @dataclass(frozen=True)
 class QueueEnvelope:
     """Machine-readable queue message for distributed processing."""
@@ -77,24 +86,20 @@ class QueueEnvelope:
     submitted_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def __post_init__(self) -> None:
-        def _require_str(value: object, *, field: str) -> str:
-            if not isinstance(value, str):
-                raise TypeError(f"Expected {field} to be string-like, got {type(value).__name__}")
-            stripped = value.strip()
-            if not stripped:
-                raise TypeError(f"Expected {field} to be non-empty string-like")
-            return stripped
-
-        object.__setattr__(self, "queue_backend", _require_str(self.queue_backend, field="queue_backend"))
-        object.__setattr__(self, "queue_name", _require_str(self.queue_name, field="queue_name"))
-        object.__setattr__(self, "schema_version", _require_str(self.schema_version, field="schema_version"))
-        object.__setattr__(self, "submitted_at", _require_str(self.submitted_at, field="submitted_at"))
+        object.__setattr__(
+            self, "queue_backend", _require_str(self.queue_backend, field="queue_backend", non_empty=True)
+        )
+        object.__setattr__(
+            self, "queue_name", _require_str(self.queue_name, field="queue_name", non_empty=True)
+        )
+        object.__setattr__(
+            self, "schema_version", _require_str(self.schema_version, field="schema_version", non_empty=True)
+        )
+        object.__setattr__(
+            self, "submitted_at", _require_str(self.submitted_at, field="submitted_at", non_empty=True)
+        )
         if self.idempotency_key is not None:
-            object.__setattr__(
-                self,
-                "idempotency_key",
-                _require_str(self.idempotency_key, field="idempotency_key"),
-            )
+            object.__setattr__(self, "idempotency_key", _require_str(self.idempotency_key, field="idempotency_key"))
         if self.attempts < 0:
             raise _invalid_retry_counter_value(key="attempts")
         if self.max_attempts <= 0:
@@ -180,6 +185,12 @@ class QueueReceipt:
     receipt_id: str
     message_id: str
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "queue_backend", _require_str(self.queue_backend, field="queue_backend"))
+        object.__setattr__(self, "queue_name", _require_str(self.queue_name, field="queue_name"))
+        object.__setattr__(self, "receipt_id", _require_str(self.receipt_id, field="receipt_id"))
+        object.__setattr__(self, "message_id", _require_str(self.message_id, field="message_id"))
+
 
 @dataclass(frozen=True)
 class DistributedJobRecord:
@@ -206,6 +217,33 @@ class DistributedJobRecord:
     result_json: dict[str, object] | None = None
     phase_timings_ms: dict[str, int] = field(default_factory=dict)
     queue_metadata: dict[str, object] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "job_id", _require_str(self.job_id, field="job_id"))
+        object.__setattr__(
+            self, "correlation_id", _require_str(self.correlation_id, field="correlation_id")
+        )
+        object.__setattr__(
+            self, "queue_backend", _require_str(self.queue_backend, field="queue_backend")
+        )
+        object.__setattr__(self, "queue_name", _require_str(self.queue_name, field="queue_name"))
+        object.__setattr__(self, "input_kind", _require_str(self.input_kind, field="input_kind"))
+        object.__setattr__(self, "source_value", _require_str(self.source_value, field="source_value"))
+        object.__setattr__(self, "status", _require_str(self.status, field="status"))
+        if self.idempotency_key is not None:
+            object.__setattr__(self, "idempotency_key", _require_str(self.idempotency_key, field="idempotency_key"))
+        if self.submitted_at:
+            object.__setattr__(self, "submitted_at", _require_str(self.submitted_at, field="submitted_at"))
+        if self.started_at is not None:
+            object.__setattr__(self, "started_at", _require_str(self.started_at, field="started_at"))
+        if self.completed_at is not None:
+            object.__setattr__(self, "completed_at", _require_str(self.completed_at, field="completed_at"))
+        if self.dead_lettered_at is not None:
+            object.__setattr__(
+                self, "dead_lettered_at", _require_str(self.dead_lettered_at, field="dead_lettered_at")
+            )
+        if self.receipt_id is not None:
+            object.__setattr__(self, "receipt_id", _require_str(self.receipt_id, field="receipt_id"))
 
     def to_record(self) -> dict[str, object]:
         return {
@@ -248,6 +286,18 @@ class DeadLetterRecord:
     error: PipelineErrorInfo
     dead_lettered_at: str
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "job_id", _require_str(self.job_id, field="job_id"))
+        object.__setattr__(
+            self, "correlation_id", _require_str(self.correlation_id, field="correlation_id")
+        )
+        object.__setattr__(
+            self, "queue_backend", _require_str(self.queue_backend, field="queue_backend")
+        )
+        object.__setattr__(self, "queue_name", _require_str(self.queue_name, field="queue_name"))
+        object.__setattr__(self, "source_value", _require_str(self.source_value, field="source_value"))
+        object.__setattr__(self, "dead_lettered_at", _require_str(self.dead_lettered_at, field="dead_lettered_at"))
+
     def to_record(self) -> dict[str, object]:
         return {
             "schema_version": DISTRIBUTED_JOB_SCHEMA_VERSION,
@@ -274,6 +324,18 @@ class TelemetryEvent:
     queue_name: str
     attributes: dict[str, object] = field(default_factory=dict)
     emitted_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "name", _require_str(self.name, field="name"))
+        object.__setattr__(self, "job_id", _require_str(self.job_id, field="job_id"))
+        object.__setattr__(
+            self, "correlation_id", _require_str(self.correlation_id, field="correlation_id")
+        )
+        object.__setattr__(
+            self, "queue_backend", _require_str(self.queue_backend, field="queue_backend")
+        )
+        object.__setattr__(self, "queue_name", _require_str(self.queue_name, field="queue_name"))
+        object.__setattr__(self, "emitted_at", _require_str(self.emitted_at, field="emitted_at"))
 
     def to_record(self) -> dict[str, object]:
         return {

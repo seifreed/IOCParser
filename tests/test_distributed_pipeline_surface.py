@@ -137,6 +137,52 @@ def test_domain_distributed_records_and_telemetry_sinks() -> None:
     NoOpTelemetrySink().emit(event)
     LoggingTelemetrySink().emit(event)
 
+    with pytest.raises(TypeError, match="job_id"):
+        DistributedJobRecord(
+            job_id=1,  # type: ignore[arg-type]
+            correlation_id="corr-1",
+            queue_backend="filesystem",
+            queue_name="jobs",
+            input_kind="text",
+            source_value="src",
+            status="queued",
+            attempts=0,
+            max_attempts=2,
+        )
+    with pytest.raises(TypeError, match="dead_lettered_at"):
+        DeadLetterRecord(
+            job_id="job-1",
+            correlation_id="corr-1",
+            queue_backend="filesystem",
+            queue_name="jobs",
+            source_value="src",
+            attempts=2,
+            max_attempts=2,
+            error=PipelineErrorInfo(
+                code="INPUT_TIMEOUT",
+                category="timeout",
+                retryable=True,
+                status="failed",
+                message="timeout",
+            ),
+            dead_lettered_at=1,  # type: ignore[arg-type]
+        )
+    with pytest.raises(TypeError, match="name"):
+        TelemetryEvent(
+            name=1,  # type: ignore[arg-type]
+            job_id="job-1",
+            correlation_id="corr-1",
+            queue_backend="filesystem",
+            queue_name="jobs",
+        )
+    with pytest.raises(TypeError, match="queue_backend"):
+        QueueReceipt(
+            queue_backend=1,  # type: ignore[arg-type]
+            queue_name="jobs",
+            receipt_id="receipt-1",
+            message_id="message-1",
+        )
+
 
 def test_queue_envelope_from_record_parses_bool_compatible_values() -> None:
     payload = _envelope("job-bool").to_record()

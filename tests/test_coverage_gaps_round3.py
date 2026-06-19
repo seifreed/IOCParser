@@ -263,6 +263,39 @@ class TestPluginEntryPointLoading:
             enums_module._custom_ioc_aliases.pop("ok", None)
             enums_module._custom_ioc_aliases.pop("123", None)
 
+    def test_register_discovered_ioc_types_rejects_non_string_manifest_fields(self) -> None:
+        from iocparser.domain import enums as enums_module
+        from iocparser.plugins import (
+            _ioc_type_registry,
+            _register_discovered_ioc_types,
+            custom_ioc_types,
+            register_ioc_type_plugin,
+        )
+
+        cases = (
+            ("_bad_name_plugin", {"name": 1, "base_type": "urls"}, "_bad_name_type"),
+            ("_bad_base_plugin", {"name": "_bad_base_type", "base_type": 1}, "_bad_base_type"),
+            (
+                "_bad_severity_plugin",
+                {"name": "_bad_severity_type", "base_type": "urls", "severity": 1},
+                "_bad_severity_type",
+            ),
+            (
+                "_bad_stix_plugin",
+                {"name": "_bad_stix_type", "base_type": "urls", "stix_pattern": 1},
+                "_bad_stix_type",
+            ),
+        )
+        try:
+            for plugin_name, definition, type_name in cases:
+                register_ioc_type_plugin(plugin_name, lambda definition=definition: definition)
+                _register_discovered_ioc_types()
+                assert type_name not in custom_ioc_types()
+        finally:
+            for plugin_name, _definition, type_name in cases:
+                _ioc_type_registry.pop(plugin_name, None)
+                enums_module._custom_ioc_types.pop(type_name, None)
+
     def test_builtin_renderer_override_warning(self) -> None:
         from iocparser.plugins import (
             _BUILTIN_RENDERER_NAMES,

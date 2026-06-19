@@ -206,6 +206,12 @@ def _string_tuple(value: object) -> tuple[str, ...]:
     return tuple(items)
 
 
+def _require_str_field(value: object, *, field: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"Expected {field} to be string, got {type(value).__name__}")
+    return value
+
+
 def _load_group[FactoryT](
     discovered: EntryPoints,
     *,
@@ -259,21 +265,24 @@ def _load_discovered_entry_points(discovered: EntryPoints) -> None:
 def _register_ioc_type_plugin(plugin_name: str) -> None:
     try:
         definition = _ioc_type_plugin_definition(plugin_name)
-        base_type_raw = str(definition.get("base_type", "urls")).strip()
+        base_type_raw = _require_str_field(definition.get("base_type", "urls"), field="base_type").strip()
         if not base_type_raw:
             _logger.warning("Plugin '%s' has empty base_type, skipping", plugin_name)
             return
+        name = _require_str_field(definition.get("name", plugin_name), field="name")
+        severity = definition.get("severity")
+        if severity is not None:
+            severity = _require_str_field(severity, field="severity")
+        stix_pattern = definition.get("stix_pattern")
+        if stix_pattern is not None:
+            stix_pattern = _require_str_field(stix_pattern, field="stix_pattern")
         register_custom_ioc_type(
-            str(definition.get("name", plugin_name)),
+            name,
             base_type=base_type_raw,
             aliases=_string_tuple(definition.get("aliases")),
-            severity=str(definition["severity"])
-            if definition.get("severity") is not None
-            else None,
+            severity=severity,
             tags=_string_tuple(definition.get("tags")),
-            stix_pattern=str(definition["stix_pattern"])
-            if definition.get("stix_pattern") is not None
-            else None,
+            stix_pattern=stix_pattern,
         )
     except (ValueError, TypeError, KeyError) as exc:
         _logger.warning("Failed to register IOC type plugin '%s': %s", plugin_name, exc)

@@ -353,7 +353,7 @@ def load_config(
     file_values = default_config_values()
 
     if cli_config_path:
-        config_path = Path(cli_config_path)
+        config_path = Path(cli_config_path).expanduser()
         if not config_path.is_file():
             # SourceNotFoundError subclasses both FileNotFoundError (the contract
             # callers/tests expect) and IOCParserError, so the CLI reports a missing

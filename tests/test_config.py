@@ -218,6 +218,22 @@ def test_explicit_missing_config_path_is_rejected(tmp_path) -> None:
         load_config(None, None, str(missing_config))
 
 
+def test_explicit_config_path_expands_user_home(tmp_path, monkeypatch) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    config_path = home / "iocparser.ini"
+    config_path.write_text(
+        "[database]\npersist=true\nuri=sqlite:///from_home.db\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("HOME", str(home))
+
+    config = load_config(None, None, "~/iocparser.ini")
+
+    assert config.config_path == config_path
+    assert config.db_uri == "sqlite:///from_home.db"
+
+
 def test_missing_config_path_error_is_an_iocparser_error(tmp_path) -> None:
     # The missing-config error must be an IOCParserError (while staying a
     # FileNotFoundError) so the CLI top-level handler reports it as a clean message

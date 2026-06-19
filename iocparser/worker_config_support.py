@@ -116,7 +116,7 @@ def resolve_config_path(config_path: str | None) -> Path | None:
         chosen = config_path.strip()
         if not chosen:
             return None
-        candidate = Path(chosen)
+        candidate = Path(chosen).expanduser()
         if not candidate.exists():
             raise SourceNotFoundError(str(candidate))
         return candidate
@@ -124,7 +124,7 @@ def resolve_config_path(config_path: str | None) -> Path | None:
     if isinstance(chosen, str):
         chosen = chosen.strip()
     if chosen:
-        candidate = Path(chosen)
+        candidate = Path(chosen).expanduser()
         if not candidate.exists():
             raise SourceNotFoundError(str(candidate))
         return candidate

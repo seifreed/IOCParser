@@ -143,6 +143,19 @@ def test_worker_config_rejects_missing_explicit_config_path(tmp_path: Path) -> N
         WorkerServiceConfig.from_sources(str(missing))
 
 
+def test_worker_config_expands_user_home_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    config_path = home / "worker.ini"
+    config_path.write_text("[worker]\nqueue_name = from-home\n", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(home))
+
+    config = WorkerServiceConfig.from_sources("~/worker.ini")
+
+    assert config.config_path == config_path
+    assert config.queue_name == "from-home"
+
+
 def test_worker_config_runtime_section_preserves_network_queue_limits(tmp_path: Path) -> None:
     config_path = tmp_path / "iocparser.ini"
     config_path.write_text(

@@ -110,20 +110,26 @@ def print_batch_report(report: Mapping[str, object], *, stream: TextIO | None = 
     out.write(f"Batch summary\t{successful}/{total} successful\t{failed} failed" + "\n")
     failures = report.get("failures", {})
     if isinstance(failures, dict) and failures:
-        for item, error in sorted((str(key), str(value)) for key, value in failures.items()):
+        if not all(isinstance(key, str) for key in failures):
+            raise TypeError("Expected batch report failure keys to be strings")
+        for item, error in sorted((key, str(value)) for key, value in failures.items()):
             out.write(f"  FAIL\t{item}\t{error}" + "\n")
     error_groups = report.get("error_groups", {})
     if isinstance(error_groups, dict) and error_groups:
         out.write("Failure groups" + "\n")
+        if not all(isinstance(key, str) for key in error_groups):
+            raise TypeError("Expected batch report error group keys to be strings")
         for error_type, count in sorted(
-            (str(key), _int_value(value)) for key, value in error_groups.items()
+            (key, _int_value(value)) for key, value in error_groups.items()
         ):
             out.write(f"  {error_type}\t{count}" + "\n")
     phase_timings = report.get("phase_timings_ms", {})
     if isinstance(phase_timings, dict) and phase_timings:
         out.write("Phase timings (ms)" + "\n")
+        if not all(isinstance(key, str) for key in phase_timings):
+            raise TypeError("Expected batch report phase timing keys to be strings")
         for phase, value in sorted(
-            (str(key), _int_value(val)) for key, val in phase_timings.items()
+            (key, _int_value(val)) for key, val in phase_timings.items()
         ):
             out.write(f"  {phase}\t{value}" + "\n")
     metrics = report.get("metrics", {})

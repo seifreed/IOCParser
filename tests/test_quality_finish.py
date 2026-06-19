@@ -301,6 +301,12 @@ def test_cli_output_batch_helpers_cover_stdout_and_default_file() -> None:
     assert "Batch report schema" in output.getvalue()
     with pytest.raises(TypeError, match="Expected batch report keys to be strings"):
         print_batch_report({1: "one"})
+    with pytest.raises(TypeError, match="Expected batch report failure keys to be strings"):
+        print_batch_report({"failures": {1: "boom"}})
+    with pytest.raises(TypeError, match="Expected batch report error group keys to be strings"):
+        print_batch_report({"error_groups": {1: 1}})
+    with pytest.raises(TypeError, match="Expected batch report phase timing keys to be strings"):
+        print_batch_report({"phase_timings_ms": {1: 1}})
 
     writer = _MemoryWriter()
     save_batch_report({"total": 0}, None, file_writer=writer)

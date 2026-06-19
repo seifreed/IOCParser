@@ -462,6 +462,21 @@ class TestSetupApplication:
             finally:
                 setup_logger(console=False)
 
+    def test_setup_application_expands_user_home_log_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        home = tmp_path / "home"
+        home.mkdir()
+        log_path = home / "app.log"
+        monkeypatch.setenv("HOME", str(home))
+        args = argparse.Namespace(debug=False, verbose=True, log_file="~/app.log")
+
+        try:
+            setup_application(args)
+            assert log_path.exists()
+        finally:
+            setup_logger(console=False)
+
 
 class TestFileTypeDetection:
     """Test file type detection functions."""

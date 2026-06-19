@@ -79,7 +79,7 @@ def setup_application(args: argparse.Namespace) -> None:
     verbose = get_bool_arg(args, "verbose")
     log_file_path = get_optional_str_arg(args, "log_file")
     log_level = logging.DEBUG if debug else (logging.INFO if verbose else logging.WARNING)
-    log_file = Path(log_file_path) if log_file_path else None
+    log_file = Path(log_file_path).expanduser() if log_file_path else None
     setup_logger(level=log_level, log_file=log_file)
 
 

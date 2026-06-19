@@ -179,6 +179,24 @@ class PipelineJobResult:
     started_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     finished_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
+    def __post_init__(self) -> None:
+        def _require_str(value: object, *, field: str) -> str:
+            if not isinstance(value, str):
+                raise TypeError(f"Expected {field} to be string-like, got {type(value).__name__}")
+            stripped = value.strip()
+            if not stripped:
+                raise TypeError(f"Expected {field} to be non-empty string-like")
+            return stripped
+
+        object.__setattr__(self, "input_kind", _require_str(self.input_kind, field="input_kind"))
+        object.__setattr__(self, "source_value", _require_str(self.source_value, field="source_value"))
+        object.__setattr__(self, "status", _require_str(self.status, field="status"))
+        object.__setattr__(self, "correlation_id", _require_str(self.correlation_id, field="correlation_id"))
+        object.__setattr__(self, "job_id", _require_str(self.job_id, field="job_id"))
+        object.__setattr__(self, "schema_version", _require_str(self.schema_version, field="schema_version"))
+        object.__setattr__(self, "started_at", _require_str(self.started_at, field="started_at"))
+        object.__setattr__(self, "finished_at", _require_str(self.finished_at, field="finished_at"))
+
     def to_record(self) -> dict[str, object]:
         return {
             "schema_version": self.schema_version,

@@ -667,6 +667,29 @@ def test_pipeline_job_result_and_error_info_to_record() -> None:
     assert record["result"]["schema_version"] == "1.0"
 
 
+def test_pipeline_job_result_normalizes_record_fields() -> None:
+    result = PipelineJobResult(
+        input_kind="  text  ",
+        source_value="  demo  ",
+        status="  failed  ",
+        result=ExtractionResult(),
+        correlation_id="  corr  ",
+        job_id="  job  ",
+        schema_version=" 1.0 ",
+        started_at=" 2026-01-01T00:00:00+00:00 ",
+        finished_at=" 2026-01-01T00:00:01+00:00 ",
+    )
+
+    assert result.input_kind == "text"
+    assert result.source_value == "demo"
+    assert result.status == "failed"
+    assert result.correlation_id == "corr"
+    assert result.job_id == "job"
+    assert result.schema_version == "1.0"
+    assert result.started_at == "2026-01-01T00:00:00+00:00"
+    assert result.finished_at == "2026-01-01T00:00:01+00:00"
+
+
 def test_pipeline_worker_handles_file_url_and_backpressure(tmp_path: Path, capsys) -> None:
     file_path = tmp_path / "ioc.txt"
     file_path.write_text("Visit hxxp://evil.example", encoding="utf-8")

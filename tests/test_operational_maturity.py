@@ -1683,7 +1683,9 @@ def test_cli_schema_validation_errors_and_noop() -> None:
     )
 
 
-def test_retry_failed_report_can_filter_by_error_type_and_text(tmp_path: Path) -> None:
+def test_retry_failed_report_can_filter_by_error_type_and_text(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     report_path = tmp_path / "report.json"
     report_path.write_text(
         json.dumps(
@@ -1732,6 +1734,22 @@ def test_retry_failed_report_can_filter_by_error_type_and_text(tmp_path: Path) -
     with pytest.raises(FileExistenceError):
         _failed_urls_from_report(missing)
     assert _retry_attempt_for_url("https://missing.example", str(report_path)) == 0
+
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    retry_report = home / "retry.json"
+    retry_report.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {"url": "https://one.example", "status": "failed", "retry_attempt": 4}
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert _retry_attempt_for_url("https://one.example", "~/retry.json") == 5
 
 
 def test_retry_filters_reject_non_string_error_fields(tmp_path: Path) -> None:

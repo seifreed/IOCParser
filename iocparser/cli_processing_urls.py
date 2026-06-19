@@ -198,7 +198,7 @@ def _retry_attempt_from_report(
 ) -> int | None:
     if not retry_report:
         return None
-    payload = _load_valid_batch_report_payload(Path(retry_report))
+    payload = _load_valid_batch_report_payload(Path(retry_report).expanduser())
     matches = [
         item
         for item in _report_items(payload)

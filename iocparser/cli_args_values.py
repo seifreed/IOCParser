@@ -27,6 +27,7 @@ __all__ = [
 INTEGER_VALUE_REQUIRED = "{field_name} requires an integer value"
 INVALID_IOC_TYPE_FILTER = "Invalid IOC type for {flag}: {value}"
 STRING_VALUE_REQUIRED = "{field_name} requires a string value"
+BOOLEAN_VALUE_REQUIRED = "{field_name} requires a boolean value"
 
 
 def _require_str_value(value: object, *, field_name: str) -> str:
@@ -104,10 +105,14 @@ def get_bool_arg(args: argparse.Namespace, name: str, default: bool = False) -> 
     value: object = getattr(args, name, None)
     if value is None:
         return default
+    if isinstance(value, bool):
+        return value
     if isinstance(value, str):
         parsed = parse_bool_token(value)
         return parsed if parsed is not None else False
-    return bool(value)
+    if isinstance(value, int):
+        return bool(value)
+    raise ValidationError(BOOLEAN_VALUE_REQUIRED.format(field_name=name))
 
 
 def get_int_arg(args: argparse.Namespace, name: str, default: int = 0) -> int:

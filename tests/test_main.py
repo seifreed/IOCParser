@@ -167,6 +167,17 @@ class TestArgumentHelpers:
 
         assert get_bool_arg(args, "enabled") is False
 
+    def test_get_bool_arg_rejects_non_boolean_objects(self) -> None:
+        """Test get_bool_arg rejects arbitrary objects instead of coercing truthiness."""
+        class _Truthy:
+            def __bool__(self) -> bool:
+                return True
+
+        args = argparse.Namespace(enabled=_Truthy())
+
+        with pytest.raises(ValidationError, match="enabled requires a boolean value"):
+            get_bool_arg(args, "enabled")
+
     def test_get_int_arg_with_value(self) -> None:
         """Test get_int_arg returns integer when attribute exists."""
         args = argparse.Namespace(timeout=30, workers=4)

@@ -2154,6 +2154,26 @@ def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_pa
         import_history_raw(
             db_uri,
             {
+                "distributed_jobs": [
+                    {
+                        "id": 2,
+                        "job_id": " ",
+                        "correlation_id": "corr",
+                        "queue_backend": "filesystem",
+                        "queue_name": "default",
+                        "input_kind": "text",
+                        "source_value": "payload",
+                        "submitted_at": timestamp,
+                    }
+                ]
+            },
+        )["distributed_jobs"]
+        == 0
+    )
+    assert (
+        import_history_raw(
+            db_uri,
+            {
                 "dead_letter_jobs": [
                     {
                         "id": 1,
@@ -2166,6 +2186,28 @@ def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_pa
                         "error_category": None,
                         "error_message": None,
                         "dead_lettered_at": None,
+                    }
+                ]
+            },
+        )["dead_letter_jobs"]
+        == 0
+    )
+    assert (
+        import_history_raw(
+            db_uri,
+            {
+                "dead_letter_jobs": [
+                    {
+                        "id": 2,
+                        "job_id": " ",
+                        "correlation_id": "corr",
+                        "queue_backend": "filesystem",
+                        "queue_name": "default",
+                        "source_value": "payload",
+                        "error_code": "ERR",
+                        "error_category": "generic",
+                        "error_message": "boom",
+                        "dead_lettered_at": timestamp,
                     }
                 ]
             },

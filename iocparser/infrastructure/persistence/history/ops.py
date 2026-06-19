@@ -307,23 +307,15 @@ def _json_with_import_marker(
             "original_id": original_id,
         }
     return json.dumps(payload, sort_keys=True)
-
-
 def _json_without_import_marker(raw_json: object) -> str:
     payload = _json_object(str(raw_json or "{}"))
     payload.pop(HISTORY_IMPORT_MARKER_KEY, None)
     return json.dumps(payload, sort_keys=True)
-
-
 def _json_import_marker(raw_json: object) -> dict[str, object] | None:
     marker = _json_object(str(raw_json or "{}")).get(HISTORY_IMPORT_MARKER_KEY)
     return marker if isinstance(marker, dict) else None
-
-
 def _distributed_internal_job_id(*, job_id: str, archive_id: str) -> str:
     return f"{job_id}#history:{archive_id}"
-
-
 def _public_job_id(model: DistributedJobModel | DeadLetterJobModel) -> str:
     payload = _json_object(model.payload_json or "{}")
     marker = _json_import_marker(model.payload_json or "{}")
@@ -855,7 +847,9 @@ def _import_distributed_jobs(
             for key in ("correlation_id", "queue_backend", "queue_name", "input_kind", "source_value")
         ) or not isinstance(typed.get("submitted_at"), datetime):
             continue
-        typed["job_id"] = str(typed.get("job_id", "")).strip()
+        typed["job_id"] = _normalized_text(typed.get("job_id"), default="")
+        if not typed["job_id"]:
+            continue
         existing = _existing_distributed_job(
             session, typed, archive_id=archive_id, same_origin=same_origin
         )
@@ -904,7 +898,9 @@ def _import_dead_letter_jobs(
             or not isinstance(typed.get("dead_lettered_at"), datetime)
         ):
             continue
-        typed["job_id"] = str(typed.get("job_id", "")).strip()
+        typed["job_id"] = _normalized_text(typed.get("job_id"), default="")
+        if not typed["job_id"]:
+            continue
         typed["queue_backend"] = normalized_queue_backend(str(typed.get("queue_backend", "")))
         typed["queue_name"] = str(typed.get("queue_name", "")).strip()
         typed["source_value"] = str(typed.get("source_value", "")).strip()

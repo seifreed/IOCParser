@@ -52,7 +52,6 @@ from iocparser.infrastructure.persistence_support import (
     prune_runs,
 )
 from iocparser.infrastructure.persistence_uow import create_engine_for_uri
-
 _typed_row = typed_row
 @contextmanager
 def _managed_session(db_uri: str) -> Iterator[Session]:
@@ -133,7 +132,6 @@ def _payload_fingerprint(payload: Mapping[str, object]) -> str:
     }
     encoded = json.dumps(filtered_payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
-
 def _select_rows(session: Session, model: HistoryModelType) -> list[dict[str, object]]:
     return [_row_dict(row) for row in session.execute(select(model)).scalars().all()]
 
@@ -147,16 +145,12 @@ def _archive_id(payload: dict[str, object]) -> str:
             f"{origin_id.strip()}:{_payload_fingerprint(payload)}".encode()
         ).hexdigest()
     return f"legacy:{_payload_fingerprint(payload)}"
-
-
 def _is_legacy_archive(payload: dict[str, object]) -> bool:
     raw_archive_id = payload.get(HISTORY_ARCHIVE_ID_KEY)
     raw_origin_id = payload.get(HISTORY_ORIGIN_ID_KEY)
     has_archive_id = isinstance(raw_archive_id, str) and raw_archive_id.strip()
     has_origin_id = isinstance(raw_origin_id, str) and raw_origin_id.strip()
     return not has_archive_id and not has_origin_id
-
-
 def _has_legacy_archive_collision(session: Session, *, archive_id: str) -> bool:
     for raw_json in session.execute(select(BatchJobModel.config_json)).scalars().all():
         marker = _json_import_marker(raw_json)
@@ -238,8 +232,14 @@ def _existing_source(session: Session, row: dict[str, object]) -> SourceModel | 
                 SourceModel.normalized_url.is_(None),
                 or_(
                     func.lower(func.trim(SourceModel.value)) == value.lower(),
-                    func.lower(func.trim(SourceModel.value)).like(f"{value.lower()}#%"),
-                    func.lower(func.trim(SourceModel.value)).like(f"{value.lower()}?%"),
+                    func.lower(func.trim(SourceModel.value)).like(
+                        f"{value.lower().replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')}#%",
+                        escape="\\",
+                    ),
+                    func.lower(func.trim(SourceModel.value)).like(
+                        f"{value.lower().replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')}?%",
+                        escape="\\",
+                    ),
                 ),
             )
         )

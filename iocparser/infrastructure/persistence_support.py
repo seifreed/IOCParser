@@ -142,8 +142,14 @@ def source_value_clause(*, source_kind: str | None, source_value: str) -> Clause
             SourceModel.normalized_url.is_(None),
             or_(
                 func.lower(func.trim(SourceModel.value)) == exact_value.lower(),
-                func.lower(func.trim(SourceModel.value)).like(f"{exact_value.lower()}#%"),
-                func.lower(func.trim(SourceModel.value)).like(f"{exact_value.lower()}?%"),
+                func.lower(func.trim(SourceModel.value)).like(
+                    f"{exact_value.lower().replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')}#%",
+                    escape="\\",
+                ),
+                func.lower(func.trim(SourceModel.value)).like(
+                    f"{exact_value.lower().replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')}?%",
+                    escape="\\",
+                ),
             ),
         )
     )

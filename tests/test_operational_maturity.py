@@ -1720,6 +1720,17 @@ def test_retry_failed_report_can_filter_by_error_type_and_text(tmp_path: Path) -
     assert _retry_attempt_for_url("https://missing.example", str(report_path)) == 0
 
 
+def test_retry_filters_reject_non_string_error_fields(tmp_path: Path) -> None:
+    from iocparser.cli_processing_urls import _report_item_matches_retry_filters
+
+    with pytest.raises(TypeError, match="Expected error_type to be string"):
+        _report_item_matches_retry_filters(
+            {"status": "failed", "error_type": object(), "error": "boom"},
+            error_type_filter=None,
+            error_substring=None,
+        )
+
+
 def test_clients_wrap_reusable_services_and_plugin_pipeline(tmp_path: Path) -> None:
     register_extractor("demo-extractor", DemoExtractor)
     register_postprocessor("demo-post", DemoPostProcessor)

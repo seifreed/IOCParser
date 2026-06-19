@@ -82,15 +82,21 @@ def _matches_retry_error_filters(
     )
 
 
+def _require_str(value: object, *, field: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"Expected {field} to be string, got {type(value).__name__}")
+    return value
+
+
 def _report_item_matches_retry_filters(
     item: BatchItemReport,
     *,
     error_type_filter: str | None,
     error_substring: str | None,
 ) -> bool:
-    return str(item.get("status", "")).lower() == "failed" and _matches_retry_error_filters(
-        error_type=str(item.get("error_type", "")),
-        error_message=str(item.get("error", "")),
+    return _require_str(item.get("status", ""), field="status").lower() == "failed" and _matches_retry_error_filters(
+        error_type=_require_str(item.get("error_type", ""), field="error_type"),
+        error_message=_require_str(item.get("error", ""), field="error"),
         error_type_filter=error_type_filter,
         error_substring=error_substring,
     )
@@ -103,8 +109,8 @@ def _failed_batch_item_matches_retry_filters(
     error_substring: str | None,
 ) -> bool:
     return _matches_retry_error_filters(
-        error_type=str(getattr(item, "error_type", "")),
-        error_message=str(getattr(item, "error_message", "")),
+        error_type=_require_str(getattr(item, "error_type", ""), field="error_type"),
+        error_message=_require_str(getattr(item, "error_message", ""), field="error_message"),
         error_type_filter=error_type_filter,
         error_substring=error_substring,
     )

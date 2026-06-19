@@ -928,6 +928,7 @@ def test_cli_search_normalizes_ioc_type_and_severity() -> None:
     """
     from iocparser.api_persistence_query import validated_ioc_type_filter
     from iocparser.api_persistence_query import validated_ioc_type_filters
+    from iocparser.errors import ValidationError
     from iocparser.shared_utils import validated_severity_filters
 
     assert validated_ioc_type_filter("ip") == "ips"
@@ -940,6 +941,8 @@ def test_cli_search_normalizes_ioc_type_and_severity() -> None:
         "sha512",
         "ssdeep",
     )
+    with pytest.raises(ValidationError, match="Invalid ioc_type"):
+        validated_ioc_type_filters((1,))  # type: ignore[arg-type]
     assert validated_severity_filters("HIGH") == ("high",)
 
 

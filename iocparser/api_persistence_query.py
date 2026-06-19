@@ -269,14 +269,18 @@ def validated_ioc_type_filters(value: object | None) -> tuple[str, ...]:
         return ()
     try:
         if isinstance(value, (list, tuple)):
+            if not all(isinstance(item, str) for item in value):
+                raise TypeError
             normalized = [
                 ioc_type_name(ioc_type)
                 for item in value
-                for ioc_type in parse_ioc_types(str(item))
+                for ioc_type in parse_ioc_types(item)
             ]
+        elif not isinstance(value, str):
+            raise TypeError
         else:
-            normalized = [ioc_type_name(ioc_type) for ioc_type in parse_ioc_types(str(value))]
-    except ValueError as exc:
+            normalized = [ioc_type_name(ioc_type) for ioc_type in parse_ioc_types(value)]
+    except (TypeError, ValueError) as exc:
         raise ValidationError(INVALID_IOC_TYPE_ERROR.format(value=value)) from exc
     return tuple(dict.fromkeys(normalized))
 

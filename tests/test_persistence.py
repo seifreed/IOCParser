@@ -778,6 +778,39 @@ def test_query_service_trims_source_kind_and_preserves_url_value_matching(tmp_pa
     )
 
 
+def test_query_service_matches_legacy_padded_url_sources_without_normalized_url(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-legacy-url-filter.db"
+    service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
+    service.persist_multiple_runs(
+        [
+            (
+                "url",
+                "https://example.test/report",
+                ExtractionResult.from_grouped_payload({"domains": ["example.com"]}, {}),
+            )
+        ],
+        tool_version="5.0.0",
+        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+    )
+
+    checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
+    try:
+        with Session(checker.engine) as session:
+            source = session.execute(select(Source)).scalar_one()
+            source.value = " HTTPS://Example.TEST/report#frag "
+            source.normalized_url = None
+            session.commit()
+    finally:
+        checker.close()
+
+    assert service.query_runs_page(
+        limit=10, source_kind=" url ", source_value=" HTTPS://Example.TEST/report#frag "
+    ).total == 1
+    assert service.search_iocs_page(
+        value="example.com", source_kind=" url ", source_value=" HTTPS://Example.TEST/report#frag "
+    ).total == 1
+
+
 def test_query_service_ignores_blank_source_value_filters(tmp_path) -> None:
     db_path = tmp_path / "iocparser-blank-source-value.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")

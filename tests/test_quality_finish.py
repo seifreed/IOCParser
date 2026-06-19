@@ -462,6 +462,8 @@ def test_client_persistence_and_distributed_payload_helpers() -> None:
 def test_http_and_queue_helpers_cover_error_paths() -> None:
     assert _optional_float_arg(argparse.Namespace(rate=1), "rate") == 1.0
     assert _optional_float_arg(argparse.Namespace(rate="2.5"), "rate") == 2.5
+    with pytest.raises(ValidationError, match="Invalid float argument"):
+        _optional_float_arg(argparse.Namespace(rate="bad"), "rate")
     with pytest.raises(TypeError):
         _optional_float_arg(argparse.Namespace(rate=True), "rate")
     with pytest.raises(TypeError):

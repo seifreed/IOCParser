@@ -1128,6 +1128,9 @@ def test_history_export_import_compact_and_retain(
         f"sqlite:///{tmp_path / 'restored_home.sqlite'}", "~/archive-expanded.json"
     )
     assert expanded_counts["runs"] >= 1
+    nested_archive = archive_history(restored_db, "~/nested/archive-expanded.json")
+    assert Path(nested_archive) == home_dir / "nested" / "archive-expanded.json"
+    assert Path(nested_archive).is_file()
     compact_persisted_history(db_uri=restored_db)
     affected = retain_persisted_history(db_uri=restored_db, days=0, statuses="failed")
     assert affected >= 1

@@ -1150,6 +1150,7 @@ def import_history(db_uri: str, payload: dict[str, object]) -> dict[str, int]:
         return counts
 def archive_history(db_uri: str, output_path: str) -> str:
     path = Path(output_path).expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(export_history(db_uri), indent=2, sort_keys=True), encoding="utf-8")
     return str(path)
 

@@ -14,14 +14,20 @@ NON_NEGATIVE_INT_REQUIRED = "must be zero or a positive integer, got {value}"
 
 
 def _positive_int(value: str) -> int:
-    parsed = int(value)
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(POSITIVE_INT_REQUIRED.format(value=value)) from exc
     if parsed < 1:
         raise argparse.ArgumentTypeError(POSITIVE_INT_REQUIRED.format(value=parsed))
     return parsed
 
 
 def _non_negative_int(value: str) -> int:
-    parsed = int(value)
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(NON_NEGATIVE_INT_REQUIRED.format(value=value)) from exc
     if parsed < 0:
         raise argparse.ArgumentTypeError(NON_NEGATIVE_INT_REQUIRED.format(value=parsed))
     return parsed

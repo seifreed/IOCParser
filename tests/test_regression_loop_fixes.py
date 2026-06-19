@@ -46,6 +46,7 @@ from iocparser.worker_config_support import load_worker_file_values
     [
         ("--chunk-size", "-5"),
         ("--chunk-size", "0"),
+        ("--chunk-size", "bad"),
         ("--overlap", "-1"),
     ],
 )

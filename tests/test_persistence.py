@@ -179,6 +179,25 @@ def test_source_repository_trims_optional_url_metadata_on_direct_use(tmp_path) -
     assert source.fingerprint == "def456"
 
 
+def test_source_repository_reuses_equivalent_url_without_explicit_normalized_url(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-source-reuse-url.db"
+    unit_of_work = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
+    try:
+        first_id = unit_of_work.source_repository.get_or_create(
+            kind="url",
+            value="HTTPS://Example.TEST/feed#frag",
+        )
+        second_id = unit_of_work.source_repository.get_or_create(
+            kind="url",
+            value=" https://example.test/feed ",
+        )
+        unit_of_work.commit()
+    finally:
+        unit_of_work.close()
+
+    assert second_id == first_id
+
+
 def test_ioc_repository_refreshes_legacy_defanged_search_value(tmp_path) -> None:
     db_path = tmp_path / "iocparser-legacy-search.db"
     unit_of_work = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")

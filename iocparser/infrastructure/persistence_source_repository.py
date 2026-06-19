@@ -43,6 +43,13 @@ class SQLAlchemySourceRepository(SourceRepository):
         fingerprint: str | None = None,
     ) -> int:
         value = normalize_source_value(kind, value)
+        original_url = _strip_optional(original_url)
+        normalized_url = _strip_optional(normalized_url)
+        mime_type = _strip_optional(mime_type)
+        content_hash = _strip_optional(content_hash)
+        fingerprint = _strip_optional(fingerprint)
+        if kind == "url":
+            normalized_url = normalize_url_value(normalized_url) or normalize_url_value(value)
         stmt = select(SOURCE_MODEL).where(SourceModel.kind == kind)
         if kind == "url":
             if normalized_url:
@@ -68,13 +75,6 @@ class SQLAlchemySourceRepository(SourceRepository):
         if source is None:
             source = source_rows[0] if source_rows else None
         now = datetime.now(UTC)
-        original_url = _strip_optional(original_url)
-        normalized_url = _strip_optional(normalized_url)
-        mime_type = _strip_optional(mime_type)
-        content_hash = _strip_optional(content_hash)
-        fingerprint = _strip_optional(fingerprint)
-        if kind == "url":
-            normalized_url = normalize_url_value(normalized_url) or normalize_url_value(value)
         if source is not None:
             source.last_seen = now
             if kind == "url":

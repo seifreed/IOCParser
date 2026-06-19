@@ -1328,6 +1328,8 @@ def test_strict_coverage_option_and_metadata_edge_helpers() -> None:
     assert optional_int_run_metadata_value({"duration": "   "}, "duration") is None
     assert optional_int_run_metadata_value({"duration": "bad"}, "duration") is None
     assert validated_severity_filters("High,LOW") == ("high", "low")
+    with pytest.raises(ValidationError, match="Invalid severity"):
+        validated_severity_values((1,))  # type: ignore[arg-type]
     assert bool_value(None, default=True) is True
     assert bool_value(1) is True
     assert parse_http_mapping("X-Test: value", separator=":") == {"X-Test": "value"}

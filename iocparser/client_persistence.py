@@ -72,7 +72,9 @@ _SEARCH_OPTION_KEYS = frozenset(SearchIOCsOptions.__annotations__)
 def validated_severity_values(values: tuple[str, ...]) -> tuple[str, ...]:
     normalized: list[str] = []
     for value in values:
-        severity = validated_min_severity(str(value))
+        if not isinstance(value, str):
+            raise ValidationError(f"Invalid severity: {value}")
+        severity = validated_min_severity(value)
         if severity is not None:
             normalized.append(severity)
     return tuple(normalized)

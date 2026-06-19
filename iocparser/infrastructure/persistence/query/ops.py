@@ -64,6 +64,7 @@ from iocparser.infrastructure.persistence_schema import (
     SQLAlchemyUnitOfWork,
 )
 from iocparser.infrastructure.persistence_support import (
+    INVALID_MIN_SEVERITY,
     SEVERITY_ORDER,
     build_query_hits,
     build_summary,
@@ -195,7 +196,10 @@ def search_iocs_page(query: IOCSearchPageQuery) -> PersistedIOCSearchPage:
             if normalized_tag:
                 stmt = stmt.where(~_tag_search_clause(normalized_tag))
         if query.min_severity:
-            threshold = SEVERITY_ORDER.get(query.min_severity.lower(), 0)
+            normalized_min_severity = query.min_severity.strip().lower()
+            if normalized_min_severity not in SEVERITY_ORDER:
+                raise ValueError(INVALID_MIN_SEVERITY.format(value=query.min_severity))
+            threshold = SEVERITY_ORDER[normalized_min_severity]
             allowed = tuple(name for name, rank in SEVERITY_ORDER.items() if rank >= threshold)
             stmt = stmt.where(RunIOCModel.severity.in_(allowed))
         stmt = _order_run_query_stmt(stmt, sort_by=query.sort_by)
@@ -215,7 +219,6 @@ def search_iocs_page(query: IOCSearchPageQuery) -> PersistedIOCSearchPage:
         )
     finally:
         unit_of_work.close()
-
 def _run_filter_clauses(
     *,
     date_from: str | None,
@@ -235,7 +238,6 @@ def _run_filter_clauses(
         else []
     )
     return tuple(clauses)
-
 def _order_run_query_stmt[SelectT: (RunSelect, SearchSelect)](
     stmt: SelectT, *, sort_by: str
 ) -> SelectT:
@@ -249,7 +251,6 @@ def _order_run_query_stmt[SelectT: (RunSelect, SearchSelect)](
             RunModel.id.desc(),
         )
     return stmt.order_by(RunModel.started_at.desc(), RunModel.id.desc())
-
 def _escaped_like_value(normalized_value: str) -> str:
     return normalized_value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 

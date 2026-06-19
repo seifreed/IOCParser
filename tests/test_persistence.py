@@ -783,6 +783,25 @@ def test_query_service_normalizes_tuple_ioc_type_filters(tmp_path) -> None:
     assert service.search_iocs_page(value="example.com", ioc_type=("hashes",)).total == 0
 
 
+def test_query_service_rejects_invalid_min_severity(tmp_path) -> None:
+    db_path = tmp_path / "iocparser-invalid-min-severity.db"
+    service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
+    service.persist_multiple_runs(
+        [
+            (
+                "file",
+                "sample.txt",
+                ExtractionResult.from_grouped_payload({"domains": ["example.com"]}, {}),
+            )
+        ],
+        tool_version="5.0.0",
+        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+    )
+
+    with pytest.raises(ValueError, match="Invalid min_severity"):
+        service.search_iocs_page(value="example.com", min_severity="critical")
+
+
 def test_query_service_normalizes_source_value_filters(tmp_path) -> None:
     db_path = tmp_path / "iocparser-source-value-filter.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")

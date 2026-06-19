@@ -31,6 +31,7 @@ SEVERITY_ORDER = {
     "medium": 2,
     "high": 3,
 }
+INVALID_MIN_SEVERITY = "Invalid min_severity: {value}"
 
 
 def _json_list(raw_value: str) -> list[object]:
@@ -250,9 +251,12 @@ def matches_advanced_filters(
         return False
     if min_severity is None:
         return True
-    return SEVERITY_ORDER.get((hit.severity or "").lower(), -1) >= SEVERITY_ORDER.get(
-        min_severity.lower(), 0
-    )
+    normalized_min_severity = min_severity.strip().lower()
+    if normalized_min_severity not in SEVERITY_ORDER:
+        raise ValueError(INVALID_MIN_SEVERITY.format(value=min_severity))
+    return SEVERITY_ORDER.get((hit.severity or "").lower(), -1) >= SEVERITY_ORDER[
+        normalized_min_severity
+    ]
 
 
 def delete_run(session: Session, run_id: int) -> bool:

@@ -24,7 +24,8 @@ from iocparser.domain.models import (
     IOCType,
     PersistedRunDiff,
 )
-from iocparser.domain.pipeline import PipelineJobRequest
+from iocparser.domain.distributed import DeadLetterRecord, DistributedJobRecord, QueueEnvelope
+from iocparser.domain.pipeline import PipelineErrorInfo, PipelineJobRequest
 from iocparser.infrastructure.extraction import IOCExtractor
 from iocparser.infrastructure.file_parser import decode_file_bytes, wrap_binary_stream_for_bom
 from iocparser.infrastructure.file_readers import MagicTextSourceReader
@@ -239,6 +240,55 @@ def test_pipeline_job_request_rejects_non_bool_flags() -> None:
         PipelineJobRequest(input_kind="text", source_value="x", defang="no")  # type: ignore[arg-type]
     with pytest.raises(TypeError, match="emit_only"):
         PipelineJobRequest(input_kind="text", source_value="x", emit_only=None)  # type: ignore[arg-type]
+
+
+def test_distributed_records_reject_bool_counters() -> None:
+    request = PipelineJobRequest(input_kind="text", source_value="x")
+
+    with pytest.raises(TypeError, match="attempts"):
+        QueueEnvelope(
+            request=request,
+            queue_backend="filesystem",
+            queue_name="default",
+            attempts=True,  # type: ignore[arg-type]
+        )
+    with pytest.raises(TypeError, match="max_attempts"):
+        DistributedJobRecord(
+            job_id="job",
+            correlation_id="corr",
+            queue_backend="filesystem",
+            queue_name="default",
+            input_kind="text",
+            source_value="x",
+            status="queued",
+            attempts=0,
+            max_attempts=True,  # type: ignore[arg-type]
+        )
+    with pytest.raises(TypeError, match="run_id"):
+        DistributedJobRecord(
+            job_id="job",
+            correlation_id="corr",
+            queue_backend="filesystem",
+            queue_name="default",
+            input_kind="text",
+            source_value="x",
+            status="completed",
+            attempts=1,
+            max_attempts=3,
+            run_id=False,  # type: ignore[arg-type]
+        )
+    with pytest.raises(TypeError, match="attempts"):
+        DeadLetterRecord(
+            job_id="job",
+            correlation_id="corr",
+            queue_backend="filesystem",
+            queue_name="default",
+            source_value="x",
+            attempts=False,  # type: ignore[arg-type]
+            max_attempts=3,
+            error=PipelineErrorInfo(code="x", category="y", retryable=False, status="failed", message="z"),
+            dead_lettered_at="2026-01-01T00:00:00+00:00",
+        )
 
 
 def test_idempotency_key_for_missing_file_does_not_raise(tmp_path: Path) -> None:

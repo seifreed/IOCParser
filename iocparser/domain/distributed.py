@@ -27,10 +27,6 @@ def _invalid_bool_payload_value(*, key: str, raw_value: object) -> TypeError:
     return TypeError(f"Expected {key} to be bool-compatible, got {type(raw_value).__name__}")
 
 
-def _invalid_retry_counter_value(*, key: str) -> ValueError:
-    return ValueError(f"{key} must be a valid retry counter")
-
-
 def _int_from_payload(payload: dict[str, object], key: str, default: int) -> int:
     raw_value = payload.get(key)
     if raw_value is None:
@@ -72,6 +68,13 @@ def _require_str(value: object, *, field: str, non_empty: bool = False) -> str:
         return stripped
     return value
 
+
+def _require_int(value: object, *, field: str, non_negative: bool = False) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TypeError(f"Expected {field} to be int-like, got {type(value).__name__}")
+    if non_negative and value < 0:
+        raise ValueError(f"Expected {field} to be non-negative")
+    return value
 @dataclass(frozen=True)
 class QueueEnvelope:
     """Machine-readable queue message for distributed processing."""
@@ -98,12 +101,14 @@ class QueueEnvelope:
         object.__setattr__(
             self, "submitted_at", _require_str(self.submitted_at, field="submitted_at", non_empty=True)
         )
+        object.__setattr__(self, "attempts", _require_int(self.attempts, field="attempts", non_negative=True))
+        object.__setattr__(
+            self, "max_attempts", _require_int(self.max_attempts, field="max_attempts", non_negative=True)
+        )
         if self.idempotency_key is not None:
             object.__setattr__(self, "idempotency_key", _require_str(self.idempotency_key, field="idempotency_key"))
-        if self.attempts < 0:
-            raise _invalid_retry_counter_value(key="attempts")
         if self.max_attempts <= 0:
-            raise _invalid_retry_counter_value(key="max_attempts")
+            raise ValueError("max_attempts must be a valid retry counter")
 
     def to_record(self) -> dict[str, object]:
         return {
@@ -160,8 +165,6 @@ class QueueEnvelope:
             schema_version=payload.get("schema_version", PIPELINE_JOB_SCHEMA_VERSION),
             submitted_at=payload.get("submitted_at", datetime.now(UTC).isoformat()),
         )
-
-
 @dataclass(frozen=True)
 class QueueReceipt:
     """Opaque handle returned by queue adapters for ack/nack operations."""
@@ -176,8 +179,6 @@ class QueueReceipt:
         object.__setattr__(self, "queue_name", _require_str(self.queue_name, field="queue_name"))
         object.__setattr__(self, "receipt_id", _require_str(self.receipt_id, field="receipt_id"))
         object.__setattr__(self, "message_id", _require_str(self.message_id, field="message_id"))
-
-
 @dataclass(frozen=True)
 class DistributedJobRecord:
     """Persisted distributed job lifecycle record."""
@@ -216,8 +217,14 @@ class DistributedJobRecord:
         object.__setattr__(self, "input_kind", _require_str(self.input_kind, field="input_kind"))
         object.__setattr__(self, "source_value", _require_str(self.source_value, field="source_value"))
         object.__setattr__(self, "status", _require_str(self.status, field="status"))
+        object.__setattr__(self, "attempts", _require_int(self.attempts, field="attempts", non_negative=True))
+        object.__setattr__(
+            self, "max_attempts", _require_int(self.max_attempts, field="max_attempts", non_negative=True)
+        )
         if self.idempotency_key is not None:
             object.__setattr__(self, "idempotency_key", _require_str(self.idempotency_key, field="idempotency_key"))
+        if self.run_id is not None:
+            object.__setattr__(self, "run_id", _require_int(self.run_id, field="run_id"))
         if self.submitted_at:
             object.__setattr__(self, "submitted_at", _require_str(self.submitted_at, field="submitted_at"))
         if self.started_at is not None:
@@ -282,6 +289,10 @@ class DeadLetterRecord:
         )
         object.__setattr__(self, "queue_name", _require_str(self.queue_name, field="queue_name"))
         object.__setattr__(self, "source_value", _require_str(self.source_value, field="source_value"))
+        object.__setattr__(self, "attempts", _require_int(self.attempts, field="attempts", non_negative=True))
+        object.__setattr__(
+            self, "max_attempts", _require_int(self.max_attempts, field="max_attempts", non_negative=True)
+        )
         object.__setattr__(self, "dead_lettered_at", _require_str(self.dead_lettered_at, field="dead_lettered_at"))
 
     def to_record(self) -> dict[str, object]:

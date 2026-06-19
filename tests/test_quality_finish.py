@@ -743,6 +743,8 @@ def test_renderers_cover_custom_stix_and_record_helpers() -> None:
 def test_print_warning_lists_rejects_non_string_fields() -> None:
     with pytest.raises(TypeError, match="Expected value to be string"):
         print_warning_lists({"domains": [{"value": object(), "warning_list": "wl", "description": ""}]})
+    with pytest.raises(TypeError, match="Expected warning_list to be string"):
+        print_warning_lists({"domains": [{"value": "x", "description": ""}]})
 
 
 def test_schema_version_accepts_string_rows(tmp_path: Path) -> None:

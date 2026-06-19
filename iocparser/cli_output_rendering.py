@@ -307,6 +307,12 @@ def _require_str(value: object, *, field: str) -> str:
     return value
 
 
+def _warning_field(warning: dict[str, str], field: str) -> str:
+    if field not in warning:
+        raise TypeError(f"Expected {field} to be string, got missing")
+    return _require_str(warning[field], field=field)
+
+
 def print_warning_lists(
     warnings: dict[str, list[dict[str, str]]], *, stream: TextIO | None = None
 ) -> None:
@@ -316,9 +322,9 @@ def print_warning_lists(
     for ioc_type, type_warnings in warnings.items():
         _write(f"\n{color_yellow}IOCs of type {ioc_type} with warnings:{style_reset}", stream)
         for warning in type_warnings:
-            value = _require_str(warning["value"], field="value")
-            warning_list = _require_str(warning["warning_list"], field="warning_list")
-            description = _require_str(warning["description"], field="description")
+            value = _warning_field(warning, "value")
+            warning_list = _warning_field(warning, "warning_list")
+            description = _warning_field(warning, "description")
             _write(
                 f"  {color_red}- {value} - List: {warning_list}{style_reset}",
                 stream,

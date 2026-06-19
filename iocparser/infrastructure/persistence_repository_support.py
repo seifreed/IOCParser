@@ -337,7 +337,7 @@ def build_tags_search(tags: Iterable[str]) -> str:
 def tags_from_json(raw: object) -> list[str]:
     """Parse a tags_json column into a list of tag strings, tolerating bad data."""
     try:
-        parsed = json.loads(str(raw)) if raw else []
+        parsed = json.loads(raw) if isinstance(raw, str) and raw else []
     except (TypeError, ValueError):
         return []
     if not isinstance(parsed, list):

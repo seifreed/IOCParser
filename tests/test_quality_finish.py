@@ -520,6 +520,7 @@ def test_persistence_helper_functions_cover_conversion_edges() -> None:
     )
     assert evidence[0].excerpt == "x"
     assert _tags_from_json(json.dumps([1, "tag-a", None])) == ("tag-a",)
+    assert _tags_from_json("not-json") == ()
     assert _evidence_from_json(json.dumps([{"excerpt": 1, "source": "s"}, {"excerpt": "x", "source": "s"}])) == (
         IOCEvidence(excerpt="x", line_number=None, source="s"),
     )

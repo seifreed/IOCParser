@@ -52,6 +52,12 @@ def _csv_line_number(entry: dict[str, object]) -> str:
     return str(line_number)
 
 
+def _warning_field(warning: dict[str, object], field: str) -> str:
+    if field not in warning:
+        raise TypeError(f"Expected {field} to be string, got missing")
+    return _require_str(warning[field], field=field)
+
+
 class JSONOutputRenderer(OutputRenderer):
     """Render extraction results as JSON."""
 
@@ -73,7 +79,17 @@ class JSONOutputRenderer(OutputRenderer):
         for key, values in grouped.items():
             payload[key] = sorted(_require_str(v, field="value") for v in values)
         if warnings:
-            payload["warning_list_matches"] = warnings
+            payload["warning_list_matches"] = {
+                key: [
+                    {
+                        "value": _warning_field(warning, "value"),
+                        "warning_list": _warning_field(warning, "warning_list"),
+                        "description": _warning_field(warning, "description"),
+                    }
+                    for warning in warning_values
+                ]
+                for key, warning_values in warnings.items()
+            }
         return serialize_pretty_json(payload)
 
 

@@ -812,6 +812,12 @@ def test_renderers_cover_custom_stix_and_record_helpers() -> None:
 
     with pytest.raises(TypeError, match="Expected line_number to be int"):
         CSVOutputRenderer().render(_BadCsvLineNumberResult(iocs=()))
+    class _BadJsonWarningResult(ExtractionResult):
+        def grouped_warnings(self) -> dict[str, list[dict[str, str]]]:
+            return {"domains": [{"value": "ctx.test", "description": ""}]}
+
+    with pytest.raises(TypeError, match="Expected warning_list to be string"):
+        JSONOutputRenderer().render(_BadJsonWarningResult(iocs=()))
     assert _record_string_list({"tags": "bad"}, "tags") == ()
     assert _record_dict_list({"evidence": "bad"}, "evidence") == []
     with pytest.raises(TypeError, match="Expected tags entries to be string"):

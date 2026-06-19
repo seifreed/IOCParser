@@ -22,6 +22,12 @@ def _normal_ioc_value(value: object) -> str:
     return _require_str(value, field="value")
 
 
+def _warning_field(warning: dict[str, str], field: str) -> str:
+    if field not in warning:
+        raise TypeError(f"Expected {field} to be string-like, got missing")
+    return _require_str(warning[field], field=field)
+
+
 class MISPWarningListService(WarningListService):
     """Warning-list adapter backed by MISP warning lists."""
 
@@ -90,8 +96,8 @@ class MISPWarningListService(WarningListService):
                 warnings.append(
                     WarningMatch(
                         ioc=matched_ioc,
-                        warning_list=_require_str(warning.get("warning_list", ""), field="warning_list"),
-                        description=_require_str(warning.get("description", ""), field="description"),
+                        warning_list=_warning_field(warning, "warning_list"),
+                        description=_warning_field(warning, "description"),
                     ),
                 )
         return ExtractionResult(iocs=tuple(normal_records), warnings=tuple(warnings))

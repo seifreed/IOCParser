@@ -86,6 +86,24 @@ def test_idempotency_key_for_uses_injected_digester() -> None:
     assert digester.calls == [("file", "/tmp/sample.txt"), ("file", "/tmp/sample.txt")]
 
 
+def test_idempotency_key_for_file_expands_user_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    sample = home / "sample.txt"
+    sample.write_text("same bytes", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(home))
+
+    digester = RecordingDigester()
+    request = PipelineJobRequest(input_kind="file", source_value="~/sample.txt")
+
+    key = idempotency_key_for(request, digester=digester)
+
+    assert len(key) == 64
+    assert digester.calls == [("file", str(sample))]
+
+
 def test_distributed_pipeline_filesystem_queue_e2e(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'distributed.sqlite'}"
     queue = FilesystemQueueAdapter(tmp_path / "queue")

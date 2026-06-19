@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from pathlib import Path
 
 from iocparser.domain.pipeline import PipelineJobRequest
 from iocparser.interfaces.ports import ContentDigester
@@ -25,14 +26,15 @@ def _processing_options_key(request: PipelineJobRequest) -> str:
 
 def _source_digest(request: PipelineJobRequest, *, digester: ContentDigester) -> str:
     if request.input_kind == "file":
+        file_path = str(Path(request.source_value).expanduser())
         try:
-            return digester.digest_file(request.source_value)
+            return digester.digest_file(file_path)
         except OSError:
             # A missing/unreadable file can't be content-addressed at submit time.
             # Fall back to a path-based digest so the job still enqueues and the worker
             # reports the failure through the normal failed/dead-letter path, instead of
             # crashing the caller mid-submit.
-            return digester.digest_text(request.source_value)
+            return digester.digest_text(file_path)
     return digester.digest_text(request.source_value)
 
 

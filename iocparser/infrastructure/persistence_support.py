@@ -155,7 +155,10 @@ def source_value_clause(*, source_kind: str | None, source_value: str) -> Clause
     clauses: list[ClauseElement] = [func.trim(SourceModel.value) == exact_value]
     clauses.extend(func.coalesce(SourceModel.normalized_url, "") == candidate for candidate in _url_filter_variants(exact_value))
     clauses.append(
-        and_(SourceModel.normalized_url.is_(None), legacy_url_value_clause(exact_value))
+        and_(
+            func.coalesce(func.trim(SourceModel.normalized_url), "") == "",
+            legacy_url_value_clause(exact_value),
+        )
     )
     return or_(*clauses) if len(clauses) > 1 else clauses[0]
 

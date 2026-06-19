@@ -228,7 +228,12 @@ def _existing_source(session: Session, row: dict[str, object]) -> SourceModel | 
             clauses.append(func.trim(SourceModel.value) == value)
         if normalized_url:
             clauses.append(SourceModel.normalized_url == normalized_url)
-        clauses.append(and_(SourceModel.normalized_url.is_(None), legacy_url_value_clause(value)))
+        clauses.append(
+            and_(
+                func.coalesce(func.trim(SourceModel.normalized_url), "") == "",
+                legacy_url_value_clause(value),
+            )
+        )
         stmt = stmt.where(or_(*clauses)) if clauses else stmt.where(func.trim(SourceModel.value) == value)
         candidates = session.execute(stmt).scalars().all()
         for candidate in candidates:

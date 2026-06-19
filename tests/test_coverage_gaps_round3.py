@@ -499,6 +499,33 @@ class TestBatchJobReportParsing:
         session.close()
         engine.dispose()
 
+    def test_create_batch_job_rejects_non_dict_metrics(self, tmp_path: Path) -> None:
+        from iocparser.infrastructure.persistence_batch import create_batch_job
+
+        db_uri = fresh_db(tmp_path, "batch-metrics-invalid.db")
+        engine = create_engine(db_uri, future=True)
+        session = Session(engine)
+
+        report = {
+            "total": 1,
+            "successful": 1,
+            "failed": 0,
+            "status": "success",
+            "items": [],
+            "metrics": [],
+        }
+
+        with pytest.raises(TypeError, match="Expected metrics to be dict"):
+            create_batch_job(
+                session,
+                source_kind="url",
+                run_ids=(),
+                report=report,
+                config={},
+            )
+        session.close()
+        engine.dispose()
+
 
 # ---------------------------------------------------------------------------
 # 7. persistence_distributed.py:90,93 — job transition edge cases

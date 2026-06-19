@@ -35,9 +35,11 @@ def _int_report_value(payload: dict[str, object], key: str, default: int = 0) ->
 
 def _dict_report_value(payload: dict[str, object], key: str) -> dict[str, object]:
     raw_value = payload.get(key)
+    if raw_value is None:
+        return {}
     if isinstance(raw_value, dict):
         return {name: value for name, value in raw_value.items() if isinstance(name, str)}
-    return {}
+    raise TypeError(f"Expected {key} to be dict, got {type(raw_value).__name__}")
 
 
 def _report_string_value(

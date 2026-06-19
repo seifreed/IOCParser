@@ -383,6 +383,17 @@ def test_worker_service_single_worker_sleep_on_empty():
     assert w.run_forever(max_cycles=2) == 0
 
 
+def test_worker_service_concurrency_rejects_bool_limits() -> None:
+    svc = _SimpleNamespace(
+        process_next=lambda *_args, **_kwargs: None, limits=_SimpleNamespace(max_workers=True)
+    )
+    w = DistributedWorkerService(
+        service=svc, queue_name="s", poll_interval_seconds=0.0, max_messages_per_cycle=1
+    )
+    with pytest.raises(TypeError, match="invalid literal for int"):
+        _ = w.concurrency
+
+
 def test_worker_service_zero_max_cycles_does_not_process():
     calls = [0]
 

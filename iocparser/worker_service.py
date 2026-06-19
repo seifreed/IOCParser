@@ -20,7 +20,6 @@ class WorkerServiceRuntime:
     poll_interval_seconds: float
     max_messages_per_cycle: int
 
-
 def build_worker_service_runtime(
     config: WorkerServiceConfig,
     *,
@@ -79,7 +78,10 @@ class DistributedWorkerService:
     @property
     def concurrency(self) -> int:
         limits = getattr(self.service, "limits", None)
-        return max(1, int(getattr(limits, "max_workers", 1)))
+        raw_workers = getattr(limits, "max_workers", 1)
+        if isinstance(raw_workers, bool):
+            raise TypeError(f"invalid literal for int(): {raw_workers!r}")
+        return max(1, int(raw_workers))
 
     def _process_one(self) -> bool:
         return self.service.process_next(queue_name=self.queue_name) is not None

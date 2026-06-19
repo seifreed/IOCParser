@@ -8,6 +8,12 @@ from logging import Logger
 from iocparser.infrastructure.warninglists_types import IOCValue, normalized_warning_list_text
 
 
+def _require_str(value: object, *, field: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"Expected {field} to be string-like, got {type(value).__name__}")
+    return value
+
+
 def check_string_type(value: str, values: list[IOCValue]) -> bool:
     return value.strip().lower() in [
         normalized_warning_list_text(v, list_type="string") for v in values if v is not None
@@ -32,7 +38,7 @@ def check_regex_type(get_logger: Callable[[], Logger], value: str, values: list[
     for regex_pattern in values:
         if regex_pattern is None:
             continue
-        pattern_text = str(regex_pattern)
+        pattern_text = _require_str(regex_pattern, field="regex pattern")
         if not pattern_text.strip():
             continue
         try:
@@ -49,7 +55,7 @@ def check_cidr(get_logger: Callable[[], Logger], ip_value: str, cidr_list: list[
         for cidr_value in cidr_list:
             if cidr_value is None:
                 continue
-            cidr_str = str(cidr_value).strip()
+            cidr_str = _require_str(cidr_value, field="cidr entry").strip()
             try:
                 if "/" in cidr_str:
                     network = ipaddress.ip_network(cidr_str, strict=False)

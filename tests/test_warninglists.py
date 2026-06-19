@@ -957,6 +957,14 @@ class TestWarningListsGetWarnings:
                 "bad-substring",
             )
 
+    def test_regex_and_cidr_checks_reject_non_string_entries(self):
+        warning_lists = make_warning_lists()
+
+        with pytest.raises(TypeError, match="string-like"):
+            warning_lists._check_value_in_list("example.com", [object()], "regex")  # type: ignore[list-item]
+        with pytest.raises(TypeError, match="string-like"):
+            warning_lists._check_value_in_list("1.2.3.4", [object()], "cidr")  # type: ignore[list-item]
+
     def test_get_warnings_for_iocs_empty_input(self):
         """Test getting warnings with empty input."""
         warning_lists = make_warning_lists()

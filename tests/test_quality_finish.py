@@ -299,6 +299,8 @@ def test_cli_output_batch_helpers_cover_stdout_and_default_file() -> None:
         print_batch_report(report)
         save_batch_report(report, "-", file_writer=_MemoryWriter())
     assert "Batch report schema" in output.getvalue()
+    with pytest.raises(TypeError, match="Expected batch report keys to be strings"):
+        print_batch_report({1: "one"})
 
     writer = _MemoryWriter()
     save_batch_report({"total": 0}, None, file_writer=writer)

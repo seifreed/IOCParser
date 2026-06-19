@@ -99,6 +99,8 @@ def print_batch_report(report: Mapping[str, object], *, stream: TextIO | None = 
     # The batch report is a human summary; under -o - the caller passes stderr so it does
     # not corrupt the machine output (JSONL/JSON/CSV/STIX) piped to stdout.
     out = stream if stream is not None else sys.stdout
+    if not all(isinstance(key, str) for key in report):
+        raise TypeError("Expected batch report keys to be strings")
     schema_version = str(report.get("schema_version", "")).strip()
     if schema_version:
         out.write(f"Batch report schema\t{schema_version}" + "\n")

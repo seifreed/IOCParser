@@ -173,7 +173,7 @@ def test_source_repository_trims_optional_url_metadata_on_direct_use(tmp_path) -
 
     assert source.value == "https://example.test/feed"
     assert source.original_url == "HTTPS://Example.TEST/feed#frag"
-    assert source.normalized_url == "HTTPS://Example.TEST/feed#frag"
+    assert source.normalized_url == "https://example.test/feed"
     assert source.mime_type == "text/plain"
     assert source.content_hash == "abc123"
     assert source.fingerprint == "def456"

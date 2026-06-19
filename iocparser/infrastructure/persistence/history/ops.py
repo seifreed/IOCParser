@@ -843,7 +843,7 @@ def _import_distributed_jobs(
     for row in rows:
         typed = typed_row(row)
         if not all(
-            isinstance(typed.get(key), str)
+            isinstance(typed.get(key), str) and typed.get(key).strip()
             for key in ("correlation_id", "queue_backend", "queue_name", "input_kind", "source_value")
         ) or not isinstance(typed.get("submitted_at"), datetime):
             continue
@@ -891,10 +891,13 @@ def _import_dead_letter_jobs(
         typed = typed_row(row)
         if (
             not all(
-                isinstance(typed.get(key), str)
+                isinstance(typed.get(key), str) and typed.get(key).strip()
                 for key in ("correlation_id", "queue_backend", "queue_name", "source_value")
             )
-            or not all(isinstance(typed.get(key), str) for key in ("error_code", "error_category", "error_message"))
+            or not all(
+                isinstance(typed.get(key), str) and typed.get(key).strip()
+                for key in ("error_code", "error_category", "error_message")
+            )
             or not isinstance(typed.get("dead_lettered_at"), datetime)
         ):
             continue

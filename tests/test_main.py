@@ -251,6 +251,12 @@ class TestArgumentHelpers:
         result = get_list_arg(args, "file")
         assert result == ["single.txt"]
 
+    def test_get_list_arg_rejects_blank_single_value(self) -> None:
+        args = argparse.Namespace(file="   ")
+
+        with pytest.raises(ValidationError, match="file requires a string value"):
+            get_list_arg(args, "file")
+
     def test_get_list_arg_strips_single_value(self) -> None:
         args = argparse.Namespace(file="  single.txt  ")
 

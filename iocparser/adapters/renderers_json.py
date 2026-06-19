@@ -43,6 +43,15 @@ def _csv_warning_field(record: dict[str, object], field: str) -> str:
     return _require_str(record[field], field=field)
 
 
+def _csv_line_number(entry: dict[str, object]) -> str:
+    line_number = entry.get("line_number")
+    if line_number is None:
+        return ""
+    if isinstance(line_number, bool) or not isinstance(line_number, int):
+        raise TypeError(f"Expected line_number to be int, got {type(line_number).__name__}")
+    return str(line_number)
+
+
 class JSONOutputRenderer(OutputRenderer):
     """Render extraction results as JSON."""
 
@@ -116,9 +125,7 @@ class CSVOutputRenderer(OutputRenderer):
         for record in result.to_records():
             evidence_list = record_dict_list(record, "evidence")
             line_numbers = ",".join(
-                str(entry["line_number"])
-                for entry in evidence_list
-                if isinstance(entry, dict) and entry.get("line_number") is not None
+                _csv_line_number(entry) for entry in evidence_list if isinstance(entry, dict)
             )
             evidence_text = " | ".join(evidence_excerpts(evidence_list))
             writer.writerow(

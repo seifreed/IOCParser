@@ -34,6 +34,7 @@ from iocparser.cli_output_rendering import (
     _optional_int_run_metadata_value,
     print_warning_lists,
 )
+import iocparser.cli_schema as cli_schema_module
 from iocparser.cli_processing_single import process_single_input
 from iocparser.cli_processing_support import joined_type_filters, plugin_client
 from iocparser.cli_processing_urls import (
@@ -350,6 +351,17 @@ def test_cli_and_schema_integer_helpers_raise_validation_errors() -> None:
         with pytest.raises(ValidationError):
             _history_payload(str(payload_path))
     finally:
+        payload_path.unlink()
+
+    payload_path = Path("bad-history.json")
+    payload_path.write_text("{}", encoding="utf-8")
+    original_json_loads = cli_schema_module.json.loads
+    cli_schema_module.json.loads = lambda _raw: {1: "one", "sources": []}
+    try:
+        with pytest.raises(ValidationError, match="history import file must contain a JSON object"):
+            _history_payload(str(payload_path))
+    finally:
+        cli_schema_module.json.loads = original_json_loads
         payload_path.unlink()
 
 

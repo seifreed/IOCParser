@@ -66,7 +66,9 @@ def _history_payload(path: str) -> dict[str, object]:
         raise ValidationError(HISTORY_FILE_UNREADABLE.format(path=path, error=exc)) from exc
     if not isinstance(loaded, dict):
         raise ValidationError(HISTORY_IMPORT_OBJECT_REQUIRED)
-    return {str(key): value for key, value in loaded.items()}
+    if not all(isinstance(key, str) for key in loaded):
+        raise ValidationError(HISTORY_IMPORT_OBJECT_REQUIRED)
+    return dict(loaded)
 
 
 def _run_with_engine[T](db_uri: str, operation: Callable[[Engine], T]) -> T:

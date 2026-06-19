@@ -334,10 +334,11 @@ def _build_prune_query(
     statuses: tuple[str, ...],
 ) -> Select[RunModel]:
     stmt = select(RunModel).join(SourceModel, RunModel.source_id == SourceModel.id)
+    normalized_kind = source_kind.strip().lower() if source_kind is not None else ""
     if before:
         stmt = stmt.where(RunModel.started_at < parse_datetime(before))
-    if source_kind:
-        stmt = stmt.where(SourceModel.kind == source_kind)
+    if normalized_kind:
+        stmt = stmt.where(SourceModel.kind == normalized_kind)
     if source_value:
         stmt = stmt.where(source_value_clause(source_kind=source_kind, source_value=source_value))
     if statuses:

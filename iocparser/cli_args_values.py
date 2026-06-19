@@ -137,7 +137,13 @@ def get_list_arg(args: argparse.Namespace, name: str) -> list[str]:
     if isinstance(value, (list, tuple)):
         if not all(isinstance(item, str) for item in value):
             raise ValidationError(STRING_VALUE_REQUIRED.format(field_name=name))
-        return [item.strip() for item in value if item.strip()]
+        normalized: list[str] = []
+        for item in value:
+            stripped = item.strip()
+            if not stripped:
+                raise ValidationError(STRING_VALUE_REQUIRED.format(field_name=name))
+            normalized.append(stripped)
+        return normalized
     normalized = _require_str_value(value, field_name=name).strip()
     return [normalized] if normalized else []
 

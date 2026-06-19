@@ -241,8 +241,8 @@ class TestArgumentHelpers:
     def test_get_list_arg_strips_list_items(self) -> None:
         args = argparse.Namespace(items=["  item1  ", "item2", "  "])
 
-        result = get_list_arg(args, "items")
-        assert result == ["item1", "item2"]
+        with pytest.raises(ValidationError, match="items requires a string value"):
+            get_list_arg(args, "items")
 
     def test_get_list_arg_with_single_value(self) -> None:
         """Test get_list_arg converts single value to single-item list."""

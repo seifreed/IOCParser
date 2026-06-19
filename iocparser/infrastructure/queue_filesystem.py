@@ -13,8 +13,8 @@ INVALID_QUEUE_NAME_ERROR = "Invalid queue name"
 INVALID_RECEIPT_PATH_ERROR = "Invalid filesystem queue receipt"
 
 
-def _safe_filename_component(value: object) -> str:
-    normalized = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(value)).strip("._")
+def _safe_filename_component(value: str) -> str:
+    normalized = re.sub(r"[^A-Za-z0-9_.-]+", "_", value).strip("._")
     return normalized or str(uuid4())
 
 
@@ -87,7 +87,7 @@ class FilesystemQueueAdapter:
     def requeue(self, receipt: QueueReceipt, *, envelope: QueueEnvelope) -> QueueReceipt:
         queue_dir = self._queue_dir(receipt.queue_name, "pending")
         processing_path = self._receipt_path(receipt)
-        message_name = _safe_filename_component(envelope.request.job_id or uuid4())
+        message_name = _safe_filename_component(envelope.request.job_id or str(uuid4()))
         new_path = queue_dir / f"{message_name}-{uuid4().hex}.json"
         self._atomic_write_record(new_path, envelope)
         try:

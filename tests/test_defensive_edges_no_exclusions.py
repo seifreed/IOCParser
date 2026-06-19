@@ -1396,6 +1396,7 @@ def test_strict_coverage_infrastructure_edge_helpers(tmp_path) -> None:
     )
     from iocparser.infrastructure.queue_filesystem import (
         FilesystemQueueAdapter,
+        _safe_filename_component,
         _validate_queue_name,
     )
     from iocparser.infrastructure.queue_rabbitmq import _payload_text
@@ -1411,6 +1412,9 @@ def test_strict_coverage_infrastructure_edge_helpers(tmp_path) -> None:
 
     with pytest.raises(ValueError, match="queue name"):
         _validate_queue_name("..")
+    assert _safe_filename_component("job-1") == "job-1"
+    with pytest.raises(TypeError):
+        _safe_filename_component(1)  # type: ignore[arg-type]
 
     adapter = FilesystemQueueAdapter(tmp_path / "queues")
     pending_dir = adapter._queue_dir("default", "pending")

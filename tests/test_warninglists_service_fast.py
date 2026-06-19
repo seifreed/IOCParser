@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import requests
+import pytest
 
 import iocparser.infrastructure.warninglists_service as warninglists_service_module
 from iocparser.domain.models import IOC
@@ -60,6 +61,11 @@ class ServiceBackedWarningLists:
                 ]
             },
         )
+
+
+class _BadRawValue:
+    def __init__(self) -> None:
+        self.raw = object()
 
 
 def test_warninglists_real_init_sets_paths_and_preprocesses(tmp_path: Path) -> None:
@@ -127,3 +133,11 @@ def test_warninglist_service_separates_iocs_through_adapter() -> None:
             }
         ]
     }
+
+
+def test_warninglist_service_rejects_non_string_raw_values() -> None:
+    with pytest.raises(TypeError, match="Expected raw to be string-like"):
+        warninglists_service_module.MISPWarningListService().separate(
+            (IOC(ioc_type="domains", value=_BadRawValue()),),
+            force_update=True,
+        )

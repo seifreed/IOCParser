@@ -8,6 +8,12 @@ from iocparser.infrastructure.warninglists import MISPWarningLists
 from iocparser.interfaces.ports import WarningListService
 
 
+def _require_str(value: object, *, field: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"Expected {field} to be string-like, got {type(value).__name__}")
+    return value
+
+
 class MISPWarningListService(WarningListService):
     """Warning-list adapter backed by MISP warning lists."""
 
@@ -30,8 +36,9 @@ class MISPWarningListService(WarningListService):
         by_key: dict[tuple[str, str], list[IOC]] = defaultdict(list)
         for ioc in iocs:
             ioc_type = ioc_type_name(ioc.ioc_type)
-            grouped_iocs.setdefault(ioc_type, []).append(ioc.value.raw)
-            by_key[(ioc_type, ioc.value.raw)].append(ioc)
+            raw_value = _require_str(ioc.value.raw, field="raw")
+            grouped_iocs.setdefault(ioc_type, []).append(raw_value)
+            by_key[(ioc_type, raw_value)].append(ioc)
 
         normal_iocs, warning_iocs = self._get_lists(
             force_update=force_update

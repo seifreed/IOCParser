@@ -151,6 +151,45 @@ def _args(**overrides: object) -> argparse.Namespace:
     return argparse.Namespace(**base)
 
 
+def test_numeric_defaults_let_cli_override_invalid_config_chunk_size() -> None:
+    """An explicit --chunk-size must win over a bad INI/env value (CLI > env > INI).
+
+    Regression: _apply_numeric_defaults validated config.chunk_size/overlap
+    unconditionally, before applying the CLI override, so a valid --chunk-size 100
+    still aborted with 'Invalid chunk_size: 0' when the INI carried chunk_size = 0.
+    """
+    import dataclasses
+
+    from iocparser.cli_runtime_defaults import _apply_numeric_defaults
+
+    config = dataclasses.replace(
+        load_config(cli_persist=False, cli_db_uri=None, cli_config_path=None),
+        chunk_size=0,
+        overlap=-5,
+    )
+    shared = {
+        "overlap": None,
+        "url_workers": None,
+        "url_retries": None,
+        "url_backoff": None,
+        "rate_limit": None,
+        "parallel": None,
+        "max_queue_size": None,
+        "max_input_size_mb": None,
+        "max_input_seconds": None,
+    }
+
+    overridden = argparse.Namespace(**{**shared, "chunk_size": 100, "overlap": 10})
+    _apply_numeric_defaults(overridden, config)
+    assert overridden.chunk_size == 100
+    assert overridden.overlap == 10
+
+    # No CLI override: the bad config value is still rejected.
+    not_overridden = argparse.Namespace(**{**shared, "chunk_size": None})
+    with pytest.raises(ValidationError, match="chunk_size"):
+        _apply_numeric_defaults(not_overridden, config)
+
+
 def test_resolve_tls_options_rejects_missing_paths_cleanly(tmp_path: object) -> None:
     """Regression: a missing --ca-bundle/--tls-cert path used to surface mid-download
     as a generic "Unexpected error download <url>"; validate it up front instead."""

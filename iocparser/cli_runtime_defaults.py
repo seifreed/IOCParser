@@ -102,9 +102,12 @@ def _apply_output_defaults(args: argparse.Namespace, config: AppConfig) -> None:
 
 
 def _apply_numeric_defaults(args: argparse.Namespace, config: AppConfig) -> None:
-    if config.chunk_size < 1:
+    # Precedence is CLI > env > INI, so only validate the INI/env value when the CLI
+    # did not override it; an explicit --chunk-size/--overlap already passed argparse's
+    # positive/non-negative type check and must win over a bad config value.
+    if getattr(args, "chunk_size", None) is None and config.chunk_size < 1:
         raise ValidationError(INVALID_CHUNK_SIZE.format(value=config.chunk_size))
-    if config.overlap < 0:
+    if getattr(args, "overlap", None) is None and config.overlap < 0:
         raise ValidationError(INVALID_OVERLAP.format(value=config.overlap))
     numeric_defaults: dict[str, int | float] = {
         "url_workers": config.url_workers,

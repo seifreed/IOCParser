@@ -253,35 +253,6 @@ def build_query_hits(
     ]
 
 
-def matches_advanced_filters(
-    hit: PersistedRunQueryHit,
-    *,
-    tags: tuple[str, ...],
-    exclude_tags: tuple[str, ...],
-    min_severity: str | None,
-    tag_mode: str,
-) -> bool:
-    """Evaluate advanced in-memory filters for persisted IOC hits."""
-    if tags:
-        tag_set = set(hit.tags)
-        required = set(tags)
-        if tag_mode == "any":
-            if not tag_set.intersection(required):
-                return False
-        elif not required.issubset(tag_set):
-            return False
-    if exclude_tags and any(tag in hit.tags for tag in exclude_tags):
-        return False
-    if min_severity is None:
-        return True
-    normalized_min_severity = min_severity.strip().lower()
-    if normalized_min_severity not in SEVERITY_ORDER:
-        raise ValueError(INVALID_MIN_SEVERITY.format(value=min_severity))
-    return SEVERITY_ORDER.get((hit.severity or "").lower(), -1) >= SEVERITY_ORDER[
-        normalized_min_severity
-    ]
-
-
 def delete_run(session: Session, run_id: int) -> bool:
     """Delete a persisted run and its join rows."""
     run = session.get(RunModel, run_id)

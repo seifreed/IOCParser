@@ -88,7 +88,6 @@ from iocparser.infrastructure.persistence import (
     SQLAlchemyPersistenceService,
     SQLAlchemyUnitOfWork,
 )
-from iocparser.infrastructure.persistence_support import matches_advanced_filters
 from iocparser.infrastructure.warninglists_service import CompositeWarningListService
 from iocparser.plugins import (
     enricher_names,
@@ -2997,39 +2996,6 @@ def test_internal_http_mapping_and_static_timeout_helpers() -> None:
     for non_finite in (float("nan"), float("inf"), float("-inf")):
         with pytest.raises(ValidationError, match="Invalid max_input_size_mb"):
             mb_to_bytes(non_finite)
-
-
-def test_matches_advanced_filters_rejects_missing_tags() -> None:
-    hit = SQLAlchemyPersistenceService(
-        "sqlite:///:memory:"
-    )  # lightweight owner for namespace consistency
-    del hit
-    from iocparser.domain.models import PersistedRunQueryHit
-
-    query_hit = PersistedRunQueryHit(
-        run_id=1,
-        source_kind="file",
-        source_value="sample.txt",
-        ioc_type="domains",
-        value="alpha.example",
-        is_warning=False,
-        tags=("network",),
-        severity="medium",
-    )
-    assert not matches_advanced_filters(
-        query_hit,
-        tags=("missing",),
-        exclude_tags=(),
-        min_severity=None,
-        tag_mode="any",
-    )
-    assert not matches_advanced_filters(
-        query_hit,
-        tags=("network", "missing"),
-        exclude_tags=(),
-        min_severity=None,
-        tag_mode="all",
-    )
 
 
 def test_persist_failed_batch_items_creates_failed_runs(tmp_path: Path) -> None:

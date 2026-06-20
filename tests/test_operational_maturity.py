@@ -69,7 +69,6 @@ from iocparser.domain.jobs import (
 from iocparser.domain.models import (
     IOC,
     ExtractionResult,
-    PersistedRunQueryHit,
     PersistOptions,
     PipelineErrorInfo,
     PipelineJobRequest,
@@ -103,7 +102,6 @@ from iocparser.infrastructure.persistence_migrations import (
     validate_schema,
 )
 from iocparser.infrastructure.persistence_schema import RunIOCModel, RunModel
-from iocparser.infrastructure.persistence_support import matches_advanced_filters
 from iocparser.plugins import (
     extractor_names,
     get_extractor,
@@ -1960,32 +1958,6 @@ def test_batch_report_and_filter_helpers(capsys) -> None:
     assert Path("iocparser_batch_report.json").is_file()
     Path("iocparser_batch_report.json").unlink()
 
-    hit = PersistedRunQueryHit(
-        run_id=1,
-        source_kind="file",
-        source_value="source.txt",
-        ioc_type="domains",
-        value="alpha.example",
-        is_warning=False,
-        severity="medium",
-        tags=("phishing",),
-    )
-    assert (
-        matches_advanced_filters(
-            hit, tags=("phishing",), exclude_tags=(), min_severity="low", tag_mode="all"
-        )
-        is True
-    )
-    assert (
-        matches_advanced_filters(
-            hit, tags=("phishing",), exclude_tags=("phishing",), min_severity=None, tag_mode="all"
-        )
-        is False
-    )
-    assert (
-        matches_advanced_filters(hit, tags=(), exclude_tags=(), min_severity=None, tag_mode="all")
-        is True
-    )
     assert (
         BatchJobSummary(
             batch_job_id=1,

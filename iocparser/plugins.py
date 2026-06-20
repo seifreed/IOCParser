@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import Callable, Mapping
 from importlib.metadata import EntryPoints, entry_points
 from typing import Protocol, cast
@@ -51,6 +52,7 @@ _postprocessor_registry: dict[str, PostProcessorFactory] = {}
 _extractor_registry: dict[str, ExtractorFactory] = {}
 _ioc_type_registry: dict[str, IOCTypePluginFactory] = {}
 _plugin_state = {"entry_points_loaded": False}
+_load_lock = threading.Lock()
 
 
 class ExtractorPlugin(Protocol):
@@ -294,11 +296,16 @@ def _register_discovered_ioc_types() -> None:
 
 
 def _load_entry_point_plugins() -> None:
+    # Resolvers call this lazily; under concurrent first use an unlocked check-then-act
+    # let every thread run the full entry-point discovery + re-register, re-firing
+    # override warnings. Double-checked locking loads exactly once.
     if _plugin_state["entry_points_loaded"]:
         return
-    _load_discovered_entry_points(entry_points())
-    _register_discovered_ioc_types()
-    _plugin_state["entry_points_loaded"] = True
+    with _load_lock:
+        if not _plugin_state["entry_points_loaded"]:
+            _load_discovered_entry_points(entry_points())
+            _register_discovered_ioc_types()
+            _plugin_state["entry_points_loaded"] = True
 
 
 def _register_builtin_plugins() -> None:

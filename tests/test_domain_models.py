@@ -331,6 +331,47 @@ def test_category_filter_names_stay_in_sync_with_aliases() -> None:
     assert set(_CATEGORY_ALIASES) == CATEGORY_FILTER_NAMES
 
 
+def test_concurrent_custom_ioc_registration_does_not_crash() -> None:
+    """Re-registering custom types from many threads must not crash.
+
+    Regression: register_custom_ioc_type iterated _custom_ioc_aliases while another
+    thread mutated it, raising "dictionary changed size during iteration". The
+    registry mutations are now serialized with a lock.
+    """
+    import threading
+
+    import iocparser.domain.enums as enums_module
+
+    names = [f"concurrent_ct_{n}" for n in range(20)]
+    errors: list[str] = []
+    barrier = threading.Barrier(8)
+
+    def worker() -> None:
+        barrier.wait()
+        try:
+            for _ in range(500):
+                for index, name in enumerate(names):
+                    register_custom_ioc_type(
+                        name, base_type="urls", aliases=(f"al{index}a", f"al{index}b")
+                    )
+        except RuntimeError as exc:
+            errors.append(repr(exc))
+
+    threads = [threading.Thread(target=worker) for _ in range(8)]
+    try:
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        assert errors == []
+    finally:
+        for name in names:
+            enums_module._custom_ioc_types.pop(name, None)
+        for index in range(len(names)):
+            enums_module._custom_ioc_aliases.pop(f"al{index}a", None)
+            enums_module._custom_ioc_aliases.pop(f"al{index}b", None)
+
+
 def test_json_renderer_metadata_keys_stay_within_reserved_set() -> None:
     """Drift guard: every top-level metadata key the JSON renderer emits must be declared
     in RESERVED_JSON_OUTPUT_KEYS, so the registration guard can never fall out of sync."""

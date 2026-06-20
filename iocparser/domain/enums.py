@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -211,6 +212,11 @@ class CustomIOCTypeDefinition:
 
 _custom_ioc_types: dict[str, CustomIOCTypeDefinition] = {}
 _custom_ioc_aliases: dict[str, str] = {}
+# Serializes mutation/iteration of the registry dicts. Plugin discovery can run from
+# several threads on first use; without this, register_custom_ioc_type iterated
+# _custom_ioc_aliases while another thread mutated it ("dict changed size during
+# iteration") and lost updates.
+_registry_lock = threading.Lock()
 
 
 def register_custom_ioc_type(
@@ -262,14 +268,16 @@ def register_custom_ioc_type(
     )
     # Drop aliases this type owned in a prior registration; otherwise an alias removed
     # in a re-registration (e.g. a reloaded plugin) keeps resolving and can falsely
-    # block a different type from claiming it.
-    for stale_alias in [
-        alias for alias, owner in _custom_ioc_aliases.items() if owner == normalized
-    ]:
-        del _custom_ioc_aliases[stale_alias]
-    _custom_ioc_types[normalized] = definition
-    for alias in definition.aliases:
-        _custom_ioc_aliases[alias] = normalized
+    # block a different type from claiming it. Serialized so concurrent registrations
+    # don't iterate the alias dict while another thread mutates it.
+    with _registry_lock:
+        for stale_alias in [
+            alias for alias, owner in _custom_ioc_aliases.items() if owner == normalized
+        ]:
+            del _custom_ioc_aliases[stale_alias]
+        _custom_ioc_types[normalized] = definition
+        for alias in definition.aliases:
+            _custom_ioc_aliases[alias] = normalized
     return IOCTypeName(normalized)
 
 
@@ -326,7 +334,8 @@ def get_custom_ioc_type(name: IOCType | IOCTypeName | str) -> CustomIOCTypeDefin
 
 def custom_ioc_type_names() -> tuple[str, ...]:
     """List registered custom IOC type names."""
-    return tuple(sorted(_custom_ioc_types))
+    with _registry_lock:
+        return tuple(sorted(_custom_ioc_types))
 
 
 def ioc_type_name(value: IOCType | IOCTypeName | str) -> str:

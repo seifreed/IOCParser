@@ -2887,6 +2887,46 @@ def test_plugin_registry_and_structured_records(tmp_path: Path) -> None:
         plugins_module._plugin_state["entry_points_loaded"] = False
 
 
+def test_entry_point_discovery_runs_once_under_concurrent_first_use() -> None:
+    """Lazy entry-point discovery must run exactly once across parallel first callers.
+
+    Regression: _load_entry_point_plugins did an unlocked check-then-act, so concurrent
+    resolvers each ran the full discovery + re-register (re-firing override warnings).
+    Double-checked locking now loads once.
+    """
+    import threading
+
+    import iocparser.plugins as plugins_module
+
+    passes = {"count": 0}
+    count_lock = threading.Lock()
+    original_loader = plugins_module._load_discovered_entry_points
+
+    def counting_loader(entry_points_obj: object) -> None:
+        with count_lock:
+            passes["count"] += 1
+        original_loader(entry_points_obj)  # type: ignore[arg-type]
+
+    plugins_module._load_discovered_entry_points = counting_loader
+    plugins_module._plugin_state["entry_points_loaded"] = False
+    barrier = threading.Barrier(12)
+    try:
+
+        def worker() -> None:
+            barrier.wait()
+            plugins_module.renderer_names()
+
+        threads = [threading.Thread(target=worker) for _ in range(12)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        assert passes["count"] == 1
+    finally:
+        plugins_module._load_discovered_entry_points = original_loader
+        plugins_module._plugin_state["entry_points_loaded"] = False
+
+
 def test_ioc_type_plugin_lookup_loads_entry_points() -> None:
     import iocparser.plugins as plugins_module
 

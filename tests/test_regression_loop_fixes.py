@@ -1306,6 +1306,48 @@ def test_rev_0009_backfills_dedup_hash_on_legacy_tables() -> None:
     assert "uq_iocs_dedup_hash" in unique_keys
 
 
+def test_rev_0009_collapses_colliding_legacy_sources() -> None:
+    """Legacy sources distinct under the raw UNIQUE but identical after normalization
+    must be merged, not abort the migration.
+
+    Regression: source_dedup_hash strips ``url`` values, so two legacy url rows
+    differing only by trailing whitespace (both legal under UNIQUE(kind, value))
+    produced the same dedup_hash and CREATE UNIQUE INDEX aborted the whole upgrade,
+    leaving the DB permanently stuck. Colliding rows are now collapsed to the
+    lowest-id survivor and referencing runs are repointed first.
+    """
+    from sqlalchemy import inspect as sa_inspect
+
+    from iocparser.infrastructure.migration_revisions import rev_0009_dedup_hash
+
+    engine = create_engine("sqlite://")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE TABLE sources (id INTEGER PRIMARY KEY, kind TEXT, value TEXT, "
+                "UNIQUE(kind, value))"
+            )
+        )
+        connection.execute(text("CREATE TABLE runs (id INTEGER PRIMARY KEY, source_id INTEGER)"))
+        connection.execute(
+            text("INSERT INTO sources(id, kind, value) VALUES (1, 'url', 'http://x.example')")
+        )
+        connection.execute(
+            text("INSERT INTO sources(id, kind, value) VALUES (2, 'url', 'http://x.example ')")
+        )
+        # a run pointing at the duplicate that will be deleted
+        connection.execute(text("INSERT INTO runs(id, source_id) VALUES (10, 2)"))
+
+    rev_0009_dedup_hash.apply(engine, sa_inspect(engine))
+
+    with engine.connect() as connection:
+        source_ids = [row.id for row in connection.execute(text("SELECT id FROM sources"))]
+        run_source = connection.execute(text("SELECT source_id FROM runs")).scalar_one()
+
+    assert source_ids == [1]
+    assert run_source == 1
+
+
 def test_schema_ddl_is_valid_for_mysql() -> None:
     """The iocs/sources schema must compile to valid MySQL DDL (no TEXT in keys).
 

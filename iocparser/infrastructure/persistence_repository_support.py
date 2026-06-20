@@ -127,6 +127,48 @@ _DEDUP_BACKFILL_SQL: dict[str, tuple[str, str]] = {
 }
 
 
+# Literal collision-resolution SQL (constants, never interpolated -> injection-safe).
+# Before collapsing rows that newly collide on the normalized dedup_hash, each
+# repoint statement points its referencing table at the lowest-id survivor of the
+# group; it only runs when that referencing table exists. The delete then keeps one
+# row per dedup_hash.
+_DEDUP_REPOINT_SQL: dict[str, tuple[tuple[str, str], ...]] = {
+    "sources": (
+        (
+            "runs",
+            "UPDATE runs SET source_id = "
+            "(SELECT MIN(survivor.id) FROM sources survivor "
+            " WHERE survivor.dedup_hash = "
+            "  (SELECT ref.dedup_hash FROM sources ref WHERE ref.id = runs.source_id)) "
+            "WHERE source_id NOT IN (SELECT MIN(id) FROM sources GROUP BY dedup_hash)",
+        ),
+    ),
+    "iocs": (),
+}
+_DEDUP_DELETE_SQL: dict[str, str] = {
+    "sources": (
+        "DELETE FROM sources WHERE id NOT IN (SELECT MIN(id) FROM sources GROUP BY dedup_hash)"
+    ),
+    "iocs": "DELETE FROM iocs WHERE id NOT IN (SELECT MIN(id) FROM iocs GROUP BY dedup_hash)",
+}
+
+
+def _collapse_dedup_collisions(
+    connection: Connection, table: str, existing_tables: set[str]
+) -> None:
+    """Merge legacy rows that collide on the new normalized dedup_hash.
+
+    The old UNIQUE constraints spanned raw columns, so e.g. two ``url`` sources
+    differing only by surrounding whitespace were distinct rows but now hash the
+    same. Repoint referencing rows to the lowest-id survivor, then drop the rest,
+    so CREATE UNIQUE INDEX does not abort the whole upgrade.
+    """
+    for dependent_table, statement in _DEDUP_REPOINT_SQL[table]:
+        if dependent_table in existing_tables:
+            connection.execute(text(statement))
+    connection.execute(text(_DEDUP_DELETE_SQL[table]))
+
+
 def _has_dedup_column(inspector: Inspector, table: str) -> bool:
     return any(col["name"] == "dedup_hash" for col in inspector.get_columns(table))
 
@@ -178,6 +220,7 @@ def backfill_dedup_hash_columns(engine: Engine, inspector: Inspector) -> None:
                 )
             _backfill_dedup_hash(connection, table, hasher)
             if not has_key:
+                _collapse_dedup_collisions(connection, table, tables)
                 connection.execute(text(f"CREATE UNIQUE INDEX {key} ON {table}(dedup_hash)"))
 
 

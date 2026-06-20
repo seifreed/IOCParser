@@ -18,9 +18,9 @@ from iocparser.domain.models import (
     indicator_value_for,
     register_custom_ioc_type,
 )
-from iocparser.domain.values import IndicatorValue
 from iocparser.domain.sources import normalize_url_value
 from iocparser.domain.type_filters import parse_ioc_types
+from iocparser.domain.values import IndicatorValue
 
 
 def test_source_kind_and_ioc_type_resolve_aliases() -> None:
@@ -148,6 +148,10 @@ def test_value_objects_canonicalize_expected_values() -> None:
     assert IpValue("2001:0db8::1").canonical() == "2001:db8::1"
     assert IpValue("not-an-ip").canonical() == "not-an-ip"
     assert EmailValue(" USER@Example[.]COM ").canonical() == "user@example.com"
+    # MAC must canonicalize to lowercase for cross-notation dedup and STIX conformance.
+    assert indicator_value_for(IOCType.MAC_ADDRESS, " AA:BB:CC:DD:EE:FF ").canonical() == (
+        "aa:bb:cc:dd:ee:ff"
+    )
     # ssdeep base64 is case-sensitive: strip only, never lowercase (would corrupt the digest).
     mixed_ssdeep = "768:C7tsNKI7aU8Y1O5wjNHDwLxQJidNG3qGqDRT:CtsI7aUwjNQidNG3GqDRT"
     assert indicator_value_for(IOCType.SSDEEP, f"  {mixed_ssdeep}  ").canonical() == mixed_ssdeep
@@ -187,6 +191,9 @@ def test_indicator_value_for_selects_specialized_types() -> None:
     assert type(indicator_value_for(IOCType.SSDEEP, "3:AbC:dE")).__name__ == "FuzzyHashValue"
     assert type(indicator_value_for(IOCType.IP, "198.51.100.7")).__name__ == "IpValue"
     assert type(indicator_value_for(IOCType.EMAIL, "a@b.test")).__name__ == "EmailValue"
+    assert type(indicator_value_for(IOCType.MAC_ADDRESS, "AA:BB:CC:DD:EE:FF")).__name__ == (
+        "MacValue"
+    )
     assert type(indicator_value_for("urls", "hxxps://example[.]com")).__name__ == "UrlValue"
     assert indicator_value_for("urls", "hxxps://example[.]com").canonical() == (
         "https://example.com/"

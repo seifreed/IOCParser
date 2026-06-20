@@ -105,6 +105,20 @@ class EmailValue(IndicatorValue):
         return super().canonical().strip().lower()
 
 
+@dataclass(frozen=True)
+class MacValue(IndicatorValue):
+    """MAC address indicator value.
+
+    The extractor already lowercases extracted MACs, but values reaching the domain
+    layer from other sources (history import, the public API, plugins) must also
+    canonicalize to lowercase so cross-notation dedup holds and STIX emits a
+    spec-compliant lowercase ``mac-addr:value``.
+    """
+
+    def canonical(self) -> str:
+        return super().canonical().strip().lower()
+
+
 def indicator_value_for(ioc_type: IOCType | IOCTypeName | str, raw: str) -> IndicatorValue:
     """Build the correct value object for a given IOC type."""
     custom_type = get_custom_ioc_type(ioc_type)
@@ -125,4 +139,6 @@ def indicator_value_for(ioc_type: IOCType | IOCTypeName | str, raw: str) -> Indi
         return IpValue(raw)
     if canonical_type == IOCType.EMAIL:
         return EmailValue(raw)
+    if canonical_type == IOCType.MAC_ADDRESS:
+        return MacValue(raw)
     return IndicatorValue(raw)

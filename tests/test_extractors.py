@@ -915,6 +915,20 @@ class TestCoverageMissing:
         # Should be normalized to colon-separated format
         assert any(":" in serial for serial in result)
 
+    def test_extract_cert_serials_capitalized_labels(self):
+        """Cert serials must be found under the canonical capitalized labels.
+
+        Regression: the context pattern was case-sensitive and lowercase-only, so the
+        real OpenSSL/certutil labels "Serial Number:", "Thumbprint:", "Certificate:"
+        (and "Serial Number" has an intervening word) extracted nothing.
+        """
+        serial = "00fa1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c"
+        for label in ("Serial Number:", "Thumbprint:", "Certificate:", "SERIAL:"):
+            result = self.extractor.extract_cert_serials(f"{label} {serial}")
+            assert result, label
+        # A context-free 24-hex run must still not be treated as a cert serial.
+        assert not self.extractor.extract_cert_serials("loose abcdef1234567890abcdef value")
+
     def test_extract_cert_serials_mac_address_exclusion(self):
         """Test extract_cert_serials excludes MAC addresses (6 parts)."""
         text = """

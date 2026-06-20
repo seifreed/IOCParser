@@ -161,8 +161,10 @@ PATTERNS: dict[str, Pattern[str]] = {
     "cert_serials": re.compile(
         # Colon-separated (8-32 bytes)
         r"\b([a-fA-F0-9]{2}(?::[a-fA-F0-9]{2}){7,31})\b|"
-        # Hex with context
-        r"(?:serial|certificate|cert|thumbprint)[\s:]+([a-fA-F0-9]{16,64})\b",
+        # Hex with context. Case-insensitive and tolerant of the canonical OpenSSL/
+        # certutil labels ("Serial Number:", "Thumbprint:", "Certificate:").
+        r"(?:serial(?:\s+number)?|certificate|cert|thumbprint)[\s:]+([a-fA-F0-9]{16,64})\b",
+        re.IGNORECASE,
     ),
     "cidr": re.compile(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,2}\b"),
     "mitre_software": re.compile(r"\bS[0-9]{4}\b"),

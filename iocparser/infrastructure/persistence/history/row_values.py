@@ -64,14 +64,14 @@ def typed_row(row: dict[str, object]) -> dict[str, object]:
             if not stripped:
                 continue
             with suppress(ValueError, TypeError):
-                parsed = datetime.fromisoformat(stripped)
+                parsed_dt = datetime.fromisoformat(stripped)
                 # The DB stores naive UTC and every live writer uses datetime.now(UTC)
                 # then drops tzinfo. Archives may carry a tz offset (hand-edited or
                 # produced by another tool); normalize so imported timestamps compare
                 # against existing naive rows instead of raising a TypeError.
-                if parsed.tzinfo is not None:
-                    parsed = parsed.astimezone(UTC).replace(tzinfo=None)
-                row_dict[key] = parsed
+                if parsed_dt.tzinfo is not None:
+                    parsed_dt = parsed_dt.astimezone(UTC).replace(tzinfo=None)
+                row_dict[key] = parsed_dt
         if key in INT_FIELD_DEFAULTS:
             parsed = int_from_row(value, default=INT_FIELD_DEFAULTS[key])
             if parsed is None:

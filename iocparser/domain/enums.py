@@ -30,6 +30,14 @@ RESERVES_JSON_OUTPUT_KEY = (
     "Custom IOC type name {name!r} collides with a reserved JSON output key and would "
     "corrupt the rendered document"
 )
+RESERVES_CATEGORY_FILTER_NAME = (
+    "Custom IOC type name {name!r} collides with a category filter word; --only/--exclude "
+    "expands it to a family of types, so the custom type would never resolve"
+)
+# Category words that --only/--exclude expand to a whole family of types before resolving
+# any individual type. A custom type named after one can never be selected, so registration
+# rejects it. Keep in sync with type_filters._CATEGORY_ALIASES (a guard there asserts it).
+CATEGORY_FILTER_NAMES: frozenset[str] = frozenset({"hashes"})
 # Structural keys the JSON renderer puts at the top level of its document. A custom IOC
 # type whose name equals one of these would, when grouped into the payload, overwrite the
 # metadata key with a flat list and corrupt the output. Keep in sync with
@@ -227,6 +235,10 @@ def register_custom_ioc_type(
     # type's value list when rendered, silently corrupting the document. Reject up front.
     if normalized in RESERVED_JSON_OUTPUT_KEYS:
         raise ValueError(RESERVES_JSON_OUTPUT_KEY.format(name=name))
+    # A name equal to a category filter word ("hashes") is expanded by parse_ioc_types
+    # before any per-type resolution, so --only/--exclude could never select it.
+    if normalized in CATEGORY_FILTER_NAMES:
+        raise ValueError(RESERVES_CATEGORY_FILTER_NAME.format(name=name))
     if isinstance(base_type, IOCType):
         base: IOCType | IOCTypeName = base_type
     else:

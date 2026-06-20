@@ -5,6 +5,9 @@ from iocparser.domain.enums import HASH_IOC_TYPES, IOCType, IOCTypeName, ioc_typ
 # Category words that select a whole family of IOC types rather than one type.
 # "hashes" must expand to every hash type; aliasing it to a single type silently
 # dropped md5/sha1/sha512/ssdeep/imphash from --only/--exclude.
+# Keys must stay equal to enums.CATEGORY_FILTER_NAMES (the registration guard), or a
+# custom type named after a new category would silently become unselectable; a test
+# asserts the two stay in sync.
 _CATEGORY_ALIASES: dict[str, tuple[IOCType, ...]] = {
     "hashes": tuple(sorted(HASH_IOC_TYPES, key=lambda ioc_type: ioc_type.value)),
 }

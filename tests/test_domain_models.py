@@ -306,6 +306,31 @@ def test_register_custom_ioc_type_rejects_reserved_json_output_key() -> None:
             register_custom_ioc_type(reserved, base_type="urls")
 
 
+def test_register_custom_ioc_type_rejects_category_filter_word() -> None:
+    """A custom type named like a category word ("hashes") can never be selected.
+
+    Regression: --only/--exclude expand category words to a family of types before any
+    per-type resolution, so a custom type named after one was registered live but
+    orphaned from the only user-facing selection path. Reject it at definition time.
+    """
+    import pytest
+
+    from iocparser.domain.enums import CATEGORY_FILTER_NAMES
+
+    for category in CATEGORY_FILTER_NAMES:
+        with pytest.raises(ValueError, match="category filter word"):
+            register_custom_ioc_type(category, base_type="urls")
+
+
+def test_category_filter_names_stay_in_sync_with_aliases() -> None:
+    """Drift guard: the registration guard set must list exactly the category words the
+    filter expander knows, or a new category would silently become unselectable."""
+    from iocparser.domain.enums import CATEGORY_FILTER_NAMES
+    from iocparser.domain.type_filters import _CATEGORY_ALIASES
+
+    assert set(_CATEGORY_ALIASES) == CATEGORY_FILTER_NAMES
+
+
 def test_json_renderer_metadata_keys_stay_within_reserved_set() -> None:
     """Drift guard: every top-level metadata key the JSON renderer emits must be declared
     in RESERVED_JSON_OUTPUT_KEYS, so the registration guard can never fall out of sync."""

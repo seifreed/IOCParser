@@ -31,6 +31,11 @@ SCHEMA_REVISIONS = (
     SchemaRevision(
         10, "tags-search-delimiter", "Delimiter-wrapped tags_search to fix multi-word tag matches"
     ),
+    SchemaRevision(
+        11,
+        "ioc-value-search-refang",
+        "Refang iocs.value_search so legacy defanged IOCs are searchable",
+    ),
 )
 
 CURRENT_SCHEMA_VERSION = SCHEMA_REVISIONS[-1].version

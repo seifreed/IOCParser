@@ -505,6 +505,60 @@ def test_fts_rebuild_indexes_normalized_value_search() -> None:
     assert [row[0] for row in rows] == [1]
 
 
+def test_migration_refangs_legacy_ioc_value_search() -> None:
+    """Migrating a legacy DB must make defanged IOCs searchable by their real value.
+
+    Regression: the v3 backfill set value_search = lower(trim(value)) with no refang,
+    so a legacy 'hxxp://evil.com' was indexed as-is while search refangs the query to
+    'http://evil.com' -- no match. rev_0011 recomputes value_search (and the FTS index).
+    """
+    from iocparser.infrastructure.persistence_migration_runtime import migrate_engine
+    from iocparser.infrastructure.persistence_repository_support import normalize_ioc_search
+
+    engine = create_engine("sqlite://")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE TABLE sources (id INTEGER PRIMARY KEY, kind TEXT, value TEXT, "
+                "first_seen TEXT, last_seen TEXT, UNIQUE(kind, value))"
+            )
+        )
+        connection.execute(
+            text("CREATE TABLE runs (id INTEGER PRIMARY KEY, source_id INTEGER, started_at TEXT)")
+        )
+        connection.execute(
+            text(
+                "CREATE TABLE iocs (id INTEGER PRIMARY KEY, ioc_type TEXT, value TEXT, "
+                "is_warning INTEGER DEFAULT 0, warning_list TEXT DEFAULT '', "
+                "warning_description TEXT DEFAULT '', "
+                "UNIQUE(ioc_type, value, is_warning, warning_list, warning_description))"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE TABLE run_iocs (id INTEGER PRIMARY KEY, run_id INTEGER, ioc_id INTEGER, "
+                "severity TEXT, tags_json TEXT)"
+            )
+        )
+        connection.execute(
+            text("INSERT INTO iocs(ioc_type, value) VALUES ('urls', 'hxxp://evil.com/path')")
+        )
+
+    migrate_engine(engine)
+
+    with engine.connect() as connection:
+        value_search = connection.execute(text("SELECT value_search FROM iocs")).scalar_one()
+        match_query = build_fts_query("http://evil.com/path")
+        assert match_query is not None
+        fts_rows = connection.execute(
+            text("SELECT rowid FROM ioc_search_fts WHERE ioc_search_fts MATCH :q"),
+            {"q": match_query},
+        ).fetchall()
+
+    assert value_search == normalize_ioc_search("hxxp://evil.com/path") == "http://evil.com/path"
+    assert [row[0] for row in fts_rows] == [1]
+
+
 def test_extract_ipv6_addresses_ending_in_double_colon() -> None:
     """Valid IPv6 addresses ending in '::' must be extracted.
 

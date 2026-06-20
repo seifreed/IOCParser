@@ -22,6 +22,9 @@ from iocparser.infrastructure.migration_revisions.rev_0009_dedup_hash import (
 from iocparser.infrastructure.migration_revisions.rev_0010_tags_search_delimiter import (
     apply as apply_rev_0010,
 )
+from iocparser.infrastructure.migration_revisions.rev_0011_ioc_value_search_refang import (
+    apply as apply_rev_0011,
+)
 from iocparser.infrastructure.persistence_fts import FTS_TABLE
 from iocparser.infrastructure.persistence_repository_support import dialect_replace_into
 
@@ -156,6 +159,8 @@ def upgrade_to_version(engine: Engine, inspector: Inspector, version: int) -> No
         apply_rev_0009(engine, inspector)
     elif version == 10:
         apply_rev_0010(engine, inspector)
+    elif version == 11:
+        apply_rev_0011(engine, inspector)
 
 
 def upgrade_to_v2(engine: Engine, inspector: Inspector) -> None:

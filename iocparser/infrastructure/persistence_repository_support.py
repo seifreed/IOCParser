@@ -408,6 +408,32 @@ def rebuild_tags_search(engine: Engine, inspector: Inspector) -> None:
             )
 
 
+def rebuild_ioc_value_search(engine: Engine, inspector: Inspector) -> None:
+    """Recompute iocs.value_search with the refanged normalization the live path uses.
+
+    The v3 SQL backfill set value_search = lower(trim(value)) without refanging, so a
+    legacy defanged IOC (e.g. ``hxxp://evil.com``) was indexed as ``hxxp://evil.com``
+    while search refangs the query to ``http://evil.com`` -- making the IOC
+    unsearchable by its real value. Recompute in Python and resync the FTS index,
+    which is populated from value_search.
+    """
+    from iocparser.infrastructure.persistence_fts import FTS_TABLE, rebuild_fts_statements
+
+    table_names = set(inspector.get_table_names())
+    if "iocs" not in table_names:
+        return
+    with engine.begin() as connection:
+        rows = cast("list[Any]", connection.execute(text("SELECT id, value FROM iocs")).all())
+        for row in rows:
+            connection.execute(
+                text("UPDATE iocs SET value_search = :value WHERE id = :id"),
+                {"value": normalize_ioc_search(row.value), "id": row.id},
+            )
+        if FTS_TABLE in table_names:
+            for statement in rebuild_fts_statements():
+                connection.execute(text(statement))
+
+
 def serialize_evidence(evidence_items: tuple[EvidenceLike, ...]) -> str:
     evidence_records: list[dict[str, str | int | None]] = []
     for evidence in evidence_items:

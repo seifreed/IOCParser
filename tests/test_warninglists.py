@@ -167,6 +167,34 @@ class TestMISPWarningLists:
         )
         assert not warning_lists._check_value_in_list("amazon.com", values, "hostname")
 
+    def test_leading_dot_hostname_matches_apex_and_subdomains(self):
+        """A leading-dot hostname entry matches the apex and every subdomain.
+
+        Regression: MISP "hostname" lists store entries like ".duckdns.org" (meaning the
+        domain and all subdomains), but preprocessing kept the leading dot and matched by
+        exact key, so the apex/subdomains never matched and shipped lists (dynamic-dns,
+        bank-website) were entirely dead.
+        """
+        warning_lists = make_warning_lists()
+        warning_lists.warning_lists = {
+            "dyndns": {
+                "name": "Dynamic DNS",
+                "type": "hostname",
+                "matching_attributes": ["domain", "hostname"],
+                "list": [".duckdns.org", "exact.example.com"],
+            }
+        }
+        warning_lists._preprocess_lists()
+
+        assert warning_lists.check_value("duckdns.org", "domains")[0]
+        assert warning_lists.check_value("malware.duckdns.org", "domains")[0]
+        assert warning_lists.check_value("a.b.duckdns.org", "domains")[0]
+        # A non-subdomain that merely ends in the same letters must not match.
+        assert not warning_lists.check_value("notduckdns.org", "domains")[0]
+        # A plain (no leading dot) entry stays an exact match, not a suffix rule.
+        assert warning_lists.check_value("exact.example.com", "domains")[0]
+        assert not warning_lists.check_value("x.exact.example.com", "domains")[0]
+
     def test_check_value_in_list_substring(self):
         """Test substring type list checking."""
         warning_lists = make_warning_lists()

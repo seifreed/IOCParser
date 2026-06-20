@@ -237,6 +237,29 @@ class WarningListMatchingMixin:
             for list_id in relevant_list_ids:
                 if list_id in matching and list_id in self.warning_lists:
                     return self._build_warning_response(self.warning_lists[list_id], list_id)
+        return self._check_suffix_lookups((clean_value_lower, domain_lower), relevant_list_ids)
+
+    def _check_suffix_lookups(
+        self,
+        candidates: tuple[str | None, str | None],
+        relevant_list_ids: list[str],
+    ) -> dict[str, str] | None:
+        """Match leading-dot hostname entries (apex + every subdomain) by parent suffix."""
+        suffix_lookups = self.lookup_data.suffix_lookups
+        if not suffix_lookups:
+            return None
+        for candidate in candidates:
+            if candidate is None:
+                continue
+            labels = candidate.split(".")
+            for index in range(len(labels) - 1):
+                suffix = ".".join(labels[index:])
+                matching = suffix_lookups.get(suffix)
+                if not matching:
+                    continue
+                for list_id in relevant_list_ids:
+                    if list_id in matching and list_id in self.warning_lists:
+                        return self._build_warning_response(self.warning_lists[list_id], list_id)
         return None
 
     def _check_regex_lookups(

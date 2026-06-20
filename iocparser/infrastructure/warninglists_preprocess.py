@@ -49,6 +49,7 @@ class WarningListPreprocessMixin:
 
     def _clear_preprocessed_data(self) -> None:
         self.lookup_data.string_lookups.clear()
+        self.lookup_data.suffix_lookups.clear()
         self.lookup_data.compiled_regex.clear()
         self.lookup_data.cidr_networks.clear()
         self.lookup_data.lists_by_ioc_type.clear()
@@ -66,6 +67,14 @@ class WarningListPreprocessMixin:
             if value is None:
                 continue
             value_lower = normalized_warning_list_text(value, list_type=list_type)
+            # A leading-dot "hostname" entry (".duckdns.org") matches the apex and every
+            # subdomain per MISP convention; index its apex for parent-suffix matching
+            # instead of as a dead exact key no extracted domain ever equals.
+            if list_type == "hostname" and value_lower.startswith("."):
+                apex = value_lower.lstrip(".")
+                if apex:
+                    self.lookup_data.suffix_lookups.setdefault(apex, set()).add(list_id)
+                continue
             if value_lower not in self.lookup_data.string_lookups:
                 self.lookup_data.string_lookups[value_lower] = set()
             self.lookup_data.string_lookups[value_lower].add(list_id)

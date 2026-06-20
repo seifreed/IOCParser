@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ipaddress
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from logging import Logger
 
 WarningListEntry = str | dict[str, str] | int | bool | None
@@ -51,3 +51,7 @@ class WarningListLookups:
     compiled_regex: dict[str, list[re.Pattern[str]]]
     cidr_networks: dict[str, list[ipaddress.IPv4Network | ipaddress.IPv6Network]]
     lists_by_ioc_type: dict[str, list[str]]
+    # Apex domains from leading-dot "hostname" entries (e.g. ".duckdns.org" -> "duckdns.org").
+    # MISP's convention is that a leading dot matches the apex AND every subdomain, so these
+    # are matched against a candidate's parent suffixes rather than by exact key.
+    suffix_lookups: dict[str, set[str]] = field(default_factory=dict)

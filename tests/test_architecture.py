@@ -124,7 +124,9 @@ def test_grouped_infrastructure_subpackages_stay_small_enough_to_review() -> Non
         # 1256 -> 1267 for dialect-aware compact_history (SQLite VACUUM vs MySQL/MariaDB
         # OPTIMIZE TABLE); VACUUM is a syntax error on MariaDB.
         IOCPARSER_ROOT / "infrastructure" / "persistence" / "history": 1267,
-        IOCPARSER_ROOT / "infrastructure" / "persistence" / "query": 700,
+        # 700 -> 713 for _date_to_clauses: a date-only --date-to is now inclusive of the
+        # whole day (compare `< next day`) instead of excluding same-day runs at midnight.
+        IOCPARSER_ROOT / "infrastructure" / "persistence" / "query": 713,
         IOCPARSER_ROOT / "infrastructure" / "queueing": 30,
         IOCPARSER_ROOT / "infrastructure" / "runtime": 45,
         IOCPARSER_ROOT / "infrastructure" / "migration_revisions": 80,

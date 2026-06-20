@@ -1544,6 +1544,35 @@ def test_parse_datetime_normalizes_tz_aware_to_naive_utc() -> None:
     assert parse_datetime(None) is None
 
 
+def test_date_only_date_to_includes_same_day_runs(tmp_path) -> None:
+    """A date-only --date-to must include runs created later that same day.
+
+    Regression: a date-only "YYYY-MM-DD" parsed to midnight and compared with `<=`,
+    so every run created after 00:00:00 on that day was silently excluded. A date-only
+    upper bound is now inclusive of the whole day; an exact timestamp stays exact.
+    """
+    from datetime import timedelta
+
+    service = SQLAlchemyPersistenceService(f"sqlite:///{tmp_path / 'date-to.db'}")
+    result = ExtractionResult.from_grouped_payload({"domains": ["today.example"]}, {})
+    service.persist_multiple_runs(
+        [("file", "t.txt", result)],
+        tool_version="1",
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
+    )
+    today_date = datetime.now(UTC).date()
+    today = today_date.isoformat()
+    yesterday = (today_date - timedelta(days=1)).isoformat()
+
+    assert len(service.search_iocs(value="today", date_to=today)) == 1
+    assert len(service.search_iocs(value="today", date_to=yesterday)) == 0
+    assert len(service.list_runs(date_to=today)) == 1
+    # An explicit midnight timestamp stays an exact bound (excludes a later-in-day run).
+    assert len(service.search_iocs(value="today", date_to=f"{today}T00:00:00")) == 0
+
+
 def test_parse_datetime_reports_invalid_input_cleanly() -> None:
     """A malformed --date-from/--date-to/--prune-before value must surface a clean
     ValidationError, not a bare ValueError stack trace from datetime.fromisoformat.

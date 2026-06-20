@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import override
 
 from sqlalchemy import ClauseElement, Select, and_, func, or_, select, text
@@ -50,6 +51,7 @@ from iocparser.infrastructure.persistence.history import (
     retain_history as _retain_history,
 )
 from iocparser.infrastructure.persistence.query.diff import diff_run_exports
+from iocparser.infrastructure.persistence.query.type_filters import normalize_ioc_type_filter
 from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
 from iocparser.infrastructure.persistence_fts import build_fts_query, has_fts_table
 from iocparser.infrastructure.persistence_repository_support import (
@@ -75,7 +77,6 @@ from iocparser.infrastructure.persistence_support import (
     source_value_clause,
 )
 from iocparser.interfaces.ports import PersistenceQueryService
-from iocparser.infrastructure.persistence.query.type_filters import normalize_ioc_type_filter
 from iocparser.shared_utils import normalize_tokens
 
 RUN_NOT_FOUND_TEMPLATE = "Run not found: {run_id}"
@@ -219,6 +220,18 @@ def search_iocs_page(query: IOCSearchPageQuery) -> PersistedIOCSearchPage:
         )
     finally:
         unit_of_work.close()
+def _date_to_clauses(date_to: str | None) -> list[ClauseElement]:
+    # A date-only "YYYY-MM-DD" parsed to midnight with `<=` would drop runs created
+    # later that day, so a date-only upper bound is inclusive of the whole day
+    # (`< next day`); a value carrying a time (has ":") stays an exact `<=` bound.
+    parsed = parse_datetime(date_to)
+    if date_to is None or parsed is None:
+        return []
+    if ":" not in date_to:
+        return [RunModel.started_at < parsed + timedelta(days=1)]
+    return [RunModel.started_at <= parsed]
+
+
 def _run_filter_clauses(
     *,
     date_from: str | None,
@@ -230,7 +243,7 @@ def _run_filter_clauses(
     normalized_kind = str(source_kind).strip().lower() if source_kind is not None else ""
     normalized_value = str(source_value).strip() if source_value is not None else ""
     clauses.extend([RunModel.started_at >= parse_datetime(date_from)] if date_from else [])
-    clauses.extend([RunModel.started_at <= parse_datetime(date_to)] if date_to else [])
+    clauses.extend(_date_to_clauses(date_to))
     clauses.extend([SourceModel.kind == normalized_kind] if normalized_kind else [])
     clauses.extend(
         [source_value_clause(source_kind=normalized_kind or source_kind, source_value=normalized_value)]

@@ -185,7 +185,7 @@ def search_iocs_page(query: IOCSearchPageQuery) -> PersistedIOCSearchPage:
         if ioc_types:
             stmt = stmt.where(IOCModel.ioc_type.in_(ioc_types))
         if query.severity:
-            stmt = stmt.where(RunIOCModel.severity.in_(query.severity))
+            stmt = stmt.where(RunIOCModel.severity.in_(normalize_tokens(query.severity)))
         if query.tags:
             tag_filters = [_tag_search_clause(tag) for tag in normalize_tokens(query.tags)]
             if tag_filters:

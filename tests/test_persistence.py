@@ -1573,6 +1573,28 @@ def test_date_only_date_to_includes_same_day_runs(tmp_path) -> None:
     assert len(service.search_iocs(value="today", date_to=f"{today}T00:00:00")) == 0
 
 
+def test_severity_filter_is_case_insensitive(tmp_path) -> None:
+    """The exact severity filter must match regardless of case, like its siblings.
+
+    Regression: search_iocs_page passed severity straight to .in_() without
+    normalizing case (unlike min_severity/tags/exclude_tags), so severity=("HIGH",)
+    matched nothing while ("high",) worked.
+    """
+    service = SQLAlchemyPersistenceService(f"sqlite:///{tmp_path / 'sev.db'}")
+    result = ExtractionResult.from_grouped_payload({"ips": ["192.168.1.1"]}, {})
+    service.persist_multiple_runs(
+        [("file", "t.txt", result)],
+        tool_version="1",
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
+    )
+
+    assert len(service.search_iocs(value="192", severity=("MEDIUM",))) == 1
+    assert len(service.search_iocs(value="192", severity=(" Medium ",))) == 1
+    assert len(service.search_iocs(value="192", severity=("low",))) == 0
+
+
 def test_parse_datetime_reports_invalid_input_cleanly() -> None:
     """A malformed --date-from/--date-to/--prune-before value must surface a clean
     ValidationError, not a bare ValueError stack trace from datetime.fromisoformat.

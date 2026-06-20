@@ -354,6 +354,37 @@ def test_completed_job_not_dead_lettered_when_ack_fails(tmp_path: Path) -> None:
     assert "job_completed" not in event_names
 
 
+def test_successful_job_not_dead_lettered_when_mark_completed_fails(tmp_path: Path) -> None:
+    """Regression: a transient DB failure in mark_completed (after the work already
+    succeeded) must not dead-letter the job. The message stays in flight for
+    redelivery so the completion can be retried, instead of killing successful work.
+    """
+    db_uri = f"sqlite:///{tmp_path / 'mark-completed-fail.sqlite'}"
+    queue = FilesystemQueueAdapter(tmp_path / "queue")
+    telemetry = InMemoryTelemetrySink()
+    service = DistributedPipelineService(
+        queue_adapter=queue, db_uri=db_uri, telemetry_sink=telemetry
+    )
+
+    def exploding_mark_completed(**_kwargs):  # type: ignore[no-untyped-def]
+        raise RuntimeError("db down during mark_completed")
+
+    service.job_service.mark_completed = exploding_mark_completed  # type: ignore[method-assign]
+    request = PipelineJobRequest(
+        input_kind="text", source_value="evil.example", persist=False, check_warnings=False
+    )
+    service.submit(request, queue_name="mc", max_attempts=3)
+
+    result = service.process_next(queue_name="mc")
+
+    assert getattr(result, "status", "") == "success"
+    jobs = service.list_jobs(limit=10)
+    assert jobs[0].status != JOB_STATUS_DEAD_LETTERED
+    event_names = [event["name"] for event in telemetry.events]
+    assert "job_ack_failed" in event_names
+    assert "job_dead_lettered" not in event_names
+
+
 def test_unexpected_exception_propagates_unexpected_dead_letter_failure(tmp_path: Path) -> None:
     """Regression: unexpected dead-letter failures must surface instead of being dropped."""
 

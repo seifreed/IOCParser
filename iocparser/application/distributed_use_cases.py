@@ -124,6 +124,8 @@ class DistributedPipelineCoordinator:
                 return None
             result = self.processor.process(envelope.request)
             if result.status in {"success", "skipped"}:
+                # Handled before bookkeeping: a transition failure redelivers, not dead-letters.
+                completed = result
                 stored = (
                     self.job_service.mark_completed(
                         job_id=str(envelope.request.job_id),
@@ -147,6 +149,7 @@ class DistributedPipelineCoordinator:
                 failure_error.retryable and (envelope.attempts + 1) < envelope.max_attempts
             )
             if should_retry:
+                completed = result  # see above: a requeue/mark_failed failure must redeliver
                 stored = (
                     self.job_service.mark_failed(
                         job_id=str(envelope.request.job_id),

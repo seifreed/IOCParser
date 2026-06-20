@@ -9,7 +9,6 @@ from iocparser.domain.models import ExtractionResult
 from iocparser.domain.pipeline import RESULT_SCHEMA_VERSION
 from iocparser.interfaces.ports import OutputRenderer
 from iocparser.rendering_support import (
-    evidence_excerpts,
     group_canonical_by_type,
     serialize_pretty_json,
 )
@@ -139,11 +138,16 @@ class CSVOutputRenderer(OutputRenderer):
         writer = DictWriter(buffer, fieldnames=self.FIELDNAMES)
         writer.writeheader()
         for record in result.to_records():
-            evidence_list = record_dict_list(record, "evidence")
-            line_numbers = ",".join(
-                _csv_line_number(entry) for entry in evidence_list if isinstance(entry, dict)
-            )
-            evidence_text = " | ".join(evidence_excerpts(evidence_list))
+            # Derive both columns from the same non-empty-excerpt entries so the
+            # line_numbers and evidence columns stay positionally aligned (an entry
+            # with an empty excerpt must not add a phantom line-number slot).
+            evidence_entries = [
+                entry
+                for entry in record_dict_list(record, "evidence")
+                if isinstance(entry, dict) and entry.get("excerpt")
+            ]
+            line_numbers = ",".join(_csv_line_number(entry) for entry in evidence_entries)
+            evidence_text = " | ".join(str(entry["excerpt"]) for entry in evidence_entries)
             writer.writerow(
                 {
                     "schema_version": RESULT_SCHEMA_VERSION,

@@ -76,6 +76,30 @@ def test_csv_renderer_neutralizes_formula_injection() -> None:
     assert "'evil.com" not in CSVOutputRenderer().render(benign)
 
 
+def test_csv_line_numbers_stay_aligned_with_evidence_excerpts() -> None:
+    """The line_numbers and evidence columns must stay positionally aligned.
+
+    Regression: line_numbers iterated every evidence entry while evidence filtered
+    out empty excerpts, so an entry with an empty excerpt added a phantom
+    line-number slot, desyncing the two columns.
+    """
+    import csv
+    import io
+
+    from iocparser.domain.models import IOCEvidence
+
+    evidence = (
+        IOCEvidence(excerpt="first", line_number=10),
+        IOCEvidence(excerpt="", line_number=20),
+        IOCEvidence(excerpt="third", line_number=30),
+    )
+    result = ExtractionResult(iocs=(IOC.from_raw("domains", "evil.example", evidence=evidence),))
+    row = next(csv.DictReader(io.StringIO(CSVOutputRenderer().render(result))))
+
+    assert row["evidence"] == "first | third"
+    assert row["line_numbers"] == "10,30"
+
+
 def test_stix_renderer_can_be_written_to_disk(tmp_path: Path) -> None:
     output_file = tmp_path / "rendered" / "bundle.json"
     output_file.parent.mkdir(parents=True, exist_ok=True)

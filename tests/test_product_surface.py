@@ -3198,6 +3198,46 @@ def test_cli_dispatch_workflow_keeps_all_failed_url_batches_in_batch_flow(tmp_pa
     assert "persistence" in saved_report["phase_timings_ms"]
 
 
+def test_batch_report_to_stdout_keeps_summary_off_stdout(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """--batch-report-json (defaulting to stdout) must not be corrupted by the summary.
+
+    Regression: the summary was routed to stderr only when -o - was set, so a
+    batch report written to stdout via --batch-report-json had the human summary
+    (display_results + print_batch_report) prepended to it, producing invalid JSON.
+    """
+    from iocparser import cli_dispatch_workflow as workflow
+
+    config = load_config(cli_persist=False, cli_db_uri=None, cli_config_path=None)
+    args = _args(persist=False, batch_report_json="-")
+
+    workflow.finalize_cli_run(
+        args,
+        config=config,
+        workflow_started=time.perf_counter(),
+        normal_iocs={"domains": ["evil.com"]},
+        warning_iocs={},
+        input_display="2 URLs",
+        results={},
+        batch_report={
+            "total": 1,
+            "successful": 0,
+            "failed": 1,
+            "items": [{"url": "https://bad.example", "status": "failed", "error": "timeout"}],
+            "run_metadata_map": {},
+            "phase_timings_ms": {},
+        },
+        save_output=lambda *_args: None,
+    )
+
+    captured = capsys.readouterr()
+    # stdout must be exactly the JSON report — parseable, no summary lines.
+    parsed = json.loads(captured.out)
+    assert parsed["failed"] == 1
+    assert "Batch summary" in captured.err
+
+
 def test_composite_warning_service_combines_results() -> None:
     from iocparser.infrastructure.warninglists_service import CompositeWarningListService
 

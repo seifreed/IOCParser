@@ -220,8 +220,11 @@ def finalize_cli_run(
     ],
 ) -> None:
     # -o - sends the rendered machine output to stdout, so the human summary must go
-    # to stderr or it corrupts the piped JSON/CSV/STIX.
-    summary_stream = sys.stderr if _cli_args.get_optional_str_arg(args, "output") == "-" else None
+    # to stderr or it corrupts the piped JSON/CSV/STIX. --batch-report-json with no
+    # path also defaults to stdout ("-"), so the summary must dodge that too.
+    output_to_stdout = _cli_args.get_optional_str_arg(args, "output") == "-"
+    batch_report_to_stdout = _cli_args.get_optional_str_arg(args, "batch_report_json") == "-"
+    summary_stream = sys.stderr if output_to_stdout or batch_report_to_stdout else None
     _cli_output.display_results(normal_iocs, warning_iocs, stream=summary_stream)
     save_output(args, normal_iocs, warning_iocs, input_display, result)
 

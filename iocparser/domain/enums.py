@@ -4,7 +4,7 @@ import threading
 from dataclasses import dataclass
 from enum import StrEnum
 
-from iocparser.shared_utils import normalize_tokens
+from iocparser.shared_utils import VALID_SEVERITIES, normalize_tokens
 
 
 class RunStatus(StrEnum):
@@ -35,6 +35,7 @@ RESERVES_CATEGORY_FILTER_NAME = (
     "Custom IOC type name {name!r} collides with a category filter word; --only/--exclude "
     "expands it to a family of types, so the custom type would never resolve"
 )
+INVALID_CUSTOM_SEVERITY = "Custom IOC type severity {severity!r} is not a recognized severity"
 # Category words that --only/--exclude expand to a whole family of types before resolving
 # any individual type. A custom type named after one can never be selected, so registration
 # rejects it. Keep in sync with type_filters._CATEGORY_ALIASES (a guard there asserts it).
@@ -262,7 +263,7 @@ def register_custom_ioc_type(
         name=normalized,
         base_type=base,
         aliases=normalized_aliases,
-        severity=severity.lower().strip() if severity else None,
+        severity=_validated_custom_severity(severity),
         tags=normalize_tokens(tags),
         stix_pattern=stix_pattern,
     )
@@ -279,6 +280,15 @@ def register_custom_ioc_type(
         for alias in definition.aliases:
             _custom_ioc_aliases[alias] = normalized
     return IOCTypeName(normalized)
+
+
+def _validated_custom_severity(severity: str | None) -> str | None:
+    # Reject an unrecognized severity (e.g. "critical"): it would be stored but ranked
+    # below informational by min_severity (silent drop) and rejected by the exact filter.
+    normalized = severity.lower().strip() if severity else None
+    if normalized is not None and normalized not in VALID_SEVERITIES:
+        raise ValueError(INVALID_CUSTOM_SEVERITY.format(severity=severity))
+    return normalized
 
 
 def _is_builtin_ioc_type(name: str) -> bool:

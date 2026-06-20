@@ -322,6 +322,35 @@ def test_register_custom_ioc_type_rejects_category_filter_word() -> None:
             register_custom_ioc_type(category, base_type="urls")
 
 
+def test_register_custom_ioc_type_rejects_unrecognized_severity() -> None:
+    """A custom severity outside VALID_SEVERITIES must be rejected at registration.
+
+    Regression: register accepted any severity (e.g. "critical"), but it is ranked
+    below "informational" by min_severity (silently dropping the IOC) and rejected by
+    the exact severity filter — an internally contradictory state. Reject it up front.
+    """
+    import pytest
+
+    import iocparser.domain.enums as enums_module
+
+    for bad in ("critical", "CRITICAL", "bogus"):
+        enums_module._custom_ioc_types.pop("sev_custom", None)
+        with pytest.raises(ValueError, match="not a recognized severity"):
+            register_custom_ioc_type("sev_custom", base_type="urls", severity=bad)
+
+    enums_module._custom_ioc_types.pop("sev_custom", None)
+    try:
+        register_custom_ioc_type("sev_custom", base_type="urls", severity="High")
+        assert enums_module._custom_ioc_types["sev_custom"].severity == "high"
+        # No severity is still allowed (falls back to classify_ioc defaults).
+        enums_module._custom_ioc_types.pop("sev_custom2", None)
+        register_custom_ioc_type("sev_custom2", base_type="urls")
+        assert enums_module._custom_ioc_types["sev_custom2"].severity is None
+    finally:
+        enums_module._custom_ioc_types.pop("sev_custom", None)
+        enums_module._custom_ioc_types.pop("sev_custom2", None)
+
+
 def test_category_filter_names_stay_in_sync_with_aliases() -> None:
     """Drift guard: the registration guard set must list exactly the category words the
     filter expander knows, or a new category would silently become unselectable."""

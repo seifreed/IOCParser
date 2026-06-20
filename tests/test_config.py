@@ -244,3 +244,16 @@ def test_missing_config_path_error_is_an_iocparser_error(tmp_path) -> None:
 
     with pytest.raises(IOCParserError, match=r"missing\.ini"):
         load_config(None, None, str(missing_config))
+
+
+def test_diff_only_empty_env_falls_back_to_all() -> None:
+    """An empty IOCPARSER_DIFF_ONLY must not coerce the non-optional str field to None.
+
+    Regression: diff_only went through the generic empty->None env coercion, so
+    IOCPARSER_DIFF_ONLY="" produced diff_only=None despite the field being typed str
+    with default "all", mirroring how the INI loader already falls back to "all".
+    """
+    with _env(IOCPARSER_DIFF_ONLY=""):
+        assert load_config(None, None, None).diff_only == "all"
+    with _env(IOCPARSER_DIFF_ONLY="  added  "):
+        assert load_config(None, None, None).diff_only == "added"

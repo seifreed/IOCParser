@@ -33,7 +33,6 @@ _ENV_STR_OPTIONS: tuple[str, ...] = (
     "output_format",
     "severity",
     "tag",
-    "diff_only",
     "user_agent",
     "headers_json",
     "cookies_json",
@@ -251,6 +250,11 @@ def _apply_env_overrides(values: ConfigValues) -> None:
         raw = os.environ.get(f"IOCPARSER_{option.upper()}")
         if raw is not None:
             mutable[option] = raw.strip() or None
+    # diff_only is a non-optional str ("all" default); an empty env value must fall back
+    # to "all" rather than None (which would break its type contract), mirroring the INI loader.
+    diff_only_raw = os.environ.get("IOCPARSER_DIFF_ONLY")
+    if diff_only_raw is not None:
+        mutable["diff_only"] = diff_only_raw.strip() or "all"
     for option in _ENV_BOOL_OPTIONS:
         raw = os.environ.get(f"IOCPARSER_{option.upper()}")
         if raw is not None:

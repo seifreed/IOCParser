@@ -25,7 +25,6 @@ from iocparser.domain.models import (
     DeadLetterRecord,
     DistributedJobRecord,
     ExtractionResult,
-    IOCType,
     PersistedIOCSearchPage,
     PersistedRunDiff,
     PersistedRunExport,
@@ -262,19 +261,6 @@ def validated_min_severity(value: object | None) -> str | None:
     if not stripped:
         return None
     return _validated_choice(stripped, valid=VALID_SEVERITIES, error=INVALID_MIN_SEVERITY_ERROR)
-
-
-def validated_ioc_type_filter(value: object | None) -> str | None:
-    if value is None:
-        return None
-    value = _require_str(value, field="ioc_type")
-    normalized = value.strip()
-    if not normalized:
-        return None
-    try:
-        return ioc_type_name(IOCType.from_name(normalized))
-    except ValueError as exc:
-        raise ValidationError(INVALID_IOC_TYPE_ERROR.format(value=value)) from exc
 
 
 def validated_ioc_type_filters(value: object | None) -> tuple[str, ...]:

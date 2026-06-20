@@ -1314,7 +1314,6 @@ def test_strict_coverage_option_and_metadata_edge_helpers() -> None:
         bool_option,
         validated_iso_datetime,
         validated_non_negative_days,
-        validated_ioc_type_filter,
         validated_required_id,
         validated_min_severity,
         validated_run_sort,
@@ -1335,15 +1334,12 @@ def test_strict_coverage_option_and_metadata_edge_helpers() -> None:
     from iocparser.shared_utils import validated_severity_filters
 
     assert bool_option("ON") is True
-    assert validated_ioc_type_filter("   ") is None
     with pytest.raises(ValidationError, match="Invalid IOC type for --stix-types"):
         validated_cli_stix_types(1)  # type: ignore[arg-type]
     with pytest.raises(ValidationError, match="Invalid ISO date"):
         validated_iso_datetime(1)  # type: ignore[arg-type]
     with pytest.raises(ValidationError, match="Invalid min_severity"):
         validated_min_severity(1)  # type: ignore[arg-type]
-    with pytest.raises(ValidationError, match="Invalid ioc_type"):
-        validated_ioc_type_filter(1)  # type: ignore[arg-type]
     with pytest.raises(ValidationError, match="Invalid stix_types"):
         validated_stix_types(1)  # type: ignore[arg-type]
     with pytest.raises(ValidationError, match="Invalid tag_mode"):

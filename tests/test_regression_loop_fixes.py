@@ -1240,15 +1240,12 @@ def test_cli_search_normalizes_ioc_type_and_severity() -> None:
     --ioc-type ip (alias of 'ips') and --severity HIGH were passed raw to a
     case-sensitive exact SQL comparison, silently returning zero hits.
     """
-    from iocparser.api_persistence_query import (
-        validated_ioc_type_filter,
-        validated_ioc_type_filters,
-    )
+    from iocparser.api_persistence_query import validated_ioc_type_filters
     from iocparser.errors import ValidationError
     from iocparser.shared_utils import validated_severity_filters
 
-    assert validated_ioc_type_filter("ip") == "ips"
-    assert validated_ioc_type_filter("domain") == "domains"
+    assert validated_ioc_type_filters(("ip",)) == ("ips",)
+    assert validated_ioc_type_filters(("domain",)) == ("domains",)
     assert validated_ioc_type_filters(("hashes",)) == (
         "imphash",
         "md5",

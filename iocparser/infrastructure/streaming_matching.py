@@ -28,9 +28,11 @@ def should_keep_ioc(
     chunk_size: int,
     is_final: bool = False,
 ) -> bool:
-    if prefix_length <= 0:
-        return True
-
+    # The first chunk has no overlap prefix (prefix_length == 0) so there are no
+    # leading artifacts to drop, but a match that ends exactly at a non-final
+    # chunk's trailing edge may be a truncated prefix of an IOC that straddles the
+    # boundary. The unified loop below defers that case (the next chunk re-presents
+    # the value in full via its overlap), so the first chunk runs through it too.
     candidates = (ioc, refang_ioc(ioc))
     haystacks = (chunk, chunk.lower())
 

@@ -185,8 +185,15 @@ class StreamingIOCExtractor:
         prefix_length: int,
         is_final: bool = False,
     ) -> dict[str, list[str]]:
-        """Remove IOCs that exist only in the overlap prefix of a chunk."""
-        if prefix_length <= 0:
+        """Remove IOCs that exist only in the overlap prefix of a chunk.
+
+        The first chunk (prefix_length == 0) has no overlap prefix but can still
+        emit a truncated match at its trailing boundary, so it is filtered too —
+        should_keep_ioc defers that trailing-edge match to the next chunk, which
+        re-presents the value in full via its overlap. Without an overlap there is
+        no next chunk to recover a deferred value, so filtering is skipped.
+        """
+        if self.overlap <= 0:
             return chunk_iocs
 
         filtered: dict[str, list[str]] = {}

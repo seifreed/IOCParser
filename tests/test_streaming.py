@@ -1363,6 +1363,23 @@ class TestEdgeCases:
 
         assert result["domains"] == ["abcde.com"]
 
+    def test_first_chunk_trailing_truncation_not_emitted(self, tmp_path: Path):
+        """A domain straddling the first chunk boundary must not leak a truncated FP.
+
+        Regression: the first chunk (prefix_length == 0) skipped overlap-artifact
+        filtering entirely, so an IOC whose truncated prefix ended at the first
+        chunk's trailing edge (e.g. "dupcheck.co" from "dupcheck.com") was emitted
+        alongside the correct value recovered from the next chunk's overlap.
+        """
+        extractor = StreamingIOCExtractor(chunk_size=64, overlap=32, defang=False)
+        file_path = tmp_path / "first-boundary.txt"
+        # "dupcheck.com" starts at offset 53, so chunk[0:64] ends in "dupcheck.co".
+        file_path.write_text("z" * 52 + " dupcheck.com " + "w" * 60, encoding="utf-8")
+
+        result = _get_file_extraction_result(extractor, file_path, yield_chunks=False)
+
+        assert result["domains"] == ["dupcheck.com"]
+
     def test_very_small_chunk_size(self):
         """
         Test processing with very small chunk size.

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import suppress
-from datetime import datetime
+from datetime import UTC, datetime
 
 from iocparser.shared_utils import TRUE_BOOL_VALUES
 
@@ -64,7 +64,14 @@ def typed_row(row: dict[str, object]) -> dict[str, object]:
             if not stripped:
                 continue
             with suppress(ValueError, TypeError):
-                row_dict[key] = datetime.fromisoformat(stripped)
+                parsed = datetime.fromisoformat(stripped)
+                # The DB stores naive UTC and every live writer uses datetime.now(UTC)
+                # then drops tzinfo. Archives may carry a tz offset (hand-edited or
+                # produced by another tool); normalize so imported timestamps compare
+                # against existing naive rows instead of raising a TypeError.
+                if parsed.tzinfo is not None:
+                    parsed = parsed.astimezone(UTC).replace(tzinfo=None)
+                row_dict[key] = parsed
         if key in INT_FIELD_DEFAULTS:
             parsed = int_from_row(value, default=INT_FIELD_DEFAULTS[key])
             if parsed is None:

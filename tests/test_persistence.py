@@ -665,6 +665,39 @@ def test_import_history_trims_replayed_non_url_source_value(tmp_path) -> None:
     assert len(sources) == 1
 
 
+def test_import_history_accepts_tz_aware_source_timestamps(tmp_path) -> None:
+    """Importing an archive whose source carries a tz offset must not crash.
+
+    Regression: typed_row parsed an ISO timestamp without dropping its tz offset,
+    so updating an existing (naive) source from a tz-aware archived last_seen
+    compared offset-aware vs offset-naive datetimes and raised a TypeError,
+    aborting the whole import.
+    """
+    db_path = tmp_path / "iocparser-import-tz-aware.db"
+    service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
+    result = ExtractionResult.from_grouped_payload({"domains": ["example.com"]}, {})
+    service.persist_multiple_runs(
+        [("file", "tz.txt", result)],
+        tool_version="5.0.0",
+        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+    )
+    payload = export_persisted_history(db_uri=f"sqlite:///{db_path}")
+    # A future, tz-aware last_seen so the import actually advances the existing row.
+    payload["sources"][0]["last_seen"] = "2030-01-02T17:50:06+00:00"
+
+    counts = service.import_history(payload)
+
+    assert counts["sources"] == 0
+    checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
+    try:
+        with Session(checker.engine) as session:
+            source = session.execute(select(Source)).scalar_one()
+            assert source.last_seen.tzinfo is None
+            assert source.last_seen.isoformat() == "2030-01-02T17:50:06"
+    finally:
+        checker.close()
+
+
 def test_import_history_reuses_legacy_spaced_non_url_source_value(tmp_path) -> None:
     db_path = tmp_path / "iocparser-import-source-value-legacy-spaces.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")

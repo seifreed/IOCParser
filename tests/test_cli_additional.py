@@ -348,3 +348,25 @@ def test_handle_misp_init_with_concrete_replacement() -> None:
     output = buffer.getvalue()
     assert "Dns: 2 lists" in output
     assert "Other: 1 lists" in output
+
+
+def test_read_stdin_text_decodes_binary_buffer_tolerantly() -> None:
+    """Non-UTF-8/binary stdin must decode tolerantly like the file path, not crash.
+
+    Regression: process_stdin_payload called stdin.read() (strict locale codec), so
+    binary stdin raised an uncaught UnicodeDecodeError instead of the graceful,
+    BOM-aware, errors-ignored handling the file path uses.
+    """
+    binary = b"\x85\xff\x00 evil.example.com 8.8.8.8 \xfe"
+    stream = io.TextIOWrapper(io.BytesIO(binary))
+
+    text = cli_processing_single_support_module._read_stdin_text(stream)
+
+    assert "evil.example.com" in text
+    assert "8.8.8.8" in text
+
+    # A pure text stream (no .buffer, e.g. StringIO) is read directly.
+    assert (
+        cli_processing_single_support_module._read_stdin_text(io.StringIO("plain text"))
+        == "plain text"
+    )

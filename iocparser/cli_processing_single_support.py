@@ -22,6 +22,7 @@ from iocparser.client import IOCParserClient
 from iocparser.domain.options import ExtractionOptions
 from iocparser.domain.results import ExtractionResult
 from iocparser.errors import ValidationError
+from iocparser.infrastructure.file_parser import decode_file_bytes
 from iocparser.interfaces.ports import (
     IOCExtractionEngine,
     TemporaryResourceCleaner,
@@ -167,6 +168,17 @@ def process_stdin_input(
     return payload.normal_iocs, payload.warning_iocs, payload.input_display, payload.result
 
 
+def _read_stdin_text(stdin_stream: TextIOBase) -> str:
+    # Decode from the binary buffer when present (real sys.stdin) so non-UTF-8/binary
+    # input is handled tolerantly like the file path (BOM-aware, errors ignored) instead
+    # of raising an uncaught UnicodeDecodeError. A pure text stream (e.g. StringIO in
+    # tests) has no buffer, so read it directly.
+    buffer = getattr(stdin_stream, "buffer", None)
+    if buffer is not None:
+        return decode_file_bytes(buffer.read())
+    return stdin_stream.read()
+
+
 def process_stdin_payload(
     *,
     stdin_stream: object,
@@ -178,7 +190,7 @@ def process_stdin_payload(
         raise stdin_stream_error()
     if context.options.file_type in {"pdf", "html"}:
         raise stdin_typed_input_error(context.options.file_type)
-    text_content = stdin_stream.read()
+    text_content = _read_stdin_text(stdin_stream)
     if context.configured_plugin_client is not None:
         only, exclude = joined_type_filters(context.processing_options)
         result = context.configured_plugin_client.extract_result_from_text(

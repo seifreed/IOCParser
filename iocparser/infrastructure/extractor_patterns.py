@@ -38,9 +38,11 @@ PATTERNS: dict[str, Pattern[str]] = {
         re.IGNORECASE,
     ),  # Context-dependent: requires 'imphash' or 'import hash' prefix
     # Network indicators
+    # Single defang-aware alternation: the separator class already accepts a plain
+    # ".", so a separate plain-dot branch is redundant. A plain-dot-first branch also
+    # mis-fires on subdomains of defanged hosts (e.g. "www.evil[.]com"): leftmost
+    # alternation matches "www.evil", strips the rest, and the IOC is lost.
     "domains": re.compile(
-        r"\b((?:[a-zA-Z0-9](?:[-a-zA-Z0-9]{0,61}[a-zA-Z0-9])?\.){1,10}"
-        r"[a-zA-Z]{2,63})\b|"
         r"\b((?:[a-zA-Z0-9](?:[-a-zA-Z0-9]{0,61}[a-zA-Z0-9])?"
         r"(?:\[\.\]|\(\.\)|\{\.\}|(?i:\[dot\]|\(dot\)|\{dot\})|\.)){1,10}[a-zA-Z]{2,63})\b",
     ),

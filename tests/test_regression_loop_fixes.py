@@ -17,14 +17,6 @@ from iocparser.adapters.renderers_stix import STIXOutputRenderer
 from iocparser.application.distributed_idempotency import idempotency_key_for
 from iocparser.cli_output import _build_diff_payload, _render_structured_diff
 from iocparser.cli_processing_url_reports import build_batch_report
-from iocparser.domain.models import (
-    IOC,
-    ExtractionOptions,
-    ExtractionResult,
-    IOCType,
-    PersistedRunDiff,
-    IOCEvidence,
-)
 from iocparser.domain.distributed import (
     DeadLetterRecord,
     DistributedJobRecord,
@@ -32,18 +24,25 @@ from iocparser.domain.distributed import (
     QueueReceipt,
     TelemetryEvent,
 )
+from iocparser.domain.models import (
+    IOC,
+    ExtractionOptions,
+    ExtractionResult,
+    IOCEvidence,
+    IOCType,
+    PersistedRunDiff,
+)
 from iocparser.domain.pipeline import PipelineErrorInfo, PipelineJobRequest, ResourceLimits
 from iocparser.infrastructure.extraction import IOCExtractor
 from iocparser.infrastructure.file_parser import decode_file_bytes, wrap_binary_stream_for_bom
 from iocparser.infrastructure.file_readers import MagicTextSourceReader
 from iocparser.infrastructure.migration_revisions import rev_0005_fts_metrics
-from iocparser.infrastructure.persistence_support import _evidence_from_json
-from iocparser.infrastructure.persistence.history.row_values import typed_row
-from iocparser.infrastructure.persistence.history.row_values import bool_from_row
-from iocparser.infrastructure.persistence.query.ops import _coerce_count
-from iocparser.infrastructure.persistence_migration_steps import _coerce_version_row
-from iocparser.infrastructure.persistence_fts import build_fts_query
 from iocparser.infrastructure.persistence.history.ops import _json_object
+from iocparser.infrastructure.persistence.history.row_values import bool_from_row, typed_row
+from iocparser.infrastructure.persistence.query.ops import _coerce_count
+from iocparser.infrastructure.persistence_fts import build_fts_query
+from iocparser.infrastructure.persistence_migration_steps import _coerce_version_row
+from iocparser.infrastructure.persistence_support import _evidence_from_json
 from iocparser.infrastructure.streaming_chunks import read_chunks_with_prefix
 from iocparser.pipeline_worker_support import extract_result, prepare_input
 from iocparser.worker_config_support import load_worker_file_values
@@ -1094,7 +1093,13 @@ def test_job_record_preserves_error_with_empty_message() -> None:
 def test_persisted_view_models_reject_non_string_fields() -> None:
     from datetime import datetime
 
-    from iocparser.domain.jobs import BatchDashboard, BatchDashboardWindow, BatchJobDetail, BatchJobSummary, FailedBatchItem
+    from iocparser.domain.jobs import (
+        BatchDashboard,
+        BatchDashboardWindow,
+        BatchJobDetail,
+        BatchJobSummary,
+        FailedBatchItem,
+    )
     from iocparser.domain.persisted import PersistedRunQueryHit, PersistedRunSummary
 
     now = datetime.now()
@@ -1181,8 +1186,10 @@ def test_cli_search_normalizes_ioc_type_and_severity() -> None:
     --ioc-type ip (alias of 'ips') and --severity HIGH were passed raw to a
     case-sensitive exact SQL comparison, silently returning zero hits.
     """
-    from iocparser.api_persistence_query import validated_ioc_type_filter
-    from iocparser.api_persistence_query import validated_ioc_type_filters
+    from iocparser.api_persistence_query import (
+        validated_ioc_type_filter,
+        validated_ioc_type_filters,
+    )
     from iocparser.errors import ValidationError
     from iocparser.shared_utils import validated_severity_filters
 
@@ -1349,3 +1356,22 @@ def test_refang_handles_bracketed_scheme_separator() -> None:
     assert refang_ioc("ftp(://)host[.]net") == "ftp://host.net"
     # Existing alphabetic scheme refang still works.
     assert refang_ioc("hxxp://still[.]works") == "http://still.works"
+
+
+def test_defanged_domain_with_real_subdomain_is_extracted() -> None:
+    """A defanged host whose subdomain uses a real dot must not be dropped.
+
+    Regression: the domains pattern had a plain-dot-first alternation branch that
+    won the leftmost-alternation race on "www.badsite[.]com", matching only the
+    "www.badsite" prefix (rejected as an invalid TLD) and discarding the rest, so
+    the whole IOC was lost. The defang-aware branch is now the sole pattern.
+    """
+    from iocparser import extraction
+
+    for sample, expected in (
+        ("www.badsite[.]com", "www[.]badsite[.]com"),
+        ("mail.attacker[.]org", "mail[.]attacker[.]org"),
+        ("sub.badsite[dot]com", "sub[.]badsite[.]com"),
+    ):
+        iocs, _ = extraction.extract_iocs_from_text(sample)
+        assert iocs.get("domains") == [expected], (sample, iocs.get("domains"))

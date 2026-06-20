@@ -1771,6 +1771,14 @@ def test_retry_failed_report_can_filter_by_error_type_and_text(
     bad_report.write_text(json.dumps({"items": {}}), encoding="utf-8")
     with pytest.raises(ValidationError):
         _failed_urls_from_report(bad_report)
+    # A null/non-string item field must surface as a clean ValidationError, not let the
+    # strict require_string TypeError escape the untrusted-file path as a traceback.
+    bad_report.write_text(
+        json.dumps({"items": [{"url": "http://x/", "status": "failed", "error_type": None}]}),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValidationError):
+        _failed_urls_from_report(bad_report)
     from iocparser.errors import FileExistenceError
 
     missing = tmp_path / "missing.json"

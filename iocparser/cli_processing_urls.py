@@ -129,6 +129,13 @@ def _load_valid_batch_report_payload(report_path: Path) -> dict[str, object]:
     raw_items = payload.get("items")
     if raw_items is not None and not isinstance(raw_items, list):
         raise _invalid_batch_report_items(report_path)
+    # Parse items up front so a non-string/null field (e.g. "error_type": null) in this
+    # untrusted file surfaces as a clean ValidationError here instead of letting the
+    # strict require_string TypeError escape later as an uncaught traceback.
+    try:
+        _report_items(payload)
+    except (TypeError, ValueError) as exc:
+        raise _invalid_batch_report_items(report_path) from exc
     return payload
 
 

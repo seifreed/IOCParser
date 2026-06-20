@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from collections import defaultdict
 
 from iocparser.domain.enums import ioc_type_name
@@ -33,11 +34,19 @@ class MISPWarningListService(WarningListService):
 
     def __init__(self) -> None:
         self._cached_lists: MISPWarningLists | None = None
+        self._lock = threading.Lock()
 
     def _get_lists(self, *, force_update: bool) -> MISPWarningLists:
-        if force_update or self._cached_lists is None:
-            self._cached_lists = MISPWarningLists(force_update=force_update)
-        return self._cached_lists
+        # One service instance is shared across parallel workers, so build the lists
+        # under a lock with a double-check. Without it, concurrent first-use each saw
+        # None and each ran the full GitHub download + preprocess, wasting N-1 of them.
+        cached = self._cached_lists
+        if not force_update and cached is not None:
+            return cached
+        with self._lock:
+            if force_update or self._cached_lists is None:
+                self._cached_lists = MISPWarningLists(force_update=force_update)
+            return self._cached_lists
 
     def separate(
         self,

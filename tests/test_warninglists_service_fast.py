@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import requests
 import pytest
+import requests
 
 import iocparser.infrastructure.warninglists_service as warninglists_service_module
 from iocparser.domain.models import IOC
@@ -272,3 +272,44 @@ def test_warninglist_service_rejects_dict_normal_output_without_value() -> None:
             )
     finally:
         warninglists_service_module.MISPWarningLists = original
+
+
+def test_get_lists_builds_once_under_concurrent_first_use() -> None:
+    """One shared service must build the warning lists once across parallel workers.
+
+    Regression: _get_lists did an unlocked check-then-act on _cached_lists, so under
+    --parallel each worker saw None and ran the full GitHub download + preprocess,
+    wasting all but one. A double-checked lock now builds it exactly once.
+    """
+    import threading
+
+    instantiations = {"count": 0}
+    lock = threading.Lock()
+
+    class CountingLists:
+        def __init__(self, *, force_update: bool = False) -> None:
+            with lock:
+                instantiations["count"] += 1
+
+        def separate_iocs_by_warnings(self, grouped):  # type: ignore[no-untyped-def]
+            return ({}, {})
+
+    original = warninglists_service_module.MISPWarningLists
+    warninglists_service_module.MISPWarningLists = CountingLists
+    try:
+        service = warninglists_service_module.MISPWarningListService()
+        barrier = threading.Barrier(12)
+
+        def worker() -> None:
+            barrier.wait()
+            service._get_lists(force_update=False)
+
+        threads = [threading.Thread(target=worker) for _ in range(12)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+    finally:
+        warninglists_service_module.MISPWarningLists = original
+
+    assert instantiations["count"] == 1

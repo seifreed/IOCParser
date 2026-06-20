@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 
 from iocparser.cli_args import get_bool_arg, get_optional_str_arg
@@ -22,7 +23,9 @@ def mb_to_bytes(megabytes: float | None) -> int | None:
     """Convert a megabyte limit (e.g. --max-input-size-mb) to bytes, preserving None."""
     if megabytes is None:
         return None
-    if megabytes < 0:
+    # argparse type=float accepts nan/inf, which slip past `< 0` (both compare False) and
+    # then crash int(); reject any non-finite or negative size as a clean ValidationError.
+    if not math.isfinite(megabytes) or megabytes < 0:
         raise ValidationError(INVALID_MAX_INPUT_SIZE_MB.format(value=megabytes))
     return int(megabytes * 1024 * 1024)
 

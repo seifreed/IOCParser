@@ -2992,6 +2992,11 @@ def test_internal_http_mapping_and_static_timeout_helpers() -> None:
     assert mb_to_bytes(1.5) == 1572864
     with pytest.raises(ValidationError, match="Invalid max_input_size_mb"):
         mb_to_bytes(-1)
+    # nan/inf are accepted by argparse type=float but slip past `< 0`; they must be
+    # rejected as a clean ValidationError, not crash int() with an uncaught traceback.
+    for non_finite in (float("nan"), float("inf"), float("-inf")):
+        with pytest.raises(ValidationError, match="Invalid max_input_size_mb"):
+            mb_to_bytes(non_finite)
 
 
 def test_matches_advanced_filters_rejects_missing_tags() -> None:

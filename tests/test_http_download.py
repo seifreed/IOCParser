@@ -424,6 +424,39 @@ def test_download_url_to_temp_reports_timeout_and_network_errors(monkeypatch) ->
         download_url_to_temp("http://127.0.0.1/missing", timeout=1)
 
 
+def test_body_read_timeout_is_classified_as_timeout(monkeypatch) -> None:
+    """Regression: a read timeout firing while streaming the response body surfaces
+    as ConnectionError(ReadTimeoutError) -- not requests.Timeout -- and was
+    misclassified as a generic DownloadError. It must now map to IOCTimeoutError,
+    while a non-timeout ConnectionError (e.g. a reset) stays a DownloadError.
+    """
+    from urllib3.exceptions import ProtocolError, ReadTimeoutError
+
+    from iocparser.infrastructure.http_download import RequestsURLDownloader
+
+    downloader = RequestsURLDownloader(retries=0)
+
+    def raise_exc(exc):
+        def _boom(*_args, **_kwargs):
+            raise exc
+
+        return _boom
+
+    read_timeout = requests.ConnectionError(
+        ReadTimeoutError(None, "http://example.com", "read timed out")
+    )
+    monkeypatch.setattr(downloader, "_download_once", raise_exc(read_timeout))
+    with pytest.raises(IOCTimeoutError):
+        downloader.download("http://example.com/x")
+
+    # A genuine connection reset wraps a ProtocolError, not a ReadTimeoutError:
+    # it must remain a DownloadError.
+    reset = requests.ConnectionError(ProtocolError("connection reset"))
+    monkeypatch.setattr(downloader, "_download_once", raise_exc(reset))
+    with pytest.raises(DownloadError):
+        downloader.download("http://example.com/x")
+
+
 def test_download_url_to_temp_reports_file_size_and_unexpected_errors() -> None:
     with LocalHTTPServer(body=b"", content_length=str(MAX_URL_SIZE + 1)) as oversized_url:
         with pytest.raises(FileSizeError):

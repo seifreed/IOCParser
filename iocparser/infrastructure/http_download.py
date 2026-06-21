@@ -14,9 +14,11 @@ from typing import TypeVar, cast
 from urllib.parse import ParseResult, urljoin, urlparse
 
 import requests
+from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import RequestException, Timeout
 from requests.models import PreparedRequest
 from urllib3.connectionpool import ConnectionPool
+from urllib3.exceptions import ReadTimeoutError
 
 from iocparser.domain.sources import normalize_url_value
 from iocparser.errors import (
@@ -41,6 +43,22 @@ MAX_DOWNLOAD_REDIRECTS = 10
 ALLOW_PRIVATE_URLS_ENV = "IOCPARSER_ALLOW_PRIVATE_URLS"
 TimeoutValue = int | float | tuple[float, float]
 logger = get_logger(__name__)
+
+
+def _is_read_timeout(exc: RequestException) -> bool:
+    """Whether a RequestException is actually a body-read timeout.
+
+    A read timeout that fires while streaming the response body (after headers)
+    is raised by requests as ConnectionError wrapping urllib3's ReadTimeoutError,
+    which is NOT a requests.Timeout -- so without this it is misclassified as a
+    generic DownloadError instead of IOCTimeoutError. A genuine connection reset
+    wraps a ProtocolError (not a ReadTimeoutError) and stays a DownloadError.
+    """
+    return (
+        isinstance(exc, RequestsConnectionError)
+        and bool(exc.args)
+        and isinstance(exc.args[0], ReadTimeoutError)
+    )
 
 
 def _env_allows_private_urls() -> bool:
@@ -412,6 +430,11 @@ class RequestsURLDownloader(URLDownloader):
                         retry_delay: float = self.backoff * (2.0**attempt)
                         time.sleep(retry_delay)
                     continue
+                # A body-read timeout surfaces as ConnectionError(ReadTimeoutError),
+                # not requests.Timeout, so classify it as a timeout like the header
+                # case above rather than a generic download error.
+                if _is_read_timeout(exc):
+                    raise IOCTimeoutError("Download", url) from exc
                 raise DownloadError(url, str(exc)) from exc
             except (OSError, ValueError, RuntimeError) as exc:
                 raise DownloadError(url, str(exc), error_type="unexpected") from exc

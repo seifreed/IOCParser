@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from csv import DictWriter
 from io import StringIO
 from typing import ClassVar
@@ -51,7 +52,7 @@ def _csv_line_number(entry: dict[str, object]) -> str:
     return str(line_number)
 
 
-def _warning_field(warning: dict[str, object], field: str) -> str:
+def _warning_field(warning: Mapping[str, object], field: str) -> str:
     if field not in warning:
         raise TypeError(f"Expected {field} to be string, got missing")
     return _require_str(warning[field], field=field)

@@ -144,10 +144,10 @@ def get_list_arg(args: argparse.Namespace, name: str) -> list[str]:
                 raise ValidationError(STRING_VALUE_REQUIRED.format(field_name=name))
             normalized.append(stripped)
         return normalized
-    normalized = _require_str_value(value, field_name=name).strip()
-    if not normalized:
+    single = _require_str_value(value, field_name=name).strip()
+    if not single:
         raise ValidationError(STRING_VALUE_REQUIRED.format(field_name=name))
-    return [normalized]
+    return [single]
 
 
 def get_optional_str_arg(args: argparse.Namespace, name: str) -> str | None:

@@ -25,7 +25,7 @@ def matching_attribute_name(attr: WarningListEntry) -> str:
     raise TypeError(f"Expected matching attribute to be string-like, got {type(attr).__name__}")
 
 
-def normalized_warning_list_text(value: WarningListEntry, *, list_type: str) -> str:
+def normalized_warning_list_text(value: WarningListEntry | float, *, list_type: str) -> str:
     """Normalize warning-list text entries for exact/string-style matching."""
     if not isinstance(value, str):
         raise TypeError(f"Expected warning-list entry to be string-like, got {type(value).__name__}")

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import cast
 
 from iocparser.domain.pipeline import (
     PIPELINE_JOB_SCHEMA_VERSION,
@@ -159,13 +160,13 @@ class QueueEnvelope:
                 job_id=request_payload.get("job_id"),
                 emit_only=_bool_from_payload(request_payload, "emit_only", False),
             ),
-            queue_backend=payload.get("queue_backend", "filesystem"),
-            queue_name=payload.get("queue_name", "default"),
+            queue_backend=cast("str", payload.get("queue_backend", "filesystem")),
+            queue_name=cast("str", payload.get("queue_name", "default")),
             attempts=_int_from_payload(payload, "attempts", 0),
             max_attempts=_int_from_payload(payload, "max_attempts", 3),
-            idempotency_key=payload.get("idempotency_key"),
-            schema_version=payload.get("schema_version", PIPELINE_JOB_SCHEMA_VERSION),
-            submitted_at=payload.get("submitted_at", datetime.now(UTC).isoformat()),
+            idempotency_key=cast("str | None", payload.get("idempotency_key")),
+            schema_version=cast("str", payload.get("schema_version", PIPELINE_JOB_SCHEMA_VERSION)),
+            submitted_at=cast("str", payload.get("submitted_at", datetime.now(UTC).isoformat())),
         )
 @dataclass(frozen=True)
 class QueueReceipt:

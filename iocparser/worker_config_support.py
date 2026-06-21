@@ -120,11 +120,10 @@ def resolve_config_path(config_path: str | None) -> Path | None:
         if not candidate.exists():
             raise SourceNotFoundError(str(candidate))
         return candidate
-    chosen = os.environ.get("IOCPARSER_CONFIG")
-    if isinstance(chosen, str):
-        chosen = chosen.strip()
-    if chosen:
-        candidate = Path(chosen).expanduser()
+    env_value = os.environ.get("IOCPARSER_CONFIG")
+    env_chosen = env_value.strip() if env_value is not None else None
+    if env_chosen:
+        candidate = Path(env_chosen).expanduser()
         if not candidate.exists():
             raise SourceNotFoundError(str(candidate))
         return candidate

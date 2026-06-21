@@ -234,7 +234,7 @@ def fallback_int(metadata: Mapping[str, int | str | None] | None, key: str, defa
     return _cli_args.int_value(value, default=default)
 
 
-def fallback_str(metadata: Mapping[str, int | str | None] | None, key: str, default: str) -> str:
+def fallback_str(metadata: Mapping[str, object] | None, key: str, default: str) -> str:
     if metadata is None:
         return default
     value = metadata.get(key)

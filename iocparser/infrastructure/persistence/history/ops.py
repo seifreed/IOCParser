@@ -53,6 +53,7 @@ from iocparser.infrastructure.persistence_support import (
     prune_runs,
 )
 from iocparser.infrastructure.persistence_uow import create_engine_for_uri
+
 _typed_row = typed_row
 @contextmanager
 def _managed_session(db_uri: str) -> Iterator[Session]:
@@ -281,7 +282,7 @@ def _normalized_text(value: object, *, default: str) -> str:
     stripped = value.strip()
     return stripped or default
 def _batch_job_signature(row: dict[str, object]) -> tuple[object, ...]:
-    return (str(row.get("source_kind", "")), row.get("started_at"), row.get("finished_at"), int(row.get("total_inputs", 0)), int(row.get("successful_inputs", 0)), int(row.get("failed_inputs", 0)), int(row.get("retry_attempt", 0)), _normalized_text(row.get("status"), default="queued"), _normalized_text(row.get("config_json"), default="{}"), _normalized_text(row.get("error_summary_json"), default="{}"), _normalized_text(row.get("metrics_json"), default="{}"))
+    return (str(row.get("source_kind", "")), row.get("started_at"), row.get("finished_at"), int_from_row(row.get("total_inputs"), default=0) or 0, int_from_row(row.get("successful_inputs"), default=0) or 0, int_from_row(row.get("failed_inputs"), default=0) or 0, int_from_row(row.get("retry_attempt"), default=0) or 0, _normalized_text(row.get("status"), default="queued"), _normalized_text(row.get("config_json"), default="{}"), _normalized_text(row.get("error_summary_json"), default="{}"), _normalized_text(row.get("metrics_json"), default="{}"))
 
 def _public_batch_job_config(raw_config_json: object) -> dict[str, object]:
     config = _json_object(str(raw_config_json or "{}"))
@@ -539,7 +540,7 @@ def _import_iocs(session: Session, rows: list[dict[str, object]]) -> tuple[int, 
         typed["value_search"] = search_value
         typed["dedup_hash"] = ioc_dedup_hash(
             ioc_type,
-            typed["value"],
+            str(typed["value"]),
             bool(typed.get("is_warning")),
             str(typed.get("warning_list", "")),
             str(typed.get("warning_description", "")),
@@ -772,14 +773,14 @@ def _import_failed_batch_items(
     batch_map: dict[int, int],
 ) -> int:
     inserted = 0
-    seen_signatures: dict[tuple[int, str, str, str, int, object], int] = {}
+    seen_signatures: dict[tuple[object, ...], int] = {}
     for row in rows:
         typed = typed_row(row)
         batch_job_id = batch_map.get(int_from_row(typed.get("batch_job_id"), default=0) or 0)
         if batch_job_id is None:
             continue
         if not all(
-            isinstance(typed.get(key), str) and typed.get(key).strip()
+            isinstance(value := typed.get(key), str) and value.strip()
             for key in ("source_value", "error_type", "error_message")
         ) or not isinstance(typed.get("created_at"), datetime):
             continue
@@ -835,7 +836,7 @@ def _import_distributed_jobs(
     for row in rows:
         typed = typed_row(row)
         if not all(
-            isinstance(typed.get(key), str) and typed.get(key).strip()
+            isinstance(value := typed.get(key), str) and value.strip()
             for key in ("correlation_id", "queue_backend", "queue_name", "input_kind", "source_value")
         ) or not isinstance(typed.get("submitted_at"), datetime):
             continue
@@ -883,11 +884,11 @@ def _import_dead_letter_jobs(
         typed = typed_row(row)
         if (
             not all(
-                isinstance(typed.get(key), str) and typed.get(key).strip()
+                isinstance(value := typed.get(key), str) and value.strip()
                 for key in ("correlation_id", "queue_backend", "queue_name", "source_value")
             )
             or not all(
-                isinstance(typed.get(key), str) and typed.get(key).strip()
+                isinstance(value := typed.get(key), str) and value.strip()
                 for key in ("error_code", "error_category", "error_message")
             )
             or not isinstance(typed.get("dead_lettered_at"), datetime)

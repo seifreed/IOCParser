@@ -13,7 +13,6 @@ import requests
 from iocparser.infrastructure.logger import get_logger
 from iocparser.infrastructure.utils import DEFANG_REPLACEMENTS
 from iocparser.infrastructure.warninglists_cache import WarningListCacheMixin
-from iocparser.infrastructure.warninglists_diagnostics import WarningListDiagnosticsMixin
 from iocparser.infrastructure.warninglists_matching import WarningListMatchingMixin
 from iocparser.infrastructure.warninglists_preprocess import WarningListPreprocessMixin
 from iocparser.infrastructure.warninglists_types import WarningListDict, WarningListLookups
@@ -27,7 +26,6 @@ class MISPWarningLists(
     WarningListCacheMixin,
     WarningListPreprocessMixin,
     WarningListMatchingMixin,
-    WarningListDiagnosticsMixin,
 ):
     """Class for managing MISP warning lists to detect false positives"""
 

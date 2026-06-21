@@ -10,7 +10,6 @@ from iocparser.infrastructure.extraction import IOCExtractor
 from iocparser.infrastructure.file_readers import MagicTextSourceReader
 from iocparser.infrastructure.http_download import RequestsURLDownloader
 from iocparser.infrastructure.streaming import ParallelStreamingExtractor, StreamingIOCExtractor
-from iocparser.infrastructure.warninglists_diagnostics import WarningListDiagnosticsMixin
 from tests.http_server_helpers import LocalHTTPTextServer
 
 
@@ -27,24 +26,6 @@ class TimeoutDownloader(RequestsURLDownloader):
         from requests.exceptions import Timeout
 
         raise Timeout("simulated timeout")
-
-
-class DiagnosticProbe(WarningListDiagnosticsMixin):
-    TYPE_KEYWORDS = {"domains": ["domain"], "ips": ["ip"]}
-
-    def __init__(self) -> None:
-        self.warning_lists = {}
-
-    def _check_value_in_list(self, value: str, values: list[object], list_type: str) -> bool:
-        del list_type
-        return value in values
-
-    def _clean_defanged_value(self, value: str) -> str:
-        return value
-
-    def check_value(self, value: str, ioc_type: str) -> tuple[bool, dict[str, str] | None]:
-        del value, ioc_type
-        return False, None
 
 
 def test_file_reader_treats_plain_text_html_extension_as_html(tmp_path: Path) -> None:
@@ -65,12 +46,6 @@ def test_http_downloader_wraps_timeout_from_download_phase() -> None:
             pass
         else:
             raise AssertionError
-
-
-def test_warninglist_diagnostics_returns_empty_values_for_non_list() -> None:
-    probe = DiagnosticProbe()
-
-    assert probe._get_warning_list_values({"list": "not-a-list"}) == []
 
 
 def test_network_extractor_covers_url_error_and_host_filtering() -> None:

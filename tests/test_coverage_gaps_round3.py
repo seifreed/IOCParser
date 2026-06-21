@@ -378,12 +378,6 @@ class TestWorkerServiceConcurrentSleep:
 
 
 class TestPersistenceSupportHelpers:
-    def test_normalized_url_filter_returns_none_for_garbage(self) -> None:
-        from iocparser.infrastructure.persistence_support import normalized_url_filter
-
-        result = normalized_url_filter("not a url at all")
-        assert result is None or isinstance(result, str)
-
     def test_url_filter_variants_trailing_slash(self) -> None:
         from iocparser.infrastructure.persistence_support import _url_filter_variants
 

@@ -105,9 +105,6 @@ def parse_datetime(value: str | None) -> datetime | None:
 def normalized_source_filter(value: str) -> str:
     return value.strip().lower()
 
-def normalized_url_filter(value: str) -> str | None:
-    return normalize_url_value(value)
-
 def _url_filter_variants(value: str) -> tuple[str, ...]:
     normalized = normalize_url_value(value)
     if normalized is None:

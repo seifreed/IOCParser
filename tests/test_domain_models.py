@@ -482,6 +482,26 @@ def test_register_custom_ioc_type_rejects_alias_shadowing_another_type_name() ->
     assert str(resolve_custom_ioc_type("shadow_target")) == "shadow_target"
 
 
+def test_register_custom_ioc_type_rejects_name_colliding_with_existing_alias() -> None:
+    """Regression: a custom type whose NAME equals an existing alias of a different type
+    was accepted but silently shadowed -- resolve_custom_ioc_type maps the alias to its
+    original owner first, so the new type resolved to the wrong type/severity. The reverse
+    direction (alias vs type name) was already guarded; this is the symmetric guard.
+    """
+    import pytest
+
+    from iocparser.domain.enums import IOCType, get_custom_ioc_type, resolve_custom_ioc_type
+
+    register_custom_ioc_type(
+        "alias_name_owner", base_type=IOCType.URL, aliases=("claimed_handle",), severity="high"
+    )
+    with pytest.raises(ValueError, match="already an alias of custom type"):
+        register_custom_ioc_type("claimed_handle", base_type=IOCType.IP, severity="low")
+    # The existing alias still resolves to its real owner, uncorrupted.
+    assert str(resolve_custom_ioc_type("claimed_handle")) == "alias_name_owner"
+    assert get_custom_ioc_type("claimed_handle").severity == "high"
+
+
 def test_malformed_urls_do_not_break_source_normalization() -> None:
     source = Source.from_raw("url", "http://[::1")
 

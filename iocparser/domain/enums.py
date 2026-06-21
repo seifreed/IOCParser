@@ -59,6 +59,10 @@ ALIAS_COLLIDES_WITH_CUSTOM_TYPE_NAME = (
     "Alias {alias!r} for custom IOC type {name!r} shadows the canonical name of custom "
     "type {owner!r} and would make it unresolvable"
 )
+NAME_COLLIDES_WITH_CUSTOM_ALIAS = (
+    "Custom IOC type name {name!r} is already an alias of custom type {owner!r}; it would "
+    "resolve to {owner!r} instead of itself and be silently shadowed"
+)
 
 
 class SourceKind(StrEnum):
@@ -221,19 +225,8 @@ _custom_ioc_aliases: dict[str, str] = {}
 _registry_lock = threading.Lock()
 
 
-def register_custom_ioc_type(
-    name: str,
-    *,
-    base_type: IOCType | str = IOCType.URL,
-    aliases: tuple[str, ...] = (),
-    severity: str | None = None,
-    tags: tuple[str, ...] = (),
-    stix_pattern: str | None = None,
-) -> IOCTypeName:
-    """Register a custom IOC type that behaves like a first-class domain type."""
-    normalized = name.strip().lower()
-    if not normalized:
-        raise ValueError(EMPTY_CUSTOM_IOC_TYPE)
+def _validate_custom_ioc_type_name(name: str, normalized: str) -> None:
+    """Reject a custom IOC type name that could never resolve to its own definition."""
     # A name equal to a built-in IOC type/alias can never resolve to this custom
     # type (IOCType.from_name checks built-ins first), so the registration would be
     # silently inert. Reject it instead of accepting a dead definition.
@@ -247,6 +240,31 @@ def register_custom_ioc_type(
     # before any per-type resolution, so --only/--exclude could never select it.
     if normalized in CATEGORY_FILTER_NAMES:
         raise ValueError(RESERVES_CATEGORY_FILTER_NAME.format(name=name))
+    # A name already claimed as an alias of a DIFFERENT custom type can never resolve to
+    # this type -- resolve_custom_ioc_type maps the alias to its owner first -- so the
+    # definition would be silently shadowed. Reject it, symmetric with the alias guards
+    # in _validated_custom_aliases (which already reject a new alias colliding with an
+    # existing type name or alias). Re-registering the same type (owner == normalized) is
+    # fine; its stale aliases are pruned during registration.
+    alias_owner = _custom_ioc_aliases.get(normalized)
+    if alias_owner is not None and alias_owner != normalized:
+        raise ValueError(NAME_COLLIDES_WITH_CUSTOM_ALIAS.format(name=name, owner=alias_owner))
+
+
+def register_custom_ioc_type(
+    name: str,
+    *,
+    base_type: IOCType | str = IOCType.URL,
+    aliases: tuple[str, ...] = (),
+    severity: str | None = None,
+    tags: tuple[str, ...] = (),
+    stix_pattern: str | None = None,
+) -> IOCTypeName:
+    """Register a custom IOC type that behaves like a first-class domain type."""
+    normalized = name.strip().lower()
+    if not normalized:
+        raise ValueError(EMPTY_CUSTOM_IOC_TYPE)
+    _validate_custom_ioc_type_name(name, normalized)
     if isinstance(base_type, IOCType):
         base: IOCType | IOCTypeName = base_type
     else:

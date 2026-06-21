@@ -119,7 +119,15 @@ def test_domain_and_application_modules_stay_small_enough_to_review() -> None:
     # 40+ modules; ruff-format line-wrapping pushes it past the domain cap without any
     # logic growth, and extracting the records would only scatter them. Per-file
     # override keeps the tight cap for every other domain module.
-    file_overrides = {IOCPARSER_ROOT / "domain" / "distributed.py": 430}
+    # enums.py override (358 -> 374): the custom-IOC-type registry's symmetric guard
+    # against a new type name colliding with an existing alias (previously the name was
+    # silently shadowed and resolved to the alias owner), extracted into a
+    # _validate_custom_ioc_type_name helper to keep register_custom_ioc_type under the
+    # C901 complexity cap. Real correctness logic, not formatting growth.
+    file_overrides = {
+        IOCPARSER_ROOT / "domain" / "distributed.py": 430,
+        IOCPARSER_ROOT / "domain" / "enums.py": 374,
+    }
     for directory, limit in limits.items():
         for path in directory.glob("*.py"):
             line_count = len(path.read_text(encoding="utf-8").splitlines())
@@ -189,7 +197,10 @@ def test_public_facades_stay_thin() -> None:
         # in-flight guard (_inflight_capacity), so an over-subscribed pool no longer
         # dead-letters surplus jobs as backpressure errors.
         # 178 -> 181 for the IntLiteralError import plus ruff-format wrapping (formatting only).
-        IOCPARSER_ROOT / "worker_service.py": 181,
+        # 181 -> 190 for the _idle_wait helper: empty-cycle sleeps now use Event.wait() so a
+        # stop signal during an idle poll interrupts the wait instead of blocking the full
+        # interval. Real shutdown-latency fix, not formatting growth.
+        IOCPARSER_ROOT / "worker_service.py": 190,
         IOCPARSER_ROOT / "cli_schema.py": 220,
         IOCPARSER_ROOT / "domain" / "models.py": 60,
         IOCPARSER_ROOT / "infrastructure" / "warninglists.py": 180,

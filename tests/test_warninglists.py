@@ -392,6 +392,39 @@ class TestMISPWarningLists:
         assert is_warning
         assert info["name"] == "Abuse Domains"
 
+    def test_regex_list_scoped_to_unrelated_attribute_does_not_flag(self):
+        """A regex list scoped to an unrelated attribute must not flag other types.
+
+        Regression: a list whose matching_attributes map to no known IOC type (e.g.
+        the shipped phone_numbers list) was treated as unscoped and its unanchored
+        digit regexes ran against every value, so a real SHA256/domain containing
+        the digit pattern was false-flagged as benign and dropped. The regex path
+        now applies the same matching_attributes gate as the substring path. Lists
+        with no matching_attributes stay truly global.
+        """
+        warning_lists = make_warning_lists()
+        phone_list = {
+            "name": "Phone numbers",
+            "description": "Unattributed phone number.",
+            "type": "regex",
+            "matching_attributes": ["phone-number", "whois-registrant-phone"],
+            "list": [r"((?:\+|00)33?|0?)(999)([0-9]{6})"],
+        }
+        warning_lists.warning_lists = {"phone-numbers": phone_list}
+        warning_lists._preprocess_lists()
+
+        hash_with_digits = "8c6c42f379f08f03b79653a3230abd5e8079999435030fd8ca703ae35fe9b37a"
+        assert warning_lists.check_value(hash_with_digits, "sha256") == (False, None)
+        assert warning_lists.check_value("a999435030b.example.com", "domains") == (False, None)
+
+        # A truly global regex list (no matching_attributes) still applies everywhere.
+        global_list = dict(phone_list, matching_attributes=[])
+        warning_lists.warning_lists = {"global-regex": global_list}
+        warning_lists._warning_lookup_cache = {}
+        warning_lists._preprocess_lists()
+        is_warning, _ = warning_lists.check_value(hash_with_digits, "sha256")
+        assert is_warning
+
     def test_email_domain_warning_excluded(self):
         """Email IOCs with warning-listed domains appear in warning list, not dropped."""
         warning_lists = make_warning_lists()
@@ -660,7 +693,9 @@ class TestWarningListsPreprocessing:
         warning_lists._preprocess_lists()
 
         assert "phone_numbers" in warning_lists.compiled_regex
-        assert warning_lists.check_value("1900654321", "unknown-type")[0]
+        # The /.../g wrapper must be stripped so the inner pattern compiles and matches.
+        compiled = warning_lists.compiled_regex["phone_numbers"]
+        assert any(pattern.search("1900654321") for pattern in compiled)
 
     def test_preprocess_lists_supports_slash_delimited_regex_without_flags(self):
         """Test preprocessing handles slash-delimited regexes with no flags."""

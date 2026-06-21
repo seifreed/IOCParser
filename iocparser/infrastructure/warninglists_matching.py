@@ -268,16 +268,31 @@ class WarningListMatchingMixin:
         clean_value: str,
         extracted_domain: str | None,
         relevant_list_ids: list[str],
+        ioc_type: str,
     ) -> dict[str, str] | None:
         compiled_regex = self.lookup_data.compiled_regex
         for list_id in relevant_list_ids:
             if list_id not in compiled_regex or list_id not in self.warning_lists:
                 continue
+            warning_list = self.warning_lists[list_id]
+            misp_types = self._get_misp_types_for_ioc(ioc_type)
+            if extracted_domain:
+                # A URL/email also carries a domain, so domain-scoped lists apply.
+                misp_types = misp_types + self._get_misp_types_for_ioc("domains")
+            # Gate by matching_attributes the same way _check_substring_lists does:
+            # an unanchored regex from a list scoped to an unrelated attribute (e.g. a
+            # phone-number list whose digit patterns occur inside hashes/domains) must
+            # not flag values of types it does not apply to. Lists with no
+            # matching_attributes stay truly global.
+            if self._matching_attribute_names(warning_list) and not self._is_list_applicable(
+                warning_list, misp_types, ioc_type
+            ):
+                continue
             for pattern in compiled_regex[list_id]:
                 if pattern.search(clean_value) or (
                     extracted_domain and pattern.search(extracted_domain)
                 ):
-                    return self._build_warning_response(self.warning_lists[list_id], list_id)
+                    return self._build_warning_response(warning_list, list_id)
         return None
 
     def _check_cidr_lookups(
@@ -352,7 +367,9 @@ class WarningListMatchingMixin:
             string_result: tuple[bool, dict[str, str] | None] = (True, warning)
             self._cache_check_value(cache_key, string_result)
             return string_result
-        warning = self._check_regex_lookups(clean_value, extracted_domain, candidate_list_ids)
+        warning = self._check_regex_lookups(
+            clean_value, extracted_domain, candidate_list_ids, ioc_type
+        )
         if warning:
             regex_result: tuple[bool, dict[str, str] | None] = (True, warning)
             self._cache_check_value(cache_key, regex_result)

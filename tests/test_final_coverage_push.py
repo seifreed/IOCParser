@@ -11,6 +11,7 @@ from iocparser.cli_args import get_output_filename
 from iocparser.domain.models import IOC, ExtractionResult, IOCType, PersistOptions, classify_ioc
 from iocparser.infrastructure.persistence.query import SQLAlchemyPersistenceService
 from iocparser.infrastructure.streaming import StreamingIOCExtractor
+from tests.persistence_helpers import persist_multiple_runs
 
 
 class NoSeekBytesIO(io.BytesIO):
@@ -76,7 +77,8 @@ def test_classify_high_severity_and_cli_filename_formats() -> None:
 
 def test_persistence_queries_cover_warning_and_missing_run(tmp_path: Path) -> None:
     service = SQLAlchemyPersistenceService(f"sqlite:///{tmp_path / 'runs.sqlite'}")
-    run_ids = service.persist_multiple_runs(
+    run_ids = persist_multiple_runs(
+        service,
         [
             (
                 "file",

@@ -30,6 +30,7 @@ from iocparser.infrastructure.persistence import (
     SourceModel as Source,
 )
 from iocparser.infrastructure.persistence_repository_support import source_dedup_hash
+from tests.persistence_helpers import persist_multiple_runs
 
 
 def test_persist_run_sqlite(tmp_path) -> None:
@@ -373,7 +374,8 @@ def test_import_history_matches_existing_url_sources_by_normalized_identity(tmp_
         force_update=False,
         output_format="json",
     )
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "url",
@@ -420,7 +422,8 @@ def test_import_history_matches_existing_url_sources_without_normalized_url(tmp_
         force_update=False,
         output_format="json",
     )
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "url",
@@ -457,7 +460,9 @@ def test_import_history_matches_existing_url_sources_without_normalized_url(tmp_
     assert len(sources) == 1
 
 
-def test_import_history_matches_existing_padded_url_sources_without_normalized_url(tmp_path) -> None:
+def test_import_history_matches_existing_padded_url_sources_without_normalized_url(
+    tmp_path,
+) -> None:
     db_path = tmp_path / "iocparser-import-url-source-padded.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
     options = PersistOptions(
@@ -466,7 +471,8 @@ def test_import_history_matches_existing_padded_url_sources_without_normalized_u
         force_update=False,
         output_format="json",
     )
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "url",
@@ -521,7 +527,8 @@ def test_import_history_matches_canonical_url_against_legacy_uppercase_source(tm
         force_update=False,
         output_format="json",
     )
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "url",
@@ -604,7 +611,8 @@ def test_import_history_trims_replayed_source_kind_identity(tmp_path) -> None:
         force_update=False,
         output_format="json",
     )
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "url",
@@ -646,10 +654,13 @@ def test_import_history_trims_replayed_non_url_source_value(tmp_path) -> None:
     db_path = tmp_path / "iocparser-import-source-value.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
     result = ExtractionResult.from_grouped_payload({"domains": ["example.com"]}, {})
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [("file", "f.txt", result)],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
     payload = export_persisted_history(db_uri=f"sqlite:///{db_path}")
     payload["sources"][0]["value"] = " f.txt "
@@ -676,10 +687,13 @@ def test_import_history_accepts_tz_aware_source_timestamps(tmp_path) -> None:
     db_path = tmp_path / "iocparser-import-tz-aware.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
     result = ExtractionResult.from_grouped_payload({"domains": ["example.com"]}, {})
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [("file", "tz.txt", result)],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
     payload = export_persisted_history(db_uri=f"sqlite:///{db_path}")
     # A future, tz-aware last_seen so the import actually advances the existing row.
@@ -702,10 +716,13 @@ def test_import_history_reuses_legacy_spaced_non_url_source_value(tmp_path) -> N
     db_path = tmp_path / "iocparser-import-source-value-legacy-spaces.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
     result = ExtractionResult.from_grouped_payload({"domains": ["example.com"]}, {})
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [("file", "sample.txt", result)],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
     checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
     try:
@@ -734,10 +751,13 @@ def test_import_history_trims_replayed_ioc_type_identity(tmp_path) -> None:
     db_path = tmp_path / "iocparser-import-ioc-type.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
     result = ExtractionResult.from_grouped_payload({"domains": ["example.com"]}, {})
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [("file", "f.txt", result)],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
     payload = {
         "iocs": [
@@ -771,10 +791,13 @@ def test_import_history_trims_replayed_warning_ioc_metadata(tmp_path) -> None:
         {"domains": ["example.com"]},
         {"domains": [{"value": "bad.example", "warning_list": "top", "description": "popular"}]},
     )
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [("file", "f.txt", result)],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=True, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=True, force_update=False, output_format="json"
+        ),
     )
     payload = export_persisted_history(db_uri=f"sqlite:///{db_path}")
     payload["iocs"][1]["warning_list"] = " top "
@@ -795,10 +818,13 @@ def test_import_history_trims_replayed_ioc_value(tmp_path) -> None:
     db_path = tmp_path / "iocparser-import-ioc-value.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
     result = ExtractionResult.from_grouped_payload({"domains": ["example.com"]}, {})
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [("file", "f.txt", result)],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
     payload = export_persisted_history(db_uri=f"sqlite:///{db_path}")
     payload["iocs"][0]["value"] = " example.com "
@@ -854,7 +880,8 @@ def test_persisted_diff_compares_canonical_ioc_values(tmp_path) -> None:
         force_update=False,
         output_format="json",
     )
-    run_ids = service.persist_multiple_runs(
+    run_ids = persist_multiple_runs(
+        service,
         [
             (
                 "file",
@@ -915,7 +942,8 @@ def test_prune_keep_latest_uses_newest_run_id_as_timestamp_tiebreaker(tmp_path) 
         force_update=False,
         output_format="json",
     )
-    run_ids = service.persist_multiple_runs(
+    run_ids = persist_multiple_runs(
+        service,
         [
             (
                 "file",
@@ -956,7 +984,8 @@ def test_prune_keep_latest_uses_newest_run_id_as_timestamp_tiebreaker(tmp_path) 
 def test_query_service_trims_source_kind_filters(tmp_path) -> None:
     db_path = tmp_path / "iocparser-source-kind-filter.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "file",
@@ -965,7 +994,9 @@ def test_query_service_trims_source_kind_filters(tmp_path) -> None:
             )
         ],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
 
     assert service.query_runs_page(limit=10, source_kind="file").total == 1
@@ -977,7 +1008,8 @@ def test_query_service_trims_source_kind_filters(tmp_path) -> None:
 def test_query_service_matches_legacy_spaced_non_url_source_values(tmp_path) -> None:
     db_path = tmp_path / "iocparser-legacy-nonurl-query.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "file",
@@ -986,7 +1018,9 @@ def test_query_service_matches_legacy_spaced_non_url_source_values(tmp_path) -> 
             )
         ],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
 
     checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
@@ -1005,7 +1039,8 @@ def test_query_service_matches_legacy_spaced_non_url_source_values(tmp_path) -> 
 def test_prune_runs_trims_source_kind_filters(tmp_path) -> None:
     db_path = tmp_path / "iocparser-prune-source-kind.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "file",
@@ -1014,7 +1049,9 @@ def test_prune_runs_trims_source_kind_filters(tmp_path) -> None:
             )
         ],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
 
     assert service.prune_runs(source_kind=" file ", keep_latest=0) == 1
@@ -1024,7 +1061,8 @@ def test_prune_runs_trims_source_kind_filters(tmp_path) -> None:
 def test_query_persisted_runs_honors_source_kind_filters(tmp_path) -> None:
     db_path = tmp_path / "iocparser-source-kind-api.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "file",
@@ -1038,7 +1076,9 @@ def test_query_persisted_runs_honors_source_kind_filters(tmp_path) -> None:
             ),
         ],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
 
     assert query_persisted_runs(db_uri=f"sqlite:///{db_path}", source_kind="file").total == 1
@@ -1047,7 +1087,8 @@ def test_query_persisted_runs_honors_source_kind_filters(tmp_path) -> None:
 def test_query_service_normalizes_tuple_ioc_type_filters(tmp_path) -> None:
     db_path = tmp_path / "iocparser-ioc-type-filter.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "file",
@@ -1068,7 +1109,8 @@ def test_query_service_normalizes_tuple_ioc_type_filters(tmp_path) -> None:
 def test_query_service_rejects_invalid_min_severity(tmp_path) -> None:
     db_path = tmp_path / "iocparser-invalid-min-severity.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "file",
@@ -1077,7 +1119,9 @@ def test_query_service_rejects_invalid_min_severity(tmp_path) -> None:
             )
         ],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
 
     with pytest.raises(ValueError, match="Invalid min_severity"):
@@ -1087,7 +1131,8 @@ def test_query_service_rejects_invalid_min_severity(tmp_path) -> None:
 def test_query_service_normalizes_source_value_filters(tmp_path) -> None:
     db_path = tmp_path / "iocparser-source-value-filter.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "file",
@@ -1108,7 +1153,8 @@ def test_query_service_normalizes_source_value_filters(tmp_path) -> None:
 def test_query_service_trims_source_kind_and_preserves_url_value_matching(tmp_path) -> None:
     db_path = tmp_path / "iocparser-source-kind-url-filter.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "url",
@@ -1117,7 +1163,9 @@ def test_query_service_trims_source_kind_and_preserves_url_value_matching(tmp_pa
             )
         ],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
 
     assert (
@@ -1137,7 +1185,8 @@ def test_query_service_trims_source_kind_and_preserves_url_value_matching(tmp_pa
 def test_query_service_matches_legacy_padded_url_sources_without_normalized_url(tmp_path) -> None:
     db_path = tmp_path / "iocparser-legacy-url-filter.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "url",
@@ -1146,7 +1195,9 @@ def test_query_service_matches_legacy_padded_url_sources_without_normalized_url(
             )
         ],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
 
     checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
@@ -1159,18 +1210,27 @@ def test_query_service_matches_legacy_padded_url_sources_without_normalized_url(
     finally:
         checker.close()
 
-    assert service.query_runs_page(
-        limit=10, source_kind=" url ", source_value=" HTTPS://Example.TEST/report#frag "
-    ).total == 1
-    assert service.search_iocs_page(
-        value="example.com", source_kind=" url ", source_value=" HTTPS://Example.TEST/report#frag "
-    ).total == 1
+    assert (
+        service.query_runs_page(
+            limit=10, source_kind=" url ", source_value=" HTTPS://Example.TEST/report#frag "
+        ).total
+        == 1
+    )
+    assert (
+        service.search_iocs_page(
+            value="example.com",
+            source_kind=" url ",
+            source_value=" HTTPS://Example.TEST/report#frag ",
+        ).total
+        == 1
+    )
 
 
 def test_query_service_handles_invalid_url_source_value_without_crashing(tmp_path) -> None:
     db_path = tmp_path / "iocparser-invalid-url-filter.sqlite"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "url",
@@ -1179,17 +1239,27 @@ def test_query_service_handles_invalid_url_source_value_without_crashing(tmp_pat
             )
         ],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
 
     assert service.query_runs_page(limit=10, source_kind="url", source_value="not a url").total == 1
-    assert service.search_iocs_page(value="example.com", source_kind="url", source_value="not a url").total == 1
+    assert (
+        service.search_iocs_page(
+            value="example.com", source_kind="url", source_value="not a url"
+        ).total
+        == 1
+    )
 
 
-def test_query_service_matches_canonical_url_against_legacy_blank_normalized_url_source(tmp_path) -> None:
+def test_query_service_matches_canonical_url_against_legacy_blank_normalized_url_source(
+    tmp_path,
+) -> None:
     db_path = tmp_path / "iocparser-legacy-url-filter-blank-normalized.sqlite"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "url",
@@ -1198,7 +1268,9 @@ def test_query_service_matches_canonical_url_against_legacy_blank_normalized_url
             )
         ],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
 
     checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
@@ -1211,18 +1283,25 @@ def test_query_service_matches_canonical_url_against_legacy_blank_normalized_url
     finally:
         checker.close()
 
-    assert service.query_runs_page(
-        limit=10, source_kind="url", source_value="https://example.test/report"
-    ).total == 1
-    assert service.search_iocs_page(
-        value="example.com", source_kind="url", source_value="https://example.test/report"
-    ).total == 1
+    assert (
+        service.query_runs_page(
+            limit=10, source_kind="url", source_value="https://example.test/report"
+        ).total
+        == 1
+    )
+    assert (
+        service.search_iocs_page(
+            value="example.com", source_kind="url", source_value="https://example.test/report"
+        ).total
+        == 1
+    )
 
 
 def test_query_service_matches_canonical_url_against_legacy_uppercase_source(tmp_path) -> None:
     db_path = tmp_path / "iocparser-legacy-url-filter-canonical.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "url",
@@ -1231,7 +1310,9 @@ def test_query_service_matches_canonical_url_against_legacy_uppercase_source(tmp
             )
         ],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
 
     checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
@@ -1244,18 +1325,27 @@ def test_query_service_matches_canonical_url_against_legacy_uppercase_source(tmp
     finally:
         checker.close()
 
-    assert service.query_runs_page(
-        limit=10, source_kind="url", source_value="https://example.test/report"
-    ).total == 1
-    assert service.search_iocs_page(
-        value="example.com", source_kind="url", source_value="https://example.test/report"
-    ).total == 1
+    assert (
+        service.query_runs_page(
+            limit=10, source_kind="url", source_value="https://example.test/report"
+        ).total
+        == 1
+    )
+    assert (
+        service.search_iocs_page(
+            value="example.com", source_kind="url", source_value="https://example.test/report"
+        ).total
+        == 1
+    )
 
 
-def test_query_service_does_not_match_canonical_url_against_legacy_different_suffix(tmp_path) -> None:
+def test_query_service_does_not_match_canonical_url_against_legacy_different_suffix(
+    tmp_path,
+) -> None:
     db_path = tmp_path / "iocparser-legacy-url-filter-no-false-positive.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "url",
@@ -1264,7 +1354,9 @@ def test_query_service_does_not_match_canonical_url_against_legacy_different_suf
             )
         ],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
 
     checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
@@ -1276,18 +1368,25 @@ def test_query_service_does_not_match_canonical_url_against_legacy_different_suf
     finally:
         checker.close()
 
-    assert service.query_runs_page(
-        limit=10, source_kind="url", source_value="https://example.test/report"
-    ).total == 0
-    assert service.search_iocs_page(
-        value="example.com", source_kind="url", source_value="https://example.test/report"
-    ).total == 0
+    assert (
+        service.query_runs_page(
+            limit=10, source_kind="url", source_value="https://example.test/report"
+        ).total
+        == 0
+    )
+    assert (
+        service.search_iocs_page(
+            value="example.com", source_kind="url", source_value="https://example.test/report"
+        ).total
+        == 0
+    )
 
 
 def test_query_service_does_not_wildcard_match_percent_in_legacy_url_source(tmp_path) -> None:
     db_path = tmp_path / "iocparser-legacy-url-filter-percent.sqlite"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "url",
@@ -1296,7 +1395,9 @@ def test_query_service_does_not_wildcard_match_percent_in_legacy_url_source(tmp_
             )
         ],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
 
     checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
@@ -1308,18 +1409,27 @@ def test_query_service_does_not_wildcard_match_percent_in_legacy_url_source(tmp_
     finally:
         checker.close()
 
-    assert service.query_runs_page(
-        limit=10, source_kind="url", source_value="https://example.test/report?x=100%25"
-    ).total == 0
-    assert service.search_iocs_page(
-        value="example.com", source_kind="url", source_value="https://example.test/report?x=100%25"
-    ).total == 0
+    assert (
+        service.query_runs_page(
+            limit=10, source_kind="url", source_value="https://example.test/report?x=100%25"
+        ).total
+        == 0
+    )
+    assert (
+        service.search_iocs_page(
+            value="example.com",
+            source_kind="url",
+            source_value="https://example.test/report?x=100%25",
+        ).total
+        == 0
+    )
 
 
 def test_query_service_matches_canonical_url_against_legacy_trailing_slash_source(tmp_path) -> None:
     db_path = tmp_path / "iocparser-legacy-url-filter-trailing-slash.sqlite"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "url",
@@ -1328,7 +1438,9 @@ def test_query_service_matches_canonical_url_against_legacy_trailing_slash_sourc
             )
         ],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
 
     checker = SQLAlchemyUnitOfWork(f"sqlite:///{db_path}")
@@ -1340,18 +1452,25 @@ def test_query_service_matches_canonical_url_against_legacy_trailing_slash_sourc
     finally:
         checker.close()
 
-    assert service.query_runs_page(
-        limit=10, source_kind="url", source_value="https://example.test/report"
-    ).total == 1
-    assert service.search_iocs_page(
-        value="example.com", source_kind="url", source_value="https://example.test/report"
-    ).total == 1
+    assert (
+        service.query_runs_page(
+            limit=10, source_kind="url", source_value="https://example.test/report"
+        ).total
+        == 1
+    )
+    assert (
+        service.search_iocs_page(
+            value="example.com", source_kind="url", source_value="https://example.test/report"
+        ).total
+        == 1
+    )
 
 
 def test_query_service_ignores_blank_source_value_filters(tmp_path) -> None:
     db_path = tmp_path / "iocparser-blank-source-value.db"
     service = SQLAlchemyPersistenceService(f"sqlite:///{db_path}")
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "file",
@@ -1360,7 +1479,9 @@ def test_query_service_ignores_blank_source_value_filters(tmp_path) -> None:
             )
         ],
         tool_version="5.0.0",
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
     )
 
     assert service.query_runs_page(limit=10, source_value="   ").total == 1
@@ -1399,7 +1520,8 @@ def test_persistence_service_persists_multiple_runs(tmp_path) -> None:
         output_format="json",
     )
 
-    run_ids = service.persist_multiple_runs(
+    run_ids = persist_multiple_runs(
+        service,
         [
             ("file", "/tmp/a.txt", result),
             ("url", "https://example.test/report", result),
@@ -1440,7 +1562,8 @@ def test_persistence_service_handles_duplicate_iocs_in_run_result(tmp_path) -> N
         output_format="json",
     )
 
-    (run_id,) = service.persist_multiple_runs(
+    (run_id,) = persist_multiple_runs(
+        service,
         [("file", "/tmp/duplicates.txt", result)],
         tool_version="9.9.9",
         options=options,
@@ -1464,7 +1587,8 @@ def test_persistence_service_preserves_direct_url_source_metadata(tmp_path) -> N
         output_format="json",
     )
 
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "url",
@@ -1491,7 +1615,8 @@ def test_url_source_filter_preserves_path_case_identity(tmp_path) -> None:
         force_update=False,
         output_format="json",
     )
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "url",
@@ -1555,7 +1680,8 @@ def test_date_only_date_to_includes_same_day_runs(tmp_path) -> None:
 
     service = SQLAlchemyPersistenceService(f"sqlite:///{tmp_path / 'date-to.db'}")
     result = ExtractionResult.from_grouped_payload({"domains": ["today.example"]}, {})
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [("file", "t.txt", result)],
         tool_version="1",
         options=PersistOptions(
@@ -1582,7 +1708,8 @@ def test_severity_filter_is_case_insensitive(tmp_path) -> None:
     """
     service = SQLAlchemyPersistenceService(f"sqlite:///{tmp_path / 'sev.db'}")
     result = ExtractionResult.from_grouped_payload({"ips": ["192.168.1.1"]}, {})
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [("file", "t.txt", result)],
         tool_version="1",
         options=PersistOptions(

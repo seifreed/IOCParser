@@ -53,6 +53,7 @@ from iocparser.errors import ValidationError
 from iocparser.infrastructure.extraction import DefaultIOCExtractionEngine
 from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
 from tests.http_server_helpers import LocalHTTPTextServer
+from tests.persistence_helpers import persist_multiple_runs
 
 
 def test_public_api_extract_iocs_from_url_supports_filters() -> None:
@@ -273,7 +274,8 @@ def test_persistence_queries_and_cli_query_paths(tmp_path: Path) -> None:
     service = SQLAlchemyPersistenceService(db_uri)
     result_a = ExtractionResult.from_grouped_payload({"domains": ["alpha.example"]}, {})
     result_b = ExtractionResult.from_grouped_payload({"domains": ["beta.example"]}, {})
-    run_ids = service.persist_multiple_runs(
+    run_ids = persist_multiple_runs(
+        service,
         [
             ("file", "alpha.txt", result_a),
             ("file", "beta.txt", result_b),
@@ -333,7 +335,8 @@ def test_persistence_queries_and_cli_query_paths(tmp_path: Path) -> None:
 def test_cli_export_and_diff_outputs_use_new_renderers(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'iocparser2.db'}"
     service = SQLAlchemyPersistenceService(db_uri)
-    run_ids = service.persist_multiple_runs(
+    run_ids = persist_multiple_runs(
+        service,
         [
             (
                 "file",

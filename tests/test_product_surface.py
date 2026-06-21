@@ -98,6 +98,7 @@ from iocparser.plugins import (
     renderer_names,
 )
 from tests.http_server_helpers import LocalHTTPFileServer, ThreadedHTTPServer
+from tests.persistence_helpers import persist_multiple_runs
 
 
 def _args(**overrides: object) -> argparse.Namespace:
@@ -212,7 +213,9 @@ def test_resolve_tls_options_rejects_missing_paths_cleanly(tmp_path: object) -> 
         )
 
 
-def test_resolve_tls_options_expands_user_home_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_tls_options_expands_user_home_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from iocparser.cli_runtime_defaults import resolve_tls_options
 
     home = tmp_path / "home"
@@ -376,7 +379,8 @@ class SlowLocalHTTPServer(ThreadedHTTPServer):
 def test_public_query_api_and_diff_previous_source(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'queries.db'}"
     service = SQLAlchemyPersistenceService(db_uri)
-    run_ids = service.persist_multiple_runs(
+    run_ids = persist_multiple_runs(
+        service,
         [
             (
                 "file",
@@ -756,7 +760,9 @@ def test_retry_report_attempts_follow_filtered_failed_items(tmp_path: Path) -> N
     assert report["items"][0]["retry_attempt"] == 6
 
 
-def test_retry_report_expands_user_home_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_retry_report_expands_user_home_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     report_path = tmp_path / "home" / "report.json"
     report_path.parent.mkdir()
     report_path.write_text(
@@ -1169,7 +1175,8 @@ def test_url_sources_reuse_same_identity_across_direct_and_downloader_style_norm
 def test_persist_multiple_runs_reuses_canonical_url_identity(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'normalized-source-bulk.sqlite'}"
     service = SQLAlchemyPersistenceService(db_uri)
-    run_ids = service.persist_multiple_runs(
+    run_ids = persist_multiple_runs(
+        service,
         [
             (
                 "url",
@@ -1507,7 +1514,9 @@ def test_public_rich_extraction_api(tmp_path: Path) -> None:
     assert text_result.iocs
 
 
-def test_public_rich_extraction_api_expands_user_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_public_rich_extraction_api_expands_user_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     home = tmp_path / "home"
     home.mkdir()
     sample = home / "sample.txt"
@@ -1592,7 +1601,8 @@ def test_render_result_supports_summary_and_analyst_filters() -> None:
 
 def test_save_diff_output_supports_counts_and_selective_sections(tmp_path: Path) -> None:
     diff = SQLAlchemyPersistenceService(f"sqlite:///{tmp_path / 'diff.db'}")
-    run_ids = diff.persist_multiple_runs(
+    run_ids = persist_multiple_runs(
+        diff,
         [
             (
                 "file",
@@ -1630,7 +1640,8 @@ def test_diff_previous_source_uses_run_id_to_break_started_at_ties(tmp_path: Pat
 
     db_uri = f"sqlite:///{tmp_path / 'diff-started-at-tie.db'}"
     service = SQLAlchemyPersistenceService(db_uri)
-    run_ids = service.persist_multiple_runs(
+    run_ids = persist_multiple_runs(
+        service,
         [
             (
                 "file",
@@ -2035,7 +2046,8 @@ def test_persistence_query_service_raises_for_missing_runs(tmp_path: Path) -> No
     with pytest.raises(ValueError, match="Run not found"):
         service.diff_run_against_previous_source(run_id=999)
 
-    run_ids = service.persist_multiple_runs(
+    run_ids = persist_multiple_runs(
+        service,
         [
             (
                 "file",
@@ -2080,7 +2092,8 @@ def test_public_render_api_and_semantic_diff_filters(tmp_path: Path) -> None:
         ),
     )
     updated = ExtractionResult(iocs=(IOC.from_raw("urls", "https://beta.example/path"),))
-    run_ids = service.persist_multiple_runs(
+    run_ids = persist_multiple_runs(
+        service,
         [
             ("file", "alpha.txt", initial),
             ("file", "alpha.txt", updated),
@@ -2222,7 +2235,8 @@ def test_query_filters_and_previous_successful_baseline(tmp_path: Path) -> None:
             ),
         ),
     )
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [("file", "sample.txt", warning_result)],
         tool_version="5.0.0",
         options=PersistOptions(
@@ -2375,7 +2389,8 @@ def test_export_run_rehydrates_legacy_warning_tags(tmp_path: Path) -> None:
             ),
         ),
     )
-    (run_id,) = service.persist_multiple_runs(
+    (run_id,) = persist_multiple_runs(
+        service,
         [("file", "legacy-warning.txt", warning_result)],
         tool_version="5.0.0",
         options=PersistOptions(
@@ -2728,7 +2743,8 @@ def test_schema_migration_status_and_retry_failed_batch(tmp_path: Path) -> None:
 def test_delete_and_prune_persisted_runs(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'maint.db'}"
     service = SQLAlchemyPersistenceService(db_uri)
-    run_ids = service.persist_multiple_runs(
+    run_ids = persist_multiple_runs(
+        service,
         [
             (
                 "file",
@@ -2765,7 +2781,8 @@ def test_prune_persisted_runs_accepts_string_statuses(tmp_path: Path) -> None:
     """
     db_uri = f"sqlite:///{tmp_path / 'prune-status.db'}"
     service = SQLAlchemyPersistenceService(db_uri)
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [("file", "s.txt", ExtractionResult.from_grouped_payload({"domains": ["a.example"]}, {}))],
         tool_version="6.0.0",
         options=PersistOptions(
@@ -2810,7 +2827,8 @@ def test_plugin_registry_and_structured_records(tmp_path: Path) -> None:
 
     db_uri = f"sqlite:///{tmp_path / 'plugins.sqlite'}"
     service = SQLAlchemyPersistenceService(db_uri)
-    run_ids = service.persist_multiple_runs(
+    run_ids = persist_multiple_runs(
+        service,
         [
             (
                 "file",

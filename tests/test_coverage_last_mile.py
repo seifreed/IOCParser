@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from iocparser.domain.models import IOC, ExtractionResult, WarningMatch
 from iocparser.errors import ValidationError
 from tests.coverage_helpers import fresh_db
+from tests.persistence_helpers import persist_multiple_runs
 
 
 # renderers_json.py:120 — dict decode from JSON parse
@@ -83,7 +84,8 @@ def test_api_optional_str_and_datetime_trim_whitespace() -> None:
     with TemporaryDirectory() as d:
         db_uri = f"sqlite:///{Path(d) / 't.db'}"
         service = SQLAlchemyPersistenceService(db_uri)
-        service.persist_multiple_runs(
+        persist_multiple_runs(
+            service,
             [
                 (
                     "file",

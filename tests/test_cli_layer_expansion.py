@@ -44,6 +44,7 @@ from iocparser.infrastructure.http_download import RequestsURLDownloader
 from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
 from iocparser.infrastructure.runtime import LocalFileWriter
 from iocparser.infrastructure.warninglists_service import MISPWarningListService
+from tests.persistence_helpers import persist_multiple_runs
 
 
 class StaticQueryService:
@@ -529,7 +530,8 @@ def test_cli_output_helpers_cover_text_and_export_paths(tmp_path: Path) -> None:
 def test_cli_diff_invalid_ioc_type_raises_validation_error(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'diff-bad-type.sqlite'}"
     service = SQLAlchemyPersistenceService(db_uri)
-    run_ids = service.persist_multiple_runs(
+    run_ids = persist_multiple_runs(
+        service,
         [
             ("file", "alpha.txt", ExtractionResult.from_grouped_payload({"domains": ["a.x"]}, {})),
             ("file", "beta.txt", ExtractionResult.from_grouped_payload({"domains": ["b.x"]}, {})),
@@ -557,7 +559,8 @@ def test_cli_diff_invalid_ioc_type_raises_validation_error(tmp_path: Path) -> No
 def test_cli_queries_and_dispatch_paths(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'queries.sqlite'}"
     service = SQLAlchemyPersistenceService(db_uri)
-    run_ids = service.persist_multiple_runs(
+    run_ids = persist_multiple_runs(
+        service,
         [
             (
                 "file",

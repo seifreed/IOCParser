@@ -83,6 +83,7 @@ from iocparser.plugins import (
     renderer_names,
 )
 from tests.http_server_helpers import LocalHTTPFileServer
+from tests.persistence_helpers import persist_multiple_runs
 
 
 class _Writer:
@@ -206,7 +207,8 @@ def test_fts_search_finds_ipv4_address(tmp_path: Path) -> None:
     """
     db_uri = f"sqlite:///{tmp_path / 'fts-ipv4.sqlite'}"
     service = SQLAlchemyPersistenceService(db_uri)
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [("file", "f.txt", ExtractionResult.from_grouped_payload({"ips": ["1.2.3.4"]}, {}))],
         tool_version="1.0.0",
         options=PersistOptions(
@@ -228,7 +230,8 @@ def test_auto_search_backend_uses_substring_even_with_fts_table(tmp_path: Path) 
     """
     db_uri = f"sqlite:///{tmp_path / 'auto.sqlite'}"
     service = SQLAlchemyPersistenceService(db_uri)
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "file",
@@ -268,7 +271,8 @@ def test_fts_backend_falls_back_to_substring_without_fts_table(
 
     db_uri = f"sqlite:///{tmp_path / 'nofts-fallback.sqlite'}"
     service = SQLAlchemyPersistenceService(db_uri)
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "file",

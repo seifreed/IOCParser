@@ -111,6 +111,7 @@ from iocparser.plugins import (
     register_postprocessor,
 )
 from tests.http_server_helpers import LocalHTTPFileServer
+from tests.persistence_helpers import persist_multiple_runs
 
 
 class _Writer:
@@ -523,19 +524,28 @@ def test_public_query_api_validates_dates_and_min_severity(tmp_path: Path) -> No
     assert hashes_diff.added.total_count() == 1
     assert hashes_diff.removed.total_count() == 1
     assert {str(ioc_type) for ioc_type in hashes_diff.added.canonical_by_type()} == {"md5"}
-    assert query_persisted_iocs(
-        db_uri=db_uri, value="d41d8cd98f00b204e9800998ecf8427e", ioc_type=("hashes",)
-    ).total == 1
-    assert diff_persisted_runs(
-        db_uri=db_uri,
-        left_run_id=hash_left,
-        right_run_id=hash_right,
-        ioc_type=("hashes",),
-    ).added.total_count() == 1
-    assert client.search_iocs(value="d41d8cd98f00b204e9800998ecf8427e", ioc_type="hashes").total == 1
-    assert client.search_iocs(
-        value="d41d8cd98f00b204e9800998ecf8427e", ioc_type=("hashes",)
-    ).total == 1
+    assert (
+        query_persisted_iocs(
+            db_uri=db_uri, value="d41d8cd98f00b204e9800998ecf8427e", ioc_type=("hashes",)
+        ).total
+        == 1
+    )
+    assert (
+        diff_persisted_runs(
+            db_uri=db_uri,
+            left_run_id=hash_left,
+            right_run_id=hash_right,
+            ioc_type=("hashes",),
+        ).added.total_count()
+        == 1
+    )
+    assert (
+        client.search_iocs(value="d41d8cd98f00b204e9800998ecf8427e", ioc_type="hashes").total == 1
+    )
+    assert (
+        client.search_iocs(value="d41d8cd98f00b204e9800998ecf8427e", ioc_type=("hashes",)).total
+        == 1
+    )
     rendered_hashes_diff = render_persisted_diff(
         db_uri=db_uri,
         left_run_id=hash_left,
@@ -692,7 +702,8 @@ def test_public_persistence_run_ids_reject_non_integer_values(tmp_path: Path) ->
 def test_persistence_client_exposes_remaining_service_methods(tmp_path: Path) -> None:
     db_uri = f"sqlite:///{tmp_path / 'client-remaining.sqlite'}"
     service = SQLAlchemyPersistenceService(db_uri)
-    first_run_id, second_run_id = service.persist_multiple_runs(
+    first_run_id, second_run_id = persist_multiple_runs(
+        service,
         [
             (
                 "file",
@@ -739,9 +750,7 @@ def test_persistence_client_exposes_remaining_service_methods(tmp_path: Path) ->
                 "retry_attempt": 1,
             }
         ],
-        "run_metadata_map": {
-            "https://batch.example/path": {"status": "failed", "failed_items": 1}
-        },
+        "run_metadata_map": {"https://batch.example/path": {"status": "failed", "failed_items": 1}},
     }
     failed_run_ids = persist_failed_batch_items(
         report,
@@ -767,7 +776,8 @@ def test_direct_persistence_services_do_not_treat_negative_limits_as_unbounded(
 ) -> None:
     db_uri = f"sqlite:///{tmp_path / 'negative-limit.sqlite'}"
     service = SQLAlchemyPersistenceService(db_uri)
-    service.persist_multiple_runs(
+    persist_multiple_runs(
+        service,
         [
             (
                 "file",
@@ -1272,7 +1282,9 @@ def test_persist_many_results_preserves_batch_error_message(tmp_path: Path, monk
     run_ids = persist_many_results(
         results,
         config=config,
-        options=PersistOptions(defang=False, check_warnings=False, force_update=False, output_format="json"),
+        options=PersistOptions(
+            defang=False, check_warnings=False, force_update=False, output_format="json"
+        ),
         source_kind="file",
     )
 
@@ -1790,11 +1802,7 @@ def test_retry_failed_report_can_filter_by_error_type_and_text(
     retry_report = home / "retry.json"
     retry_report.write_text(
         json.dumps(
-            {
-                "items": [
-                    {"url": "https://one.example", "status": "failed", "retry_attempt": 4}
-                ]
-            }
+            {"items": [{"url": "https://one.example", "status": "failed", "retry_attempt": 4}]}
         ),
         encoding="utf-8",
     )
@@ -2013,12 +2021,16 @@ def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_pa
     timestamp = "2026-01-01T00:00:00"
     assert import_history_raw(db_uri, {"sources": "bad"})["sources"] == 0
     assert import_history_raw(db_uri, {"sources": [1]})["sources"] == 0
-    assert import_history_raw(db_uri, {"sources": [{"id": 1, "kind": None, "value": None}]})[
-        "sources"
-    ] == 0
-    assert import_history_raw(db_uri, {"sources": [{"id": 1, "kind": "text", "value": "x"}]})[
-        "sources"
-    ] == 0
+    assert (
+        import_history_raw(db_uri, {"sources": [{"id": 1, "kind": None, "value": None}]})["sources"]
+        == 0
+    )
+    assert (
+        import_history_raw(db_uri, {"sources": [{"id": 1, "kind": "text", "value": "x"}]})[
+            "sources"
+        ]
+        == 0
+    )
     assert (
         import_history_raw(
             db_uri,
@@ -2036,18 +2048,35 @@ def test_history_batch_session_plugin_entry_points_and_dispatch_shortcuts(tmp_pa
         )["sources"]
         == 0
     )
-    assert import_history_raw(
-        db_uri, {"iocs": [{"id": 1, "ioc_type": None, "value": "x", "is_warning": False}]}
-    )["iocs"] == 0
-    assert import_history_raw(
-        db_uri, {"iocs": [{"id": 1, "ioc_type": "domain", "value": None, "is_warning": False}]}
-    )["iocs"] == 0
-    assert import_history_raw(
-        db_uri, {"iocs": [{"id": 2, "ioc_type": "domain", "value": " ", "is_warning": False}]}
-    )["iocs"] == 0
-    assert import_history_raw(
-        db_uri, {"batch_jobs": [{"id": 1, "source_kind": None, "started_at": None, "finished_at": None}]}
-    )["batch_jobs"] == 0
+    assert (
+        import_history_raw(
+            db_uri, {"iocs": [{"id": 1, "ioc_type": None, "value": "x", "is_warning": False}]}
+        )["iocs"]
+        == 0
+    )
+    assert (
+        import_history_raw(
+            db_uri, {"iocs": [{"id": 1, "ioc_type": "domain", "value": None, "is_warning": False}]}
+        )["iocs"]
+        == 0
+    )
+    assert (
+        import_history_raw(
+            db_uri, {"iocs": [{"id": 2, "ioc_type": "domain", "value": " ", "is_warning": False}]}
+        )["iocs"]
+        == 0
+    )
+    assert (
+        import_history_raw(
+            db_uri,
+            {
+                "batch_jobs": [
+                    {"id": 1, "source_kind": None, "started_at": None, "finished_at": None}
+                ]
+            },
+        )["batch_jobs"]
+        == 0
+    )
     assert (
         import_history_raw(
             db_uri,
@@ -2880,11 +2909,14 @@ def test_import_history_normalizes_replayed_failed_batch_item_identity_fields(
     assert import_history_raw(target_db_uri, payload)["failed_batch_items"] == 0
     imported_jobs = list_failed_batch_jobs(db_uri=target_db_uri, limit=10)
     assert len(imported_jobs) == 1
-    assert len(
-        list_failed_batch_items(
-            db_uri=target_db_uri, batch_job_id=imported_jobs[0].batch_job_id
+    assert (
+        len(
+            list_failed_batch_items(
+                db_uri=target_db_uri, batch_job_id=imported_jobs[0].batch_job_id
+            )
         )
-    ) == 2
+        == 2
+    )
 
 
 def test_import_history_normalizes_replayed_batch_job_identity_fields(
@@ -2917,8 +2949,8 @@ def test_import_history_normalizes_replayed_batch_job_identity_fields(
     payload = export_persisted_history(db_uri=source_db_uri)
     payload["batch_jobs"][0]["source_kind"] = " URL "
     payload["batch_jobs"][0]["status"] = " failed "
-    payload["batch_jobs"][0]["error_summary_json"] = "{\n  \"TimeoutError\": 1\n}"
-    payload["batch_jobs"][0]["metrics_json"] = "{\n  \"duration_ms\": 10\n}"
+    payload["batch_jobs"][0]["error_summary_json"] = '{\n  "TimeoutError": 1\n}'
+    payload["batch_jobs"][0]["metrics_json"] = '{\n  "duration_ms": 10\n}'
 
     assert import_history_raw(target_db_uri, payload)["batch_jobs"] == 1
     assert import_history_raw(target_db_uri, payload)["batch_jobs"] == 0

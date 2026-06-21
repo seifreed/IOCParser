@@ -12,6 +12,7 @@ from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import BinaryIO, TextIO, cast
 
+from iocparser.domain.values import indicator_value_for
 from iocparser.errors import IOCFileNotFoundError
 from iocparser.infrastructure.file_parser import detect_bom_encoding
 from iocparser.infrastructure.logger import get_logger
@@ -33,6 +34,19 @@ logger = get_logger(__name__)
 # plus scheme/host/port/userinfo headroom) guarantees boundary recovery for every
 # realistic IOC. The default 1 KB overlap was below this and dropped long boundary URLs.
 _BOUNDARY_IOC_LENGTH_CAP = 4096
+
+
+def _canonical_dedup_key(ioc_type: str, value: str) -> str:
+    """Per-type canonical dedup key for streaming, mirroring canonical_by_type.
+
+    Case-insensitive types (domains, hashes, IPs, ...) fold to lowercase; URL paths
+    and ssdeep digests keep their case so case-distinct values are not merged. Falls
+    back to the raw value for unregistered custom types (where no canonical exists).
+    """
+    try:
+        return indicator_value_for(ioc_type, value).canonical()
+    except ValueError:
+        return value
 
 
 def _aligned_utf8_chunk_end(
@@ -189,7 +203,9 @@ class StreamingIOCExtractor:
             Deduplicated IOCs
         """
         result: dict[str, list[str]] = deduplicate_iocs_with_state(
-            new_iocs, seen_iocs if seen_iocs is not None else self.seen_iocs
+            new_iocs,
+            seen_iocs if seen_iocs is not None else self.seen_iocs,
+            key_func=_canonical_dedup_key,
         )
         return result
 

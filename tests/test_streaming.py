@@ -150,6 +150,26 @@ class TestStreamingIOCExtractor:
         # evil.com appears twice in the source but must be de-duplicated to one entry.
         assert sorted(iocs.get("domains", [])) == ["also-bad.net", "evil.com"]
 
+    def test_streaming_keeps_case_distinct_urls(self):
+        """Regression: the streaming dedup keyed on a blanket lowercase, so two URLs
+        differing only by path case collapsed to one (silent data loss) -- unlike the
+        non-streaming path, which keys on the canonical value (URL path case kept).
+        Streaming now uses the same per-type canonical key.
+        """
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as handle:
+            handle.write("see https://evil-corp.net/AbC then https://evil-corp.net/abc end\n")
+            path = handle.name
+        try:
+            extractor = StreamingIOCExtractor(defang=False)
+            urls = extractor.extract_from_file(path).get("urls", [])
+        finally:
+            Path(path).unlink()
+
+        assert sorted(urls) == [
+            "https://evil-corp.net/AbC",
+            "https://evil-corp.net/abc",
+        ]
+
     def test_long_url_straddling_chunk_boundary_is_not_dropped(self):
         """Regression: an IOC longer than the configured overlap that straddles a
         chunk boundary was silently dropped -- should_keep_ioc defers a boundary

@@ -203,14 +203,23 @@ def deduplicate_iocs(
 def deduplicate_iocs_with_state(
     new_iocs: dict[str, list[str]],
     seen_iocs: dict[str, set[str]],
+    *,
+    key_func: Callable[[str, str], str] | None = None,
 ) -> dict[str, list[str]]:
-    """Remove duplicate IOCs using external state tracking (case-insensitive)."""
+    """Remove duplicate IOCs using external state tracking.
+
+    Without ``key_func`` the dedup key is a blanket lowercase (case-insensitive).
+    Pass ``key_func(ioc_type, value)`` to supply a per-type canonical key so
+    case-sensitive types (URL paths, ssdeep digests) are not wrongly merged --
+    a blanket lowercase silently dropped case-distinct URLs, matching the bug
+    already fixed in the domain ``grouped_iocs``/``canonical_by_type`` dedup.
+    """
     unique_iocs: dict[str, list[str]] = {}
     for ioc_type, ioc_list in new_iocs.items():
         unique = []
         type_seen = seen_iocs.setdefault(ioc_type, set())
         for ioc in ioc_list:
-            key = ioc.lower()
+            key = key_func(ioc_type, ioc) if key_func is not None else ioc.lower()
             if key not in type_seen:
                 type_seen.add(key)
                 unique.append(ioc)

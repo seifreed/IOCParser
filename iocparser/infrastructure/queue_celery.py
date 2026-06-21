@@ -7,7 +7,6 @@ from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
 from iocparser.infrastructure.queue_records import (
     import_optional_backend_module,
     materialize_queue_envelope,
-    serialize_queue_record,
 )
 
 
@@ -87,8 +86,3 @@ class CeleryQueueAdapter:
                 submitted_at=envelope.submitted_at,
             ),
         )
-
-
-def build_celery_task_payload(envelope: QueueEnvelope) -> str:
-    """Serialize a queue envelope for external Celery workers."""
-    return serialize_queue_record(materialize_queue_envelope(envelope))

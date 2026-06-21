@@ -26,7 +26,7 @@ from iocparser.domain.pipeline import PipelineErrorInfo, PipelineJobRequest, Res
 from iocparser.errors import IOCTimeoutError
 from iocparser.infrastructure.persistence_distributed import SQLAlchemyDistributedJobService
 from iocparser.infrastructure.persistence_schema import SQLAlchemyUnitOfWork
-from iocparser.infrastructure.queue_celery import CeleryQueueAdapter, build_celery_task_payload
+from iocparser.infrastructure.queue_celery import CeleryQueueAdapter
 from iocparser.infrastructure.queue_factory import create_queue_adapter
 from iocparser.infrastructure.queue_filesystem import FilesystemQueueAdapter
 from iocparser.infrastructure.queue_rabbitmq import RabbitMQQueueAdapter
@@ -950,7 +950,6 @@ def test_queue_factory_and_optional_queue_adapters(
         celery.ack(receipt)
         celery.requeue(receipt, envelope=envelope)
         celery.dead_letter(receipt, envelope=envelope)
-        assert json.loads(build_celery_task_payload(envelope))["queue_name"] == "jobs"
 
     with pytest.raises(ValueError, match="requires queue_url"):
         create_queue_adapter("rabbitmq")

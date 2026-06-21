@@ -84,14 +84,11 @@ class DistributedWorkerService:
         return max(1, int(raw_workers))
 
     def _inflight_capacity(self) -> int:
-        """Backpressure threshold the processor enforces (its max in-flight reservations).
+        """Processor backpressure threshold (max in-flight reservations = max_queue_size).
 
-        The processor's reservation guard raises once ``max_queue_size`` jobs are
-        concurrently in flight. Running more worker threads than that cap makes the
-        surplus jobs hit backpressure inside ``process_next``, which treats the raised
-        RuntimeError as an unhandled error and dead-letters a job that was never actually
-        processed. The pool is sized to this cap so the worker never trips its own guard.
-        Falls back to ``concurrency`` when no usable cap is exposed (e.g. a stub service).
+        Sizing the pool above this makes surplus workers trip the reservation guard, whose
+        RuntimeError process_next dead-letters as an unprocessed job. Falls back to
+        ``concurrency`` when no usable cap is exposed (e.g. a stub service).
         """
         processor = getattr(self.service, "processor", None)
         limits = getattr(processor, "limits", None)

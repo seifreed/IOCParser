@@ -131,7 +131,10 @@ def test_grouped_infrastructure_subpackages_stay_small_enough_to_review() -> Non
         # whole day (compare `< next day`) instead of excluding same-day runs at midnight.
         IOCPARSER_ROOT / "infrastructure" / "persistence" / "query": 713,
         IOCPARSER_ROOT / "infrastructure" / "queueing": 30,
-        IOCPARSER_ROOT / "infrastructure" / "runtime": 45,
+        # 45 -> 55 for limits.py: runtime_limits_guard now warns once that the
+        # orchestrator-level limits (memory/cpu/hard-timeout) are not enforced in-process
+        # instead of silently discarding them.
+        IOCPARSER_ROOT / "infrastructure" / "runtime": 55,
         IOCPARSER_ROOT / "infrastructure" / "migration_revisions": 80,
     }
     for directory, limit in limits.items():
@@ -171,7 +174,10 @@ def test_public_facades_stay_thin() -> None:
         IOCPARSER_ROOT / "distributed_pipeline.py": 145,
         # Raised from 145 for graceful-shutdown stop_event propagation into the
         # per-cycle run loop (prompt break on stop instead of draining the batch).
-        IOCPARSER_ROOT / "worker_service.py": 152,
+        # Raised from 152 to cap the worker pool at the processor's max_queue_size
+        # in-flight guard (_inflight_capacity), so an over-subscribed pool no longer
+        # dead-letters surplus jobs as backpressure errors.
+        IOCPARSER_ROOT / "worker_service.py": 178,
         IOCPARSER_ROOT / "cli_schema.py": 220,
         IOCPARSER_ROOT / "domain" / "models.py": 60,
         IOCPARSER_ROOT / "infrastructure" / "warninglists.py": 180,
@@ -476,3 +482,30 @@ def test_root_runtime_limits_is_thin_fascade() -> None:
     from iocparser.infrastructure.runtime.limits import runtime_limits_guard
 
     assert callable(runtime_limits_guard)
+
+
+def test_runtime_limits_guard_warns_once_for_unenforced_limits(caplog, monkeypatch) -> None:
+    """Configured orchestrator-level limits must warn once instead of silently no-opping."""
+    import iocparser.infrastructure.runtime.limits as limits_module
+
+    logger_name = "iocparser.infrastructure.runtime.limits"
+    monkeypatch.setitem(limits_module._warn_state, "warned", False)
+    with caplog.at_level("WARNING", logger=logger_name):
+        with limits_module.runtime_limits_guard(hard_timeout_seconds=5, cpu_seconds=3):
+            pass
+        first = caplog.text
+        with limits_module.runtime_limits_guard(memory_limit_bytes=1024):
+            pass
+        warned_again = caplog.text[len(first):]
+
+    assert "not enforced in-process" in first
+    assert "hard_timeout_seconds" in first
+    assert "cpu_seconds" in first
+    assert "not enforced" not in warned_again  # warn-once, even for a different limit
+
+    monkeypatch.setitem(limits_module._warn_state, "warned", False)
+    caplog.clear()
+    with caplog.at_level("WARNING", logger=logger_name):
+        with limits_module.runtime_limits_guard():
+            pass
+    assert "not enforced" not in caplog.text  # all-None never warns

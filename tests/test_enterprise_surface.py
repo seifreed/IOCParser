@@ -8,7 +8,6 @@ from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import create_engine, inspect
-from sqlalchemy.orm import Session
 
 from iocparser import (
     api_extraction,
@@ -69,7 +68,7 @@ from iocparser.infrastructure.persistence import (
 from iocparser.infrastructure.persistence.history import get_batch_job as get_batch_job_history
 from iocparser.infrastructure.persistence.history import list_batch_jobs as list_batch_jobs_history
 from iocparser.infrastructure.persistence.history import list_batch_runs as list_batch_runs_history
-from iocparser.infrastructure.persistence_fts import build_fts_query, has_fts_table, sync_fts_index
+from iocparser.infrastructure.persistence_fts import build_fts_query, has_fts_table
 from iocparser.plugins import (
     custom_ioc_types,
     get_ioc_type_plugin,
@@ -356,7 +355,6 @@ def test_custom_ioc_types_fts_and_public_batch_api(tmp_path: Path) -> None:
     uow = SQLAlchemyUnitOfWork(db_uri)
     try:
         assert has_fts_table(uow.engine) is True
-        sync_fts_index(uow.session)
     finally:
         uow.close()
     assert build_fts_query("ok example") == '"ok example"*'
@@ -364,11 +362,6 @@ def test_custom_ioc_types_fts_and_public_batch_api(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="alphanumeric term"):
         service.search_iocs_page(value="!!!", search_backend="fts")
     assert service.search_iocs_page(value="ok", search_backend="like").total >= 1
-    empty_uow = SQLAlchemyUnitOfWork(f"sqlite:///{tmp_path / 'nofts.sqlite'}")
-    try:
-        sync_fts_index(empty_uow.session)
-    finally:
-        empty_uow.close()
 
     jobs = list_batch_jobs_api(db_uri=db_uri, limit=5)
     detail = get_batch_job_api(db_uri=db_uri, batch_job_id=batch_job_id)
@@ -690,13 +683,6 @@ def test_cli_plugin_paths_and_batch_queries(
     output = capsys.readouterr().out
     assert "Phase timings (ms)" in output
     assert 'metrics\t{"duration_ms": 10}' in output
-
-    blank_engine = create_engine(f"sqlite:///{tmp_path / 'blank-no-fts.sqlite'}", future=True)
-    try:
-        with Session(blank_engine) as blank_session:
-            sync_fts_index(blank_session)
-    finally:
-        blank_engine.dispose()
 
 
 def test_search_index_revision_is_noop_without_known_tables(tmp_path: Path) -> None:

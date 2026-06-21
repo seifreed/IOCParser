@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import re
 
-from sqlalchemy import Engine, Inspector, inspect, text
-from sqlalchemy.orm import Session
+from sqlalchemy import Engine, Inspector, inspect
 
 FTS_TABLE = "ioc_search_fts"
 
@@ -47,12 +46,3 @@ def rebuild_fts_statements() -> tuple[str, str]:
         "INSERT INTO ioc_search_fts(rowid, value, ioc_type) "
         "SELECT id, value_search, ioc_type FROM iocs",
     )
-
-
-def sync_fts_index(session: Session) -> None:
-    """Rebuild the IOC FTS index from the canonical IOC table."""
-    bind = session.get_bind()
-    if not has_fts_table(bind):
-        return
-    for statement in rebuild_fts_statements():
-        session.execute(text(statement))

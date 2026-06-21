@@ -2957,7 +2957,8 @@ def test_ioc_type_plugin_lookup_loads_entry_points() -> None:
     original_entry_points = plugins_module.entry_points
     try:
         plugins_module.entry_points = _EntryPoints
-        definition = plugins_module.get_ioc_type_plugin("entry-ioc-type")
+        plugins_module._load_entry_point_plugins()
+        definition = plugins_module._ioc_type_plugin_definition("entry-ioc-type")
         assert definition["name"] == "entry_ioc_type"
     finally:
         plugins_module.entry_points = original_entry_points

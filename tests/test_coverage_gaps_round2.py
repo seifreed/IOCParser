@@ -388,12 +388,12 @@ class TestPluginRegistration:
         assert "test_pp_x" in postprocessor_names()
 
     def test_register_ioc_type_plugin_and_resolve(self) -> None:
-        from iocparser.plugins import get_ioc_type_plugin, register_ioc_type_plugin
+        from iocparser.plugins import _ioc_type_plugin_definition, register_ioc_type_plugin
 
         register_ioc_type_plugin(
             "test_ioc_type_x", lambda: {"name": "test_ioc_type_x", "base_type": "urls"}
         )
-        definition = get_ioc_type_plugin("test_ioc_type_x")
+        definition = _ioc_type_plugin_definition("test_ioc_type_x")
         assert definition["name"] == "test_ioc_type_x"
 
     def test_unknown_plugin_names_raise_clean_validation_error(self) -> None:

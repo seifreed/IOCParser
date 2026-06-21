@@ -70,8 +70,8 @@ from iocparser.infrastructure.persistence.history import list_batch_jobs as list
 from iocparser.infrastructure.persistence.history import list_batch_runs as list_batch_runs_history
 from iocparser.infrastructure.persistence_fts import build_fts_query, has_fts_table
 from iocparser.plugins import (
+    _ioc_type_plugin_definition,
     custom_ioc_types,
-    get_ioc_type_plugin,
     get_renderer,
     ioc_type_plugin_names,
     postprocessor_names,
@@ -307,7 +307,7 @@ def test_custom_ioc_types_fts_and_public_batch_api(tmp_path: Path) -> None:
             "tags": ("wallet",),
         },
     )
-    plugin_definition = get_ioc_type_plugin("wallet-tag")
+    plugin_definition = _ioc_type_plugin_definition("wallet-tag")
     assert plugin_definition["name"] == "wallet_tags"
     assert "wallet-tag" in ioc_type_plugin_names()
     assert "telegram_handles" in custom_ioc_types()

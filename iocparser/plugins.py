@@ -179,12 +179,6 @@ def _ioc_type_plugin_definition(name: str) -> dict[str, object]:
     return dict(_ioc_type_registry[name.lower()]())
 
 
-def get_ioc_type_plugin(name: str) -> dict[str, object]:
-    """Resolve a custom IOC type plugin definition."""
-    _load_entry_point_plugins()
-    return _ioc_type_plugin_definition(name)
-
-
 def ioc_type_plugin_names() -> tuple[str, ...]:
     """List registered IOC type plugin names."""
     _load_entry_point_plugins()

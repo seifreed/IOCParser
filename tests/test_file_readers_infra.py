@@ -13,7 +13,6 @@ from iocparser.infrastructure.file_parser import HTMLParser
 from iocparser.infrastructure.file_readers import (
     MagicTextSourceReader,
     detect_file_type,
-    read_text_content,
 )
 from tests.http_server_helpers import LocalHTTPTextServer
 
@@ -29,7 +28,7 @@ def test_read_text_content_reads_plain_text(tmp_path: Path) -> None:
     sample.write_text("IOC domain: example.com", encoding="utf-8")
 
     assert (
-        read_text_content(str(sample), ExtractionOptions(file_type="text"))
+        MagicTextSourceReader().read(str(sample), ExtractionOptions(file_type="text"))
         == "IOC domain: example.com"
     )
 
@@ -41,7 +40,7 @@ def test_read_text_content_routes_xml_to_xml_parser(tmp_path: Path) -> None:
         "<config><script>1.2.3.4</script><node>5.6.7.8</node></config>", encoding="utf-8"
     )
 
-    text = read_text_content(str(sample), ExtractionOptions(file_type="xml"))
+    text = MagicTextSourceReader().read(str(sample), ExtractionOptions(file_type="xml"))
 
     assert "1.2.3.4" in text
     assert "5.6.7.8" in text

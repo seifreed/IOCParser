@@ -156,8 +156,3 @@ def detect_file_type_by_extension(file_path: Path) -> str:
 def detect_file_type(file_path: Path) -> str:
     """Module-level convenience wrapper for file type detection."""
     return _default_reader().detect_file_type(file_path)
-
-
-def read_text_content(file_path: str, options: ExtractionOptions) -> str:
-    """Module-level convenience wrapper for reading a text source."""
-    return _default_reader().read(file_path, options)

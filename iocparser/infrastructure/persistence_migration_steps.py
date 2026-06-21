@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 from sqlalchemy import Engine, Inspector, text
@@ -142,26 +143,21 @@ def upgrade_legacy_schema(engine: Engine, inspector: Inspector) -> None:
 
 
 def upgrade_to_version(engine: Engine, inspector: Inspector, version: int) -> None:
-    if version == 2:
-        upgrade_to_v2(engine, inspector)
-    elif version == 3:
-        upgrade_to_v3(engine, inspector)
-    elif version == 4:
-        upgrade_to_v4(engine, inspector)
-    elif version == 5:
-        apply_rev_0005(engine, inspector)
-    elif version == 6:
-        apply_rev_0006(engine, inspector)
-    elif version == 7:
-        apply_rev_0007(engine, inspector)
-    elif version == 8:
-        apply_rev_0008(engine, inspector)
-    elif version == 9:
-        apply_rev_0009(engine, inspector)
-    elif version == 10:
-        apply_rev_0010(engine, inspector)
-    elif version == 11:
-        apply_rev_0011(engine, inspector)
+    upgraders: dict[int, Callable[[Engine, Inspector], None]] = {
+        2: upgrade_to_v2,
+        3: upgrade_to_v3,
+        4: upgrade_to_v4,
+        5: apply_rev_0005,
+        6: apply_rev_0006,
+        7: apply_rev_0007,
+        8: apply_rev_0008,
+        9: apply_rev_0009,
+        10: apply_rev_0010,
+        11: apply_rev_0011,
+    }
+    upgrader = upgraders.get(version)
+    if upgrader is not None:
+        upgrader(engine, inspector)
 
 
 def upgrade_to_v2(engine: Engine, inspector: Inspector) -> None:

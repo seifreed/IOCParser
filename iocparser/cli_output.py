@@ -96,6 +96,37 @@ def print_batch_job_detail(detail: BatchJobDetail) -> None:
     sys.stdout.write("metrics\t" + json.dumps(detail.metrics, sort_keys=True) + "\n")
 
 
+def _write_failures_section(out: TextIO, failures: object) -> None:
+    if not (isinstance(failures, dict) and failures):
+        return
+    if not all(isinstance(key, str) for key in failures):
+        raise TypeValidationError(None, "batch report failure keys to be strings")
+    if not all(isinstance(value, str) for value in failures.values()):
+        raise TypeValidationError(None, "batch report failure values to be strings")
+    for item, error in sorted(failures.items()):
+        out.write(f"  FAIL\t{item}\t{error}\n")
+
+
+def _write_int_section(out: TextIO, section: object, *, header: str, subject: str) -> None:
+    if not (isinstance(section, dict) and section):
+        return
+    out.write(header + "\n")
+    if not all(isinstance(key, str) for key in section):
+        raise TypeValidationError(None, subject)
+    for label, count in sorted((key, _int_value(value)) for key, value in section.items()):
+        out.write(f"  {label}\t{count}\n")
+
+
+def _write_metrics_section(out: TextIO, metrics: object) -> None:
+    if not (isinstance(metrics, dict) and metrics):
+        return
+    out.write("Batch metrics\n")
+    if not all(isinstance(key, str) for key in metrics):
+        raise TypeValidationError(None, "batch report metric keys to be strings")
+    for name, value in sorted(metrics.items()):
+        out.write(f"  {name}\t{value}\n")
+
+
 def print_batch_report(report: Mapping[str, object], *, stream: TextIO | None = None) -> None:
     # The batch report is a human summary; under -o - the caller passes stderr so it does
     # not corrupt the machine output (JSONL/JSON/CSV/STIX) piped to stdout.
@@ -104,44 +135,25 @@ def print_batch_report(report: Mapping[str, object], *, stream: TextIO | None = 
         raise TypeValidationError(None, "batch report keys to be strings")
     schema_version = str(report.get("schema_version", "")).strip()
     if schema_version:
-        out.write(f"Batch report schema\t{schema_version}" + "\n")
+        out.write(f"Batch report schema\t{schema_version}\n")
     total = _int_value(report.get("total", 0))
     successful = _int_value(report.get("successful", 0))
     failed = _int_value(report.get("failed", 0))
-    out.write(f"Batch summary\t{successful}/{total} successful\t{failed} failed" + "\n")
-    failures = report.get("failures", {})
-    if isinstance(failures, dict) and failures:
-        if not all(isinstance(key, str) for key in failures):
-            raise TypeValidationError(None, "batch report failure keys to be strings")
-        if not all(isinstance(value, str) for value in failures.values()):
-            raise TypeValidationError(None, "batch report failure values to be strings")
-        for item, error in sorted(failures.items()):
-            out.write(f"  FAIL\t{item}\t{error}" + "\n")
-    error_groups = report.get("error_groups", {})
-    if isinstance(error_groups, dict) and error_groups:
-        out.write("Failure groups" + "\n")
-        if not all(isinstance(key, str) for key in error_groups):
-            raise TypeValidationError(None, "batch report error group keys to be strings")
-        for error_type, count in sorted(
-            (key, _int_value(value)) for key, value in error_groups.items()
-        ):
-            out.write(f"  {error_type}\t{count}" + "\n")
-    phase_timings = report.get("phase_timings_ms", {})
-    if isinstance(phase_timings, dict) and phase_timings:
-        out.write("Phase timings (ms)" + "\n")
-        if not all(isinstance(key, str) for key in phase_timings):
-            raise TypeValidationError(None, "batch report phase timing keys to be strings")
-        for phase, value in sorted(
-            (key, _int_value(val)) for key, val in phase_timings.items()
-        ):
-            out.write(f"  {phase}\t{value}" + "\n")
-    metrics = report.get("metrics", {})
-    if isinstance(metrics, dict) and metrics:
-        out.write("Batch metrics" + "\n")
-        if not all(isinstance(key, str) for key in metrics):
-            raise TypeValidationError(None, "batch report metric keys to be strings")
-        for name, value in sorted(metrics.items()):
-            out.write(f"  {name}\t{value}" + "\n")
+    out.write(f"Batch summary\t{successful}/{total} successful\t{failed} failed\n")
+    _write_failures_section(out, report.get("failures", {}))
+    _write_int_section(
+        out,
+        report.get("error_groups", {}),
+        header="Failure groups",
+        subject="batch report error group keys to be strings",
+    )
+    _write_int_section(
+        out,
+        report.get("phase_timings_ms", {}),
+        header="Phase timings (ms)",
+        subject="batch report phase timing keys to be strings",
+    )
+    _write_metrics_section(out, report.get("metrics", {}))
 
 
 def save_batch_report(

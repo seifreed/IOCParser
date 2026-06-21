@@ -158,6 +158,30 @@ def _apply_network_defaults(args: argparse.Namespace, config: AppConfig) -> None
         args.tls_verify = config.tls_verify
 
 
+def _http_mapping_string_items(value: list[object] | tuple[object, ...]) -> list[str]:
+    items: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise ValidationError(INVALID_HTTP_MAPPING_ITEM_ERROR.format(value=item))
+        stripped_item = item.strip()
+        if stripped_item:
+            items.append(stripped_item)
+    return items
+
+
+def _http_mapping_from_items(items: list[str], *, separator: str) -> dict[str, str]:
+    mapping: dict[str, str] = {}
+    for item in items:
+        if separator not in item:
+            raise ValidationError(INVALID_HTTP_MAPPING_ITEM_ERROR.format(value=item))
+        name, raw_value = item.split(separator, maxsplit=1)
+        normalized_name = name.strip()
+        if not normalized_name:
+            continue
+        mapping[normalized_name] = raw_value.strip()
+    return mapping
+
+
 def parse_http_mapping(value: object, *, separator: str) -> dict[str, str]:
     if value is None:
         return {}
@@ -169,25 +193,10 @@ def parse_http_mapping(value: object, *, separator: str) -> dict[str, str]:
             return _parse_json_http_mapping(stripped)
         items = [stripped]
     elif isinstance(value, (list, tuple)):
-        items = []
-        for item in value:
-            if not isinstance(item, str):
-                raise ValidationError(INVALID_HTTP_MAPPING_ITEM_ERROR.format(value=item))
-            stripped_item = item.strip()
-            if stripped_item:
-                items.append(stripped_item)
+        items = _http_mapping_string_items(value)
     else:
         return {}
-    mapping: dict[str, str] = {}
-    for item in items:
-        if separator not in item:
-            raise ValidationError(INVALID_HTTP_MAPPING_ITEM_ERROR.format(value=item))
-        name, raw_value = item.split(separator, maxsplit=1)
-        normalized_name = name.strip()
-        if not normalized_name:
-            continue
-        mapping[normalized_name] = raw_value.strip()
-    return mapping
+    return _http_mapping_from_items(items, separator=separator)
 
 
 def _parse_json_http_mapping(value: str) -> dict[str, str]:

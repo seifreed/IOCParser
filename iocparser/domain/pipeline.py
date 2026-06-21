@@ -23,6 +23,21 @@ def _require_number(value: object, *, field: str) -> int | float:
     return value
 
 
+def _require_str(value: object, *, field: str) -> str:
+    if not isinstance(value, str):
+        raise TypeValidationError(field, "string-like", value)
+    stripped = value.strip()
+    if not stripped:
+        raise TypeValidationError(field, "non-empty string-like")
+    return stripped
+
+
+def _require_bool(value: object, *, field: str) -> bool:
+    if not isinstance(value, bool):
+        raise TypeValidationError(field, "bool", value)
+    return value
+
+
 @dataclass(frozen=True)
 class ResourceLimits:
     """Operational limits for pipeline execution."""
@@ -118,19 +133,6 @@ class PipelineJobRequest:
     emit_only: bool = False
 
     def __post_init__(self) -> None:
-        def _require_str(value: object, *, field: str) -> str:
-            if not isinstance(value, str):
-                raise TypeValidationError(field, "string-like", value)
-            stripped = value.strip()
-            if not stripped:
-                raise TypeValidationError(field, "non-empty string-like")
-            return stripped
-
-        def _require_bool(value: object, *, field: str) -> bool:
-            if not isinstance(value, bool):
-                raise TypeValidationError(field, "bool", value)
-            return value
-
         object.__setattr__(
             self, "input_kind", _require_str(self.input_kind, field="input_kind").lower()
         )
@@ -183,14 +185,6 @@ class PipelineJobResult:
     finished_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def __post_init__(self) -> None:
-        def _require_str(value: object, *, field: str) -> str:
-            if not isinstance(value, str):
-                raise TypeValidationError(field, "string-like", value)
-            stripped = value.strip()
-            if not stripped:
-                raise TypeValidationError(field, "non-empty string-like")
-            return stripped
-
         object.__setattr__(
             self, "input_kind", _require_str(self.input_kind, field="input_kind").lower()
         )

@@ -153,6 +153,34 @@ def query_runs_page(query: RunPageQuery) -> PersistedRunsPage:
     finally:
         unit_of_work.close()
 
+
+def _apply_optional_ioc_filters(
+    stmt: SearchSelect, query: IOCSearchPageQuery, ioc_types: tuple[str, ...]
+) -> SearchSelect:
+    if ioc_types:
+        stmt = stmt.where(IOCModel.ioc_type.in_(ioc_types))
+    if query.severity:
+        stmt = stmt.where(RunIOCModel.severity.in_(normalize_tokens(query.severity)))
+    if query.tags:
+        tag_filters = [_tag_search_clause(tag) for tag in normalize_tokens(query.tags)]
+        if tag_filters:
+            stmt = stmt.where(
+                or_(*tag_filters) if query.tag_mode == "any" else and_(*tag_filters)
+            )
+    for tag in query.exclude_tags:
+        normalized_tag = tag.strip().lower()
+        if normalized_tag:
+            stmt = stmt.where(~_tag_search_clause(normalized_tag))
+    if query.min_severity:
+        normalized_min_severity = query.min_severity.strip().lower()
+        if normalized_min_severity not in SEVERITY_ORDER:
+            raise ValueError(INVALID_MIN_SEVERITY.format(value=query.min_severity))
+        threshold = SEVERITY_ORDER[normalized_min_severity]
+        allowed = tuple(name for name, rank in SEVERITY_ORDER.items() if rank >= threshold)
+        stmt = stmt.where(RunIOCModel.severity.in_(allowed))
+    return stmt
+
+
 def search_iocs_page(query: IOCSearchPageQuery) -> PersistedIOCSearchPage:
     unit_of_work = SQLAlchemyUnitOfWork(query.db_uri)
     try:
@@ -179,27 +207,7 @@ def search_iocs_page(query: IOCSearchPageQuery) -> PersistedIOCSearchPage:
             source_value=query.source_value,
         ):
             stmt = stmt.where(clause)
-        if ioc_types:
-            stmt = stmt.where(IOCModel.ioc_type.in_(ioc_types))
-        if query.severity:
-            stmt = stmt.where(RunIOCModel.severity.in_(normalize_tokens(query.severity)))
-        if query.tags:
-            tag_filters = [_tag_search_clause(tag) for tag in normalize_tokens(query.tags)]
-            if tag_filters:
-                stmt = stmt.where(
-                    or_(*tag_filters) if query.tag_mode == "any" else and_(*tag_filters)
-                )
-        for tag in query.exclude_tags:
-            normalized_tag = tag.strip().lower()
-            if normalized_tag:
-                stmt = stmt.where(~_tag_search_clause(normalized_tag))
-        if query.min_severity:
-            normalized_min_severity = query.min_severity.strip().lower()
-            if normalized_min_severity not in SEVERITY_ORDER:
-                raise ValueError(INVALID_MIN_SEVERITY.format(value=query.min_severity))
-            threshold = SEVERITY_ORDER[normalized_min_severity]
-            allowed = tuple(name for name, rank in SEVERITY_ORDER.items() if rank >= threshold)
-            stmt = stmt.where(RunIOCModel.severity.in_(allowed))
+        stmt = _apply_optional_ioc_filters(stmt, query, ioc_types)
         stmt = _order_run_query_stmt(stmt, sort_by=query.sort_by)
         # Several IOCs can share one run's sort key; add a unique per-row tiebreaker
         # so LIMIT/OFFSET paging is deterministic and never skips or repeats a hit.

@@ -34,32 +34,32 @@ def check_substring_type(value: str, values: list[IOCValue]) -> bool:
     return False
 
 
+_REGEX_FLAG_MAP = {"m": re.MULTILINE, "s": re.DOTALL, "x": re.VERBOSE}
+
+
+def _parse_regex_pattern(pattern_text: str) -> tuple[str, int]:
+    """Split an optional ``/body/flags`` form into a compiled-ready (pattern, flags)."""
+    flags = re.IGNORECASE
+    if pattern_text.startswith("/") and pattern_text.count("/") >= 2:
+        closing = pattern_text.rfind("/")
+        body = pattern_text[1:closing]
+        flags_text = pattern_text[closing + 1 :]
+        if body and (not flags_text or flags_text.isalpha()):
+            for flag in flags_text.lower():
+                flags |= _REGEX_FLAG_MAP.get(flag, 0)
+            return body, flags
+    return pattern_text, flags
+
+
 def check_regex_type(get_logger: Callable[[], Logger], value: str, values: list[IOCValue]) -> bool:
     value = value.strip()
     for regex_pattern in values:
         if regex_pattern is None:
             continue
-        pattern_text = _require_str(regex_pattern, field="regex pattern")
-        pattern_text = pattern_text.strip()
+        pattern_text = _require_str(regex_pattern, field="regex pattern").strip()
         if not pattern_text:
             continue
-        pattern = pattern_text
-        flags = re.IGNORECASE
-        if pattern_text.startswith("/") and pattern_text.count("/") >= 2:
-            closing = pattern_text.rfind("/")
-            body = pattern_text[1:closing]
-            flags_text = pattern_text[closing + 1 :]
-            if body and (not flags_text or flags_text.isalpha()):
-                pattern = body
-                for flag in flags_text.lower():
-                    if flag == "g":
-                        continue
-                    if flag == "m":
-                        flags |= re.MULTILINE
-                    elif flag == "s":
-                        flags |= re.DOTALL
-                    elif flag == "x":
-                        flags |= re.VERBOSE
+        pattern, flags = _parse_regex_pattern(pattern_text)
         try:
             if re.search(pattern, value, flags):
                 return True

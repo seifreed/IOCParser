@@ -1,11 +1,32 @@
 from __future__ import annotations
 
 import ipaddress
-import re
 from dataclasses import dataclass, field
 from logging import Logger
+from typing import Protocol
 
 from iocparser.errors import TypeValidationError
+
+# Wall-clock budget for a single warning-list regex match. Warning-list regexes are
+# compiled FROM MISP list data (potentially pathological), so they are matched via the
+# `regex` engine's timeout: a catastrophic-backtracking pattern is interrupted (treated
+# as no-match) instead of hanging the run. Normal matches complete in microseconds.
+REGEX_MATCH_TIMEOUT_SECONDS = 0.25
+
+
+class TimeoutRegexPattern(Protocol):
+    """A compiled regex that supports a per-match ``timeout`` (the ``regex`` engine).
+
+    Declared as a Protocol because the ``regex`` module ships no type information;
+    this keeps the warning-list signatures free of leaked ``Any`` while exposing only
+    the members used: the source ``pattern`` text and a timeout-capable ``search``.
+    """
+
+    @property
+    def pattern(self) -> str: ...
+
+    def search(self, string: str, *, timeout: float | None = ...) -> object | None: ...
+
 
 WarningListEntry = str | dict[str, str] | int | bool | None
 WarningListValue = str | list[WarningListEntry] | int | bool
@@ -50,7 +71,7 @@ class WarningListLookups:
     """Lookup containers for optimized warning list checks."""
 
     string_lookups: dict[str, set[str]]
-    compiled_regex: dict[str, list[re.Pattern[str]]]
+    compiled_regex: dict[str, list[TimeoutRegexPattern]]
     cidr_networks: dict[str, list[ipaddress.IPv4Network | ipaddress.IPv6Network]]
     lists_by_ioc_type: dict[str, list[str]]
     # Apex domains from leading-dot "hostname" entries (e.g. ".duckdns.org" -> "duckdns.org").

@@ -5,8 +5,14 @@ import re
 from collections.abc import Callable
 from logging import Logger
 
+import regex
+
 from iocparser.errors import TypeValidationError
-from iocparser.infrastructure.warninglists_types import IOCValue, normalized_warning_list_text
+from iocparser.infrastructure.warninglists_types import (
+    REGEX_MATCH_TIMEOUT_SECONDS,
+    IOCValue,
+    normalized_warning_list_text,
+)
 
 
 def _require_str(value: object, *, field: str) -> str:
@@ -61,10 +67,14 @@ def check_regex_type(get_logger: Callable[[], Logger], value: str, values: list[
             continue
         pattern, flags = _parse_regex_pattern(pattern_text)
         try:
-            if re.search(pattern, value, flags):
+            # Match via the `regex` engine with a timeout so a catastrophic
+            # warning-list pattern cannot hang the run (re has no per-match timeout).
+            if regex.search(pattern, value, flags, timeout=REGEX_MATCH_TIMEOUT_SECONDS):
                 return True
-        except (re.error, TypeError):
+        except (re.error, regex.error, TypeError):
             get_logger().debug("Invalid regex pattern: %s", regex_pattern)
+        except TimeoutError:
+            get_logger().warning("Warning-list regex timed out; treating as no match: %s", pattern)
     return False
 
 

@@ -6,9 +6,12 @@ from contextlib import suppress
 from logging import Logger
 from typing import ClassVar
 
+import regex
+
 from iocparser.errors import TypeValidationError
 from iocparser.infrastructure.logger import get_logger
 from iocparser.infrastructure.warninglists_types import (
+    TimeoutRegexPattern,
     WarningListDict,
     WarningListEntry,
     WarningListLookups,
@@ -124,7 +127,7 @@ class WarningListPreprocessMixin:
         return body, flags
 
     def _add_regex_values(self, list_id: str, values_val: list[WarningListEntry]) -> None:
-        compiled_patterns: list[re.Pattern[str]] = []
+        compiled_patterns: list[TimeoutRegexPattern] = []
         for pattern in values_val:
             if pattern is None:
                 continue
@@ -136,8 +139,11 @@ class WarningListPreprocessMixin:
                 )
                 continue
             try:
-                compiled_patterns.append(re.compile(normalized_pattern, pattern_flags))
-            except (re.error, TypeError):
+                # Compile via the `regex` engine so matching can be time-bounded
+                # (re has no per-match timeout); _is_safe_regex above is only a cheap
+                # pre-filter, the timeout in the matching paths is the real guard.
+                compiled_patterns.append(regex.compile(normalized_pattern, pattern_flags))
+            except (re.error, regex.error, TypeError):
                 self._get_logger().debug("Invalid regex pattern: %s", pattern)
         if compiled_patterns:
             self.lookup_data.compiled_regex[list_id] = compiled_patterns

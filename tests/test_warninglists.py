@@ -757,6 +757,50 @@ class TestWarningListsPreprocessing:
         assert "unsafe-regex-list" in warning_lists.compiled_regex
         assert len(warning_lists.compiled_regex["unsafe-regex-list"]) == 1
 
+    def test_catastrophic_regex_is_time_bounded_not_hang(self):
+        """Regression: the _is_safe_regex blocklist let catastrophic patterns through
+        (e.g. (a|a)+), and matching ran on stdlib re with no timeout, so a crafted IOC
+        value could hang extraction for hours. Warning-list regexes are now matched via
+        the `regex` engine with a per-match timeout: a catastrophic pattern is bounded
+        and treated as no-match instead of hanging.
+        """
+        import time
+
+        warning_lists = make_warning_lists()
+        warning_lists.warning_lists = {
+            "evil-regex": {
+                "name": "Evil Regex",
+                "description": "catastrophic",
+                "type": "regex",
+                "matching_attributes": ["url"],
+                "list": [r"(a|a)+$"],
+            }
+        }
+        warning_lists._preprocess_lists()
+        # This value makes (a|a)+$ backtrack exponentially; without the timeout it
+        # would take many minutes.
+        adversarial = "a" * 45 + "b"
+        start = time.perf_counter()
+        is_warning, _ = warning_lists.check_value(adversarial, "urls")
+        elapsed = time.perf_counter() - start
+        assert elapsed < 2.0, f"warning-list regex match was not time-bounded ({elapsed:.2f}s)"
+        assert is_warning is False  # timed-out match is treated as no match
+
+        # A normal warning-list regex still matches.
+        warning_lists.warning_lists = {
+            "phones": {
+                "name": "Phones",
+                "description": "phone numbers",
+                "type": "regex",
+                "matching_attributes": ["phone-number"],
+                "list": [r"^\+?[0-9]{7,15}$"],
+            }
+        }
+        warning_lists._warning_lookup_cache = {}
+        warning_lists._preprocess_lists()
+        matched, _ = warning_lists.check_value("+12345678", "phone-number")
+        assert matched is True
+
     def test_preprocess_lists_keeps_safe_nested_group_regex(self):
         """A safe pattern containing a ')quantifier)' substring must not be dropped.
 

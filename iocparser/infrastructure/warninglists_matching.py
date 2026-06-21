@@ -34,7 +34,9 @@ from iocparser.infrastructure.warninglists_match_separation import (
     separate_iocs_by_warnings as _separate_iocs_by_warnings,
 )
 from iocparser.infrastructure.warninglists_types import (
+    REGEX_MATCH_TIMEOUT_SECONDS,
     IOCValue,
+    TimeoutRegexPattern,
     WarningListDict,
     WarningListLookups,
     get_mixin_logger,
@@ -289,11 +291,22 @@ class WarningListMatchingMixin:
             ):
                 continue
             for pattern in compiled_regex[list_id]:
-                if pattern.search(clean_value) or (
-                    extracted_domain and pattern.search(extracted_domain)
+                if self._regex_matches(pattern, clean_value) or (
+                    extracted_domain is not None and self._regex_matches(pattern, extracted_domain)
                 ):
                     return self._build_warning_response(warning_list, list_id)
         return None
+
+    def _regex_matches(self, pattern: TimeoutRegexPattern, value: str) -> bool:
+        # Bound the match so a catastrophic-backtracking warning-list regex cannot
+        # hang the run; a timeout is treated as no-match (the value is not flagged).
+        try:
+            return pattern.search(value, timeout=REGEX_MATCH_TIMEOUT_SECONDS) is not None
+        except TimeoutError:
+            self._get_logger().warning(
+                "Warning-list regex timed out; treating as no match: %s", pattern.pattern
+            )
+            return False
 
     def _check_cidr_lookups(
         self,

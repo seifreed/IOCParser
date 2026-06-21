@@ -3,7 +3,6 @@
 """Module for managing MISP warning lists to detect false positives."""
 
 import ipaddress
-import re
 import tempfile
 from pathlib import Path
 from typing import ClassVar
@@ -15,7 +14,11 @@ from iocparser.infrastructure.utils import DEFANG_REPLACEMENTS
 from iocparser.infrastructure.warninglists_cache import WarningListCacheMixin
 from iocparser.infrastructure.warninglists_matching import WarningListMatchingMixin
 from iocparser.infrastructure.warninglists_preprocess import WarningListPreprocessMixin
-from iocparser.infrastructure.warninglists_types import WarningListDict, WarningListLookups
+from iocparser.infrastructure.warninglists_types import (
+    TimeoutRegexPattern,
+    WarningListDict,
+    WarningListLookups,
+)
 
 logger = get_logger("iocparser.infrastructure.warninglists")
 
@@ -140,7 +143,7 @@ class MISPWarningLists(
         return self.lookup_data.string_lookups
 
     @property
-    def compiled_regex(self) -> dict[str, list[re.Pattern[str]]]:
+    def compiled_regex(self) -> dict[str, list[TimeoutRegexPattern]]:
         return self.lookup_data.compiled_regex
 
     @property

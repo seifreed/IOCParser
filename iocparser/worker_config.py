@@ -5,8 +5,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from iocparser.errors import ValidationError
 from iocparser.domain.pipeline import ResourceLimits
+from iocparser.errors import ValidationError
 from iocparser.worker_config_support import (
     bool_env,
     float_env,

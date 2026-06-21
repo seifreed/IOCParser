@@ -51,8 +51,8 @@ def materialize_queue_envelope(envelope: QueueEnvelope) -> QueueEnvelope:
     if getattr(request, "job_id", None) == job_id and getattr(request, "correlation_id", None) == correlation_id:
         return envelope
     materialized_request = PipelineJobRequest(
-        input_kind=getattr(request, "input_kind"),
-        source_value=getattr(request, "source_value"),
+        input_kind=request.input_kind,
+        source_value=request.source_value,
         file_type=getattr(request, "file_type", None),
         persist=getattr(request, "persist", False),
         db_uri=getattr(request, "db_uri", None),

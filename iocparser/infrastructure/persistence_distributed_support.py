@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
-from uuid import uuid4
 from typing import TypedDict
+from uuid import uuid4
 
 from sqlalchemy import Select, select
 from sqlalchemy.exc import IntegrityError

@@ -4,8 +4,8 @@ from iocparser.api_persistence_query import (
     query_service,
     validated_non_negative_days,
     validated_non_negative_int,
-    validated_required_id,
     validated_optional_str,
+    validated_required_id,
 )
 from iocparser.application.contracts import (
     BatchJobInput,

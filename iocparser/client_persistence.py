@@ -11,11 +11,11 @@ from iocparser.api_persistence_query import (
     validated_min_severity,
     validated_non_negative_days,
     validated_non_negative_int,
+    validated_optional_str,
     validated_required_id,
     validated_run_sort,
     validated_search_backend,
     validated_search_sort,
-    validated_optional_str,
     validated_tag_mode,
 )
 from iocparser.application.contracts import QueryRunsInput, SearchPersistedIOCsInput

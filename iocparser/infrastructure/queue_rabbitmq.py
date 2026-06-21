@@ -11,8 +11,8 @@ from iocparser.infrastructure.logger import get_logger
 from iocparser.infrastructure.queue_records import (
     build_invalid_payload_record,
     import_optional_backend_module,
-    materialize_queue_envelope,
     load_queue_record,
+    materialize_queue_envelope,
     serialize_queue_record,
 )
 from iocparser.shared_utils import close_and_log

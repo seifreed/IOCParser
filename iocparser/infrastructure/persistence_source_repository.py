@@ -6,6 +6,7 @@ from typing import override
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from iocparser.domain.sources import normalize_url_value
 from iocparser.infrastructure.persistence_models import SourceModel
 from iocparser.infrastructure.persistence_repository_support import (
     SOURCE_MODEL,
@@ -14,7 +15,6 @@ from iocparser.infrastructure.persistence_repository_support import (
     normalize_source_value,
     source_dedup_hash,
 )
-from iocparser.domain.sources import normalize_url_value
 from iocparser.infrastructure.persistence_support import normalized_source_filter
 from iocparser.interfaces.ports import SourceRepository
 

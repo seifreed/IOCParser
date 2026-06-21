@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -91,10 +92,8 @@ class FilesystemQueueAdapter:
                     continue
                 # Stamp the lease start so reclaim measures time-held, not time-enqueued
                 # (rename preserves the original write mtime, which could be arbitrarily old).
-                try:
+                with contextlib.suppress(OSError):
                     os.utime(target, None)
-                except OSError:
-                    pass
                 try:
                     payload = load_queue_record(target.read_text(encoding="utf-8"))
                     envelope = QueueEnvelope.from_record(payload)

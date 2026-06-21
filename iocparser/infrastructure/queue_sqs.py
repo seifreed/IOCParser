@@ -9,8 +9,8 @@ from iocparser.domain.distributed import QueueEnvelope, QueueReceipt
 from iocparser.infrastructure.queue_records import (
     build_invalid_payload_record,
     import_optional_backend_module,
-    materialize_queue_envelope,
     load_queue_record,
+    materialize_queue_envelope,
     serialize_queue_record,
 )
 

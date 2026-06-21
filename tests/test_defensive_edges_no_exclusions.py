@@ -1313,9 +1313,9 @@ def test_strict_coverage_option_and_metadata_edge_helpers() -> None:
     from iocparser.api_persistence_query import (
         bool_option,
         validated_iso_datetime,
+        validated_min_severity,
         validated_non_negative_days,
         validated_required_id,
-        validated_min_severity,
         validated_run_sort,
         validated_search_backend,
         validated_search_sort,

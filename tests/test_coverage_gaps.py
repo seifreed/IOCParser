@@ -324,10 +324,6 @@ class TestBatchResultsCollectionEdgeCases:
         col.add(item_key="k1", source_value="s1", normal_iocs={}, warning_iocs={})
         assert col.keys() == ["k1"]
 
-    def test_source_value_for_missing_key_returns_key(self) -> None:
-        col = BatchResultsCollection()
-        assert col.source_value_for("missing") == "missing"
-
     def test_getitem_by_source_value(self) -> None:
         col = BatchResultsCollection()
         col.add(

@@ -132,15 +132,8 @@ class TestMergeResults:
         assert len(r.iocs) == 1
 
 
-# ── cli_processing_support: source_value_for found ────────────────────────
+# ── cli_processing_support: BatchResultsCollection lookups ────────────────────────
 class TestBatchCollectionSourceValue:
-    def test_source_value_for_found(self) -> None:
-        from iocparser.cli_processing_support import BatchResultsCollection
-
-        c = BatchResultsCollection()
-        c.add(item_key="k1", source_value="s1", normal_iocs={}, warning_iocs={})
-        assert c.source_value_for("k1") == "s1"
-
     def test_getitem_ambiguous_source_multiple(self) -> None:
         from iocparser.cli_processing_support import BatchResultsCollection
 

@@ -73,12 +73,6 @@ class BatchResultsCollection:
     def keys(self) -> list[str]:
         return [entry.item_key for entry in self.entries]
 
-    def source_value_for(self, item_key: str) -> str:
-        for entry in self.entries:
-            if entry.item_key == item_key:
-                return entry.source_value
-        return item_key
-
     def __len__(self) -> int:
         return len(self.entries)
 

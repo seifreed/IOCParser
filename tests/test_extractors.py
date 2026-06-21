@@ -213,6 +213,35 @@ class TestNetworkExtractors:
         assert "::ffff:192.168.1.1" in result
         assert "64:ff9b::10.0.0.1" in result
 
+    def test_extract_all_is_not_redos_on_adversarial_separators(self):
+        """Regression: several extractor patterns (emails, filenames, docker_images,
+        mutex, service_names) used unbounded ``{2,}``/``*`` repetitions over classes
+        that include ``.``/``-``/``/``. A long separator run with no satisfying suffix
+        (e.g. ``"a-a-a..."``) drove O(n^2) backtracking, so a ~200 KB single line hung
+        extraction for minutes. The repetitions are now length-bounded -> linear.
+        """
+        import time
+
+        adversarial_inputs = [
+            "a@" + ".a" * 40000,  # emails / filenames host
+            "a" + "-a" * 40000 + "!",  # mutex / service_names / filenames
+            "a." * 40000 + "!",  # filenames / docker_images base
+            "a" + "/a" * 40000 + "!",  # docker_images namespace
+        ]
+        for payload in adversarial_inputs:
+            start = time.perf_counter()
+            self.extractor.extract_all(payload)
+            elapsed = time.perf_counter() - start
+            assert elapsed < 5.0, f"extract_all took {elapsed:.2f}s on a {len(payload)}-char input"
+
+        # Valid IOCs of the affected types still extract.
+        result = self.extractor.extract_all(
+            "drop evil.exe and nginx@sha256:" + "a" * 64 + " plus GlobalAppMutex BackgroundSvc"
+        )
+        assert "evil.exe" in result.get("filenames", [])
+        assert any("sha256" in image for image in result.get("docker_images", []))
+        assert "GlobalAppMutex" in result.get("mutex", [])
+
     def test_extract_urls(self):
         """Test URL extraction."""
         text = """

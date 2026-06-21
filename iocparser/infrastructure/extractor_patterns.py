@@ -98,10 +98,16 @@ PATTERNS: dict[str, Pattern[str]] = {
     "bitcoin": re.compile(r"\b(bc1[a-zA-HJ-NP-Z0-9]{39,59}|[13][a-zA-HJ-NP-Z0-9]{25,34})\b"),
     "ethereum": re.compile(r"\b0x[a-fA-F0-9]{40}\b"),
     "monero": re.compile(r"\b4[0-9AB][a-zA-Z0-9]{93}\b"),
-    # Email and communication
+    # Email and communication.
+    # The local-part and host repetitions are bounded to their RFC 5321 maxima
+    # (local part <= 64 octets, domain <= 253). Unbounded `*` here caused O(n^2)
+    # backtracking: from every alphanumeric start position the greedy local-part
+    # `[...]*` scanned a long dotted tail looking for an `@` that never came, so a
+    # ~200 KB single-line input (e.g. "a@" + ".a"*100000) hung extraction for
+    # minutes. Bounding each repetition makes per-start work constant -> linear.
     "emails": re.compile(
-        r"\b[a-zA-Z0-9][a-zA-Z0-9._+-]*@"
-        r"[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,63}\b",
+        r"\b[a-zA-Z0-9][a-zA-Z0-9._+-]{0,63}@"
+        r"[a-zA-Z0-9][a-zA-Z0-9.-]{0,252}\.[a-zA-Z]{2,63}\b",
     ),
     # Vulnerabilities and threats
     # The CVE ID sequence number is a minimum of 4 digits (CVE-YYYY-NNNN+); {1,7}
@@ -121,13 +127,16 @@ PATTERNS: dict[str, Pattern[str]] = {
         r"HKEY_CURRENT_CONFIG|HKCC)"
         r"(?:\\[A-Za-z0-9\-_]+(?: [A-Z0-9][A-Za-z0-9\-_]*)*)+)",
     ),
+    # The name repetition before the required Mutex/Service/Svc suffix is bounded
+    # ({2,254}): an unbounded `{2,}` over a hyphen-bearing class backtracked O(n^2)
+    # on a long "a-a-a..." run that never reached the suffix, hanging extraction.
     "mutex": re.compile(
-        r"\b(?:Global\\|Local\\)?[A-Za-z0-9][A-Za-z0-9_\-]{2,}(?:Mutex|MUTEX)\b|"
+        r"\b(?:Global\\|Local\\)?[A-Za-z0-9][A-Za-z0-9_\-]{2,254}(?:Mutex|MUTEX)\b|"
         r"\bMutex:[A-Za-z0-9_\-]+\b",
     ),
     "service_names": re.compile(
         r"\b(?:Service|SERVICE):\s*([A-Za-z0-9][A-Za-z0-9_\-]{2,})\b|"
-        r"\b([A-Za-z0-9][A-Za-z0-9_\-]{2,}(?:Service|Svc))\b",
+        r"\b([A-Za-z0-9][A-Za-z0-9_\-]{2,254}(?:Service|Svc))\b",
     ),
     # Allow interior dots (e.g. Chromium "mojo.5678") without swallowing a trailing
     # sentence period: each dot must be followed by more name characters.
@@ -136,7 +145,10 @@ PATTERNS: dict[str, Pattern[str]] = {
     ),
     # File indicators
     "filenames": re.compile(
-        r"\b([A-Za-z0-9][A-Za-z0-9-_\.]{2,}\."
+        # The base-name repetition is bounded ({2,254}): an unbounded `{2,}` over a
+        # class that includes "." backtracked O(n^2) on a long dotted/hyphenated run
+        # that never reached a valid extension (e.g. "a." * n), hanging extraction.
+        r"\b([A-Za-z0-9][A-Za-z0-9-_\.]{2,254}\."
         r"(?:exe|dll|bat|sys|htm|html|js|jar|jpg|png|vb|scr|pif|chm|"
         r"zip|rar|cab|pdf|doc|docx|ppt|pptx|xls|xlsx|swf|gif|"
         r"ps1|vbs|wsf|hta|cmd|com|lnk|ini|inf|reg))\b",
@@ -210,9 +222,14 @@ PATTERNS: dict[str, Pattern[str]] = {
         # then the image name. The single-segment-only prefix used to drop the
         # registry host (myregistry.io/library/nginx -> library/nginx) and turn a
         # host:port into garbage (myregistry.io:5000/nginx -> 5000/nginx).
-        r"\b(?:[a-z0-9]+(?:[._-][a-z0-9]+)*(?::[0-9]+)?/)?"
-        r"(?:[a-z0-9]+(?:[._-][a-z0-9]+)*/)*"
-        r"[a-z0-9]+(?:[._-][a-z0-9]+)*"
+        # Every segment repetition is bounded ({0,30} separators per component,
+        # {0,30} namespace segments): the unbounded nested `(?:...)*` quantifiers
+        # backtracked O(n^2) on a long dotted/hyphenated/slashed run with no trailing
+        # "@sha256:" digest (e.g. "a." * n), hanging extraction. Real image refs are
+        # far shorter than these caps.
+        r"\b(?:[a-z0-9]+(?:[._-][a-z0-9]+){0,30}(?::[0-9]+)?/)?"
+        r"(?:[a-z0-9]+(?:[._-][a-z0-9]+){0,30}/){0,30}"
+        r"[a-z0-9]+(?:[._-][a-z0-9]+){0,30}"
         r"(?::[a-zA-Z0-9._-]+)?@sha256:[a-fA-F0-9]{64}\b",
     ),
     "tlsh": re.compile(

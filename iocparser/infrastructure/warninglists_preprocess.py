@@ -6,6 +6,7 @@ from contextlib import suppress
 from logging import Logger
 from typing import ClassVar
 
+from iocparser.errors import TypeValidationError
 from iocparser.infrastructure.logger import get_logger
 from iocparser.infrastructure.warninglists_types import (
     WarningListDict,
@@ -21,7 +22,7 @@ logger = get_logger("iocparser.infrastructure.warninglists")
 
 def _require_str(value: object, *, field: str) -> str:
     if not isinstance(value, str):
-        raise TypeError(f"Expected {field} to be string, got {type(value).__name__}")
+        raise TypeValidationError(field, "string", value)
     return value
 
 

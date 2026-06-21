@@ -7,6 +7,7 @@ from typing import ClassVar
 from urllib.parse import urlparse
 
 from iocparser.domain.enums import IOCType, ioc_type_name
+from iocparser.errors import TypeValidationError
 from iocparser.infrastructure.logger import get_logger
 from iocparser.infrastructure.warninglists_match_checks import (
     check_cidr as _check_cidr_value,
@@ -45,7 +46,7 @@ logger = get_logger("iocparser.infrastructure.warninglists")
 
 def _require_str(value: object, *, field: str) -> str:
     if not isinstance(value, str):
-        raise TypeError(f"Expected {field} to be string, got {type(value).__name__}")
+        raise TypeValidationError(field, "string", value)
     return value
 
 

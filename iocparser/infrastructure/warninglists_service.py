@@ -5,27 +5,28 @@ from collections import defaultdict
 
 from iocparser.domain.enums import ioc_type_name
 from iocparser.domain.models import IOC, ExtractionResult, WarningMatch, classify_ioc
+from iocparser.errors import MISSING_VALUE, TypeValidationError
 from iocparser.infrastructure.warninglists import MISPWarningLists
 from iocparser.interfaces.ports import WarningListService
 
 
 def _require_str(value: object, *, field: str) -> str:
     if not isinstance(value, str):
-        raise TypeError(f"Expected {field} to be string-like, got {type(value).__name__}")
+        raise TypeValidationError(field, "string-like", value)
     return value
 
 
 def _normal_ioc_value(value: object) -> str:
     if isinstance(value, dict):
         if "value" not in value:
-            raise TypeError("Expected value to be string-like, got missing")
+            raise TypeValidationError("value", "string-like", MISSING_VALUE)
         return _require_str(value["value"], field="value")
     return _require_str(value, field="value")
 
 
 def _warning_field(warning: dict[str, str], field: str) -> str:
     if field not in warning:
-        raise TypeError(f"Expected {field} to be string-like, got missing")
+        raise TypeValidationError(field, "string-like", MISSING_VALUE)
     return _require_str(warning[field], field=field)
 
 

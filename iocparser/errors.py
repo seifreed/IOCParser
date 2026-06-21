@@ -57,6 +57,10 @@ class ValidationError(IOCParserError):
 
 
 _OMIT_GOT = object()
+_MISSING_VALUE = object()
+#: Sentinel passed as the ``value`` argument of :class:`TypeValidationError` to
+#: render a "got missing" suffix (the guarded key/attribute was absent entirely).
+MISSING_VALUE = _MISSING_VALUE
 
 
 class TypeValidationError(TypeError):
@@ -64,15 +68,21 @@ class TypeValidationError(TypeError):
 
     The message is assembled here so call sites pass structured arguments instead
     of inline f-strings. Pass ``subject`` for an "Expected {subject} to be …" lead
-    (or None for "Expected {expected} …"); omit ``value`` for no "got" suffix,
-    otherwise the runtime type name of ``value`` is appended.
+    (or None for "Expected {expected} …"); omit ``value`` for no "got" suffix, or
+    pass :data:`MISSING_VALUE` for "got missing", otherwise the runtime type name
+    of ``value`` is appended.
     """
 
     def __init__(
         self, subject: str | None, expected: str, value: object = _OMIT_GOT
     ) -> None:
         head = f"Expected {subject} to be {expected}" if subject else f"Expected {expected}"
-        message = head if value is _OMIT_GOT else f"{head}, got {type(value).__name__}"
+        if value is _OMIT_GOT:
+            message = head
+        elif value is _MISSING_VALUE:
+            message = f"{head}, got missing"
+        else:
+            message = f"{head}, got {type(value).__name__}"
         super().__init__(message)
 
 

@@ -5,6 +5,8 @@ import re
 from dataclasses import dataclass, field
 from logging import Logger
 
+from iocparser.errors import TypeValidationError
+
 WarningListEntry = str | dict[str, str] | int | bool | None
 WarningListValue = str | list[WarningListEntry] | int | bool
 WarningListDict = dict[str, WarningListValue]
@@ -21,14 +23,14 @@ def matching_attribute_name(attr: WarningListEntry) -> str:
         name = attr.get("name", "")
         if isinstance(name, str):
             return name
-        raise TypeError(f"Expected matching attribute name to be string-like, got {type(name).__name__}")
-    raise TypeError(f"Expected matching attribute to be string-like, got {type(attr).__name__}")
+        raise TypeValidationError(None, "matching attribute name to be string-like", name)
+    raise TypeValidationError(None, "matching attribute to be string-like", attr)
 
 
 def normalized_warning_list_text(value: WarningListEntry | float, *, list_type: str) -> str:
     """Normalize warning-list text entries for exact/string-style matching."""
     if not isinstance(value, str):
-        raise TypeError(f"Expected warning-list entry to be string-like, got {type(value).__name__}")
+        raise TypeValidationError(None, "warning-list entry to be string-like", value)
     text = value.strip()
     if list_type == "hostname":
         text = text.rstrip("\\")

@@ -5,12 +5,13 @@ import re
 from collections.abc import Callable
 from logging import Logger
 
+from iocparser.errors import TypeValidationError
 from iocparser.infrastructure.warninglists_types import IOCValue, normalized_warning_list_text
 
 
 def _require_str(value: object, *, field: str) -> str:
     if not isinstance(value, str):
-        raise TypeError(f"Expected {field} to be string-like, got {type(value).__name__}")
+        raise TypeValidationError(field, "string-like", value)
     return value
 
 

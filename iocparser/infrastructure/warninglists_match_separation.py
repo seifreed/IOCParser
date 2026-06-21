@@ -3,10 +3,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from logging import Logger
 
+from iocparser.errors import TypeValidationError
+
 
 def _require_str(value: object, *, field: str) -> str:
     if not isinstance(value, str):
-        raise TypeError(f"Expected {field} to be string, got {type(value).__name__}")
+        raise TypeValidationError(field, "string", value)
     return value
 
 

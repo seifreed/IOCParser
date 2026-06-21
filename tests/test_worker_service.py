@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import threading
+import time
 from pathlib import Path
 from types import SimpleNamespace as _SimpleNamespace
 
@@ -289,6 +290,34 @@ def test_worker_service_run_once_and_forever(tmp_path: Path) -> None:
         max_messages_per_cycle=1,
     )
     assert empty_service.run_forever(max_cycles=2) == 0
+
+
+def test_run_forever_idle_wait_interrupted_by_stop_event(tmp_path: Path) -> None:
+    """Regression: an empty-cycle sleep used time.sleep(poll_interval), which only
+    re-checked stop_event at the next loop top -- so a stop signalled mid-sleep was
+    not observed until the full interval elapsed. It now uses Event.wait(), which
+    returns as soon as stop is set, so shutdown is prompt on an idle queue.
+    """
+    empty_service = DistributedWorkerService(
+        service=DistributedPipelineService(
+            queue_adapter=FilesystemQueueAdapter(tmp_path / "idle-empty")
+        ),
+        queue_name="idle-empty",
+        poll_interval_seconds=5.0,
+        max_messages_per_cycle=1,
+    )
+    stop_event = threading.Event()
+    timer = threading.Timer(0.2, stop_event.set)
+    timer.start()
+    try:
+        start = time.monotonic()
+        empty_service.run_forever(stop_event=stop_event)
+        elapsed = time.monotonic() - start
+    finally:
+        timer.cancel()
+
+    # Without the fix this would block ~5s (one full poll interval).
+    assert elapsed < 2.0, f"run_forever did not interrupt its idle wait promptly ({elapsed:.2f}s)"
 
 
 def test_worker_service_from_config_and_main(tmp_path: Path) -> None:

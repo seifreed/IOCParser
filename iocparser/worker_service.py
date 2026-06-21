@@ -122,6 +122,15 @@ class DistributedWorkerService:
             raise
         return processed
 
+    def _idle_wait(self, stop_event: threading.Event | None) -> None:
+        # Wait poll_interval between empty cycles, but return immediately if a stop
+        # is signalled mid-wait. Event.wait() returns as soon as the event is set, so
+        # a SIGTERM during an idle period no longer waits out the full poll interval.
+        if stop_event is not None:
+            stop_event.wait(self.poll_interval_seconds)
+        else:
+            time.sleep(self.poll_interval_seconds)
+
     def run_forever(  # noqa: C901
         self,
         *,
@@ -149,7 +158,7 @@ class DistributedWorkerService:
                 if max_cycles is not None and cycles >= max_cycles:
                     break
                 if current == 0:
-                    time.sleep(self.poll_interval_seconds)
+                    self._idle_wait(stop_event)
         else:
             with ThreadPoolExecutor(max_workers=workers) as executor:
                 while stop_event is None or not stop_event.is_set():
@@ -175,7 +184,7 @@ class DistributedWorkerService:
                     if max_cycles is not None and cycles >= max_cycles:
                         break
                     if current == 0:
-                        time.sleep(self.poll_interval_seconds)
+                        self._idle_wait(stop_event)
                     else:
                         time.sleep(min(0.05, self.poll_interval_seconds))
         return processed

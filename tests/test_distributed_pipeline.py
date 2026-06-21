@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -214,6 +215,58 @@ def test_filesystem_queue_dequeue_survives_race_condition(tmp_path: Path) -> Non
     result = queue.dequeue(queue_name="race")
     assert result is not None
     assert pending_count(queue, queue_name="race") == 0
+
+
+def test_filesystem_queue_reclaims_stale_lease(tmp_path: Path) -> None:
+    """A processing/ message held past the visibility timeout is redelivered.
+
+    Regression: a crashed worker leaves its in-flight message in processing/ with no
+    reclaim, stranding the job forever. After the visibility timeout it must be
+    redelivered, and the original lease's late ack must not delete the redelivered copy.
+    """
+    queue = FilesystemQueueAdapter(tmp_path / "queue", visibility_timeout_seconds=0.05)
+    request = PipelineJobRequest(
+        input_kind="text",
+        source_value="reclaim me",
+        persist=False,
+        check_warnings=False,
+        job_id="job-reclaim",
+    )
+    envelope = QueueEnvelope(request=request, queue_backend="filesystem", queue_name="lease")
+    queue.enqueue(queue_name="lease", envelope=envelope)
+
+    first_receipt, _ = queue.dequeue(queue_name="lease")  # type: ignore[misc]
+    assert pending_count(queue, queue_name="lease") == 0
+
+    time.sleep(0.1)  # lease outlives the timeout, as if the worker crashed mid-processing
+
+    redelivered = queue.dequeue(queue_name="lease")
+    assert redelivered is not None
+    second_receipt, second_envelope = redelivered
+    assert second_envelope.request.job_id == "job-reclaim"
+    assert second_receipt.receipt_id != first_receipt.receipt_id  # a fresh lease
+
+    processing = tmp_path / "queue" / "lease" / "processing"
+    assert len(list(processing.glob("*.json"))) == 1
+
+    # The crashed worker's late ack points at the stale lease path -> harmless no-op.
+    queue.ack(first_receipt)
+    assert len(list(processing.glob("*.json"))) == 1  # redelivered copy survives
+
+    queue.ack(second_receipt)
+    assert len(list(processing.glob("*.json"))) == 0
+
+
+def test_filesystem_queue_zero_timeout_disables_reclaim(tmp_path: Path) -> None:
+    """visibility_timeout_seconds <= 0 keeps the legacy behavior: no redelivery."""
+    queue = FilesystemQueueAdapter(tmp_path / "queue", visibility_timeout_seconds=0)
+    request = PipelineJobRequest(input_kind="text", source_value="stay", job_id="job-stay")
+    envelope = QueueEnvelope(request=request, queue_backend="filesystem", queue_name="hold")
+    queue.enqueue(queue_name="hold", envelope=envelope)
+
+    assert queue.dequeue(queue_name="hold") is not None
+    time.sleep(0.05)
+    assert queue.dequeue(queue_name="hold") is None  # never reclaimed
 
 
 def test_process_next_drops_message_when_dead_letter_archival_fails(tmp_path: Path) -> None:

@@ -31,6 +31,7 @@ def create_queue_adapter(
     queue_url: str | None = None,
     queue_path: str | None = None,
     dead_letter_queue_url: str | None = None,
+    visibility_timeout_seconds: float | None = None,
 ) -> QueueAdapter:
     """Create a queue adapter for the selected backend."""
     normalized = backend.strip().lower()
@@ -38,7 +39,9 @@ def create_queue_adapter(
         root = Path(
             queue_path.strip() if isinstance(queue_path, str) and queue_path.strip() else ".iocparser-queue"
         ).expanduser()
-        return FilesystemQueueAdapter(root)
+        if visibility_timeout_seconds is None:
+            return FilesystemQueueAdapter(root)
+        return FilesystemQueueAdapter(root, visibility_timeout_seconds=visibility_timeout_seconds)
     if normalized == "rabbitmq":
         return RabbitMQQueueAdapter(_require_queue_url("rabbitmq", queue_url))
     if normalized == "sqs":

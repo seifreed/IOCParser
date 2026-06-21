@@ -5,7 +5,6 @@ import json
 import logging
 from collections.abc import Callable, Iterable
 from contextlib import nullcontext
-from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol, cast, runtime_checkable
 
 from sqlalchemy import Connection, Engine, Inspector, Select, text
@@ -455,11 +454,6 @@ def result_items(result: ExtractionResultLike | ExtractionResult | None) -> list
         cast("MetadataItem", warning) for warning in result.warnings
     ]
     return normal_items + warning_items
-
-
-def finished_at_from_duration(duration_ms: int) -> datetime:
-    started_at = datetime.now(UTC)
-    return started_at + timedelta(milliseconds=duration_ms)
 
 
 _IOCMetadataLike = IOCMetadataLike

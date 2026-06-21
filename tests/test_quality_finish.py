@@ -86,7 +86,6 @@ from iocparser.infrastructure.persistence_repository_support import (
     _int_metadata_value,
     _ioc_type_name,
     _optional_int_metadata_value,
-    finished_at_from_duration,
     string_metadata_value,
 )
 from iocparser.infrastructure.persistence_schema import IOCModel, RunIOCModel, RunModel, SourceModel
@@ -951,9 +950,6 @@ def test_repository_helpers_cover_remaining_metadata_branches() -> None:
         value = "domains"
 
     assert _ioc_type_name(_TypeValue()) == "domains"
-    assert int(
-        (finished_at_from_duration(1500) - finished_at_from_duration(0)).total_seconds()
-    ) in {1, 2}
 
 
 def test_worker_config_defaults_cover_none_branches() -> None:

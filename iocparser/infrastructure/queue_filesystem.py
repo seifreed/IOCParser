@@ -128,12 +128,6 @@ class FilesystemQueueAdapter:
             message_id=receipt.message_id,
         )
 
-    def pending_count(self, *, queue_name: str) -> int:
-        return len(list(self._queue_dir(queue_name, "pending").glob("*.json")))
-
-    def dead_count(self, *, queue_name: str) -> int:
-        return len(list(self._queue_dir(queue_name, "dead").glob("*.json")))
-
     def _quarantine_invalid_payload(self, queue_name: str, path: Path) -> None:
         dead_dir = self._queue_dir(queue_name, "dead")
         target = dead_dir / path.name

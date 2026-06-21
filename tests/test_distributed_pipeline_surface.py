@@ -35,6 +35,7 @@ from iocparser.infrastructure.runtime.telemetry import LoggingTelemetrySink, NoO
 from iocparser.pipeline_client import DistributedPipelineClient
 from iocparser.pipeline_worker import PipelineWorker
 from iocparser.pipeline_worker_support import prepare_input
+from tests.queue_helpers import dead_count, pending_count
 
 
 class TimeoutClient:
@@ -308,7 +309,7 @@ def test_filesystem_queue_rejects_path_traversal_components(tmp_path: Path) -> N
     pending_dir = (tmp_path / "queue" / "safe" / "pending").resolve()
     assert receipt_path.parent == pending_dir
     assert ".." not in receipt_path.name
-    assert adapter.pending_count(queue_name="safe") == 1
+    assert pending_count(adapter, queue_name="safe") == 1
 
 
 def test_filesystem_queue_materializes_missing_job_id(tmp_path: Path) -> None:
@@ -361,7 +362,7 @@ def test_filesystem_queue_quarantines_invalid_payload_and_continues(tmp_path: Pa
 
     assert item is not None
     assert item[1].request.job_id == "valid-job"
-    assert adapter.dead_count(queue_name="bad-payload") == 1
+    assert dead_count(adapter, queue_name="bad-payload") == 1
     adapter.ack(item[0])
     assert not list((tmp_path / "queue" / "bad-payload" / "processing").glob("*.json"))
 
@@ -460,7 +461,9 @@ def test_distributed_pipeline_file_and_url_idempotency_keys(tmp_path: Path) -> N
     assert len(service._idempotency_key(url_request)) == 64
 
 
-def test_prepare_input_expands_home_file_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_prepare_input_expands_home_file_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
@@ -597,9 +600,7 @@ def test_persistence_service_and_public_distributed_wrappers(tmp_path: Path) -> 
         == 1
     )
     assert (
-        len(
-            service.list_jobs(limit=10, statuses=(JOB_STATUS_DEAD_LETTERED,), queue_backend="   ")
-        )
+        len(service.list_jobs(limit=10, statuses=(JOB_STATUS_DEAD_LETTERED,), queue_backend="   "))
         == 1
     )
     assert len(service.list_dead_letters(limit=10, queue_backend="filesystem")) == 1
@@ -1095,7 +1096,11 @@ def test_rabbitmq_adapter_serializes_concurrent_access() -> None:
             if not self.messages:
                 return None, None, None
             tag, message_id, body = self.messages.pop(0)
-            return SimpleNamespace(delivery_tag=tag), TrackingProperties(message_id=message_id), body
+            return (
+                SimpleNamespace(delivery_tag=tag),
+                TrackingProperties(message_id=message_id),
+                body,
+            )
 
         def basic_ack(self, *, delivery_tag: int) -> None:
             del delivery_tag

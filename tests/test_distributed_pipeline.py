@@ -25,6 +25,7 @@ from iocparser.errors import IOCTimeoutError
 from iocparser.infrastructure.queue_factory import create_queue_adapter
 from iocparser.infrastructure.queue_filesystem import FilesystemQueueAdapter
 from iocparser.infrastructure.runtime.telemetry import InMemoryTelemetrySink
+from tests.queue_helpers import dead_count, pending_count
 
 
 class TimeoutClient(IOCParserClient):
@@ -123,12 +124,12 @@ def test_distributed_pipeline_filesystem_queue_e2e(tmp_path: Path) -> None:
 
     queued = service.submit(request, queue_name="ingest")
     assert queued.status == JOB_STATUS_QUEUED
-    assert queue.pending_count(queue_name="ingest") == 1
+    assert pending_count(queue, queue_name="ingest") == 1
 
     completed = service.process_next(queue_name="ingest")
     assert completed is not None
     assert getattr(completed, "status", "") == JOB_STATUS_COMPLETED
-    assert queue.pending_count(queue_name="ingest") == 0
+    assert pending_count(queue, queue_name="ingest") == 0
 
     jobs = service.list_jobs(limit=10)
     assert len(jobs) == 1
@@ -185,7 +186,7 @@ def test_process_next_skips_message_without_tracked_job(tmp_path: Path) -> None:
     result = service.process_next(queue_name="ingest")
 
     assert result is None
-    assert queue.pending_count(queue_name="ingest") == 0
+    assert pending_count(queue, queue_name="ingest") == 0
     assert [event["name"] for event in telemetry.events] == ["job_skipped"]
 
 
@@ -212,7 +213,7 @@ def test_filesystem_queue_dequeue_survives_race_condition(tmp_path: Path) -> Non
 
     result = queue.dequeue(queue_name="race")
     assert result is not None
-    assert queue.pending_count(queue_name="race") == 0
+    assert pending_count(queue, queue_name="race") == 0
 
 
 def test_process_next_drops_message_when_dead_letter_archival_fails(tmp_path: Path) -> None:
@@ -254,7 +255,7 @@ def test_process_next_drops_message_when_dead_letter_archival_fails(tmp_path: Pa
     assert result is not None
     assert getattr(result, "status", "") == "failed"
     assert len(queue.acked) == 1
-    assert queue.pending_count(queue_name="poison") == 0
+    assert pending_count(queue, queue_name="poison") == 0
     assert not list((tmp_path / "queue" / "poison" / "processing").glob("*.json"))
 
 
@@ -314,7 +315,7 @@ def test_redelivered_completed_job_is_not_reprocessed(tmp_path: Path) -> None:
 
     assert second is None
     assert client.calls == 1
-    assert queue.pending_count(queue_name="q") == 0
+    assert pending_count(queue, queue_name="q") == 0
     jobs = service.list_jobs(limit=10)
     assert len(jobs) == 1
     assert jobs[0].status == JOB_STATUS_COMPLETED
@@ -419,7 +420,7 @@ def test_unexpected_exception_propagates_unexpected_dead_letter_failure(tmp_path
         service.process_next(queue_name="unexpected")
 
     assert queue.acked == []
-    assert queue.pending_count(queue_name="unexpected") == 0
+    assert pending_count(queue, queue_name="unexpected") == 0
     assert list((tmp_path / "queue" / "unexpected" / "processing").glob("*.json"))
 
 
@@ -487,7 +488,7 @@ def test_filesystem_dead_letter_preserves_existing_dead_record(tmp_path: Path) -
     queue.dead_letter(receipt, envelope=dequeued_envelope)
 
     assert existing.read_text(encoding="utf-8") == "existing-dead-record"
-    assert queue.dead_count(queue_name="dl") == 2
+    assert dead_count(queue, queue_name="dl") == 2
 
 
 def test_distributed_pipeline_deduplicates_submit_before_enqueue(tmp_path: Path) -> None:
@@ -506,7 +507,7 @@ def test_distributed_pipeline_deduplicates_submit_before_enqueue(tmp_path: Path)
     first = service.submit(request, queue_name="dedupe")
     second = service.submit(request, queue_name="dedupe")
     assert first.job_id == second.job_id
-    assert service.queue_adapter.pending_count(queue_name="dedupe") == 1
+    assert pending_count(service.queue_adapter, queue_name="dedupe") == 1
 
 
 def test_distributed_pipeline_idempotency_includes_processing_options(tmp_path: Path) -> None:
@@ -535,7 +536,7 @@ def test_distributed_pipeline_idempotency_includes_processing_options(tmp_path: 
     )
 
     assert first.job_id != second.job_id
-    assert service.queue_adapter.pending_count(queue_name="dedupe-options") == 2
+    assert pending_count(service.queue_adapter, queue_name="dedupe-options") == 2
 
 
 def test_distributed_pipeline_retries_and_dead_letters(tmp_path: Path) -> None:
@@ -560,7 +561,7 @@ def test_distributed_pipeline_retries_and_dead_letters(tmp_path: Path) -> None:
     dead_letters = service.list_dead_letters(limit=10)
     assert len(dead_letters) == 1
     assert dead_letters[0].error.code == "INPUT_TIMEOUT"
-    assert queue.dead_count(queue_name="retry") == 1
+    assert dead_count(queue, queue_name="retry") == 1
 
 
 def test_distributed_pipeline_dead_letters_on_unexpected_exception(tmp_path: Path) -> None:
@@ -616,7 +617,7 @@ def test_distributed_pipeline_dead_letters_failed_result_without_error(tmp_path:
     dead_letters = service.list_dead_letters(limit=10)
     assert len(dead_letters) == 1
     assert dead_letters[0].error.code == "PIPELINE_FAILED"
-    assert queue.dead_count(queue_name="missing-error") == 1
+    assert dead_count(queue, queue_name="missing-error") == 1
 
 
 def test_queue_factory_and_client_wrapper(tmp_path: Path) -> None:

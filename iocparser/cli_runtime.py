@@ -98,6 +98,7 @@ def _optional_float_arg(args: argparse.Namespace, name: str) -> float | None:
             raise InvalidFloatArgumentError(name, value) from exc
     raise UnsupportedFloatArgumentError(name, value)
 
+
 def downloader_for_args(args: argparse.Namespace) -> RequestsURLDownloader:
     header_items: object = getattr(args, "header", None)
     cookie_items: object = getattr(args, "cookie", None)

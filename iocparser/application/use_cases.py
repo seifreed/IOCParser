@@ -201,7 +201,11 @@ def persist_run(
         status = request.status
         if isinstance(status, str):
             status = status.strip() or None
-        error_message = request.error_message.strip() if isinstance(request.error_message, str) else request.error_message
+        error_message = (
+            request.error_message.strip()
+            if isinstance(request.error_message, str)
+            else request.error_message
+        )
         status = status or (
             "failed"
             if request.successful_items <= 0 and request.failed_items > 0

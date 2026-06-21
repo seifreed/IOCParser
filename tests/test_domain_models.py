@@ -159,7 +159,7 @@ def test_value_objects_canonicalize_expected_values() -> None:
     assert (
         indicator_value_for(
             IOCType.YARA,
-            "  rule Example { meta: author = \"me\" condition: true }  ",
+            '  rule Example { meta: author = "me" condition: true }  ',
         ).canonical()
         == 'rule Example { meta: author = "me" condition: true }'
     )
@@ -249,11 +249,11 @@ def test_source_from_raw_collapses_blank_optional_metadata_to_none() -> None:
 def test_source_and_ioc_from_raw_reject_non_string_values() -> None:
     import pytest
 
-    with pytest.raises(TypeError, match="source_kind|kind"):
+    with pytest.raises(TypeError, match=r"source_kind|kind"):
         Source.from_raw(1, "sample")  # type: ignore[arg-type]
     with pytest.raises(TypeError, match="value"):
         Source.from_raw("file", 1)  # type: ignore[arg-type]
-    with pytest.raises(TypeError, match="ioc_type|kind"):
+    with pytest.raises(TypeError, match=r"ioc_type|kind"):
         IOC.from_raw(1, "sample")  # type: ignore[arg-type]
     with pytest.raises(TypeError, match="value"):
         IOC.from_raw("domains", 1)  # type: ignore[arg-type]

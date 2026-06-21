@@ -37,7 +37,9 @@ def create_queue_adapter(
     normalized = backend.strip().lower()
     if normalized == "filesystem":
         root = Path(
-            queue_path.strip() if isinstance(queue_path, str) and queue_path.strip() else ".iocparser-queue"
+            queue_path.strip()
+            if isinstance(queue_path, str) and queue_path.strip()
+            else ".iocparser-queue"
         ).expanduser()
         if visibility_timeout_seconds is None:
             return FilesystemQueueAdapter(root)

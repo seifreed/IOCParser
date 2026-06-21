@@ -96,7 +96,9 @@ def wrap_binary_stream_for_bom(
             try:
                 encoding = detect_bom_encoding(cast("bytes", peek(4)))
                 if encoding != "utf-8":
-                    return io.TextIOWrapper(cast("BinaryIO", stream), encoding=encoding, errors="ignore"), True
+                    return io.TextIOWrapper(
+                        cast("BinaryIO", stream), encoding=encoding, errors="ignore"
+                    ), True
             except (AttributeError, OSError, io.UnsupportedOperation, TypeError, ValueError):
                 try:
                     buffered = io.BufferedReader(cast("io.RawIOBase", stream))
@@ -153,7 +155,9 @@ class FileParser(ABC):
         Args:
             file_path: Path to the file to parse
         """
-        self.file_path = file_path if _is_remote_source(file_path) else str(Path(file_path).expanduser())
+        self.file_path = (
+            file_path if _is_remote_source(file_path) else str(Path(file_path).expanduser())
+        )
 
         # Verify the file exists if it's not a URL
         if not _is_remote_source(file_path) and not Path(self.file_path).is_file():

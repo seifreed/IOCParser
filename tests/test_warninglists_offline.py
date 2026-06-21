@@ -278,9 +278,7 @@ def test_full_download_keeps_fresh_state_when_cache_write_fails(
         ),
         encoding="utf-8",
     )
-    warning_lists.cache_metadata_file.write_text(
-        json.dumps({"last_update": 0.0}), encoding="utf-8"
-    )
+    warning_lists.cache_metadata_file.write_text(json.dumps({"last_update": 0.0}), encoding="utf-8")
 
     def explode(*args: object, **kwargs: object) -> None:
         del args, kwargs

@@ -47,9 +47,7 @@ def validated_stix_types(value: object | None) -> str | None:
     if value is None:
         return None
     if not isinstance(value, str):
-        raise ValidationError(
-            INVALID_IOC_TYPE_FILTER.format(flag="--stix-types", value=value)
-        )
+        raise ValidationError(INVALID_IOC_TYPE_FILTER.format(flag="--stix-types", value=value))
     try:
         parse_ioc_types(value)
     except ValueError as exc:
@@ -185,18 +183,14 @@ class ProcessingOptions:
         )
 
     @staticmethod
-    def _parse_type_filter(
-        value: str | None, *, flag: str
-    ) -> tuple[IOCType | IOCTypeName, ...]:
+    def _parse_type_filter(value: str | None, *, flag: str) -> tuple[IOCType | IOCTypeName, ...]:
         # parse_ioc_types raises a bare ValueError on an unknown type; translate it to a
         # ValidationError so the CLI reports a clean message (like --severity) instead of
         # dumping a stack trace for what is just bad user input.
         try:
             return parse_ioc_types(value)
         except ValueError as exc:
-            raise ValidationError(
-                INVALID_IOC_TYPE_FILTER.format(flag=flag, value=exc)
-            ) from exc
+            raise ValidationError(INVALID_IOC_TYPE_FILTER.format(flag=flag, value=exc)) from exc
 
     def to_domain(self) -> ExtractionOptions:
         """Convert CLI options into application/domain options."""

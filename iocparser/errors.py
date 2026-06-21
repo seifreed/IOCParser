@@ -73,9 +73,7 @@ class TypeValidationError(TypeError):
     of ``value`` is appended.
     """
 
-    def __init__(
-        self, subject: str | None, expected: str, value: object = _OMIT_GOT
-    ) -> None:
+    def __init__(self, subject: str | None, expected: str, value: object = _OMIT_GOT) -> None:
         head = f"Expected {subject} to be {expected}" if subject else f"Expected {expected}"
         if value is _OMIT_GOT:
             message = head

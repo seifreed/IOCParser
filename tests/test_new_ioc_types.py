@@ -601,10 +601,7 @@ def test_extract_aws_arns_multi_segment_partitions():
     arn:aws-us-gov:... and arn:aws-iso-b:... were dropped entirely.
     """
     engine = DefaultIOCExtractionEngine()
-    text = (
-        "Gov: arn:aws-us-gov:iam::123456789012:role/Admin "
-        "ISO: arn:aws-iso-b:s3:::secret-bucket"
-    )
+    text = "Gov: arn:aws-us-gov:iam::123456789012:role/Admin ISO: arn:aws-iso-b:s3:::secret-bucket"
     arns = engine.extract_all(text).get("aws_arns", [])
     assert "arn:aws-us-gov:iam::123456789012:role/Admin" in arns
     assert "arn:aws-iso-b:s3:::secret-bucket" in arns

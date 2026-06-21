@@ -73,7 +73,10 @@ class ServiceBackedBadWarningLists:
     ) -> tuple[dict[str, list[str | dict[str, str]]], dict[str, list[dict[str, str]]]]:
         assert self.force_update is True
         del grouped_iocs
-        return ({}, {"domains": [{"value": object(), "warning_list": "Known Good", "description": ""}]})
+        return (
+            {},
+            {"domains": [{"value": object(), "warning_list": "Known Good", "description": ""}]},
+        )
 
 
 class ServiceBackedMissingWarningListWarningLists:

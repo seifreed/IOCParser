@@ -29,7 +29,12 @@ class SourceModel(Base):
         # Uniqueness on a hash of (kind, value): a TEXT column cannot be a key on
         # MySQL/MariaDB, so the natural (kind, value) constraint is invalid there.
         UniqueConstraint("dedup_hash", name="uq_sources_dedup_hash"),
-        Index("ix_sources_kind_value_search", "kind", "value_search", mysql_length={"value_search": 255}),
+        Index(
+            "ix_sources_kind_value_search",
+            "kind",
+            "value_search",
+            mysql_length={"value_search": 255},
+        ),
         Index("ix_sources_value_search", "value_search", mysql_length=255),
     )
 
@@ -75,9 +80,19 @@ class IOCModel(Base):
         # warning_description): those TEXT columns cannot form a key on
         # MySQL/MariaDB and their combined length exceeds InnoDB's index limit.
         UniqueConstraint("dedup_hash", name="uq_iocs_dedup_hash"),
-        Index("ix_iocs_type_value_search", "ioc_type", "value_search", mysql_length={"value_search": 255}),
+        Index(
+            "ix_iocs_type_value_search",
+            "ioc_type",
+            "value_search",
+            mysql_length={"value_search": 255},
+        ),
         Index("ix_iocs_value_search", "value_search", mysql_length=255),
-        Index("ix_iocs_value_search_type", "value_search", "ioc_type", mysql_length={"value_search": 255}),
+        Index(
+            "ix_iocs_value_search_type",
+            "value_search",
+            "ioc_type",
+            mysql_length={"value_search": 255},
+        ),
     )
 
 

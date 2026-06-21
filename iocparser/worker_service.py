@@ -14,12 +14,15 @@ from iocparser.pipeline_worker import PipelineWorker
 from iocparser.worker_config import WorkerServiceConfig
 
 logger = logging.getLogger(__name__)
+
+
 @dataclass(frozen=True)
 class WorkerServiceRuntime:
     service: DistributedPipelineService
     queue_name: str
     poll_interval_seconds: float
     max_messages_per_cycle: int
+
 
 def build_worker_service_runtime(
     config: WorkerServiceConfig,

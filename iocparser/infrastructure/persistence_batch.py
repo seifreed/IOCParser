@@ -44,9 +44,7 @@ def _dict_report_value(payload: dict[str, object], key: str) -> dict[str, object
     raise TypeValidationError(key, "dict", raw_value)
 
 
-def _report_string_value(
-    payload: dict[str, object], key: str, default: str = ""
-) -> str:
+def _report_string_value(payload: dict[str, object], key: str, default: str = "") -> str:
     raw_value = payload.get(key, default)
     if not isinstance(raw_value, str):
         raise TypeValidationError(key, "string", raw_value)
@@ -120,7 +118,9 @@ def create_batch_job(
     retry_attempt = _batch_retry_attempt(items)
     duration_ms = _int_report_value(report, "duration_ms", 0)
     started_at, finished_at = _batch_timestamps(report, duration_ms=duration_ms)
-    error_summary: Counter[str] = Counter(_report_string_value(item, "error_type", "unknown") for item in failures)
+    error_summary: Counter[str] = Counter(
+        _report_string_value(item, "error_type", "unknown") for item in failures
+    )
     metrics = _dict_report_value(report, "metrics")
     serialized_config = dict(config) if config is not None else {}
     serialized_error_summary: dict[str, int] = dict(sorted(error_summary.items()))

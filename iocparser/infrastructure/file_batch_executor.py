@@ -30,9 +30,7 @@ class ThreadPoolFileBatchExecutor(FileBatchExecutor):
         results: dict[str, ExtractionResult] = {}
         request_items = [(request, key_for(request)) for request in requests]
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            future_map = {
-                executor.submit(handler, request): key for request, key in request_items
-            }
+            future_map = {executor.submit(handler, request): key for request, key in request_items}
             for future in concurrent.futures.as_completed(future_map):
                 source_key = future_map[future]
                 try:

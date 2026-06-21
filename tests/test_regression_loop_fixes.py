@@ -243,11 +243,15 @@ def test_pipeline_job_request_rejects_non_bool_flags() -> None:
         PipelineJobRequest(input_kind="text", source_value="x", persist=None)  # type: ignore[arg-type]
     with pytest.raises(TypeError, match="check_warnings"):
         PipelineJobRequest(
-            input_kind="text", source_value="x", check_warnings=None  # type: ignore[arg-type]
+            input_kind="text",
+            source_value="x",
+            check_warnings=None,  # type: ignore[arg-type]
         )
     with pytest.raises(TypeError, match="force_update"):
         PipelineJobRequest(
-            input_kind="text", source_value="x", force_update=1  # type: ignore[arg-type]
+            input_kind="text",
+            source_value="x",
+            force_update=1,  # type: ignore[arg-type]
         )
     with pytest.raises(TypeError, match="defang"):
         PipelineJobRequest(input_kind="text", source_value="x", defang="no")  # type: ignore[arg-type]
@@ -305,7 +309,9 @@ def test_distributed_records_reject_bool_counters() -> None:
             source_value="x",
             attempts=False,  # type: ignore[arg-type]
             max_attempts=3,
-            error=PipelineErrorInfo(code="x", category="y", retryable=False, status="failed", message="z"),
+            error=PipelineErrorInfo(
+                code="x", category="y", retryable=False, status="failed", message="z"
+            ),
             dead_lettered_at="2026-01-01T00:00:00+00:00",
         )
 
@@ -419,7 +425,9 @@ def test_idempotency_key_for_missing_file_does_not_raise(tmp_path: Path) -> None
     assert key != idempotency_key_for(other, digester=digester)
 
 
-def test_sha256_content_digester_expands_user_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_sha256_content_digester_expands_user_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from iocparser.infrastructure.content_digests import SHA256ContentDigester
 
     home = tmp_path / "home"
@@ -1145,7 +1153,7 @@ def test_job_record_preserves_error_with_empty_message() -> None:
 
 
 def test_persisted_view_models_reject_non_string_fields() -> None:
-    from datetime import datetime
+    from datetime import UTC, datetime
 
     from iocparser.domain.jobs import (
         BatchDashboard,
@@ -1156,7 +1164,7 @@ def test_persisted_view_models_reject_non_string_fields() -> None:
     )
     from iocparser.domain.persisted import PersistedRunQueryHit, PersistedRunSummary
 
-    now = datetime.now()
+    now = datetime.now(UTC)
     with pytest.raises(TypeError, match="source_kind"):
         PersistedRunSummary(
             run_id=1,

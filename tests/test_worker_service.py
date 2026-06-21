@@ -143,7 +143,9 @@ def test_worker_config_rejects_missing_explicit_config_path(tmp_path: Path) -> N
         WorkerServiceConfig.from_sources(str(missing))
 
 
-def test_worker_config_expands_user_home_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_worker_config_expands_user_home_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     home = tmp_path / "home"
     home.mkdir()
     config_path = home / "worker.ini"

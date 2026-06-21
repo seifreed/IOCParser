@@ -94,7 +94,9 @@ def _report_item_matches_retry_filters(
     error_type_filter: str | None,
     error_substring: str | None,
 ) -> bool:
-    return _require_str(item.get("status", ""), field="status").lower() == "failed" and _matches_retry_error_filters(
+    return _require_str(
+        item.get("status", ""), field="status"
+    ).lower() == "failed" and _matches_retry_error_filters(
         error_type=_require_str(item.get("error_type", ""), field="error_type"),
         error_message=_require_str(item.get("error", ""), field="error"),
         error_type_filter=error_type_filter,

@@ -29,9 +29,17 @@ class FailedBatchItem:
     created_at: datetime
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "source_value", _require_str(self.source_value, field="source_value", non_empty=True))
-        object.__setattr__(self, "error_type", _require_str(self.error_type, field="error_type", non_empty=True))
-        object.__setattr__(self, "error_message", _require_str(self.error_message, field="error_message"))
+        object.__setattr__(
+            self,
+            "source_value",
+            _require_str(self.source_value, field="source_value", non_empty=True),
+        )
+        object.__setattr__(
+            self, "error_type", _require_str(self.error_type, field="error_type", non_empty=True)
+        )
+        object.__setattr__(
+            self, "error_message", _require_str(self.error_message, field="error_message")
+        )
 
     def to_record(self) -> dict[str, object]:
         return {
@@ -61,8 +69,12 @@ class BatchJobSummary:
     failed_item_count: int = 0
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "source_kind", _require_str(self.source_kind, field="source_kind", non_empty=True))
-        object.__setattr__(self, "status", _require_str(self.status, field="status", non_empty=True))
+        object.__setattr__(
+            self, "source_kind", _require_str(self.source_kind, field="source_kind", non_empty=True)
+        )
+        object.__setattr__(
+            self, "status", _require_str(self.status, field="status", non_empty=True)
+        )
 
     def to_record(self) -> dict[str, object]:
         return {
@@ -99,8 +111,12 @@ class BatchJobDetail:
     failed_item_count: int = 0
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "source_kind", _require_str(self.source_kind, field="source_kind", non_empty=True))
-        object.__setattr__(self, "status", _require_str(self.status, field="status", non_empty=True))
+        object.__setattr__(
+            self, "source_kind", _require_str(self.source_kind, field="source_kind", non_empty=True)
+        )
+        object.__setattr__(
+            self, "status", _require_str(self.status, field="status", non_empty=True)
+        )
 
     def to_record(self) -> dict[str, object]:
         return {
@@ -132,7 +148,9 @@ class BatchDashboardWindow:
     average_duration_ms: int
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "started_at", _require_str(self.started_at, field="started_at", non_empty=True))
+        object.__setattr__(
+            self, "started_at", _require_str(self.started_at, field="started_at", non_empty=True)
+        )
 
     def to_record(self) -> dict[str, object]:
         return {
@@ -159,7 +177,9 @@ class BatchDashboard:
     windows: tuple[BatchDashboardWindow, ...]
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "group_by", _require_str(self.group_by, field="group_by", non_empty=True))
+        object.__setattr__(
+            self, "group_by", _require_str(self.group_by, field="group_by", non_empty=True)
+        )
 
     def to_record(self) -> dict[str, object]:
         return {

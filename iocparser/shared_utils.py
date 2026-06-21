@@ -81,7 +81,11 @@ def normalize_metadata_values(metadata: Mapping[str, object]) -> dict[str, int |
     """Coerce each metadata value to int/str/None, rejecting arbitrary objects."""
     normalized: dict[str, int | str | None] = {}
     for key, value in metadata.items():
-        if (isinstance(value, int) and not isinstance(value, bool)) or isinstance(value, str) or value is None:
+        if (
+            (isinstance(value, int) and not isinstance(value, bool))
+            or isinstance(value, str)
+            or value is None
+        ):
             normalized[key] = value
             continue
         subject = f"metadata value for {key}"

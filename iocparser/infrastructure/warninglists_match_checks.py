@@ -103,7 +103,9 @@ def check_value_in_list(
         # diagnostic must match them the same way or it contradicts check_value.
         if list_type == "hostname":
             return value.strip().lower() in [
-                normalized_warning_list_text(v, list_type=list_type) for v in values if v is not None
+                normalized_warning_list_text(v, list_type=list_type)
+                for v in values
+                if v is not None
             ]
         return check_string_type(value, values)
     if list_type == "substring":

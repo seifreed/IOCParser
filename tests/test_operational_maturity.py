@@ -1809,7 +1809,7 @@ def test_retry_failed_report_can_filter_by_error_type_and_text(
     assert _retry_attempt_for_url("https://one.example", "~/retry.json") == 5
 
 
-def test_retry_filters_reject_non_string_error_fields(tmp_path: Path) -> None:
+def test_retry_filters_reject_non_string_error_fields() -> None:
     from iocparser.cli_processing_urls import _report_item_matches_retry_filters
 
     with pytest.raises(TypeError, match="Expected error_type to be string"):

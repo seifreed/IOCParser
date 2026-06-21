@@ -399,7 +399,9 @@ def test_history_payload_reports_missing_and_unreadable_files_cleanly(tmp_path: 
         _history_payload(str(malformed))
 
 
-def test_history_payload_expands_user_home_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_history_payload_expands_user_home_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     home = tmp_path / "home"
     home.mkdir()
     payload_path = home / "history.json"
@@ -547,9 +549,9 @@ def test_persistence_helper_functions_cover_conversion_edges() -> None:
     assert _tags_from_json(json.dumps([1, "tag-a", None])) == ("tag-a",)
     with pytest.raises(ValueError, match="Invalid JSON array"):
         _tags_from_json("not-json")
-    assert _evidence_from_json(json.dumps([{"excerpt": 1, "source": "s"}, {"excerpt": "x", "source": "s"}])) == (
-        IOCEvidence(excerpt="x", line_number=None, source="s"),
-    )
+    assert _evidence_from_json(
+        json.dumps([{"excerpt": 1, "source": "s"}, {"excerpt": "x", "source": "s"}])
+    ) == (IOCEvidence(excerpt="x", line_number=None, source="s"),)
     original_json_loads = persistence_support_module.json.loads
     persistence_support_module.json.loads = lambda _raw: [{1: "one", "excerpt": "x", "source": "s"}]
     try:
@@ -696,7 +698,9 @@ def test_pipeline_worker_private_helpers_cover_remaining_branches() -> None:
     adapter = _RunRepositoryAdapter(inner)
     assert adapter.create_run(source_id=1, tool_version="1", options=object(), metadata=None) == 7
     with pytest.raises(TypeError, match="Expected metadata value"):
-        adapter.create_run(source_id=1, tool_version="1", options=object(), metadata={"x": object()})
+        adapter.create_run(
+            source_id=1, tool_version="1", options=object(), metadata={"x": object()}
+        )
     adapter.attach_iocs(
         run_id=1, ioc_ids=[1], result=ExtractionResult(iocs=(IOC.from_raw("domains", "a.test"),))
     )
@@ -831,26 +835,28 @@ def test_renderers_cover_custom_stix_and_record_helpers() -> None:
 
     weird_result = _WeirdContextResult(iocs=(IOC.from_raw("domains", "ctx.test"),))
     assert "ctx.test" in TextOutputRenderer(include_context=True).render(weird_result)
+
     class _BadGroupedResult(ExtractionResult):
         def canonical_by_type(self) -> dict[object, tuple[object, ...]]:
             return {"domains": (object(),)}
 
     with pytest.raises(TypeError, match="Expected value to be string"):
         TextOutputRenderer().render(_BadGroupedResult(iocs=()))
+
     class _BadContextResult(ExtractionResult):
         def to_records(self) -> list[dict[str, object]]:
             return [{"type": "domains", "raw_value": object(), "value": "ctx.test", "evidence": []}]
 
     with pytest.raises(TypeError, match="Expected raw_value to be string"):
         TextOutputRenderer(include_context=True).render(_BadContextResult(iocs=()))
+
     class _BadJsonGroupedResult(ExtractionResult):
         def canonical_by_type(self) -> dict[object, tuple[object, ...]]:
             return {"domains": (1,)}
 
     with pytest.raises(TypeError, match="Expected value to be string"):
-        renderer_json_object(
-            JSONOutputRenderer().render(_BadJsonGroupedResult(iocs=()))
-        )
+        renderer_json_object(JSONOutputRenderer().render(_BadJsonGroupedResult(iocs=())))
+
     class _BadCsvResult(ExtractionResult):
         def to_records(self) -> list[dict[str, object]]:
             return [
@@ -868,6 +874,7 @@ def test_renderers_cover_custom_stix_and_record_helpers() -> None:
 
     with pytest.raises(TypeError, match="Expected warning_list to be string"):
         CSVOutputRenderer().render(_BadCsvResult(iocs=()))
+
     class _BadCsvDescriptionResult(ExtractionResult):
         def to_records(self) -> list[dict[str, object]]:
             return [
@@ -884,6 +891,7 @@ def test_renderers_cover_custom_stix_and_record_helpers() -> None:
 
     with pytest.raises(TypeError, match="Expected description to be string"):
         CSVOutputRenderer().render(_BadCsvDescriptionResult(iocs=()))
+
     class _BadCsvLineNumberResult(ExtractionResult):
         def to_records(self) -> list[dict[str, object]]:
             return [
@@ -901,6 +909,7 @@ def test_renderers_cover_custom_stix_and_record_helpers() -> None:
 
     with pytest.raises(TypeError, match="Expected line_number to be int"):
         CSVOutputRenderer().render(_BadCsvLineNumberResult(iocs=()))
+
     class _BadJsonWarningResult(ExtractionResult):
         def grouped_warnings(self) -> dict[str, list[dict[str, str]]]:
             return {"domains": [{"value": "ctx.test", "description": ""}]}
@@ -919,7 +928,9 @@ def test_renderers_cover_custom_stix_and_record_helpers() -> None:
 
 def test_print_warning_lists_rejects_non_string_fields() -> None:
     with pytest.raises(TypeError, match="Expected value to be string"):
-        print_warning_lists({"domains": [{"value": object(), "warning_list": "wl", "description": ""}]})
+        print_warning_lists(
+            {"domains": [{"value": object(), "warning_list": "wl", "description": ""}]}
+        )
     with pytest.raises(TypeError, match="Expected warning_list to be string"):
         print_warning_lists({"domains": [{"value": "x", "description": ""}]})
 

@@ -226,9 +226,7 @@ class RequestsURLDownloader(URLDownloader):
             else cfg.allow_private_networks
         )
         configured_max_input_size = (
-            max_input_size_bytes
-            if max_input_size_bytes is not None
-            else cfg.max_input_size_bytes
+            max_input_size_bytes if max_input_size_bytes is not None else cfg.max_input_size_bytes
         )
         if configured_max_input_size is not None and configured_max_input_size < 0:
             raise ValueError(INVALID_MAX_INPUT_SIZE_ERROR.format(value=configured_max_input_size))
@@ -271,7 +269,11 @@ class RequestsURLDownloader(URLDownloader):
         """Return normalized metadata captured during the last download."""
         if self.last_download_metadata is None:
             return {}
-        return {name: value for name, value in self.last_download_metadata.items() if isinstance(name, str)}
+        return {
+            name: value
+            for name, value in self.last_download_metadata.items()
+            if isinstance(name, str)
+        }
 
     def _respect_rate_limit(self) -> None:
         if self.rate_limit_delay <= 0:

@@ -275,7 +275,9 @@ def process_file_payload(
     )
 
 
-def process_url_input(request: UrlProcessingRequest) -> tuple[GroupedIocs, GroupedWarnings, str, ExtractionResult | None]:
+def process_url_input(
+    request: UrlProcessingRequest,
+) -> tuple[GroupedIocs, GroupedWarnings, str, ExtractionResult | None]:
     payload = process_url_payload(request)
     return payload.normal_iocs, payload.warning_iocs, payload.input_display, payload.result
 

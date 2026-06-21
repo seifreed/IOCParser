@@ -37,6 +37,8 @@ def _resolve_plugin[FactoryT](registry: dict[str, FactoryT], name: str, *, kind:
         raise ValidationError(
             UNKNOWN_PLUGIN_ERROR.format(kind=kind, name=name, available=available)
         ) from exc
+
+
 _BUILTIN_RENDERER_NAMES: set[str] = set()
 _BUILTIN_ENRICHER_NAMES: set[str] = set()
 
@@ -261,7 +263,9 @@ def _load_discovered_entry_points(discovered: EntryPoints) -> None:
 def _register_ioc_type_plugin(plugin_name: str) -> None:
     try:
         definition = _ioc_type_plugin_definition(plugin_name)
-        base_type_raw = _require_str_field(definition.get("base_type", "urls"), field="base_type").strip()
+        base_type_raw = _require_str_field(
+            definition.get("base_type", "urls"), field="base_type"
+        ).strip()
         if not base_type_raw:
             _logger.warning("Plugin '%s' has empty base_type, skipping", plugin_name)
             return

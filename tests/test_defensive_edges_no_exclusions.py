@@ -652,7 +652,8 @@ def test_rabbitmq_adapter_resets_cache_when_publish_fails(
 
 
 def test_rabbitmq_channel_for_preserves_channel_error_when_close_fails(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     import iocparser.infrastructure.queue_rabbitmq as rabbitmq
 
@@ -748,9 +749,7 @@ def test_distributed_job_create_or_get_surfaces_close_failure(
     with pytest.raises(RuntimeError, match="close failed"):
         service.create_or_get_job(
             envelope=QueueEnvelope(
-                request=PipelineJobRequest(
-                    input_kind="text", source_value="payload", job_id="job"
-                ),
+                request=PipelineJobRequest(input_kind="text", source_value="payload", job_id="job"),
                 queue_backend="memory",
                 queue_name="default",
             ),
@@ -1234,7 +1233,7 @@ def test_history_private_edges_with_real_models(tmp_path) -> None:
 
 
 def test_history_import_skip_and_same_origin_batch_paths() -> None:
-    from iocparser.infrastructure.persistence.history import import_ops, ops
+    from iocparser.infrastructure.persistence.history import import_ops
 
     now = datetime.now(UTC)
     row = {
@@ -1305,7 +1304,10 @@ def test_history_import_skip_and_same_origin_batch_paths() -> None:
         == 0
     )
     assert (
-        import_ops._import_failed_batch_items(SimpleNamespace(), [{"batch_job_id": 3}], batch_map={}) == 0
+        import_ops._import_failed_batch_items(
+            SimpleNamespace(), [{"batch_job_id": 3}], batch_map={}
+        )
+        == 0
     )
 
 
@@ -1449,7 +1451,7 @@ def test_strict_coverage_infrastructure_edge_helpers(tmp_path) -> None:
 
 
 def test_history_import_updates_stale_ioc_search_value(tmp_path) -> None:
-    from iocparser.infrastructure.persistence.history import import_ops, ops
+    from iocparser.infrastructure.persistence.history import import_ops
     from iocparser.infrastructure.persistence_models import IOCModel
     from iocparser.infrastructure.persistence_repository_support import normalize_ioc_search
 
@@ -1721,7 +1723,7 @@ def test_batch_listings_break_started_at_ties_deterministically(tmp_path) -> Non
     so which rows survived a LIMIT (and their order) was engine-defined when
     timestamps collided. The id tiebreaker makes the cutoff deterministic.
     """
-    from iocparser.infrastructure.persistence.history import import_ops, ops
+    from iocparser.infrastructure.persistence.history import ops
     from iocparser.infrastructure.persistence_batch import BatchJobModel
 
     db_uri = _fresh_db(tmp_path, "batch-ties.db")

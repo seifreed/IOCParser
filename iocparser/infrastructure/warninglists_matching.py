@@ -158,6 +158,7 @@ class WarningListMatchingMixin:
         matching_attrs = warning_list.get("matching_attributes")
         if not isinstance(matching_attrs, list):
             return []
+
         def _names() -> list[str]:
             names: list[str] = []
             for attr in matching_attrs:
@@ -184,8 +185,7 @@ class WarningListMatchingMixin:
         return [
             list_id
             for list_id, warning_list in self.warning_lists.items()
-            if not self._matching_attribute_names(warning_list)
-            or list_id not in indexed_list_ids
+            if not self._matching_attribute_names(warning_list) or list_id not in indexed_list_ids
         ]
 
     def _is_known_ioc_type(self, ioc_type: str) -> bool:

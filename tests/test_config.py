@@ -99,23 +99,23 @@ def test_config_env_overrides_all_option_types(tmp_path) -> None:
 
 
 def test_config_rejects_invalid_int_env_value() -> None:
-    with _env(IOCPARSER_PARALLEL="not-an-int"), pytest.raises(
-        ValueError, match=r"IOCPARSER_PARALLEL"
+    with (
+        _env(IOCPARSER_PARALLEL="not-an-int"),
+        pytest.raises(ValueError, match=r"IOCPARSER_PARALLEL"),
     ):
         load_config(None, None, None)
 
 
 def test_config_rejects_invalid_float_env_value() -> None:
-    with _env(IOCPARSER_URL_BACKOFF="fast"), pytest.raises(
-        ValueError, match=r"IOCPARSER_URL_BACKOFF"
+    with (
+        _env(IOCPARSER_URL_BACKOFF="fast"),
+        pytest.raises(ValueError, match=r"IOCPARSER_URL_BACKOFF"),
     ):
         load_config(None, None, None)
 
 
 def test_config_rejects_invalid_bool_env_value() -> None:
-    with _env(IOCPARSER_STREAMING="maybe"), pytest.raises(
-        ValueError, match=r"IOCPARSER_STREAMING"
-    ):
+    with _env(IOCPARSER_STREAMING="maybe"), pytest.raises(ValueError, match=r"IOCPARSER_STREAMING"):
         load_config(None, None, None)
 
 
@@ -192,14 +192,7 @@ def test_config_empty_numeric_and_boolean_ini_values_use_defaults(tmp_path) -> N
 def test_config_blank_diff_only_uses_default(tmp_path) -> None:
     config_path = tmp_path / "iocparser.ini"
     config_path.write_text(
-        (
-            "[defaults]\n"
-            "diff_only =   \n"
-            "stix_types =   \n"
-            "[network]\n"
-            "user_agent =   \n"
-            "proxy =   \n"
-        ),
+        ("[defaults]\ndiff_only =   \nstix_types =   \n[network]\nuser_agent =   \nproxy =   \n"),
         encoding="utf-8",
     )
 

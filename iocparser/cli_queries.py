@@ -68,9 +68,7 @@ def _string_filters_attr(args: argparse.Namespace, field_name: str) -> tuple[str
 
 def _validated_limit(args: argparse.Namespace, name: str, default: int, *, field: str) -> int:
     # Reject negatives, matching the programmatic API (the CLI used to clamp to 0).
-    return validated_non_negative_int(
-        _cli_args.validated_int_arg(args, name, default), field=field
-    )
+    return validated_non_negative_int(_cli_args.validated_int_arg(args, name, default), field=field)
 
 
 def _diff_run_ids(args: argparse.Namespace) -> tuple[int, int] | None:
@@ -140,9 +138,7 @@ def _handle_search_ioc(args: argparse.Namespace, config: AppConfig) -> bool:
         severity=validated_severity_filters(_cli_args.get_optional_str_arg(args, "severity")),
         tags=_string_filters_attr(args, "tag"),
         exclude_tags=_string_filters_attr(args, "exclude_tag"),
-        min_severity=validated_min_severity(
-            _cli_args.get_optional_str_arg(args, "min_severity")
-        ),
+        min_severity=validated_min_severity(_cli_args.get_optional_str_arg(args, "min_severity")),
         tag_mode=validated_tag_mode(_cli_args.get_optional_str_arg(args, "tag_mode") or "all"),
         sort_by=validated_search_sort(
             _cli_args.get_optional_str_arg(args, "query_sort") or "newest"

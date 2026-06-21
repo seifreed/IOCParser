@@ -83,7 +83,9 @@ class ResourceLimits:
                 _require_int(self.hard_timeout_seconds, field="hard_timeout_seconds"),
             )
         object.__setattr__(self, "max_workers", _require_int(self.max_workers, field="max_workers"))
-        object.__setattr__(self, "max_queue_size", _require_int(self.max_queue_size, field="max_queue_size"))
+        object.__setattr__(
+            self, "max_queue_size", _require_int(self.max_queue_size, field="max_queue_size")
+        )
         if self.max_input_size_bytes is not None and self.max_input_size_bytes < 0:
             object.__setattr__(self, "max_input_size_bytes", None)
         if self.max_input_seconds is not None and self.max_input_seconds < 0:
@@ -136,7 +138,9 @@ class PipelineJobRequest:
         object.__setattr__(
             self, "input_kind", _require_str(self.input_kind, field="input_kind").lower()
         )
-        object.__setattr__(self, "source_value", _require_str(self.source_value, field="source_value"))
+        object.__setattr__(
+            self, "source_value", _require_str(self.source_value, field="source_value")
+        )
         if self.file_type is not None:
             object.__setattr__(self, "file_type", _require_str(self.file_type, field="file_type"))
         if self.db_uri is not None:
@@ -188,11 +192,17 @@ class PipelineJobResult:
         object.__setattr__(
             self, "input_kind", _require_str(self.input_kind, field="input_kind").lower()
         )
-        object.__setattr__(self, "source_value", _require_str(self.source_value, field="source_value"))
+        object.__setattr__(
+            self, "source_value", _require_str(self.source_value, field="source_value")
+        )
         object.__setattr__(self, "status", _require_str(self.status, field="status"))
-        object.__setattr__(self, "correlation_id", _require_str(self.correlation_id, field="correlation_id"))
+        object.__setattr__(
+            self, "correlation_id", _require_str(self.correlation_id, field="correlation_id")
+        )
         object.__setattr__(self, "job_id", _require_str(self.job_id, field="job_id"))
-        object.__setattr__(self, "schema_version", _require_str(self.schema_version, field="schema_version"))
+        object.__setattr__(
+            self, "schema_version", _require_str(self.schema_version, field="schema_version")
+        )
         object.__setattr__(self, "started_at", _require_str(self.started_at, field="started_at"))
         object.__setattr__(self, "finished_at", _require_str(self.finished_at, field="finished_at"))
 

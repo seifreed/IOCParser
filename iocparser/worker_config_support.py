@@ -152,7 +152,9 @@ def load_worker_file_values(config_path: Path | None) -> dict[str, object]:
         )
         values["queue_name"] = _ini_optional_str(parser, "worker", "queue_name") or "default"
         values["queue_url"] = _ini_optional_str(parser, "worker", "queue_url")
-        values["queue_path"] = _ini_optional_str(parser, "worker", "queue_path") or ".iocparser-queue"
+        values["queue_path"] = (
+            _ini_optional_str(parser, "worker", "queue_path") or ".iocparser-queue"
+        )
         values["dead_letter_queue_url"] = _ini_optional_str(
             parser, "worker", "dead_letter_queue_url"
         )
@@ -164,7 +166,9 @@ def load_worker_file_values(config_path: Path | None) -> dict[str, object]:
         )
         values["max_cycles"] = _ini_int(parser, "worker", "max_cycles", fallback=None)
         values["concurrency"] = _ini_int(parser, "worker", "concurrency", fallback=1)
-        values["telemetry_mode"] = _ini_optional_str(parser, "worker", "telemetry_mode") or "logging"
+        values["telemetry_mode"] = (
+            _ini_optional_str(parser, "worker", "telemetry_mode") or "logging"
+        )
     if parser.has_section("runtime"):
         values["max_input_size_bytes"] = _ini_int(
             parser, "runtime", "max_input_size_bytes", fallback=None

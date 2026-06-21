@@ -132,7 +132,9 @@ class RabbitMQQueueAdapter:
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception:
-            close_and_log(connection, logger=logger, message="Close failed while opening RabbitMQ channel")
+            close_and_log(
+                connection, logger=logger, message="Close failed while opening RabbitMQ channel"
+            )
             self._connection = None
             self._channel = None
             raise
@@ -143,7 +145,9 @@ class RabbitMQQueueAdapter:
     def _reset_connection(self) -> None:
         channel = self._channel
         if channel is not None:
-            close_and_log(channel, logger=logger, message="Close failed while resetting RabbitMQ channel")
+            close_and_log(
+                channel, logger=logger, message="Close failed while resetting RabbitMQ channel"
+            )
         connection = self._connection
         if connection is not None:
             close_and_log(

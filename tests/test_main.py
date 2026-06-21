@@ -170,6 +170,7 @@ class TestArgumentHelpers:
 
     def test_get_bool_arg_rejects_non_boolean_objects(self) -> None:
         """Test get_bool_arg rejects arbitrary objects instead of coercing truthiness."""
+
         class _Truthy:
             def __bool__(self) -> bool:
                 return True
@@ -300,6 +301,7 @@ class TestArgumentHelpers:
 
     def test_string_helpers_reject_non_string_values(self) -> None:
         """String helper accessors must not coerce arbitrary objects."""
+
         class _Textish:
             def __str__(self) -> str:
                 return "hello"

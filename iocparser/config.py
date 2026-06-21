@@ -194,7 +194,9 @@ def _parse_int_value(value: str, *, option_name: str) -> int:
     try:
         return int(value.strip())
     except ValueError as exc:
-        raise ValueError(INVALID_INTEGER_ERROR.format(option_name=option_name, value=value)) from exc
+        raise ValueError(
+            INVALID_INTEGER_ERROR.format(option_name=option_name, value=value)
+        ) from exc
 
 
 def _parse_float_value(value: str, *, option_name: str) -> float:
@@ -336,9 +338,7 @@ def _read_ini_config(config_path: Path) -> ConfigValues:
         values["connect_timeout"] = _ini_optional_float(parser, "network", "connect_timeout")
         values["read_timeout"] = _ini_optional_float(parser, "network", "read_timeout")
         values["max_input_size_mb"] = _ini_optional_float(parser, "network", "max_input_size_mb")
-        values["max_input_seconds"] = _ini_optional_float(
-            parser, "network", "max_input_seconds"
-        )
+        values["max_input_seconds"] = _ini_optional_float(parser, "network", "max_input_seconds")
         values["max_queue_size"] = _ini_int(parser, "network", "max_queue_size", fallback=64)
         values["skip_processed"] = _ini_bool(parser, "network", "skip_processed", fallback=False)
 

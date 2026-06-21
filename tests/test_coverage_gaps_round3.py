@@ -202,13 +202,11 @@ class TestPluginEntryPointLoading:
             raise ImportError("missing dependency")
 
         good_ep = SimpleNamespace(
-            name="_test_good_r", load=lambda: (lambda wc, st: SimpleNamespace(render=lambda r: "ok"))
+            name="_test_good_r", load=lambda: lambda wc, st: SimpleNamespace(render=lambda r: "ok")
         )
         bad_ep = SimpleNamespace(name="_test_bad_r", load=boom)
         fake_discovered = SimpleNamespace(
-            select=lambda group: [bad_ep, good_ep]
-            if group == "iocparser.renderers"
-            else [],
+            select=lambda group: [bad_ep, good_ep] if group == "iocparser.renderers" else [],
         )
 
         _load_discovered_entry_points(fake_discovered)

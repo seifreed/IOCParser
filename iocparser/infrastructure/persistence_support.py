@@ -107,8 +107,10 @@ def parse_datetime(value: str | None) -> datetime | None:
         parsed = parsed.astimezone(UTC).replace(tzinfo=None)
     return parsed
 
+
 def normalized_source_filter(value: str) -> str:
     return value.strip().lower()
+
 
 def _url_filter_variants(value: str) -> tuple[str, ...]:
     normalized = normalize_url_value(value)
@@ -130,10 +132,7 @@ def _url_filter_variants(value: str) -> tuple[str, ...]:
 
 def legacy_url_value_clause(value: str) -> ClauseElement:
     base_value = func.lower(func.trim(SourceModel.value))
-    clauses = [
-        base_value == candidate.lower()
-        for candidate in _url_filter_variants(value)
-    ]
+    clauses = [base_value == candidate.lower() for candidate in _url_filter_variants(value)]
     clauses.extend(
         base_value.like(
             f"{candidate.lower().replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')}{suffix}%",
@@ -155,7 +154,10 @@ def source_value_clause(*, source_kind: str | None, source_value: str) -> Clause
     if normalized_kind != "url":
         return func.trim(SourceModel.value) == exact_value
     clauses: list[ClauseElement] = [func.trim(SourceModel.value) == exact_value]
-    clauses.extend(func.coalesce(SourceModel.normalized_url, "") == candidate for candidate in _url_filter_variants(exact_value))
+    clauses.extend(
+        func.coalesce(SourceModel.normalized_url, "") == candidate
+        for candidate in _url_filter_variants(exact_value)
+    )
     clauses.append(
         and_(
             func.coalesce(func.trim(SourceModel.normalized_url), "") == "",

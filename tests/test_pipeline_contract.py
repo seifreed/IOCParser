@@ -701,7 +701,9 @@ def test_pipeline_worker_handles_file_url_and_backpressure(tmp_path: Path, capsy
     assert file_result.status == "success"
 
     job_result = PipelineWorker().process(
-        PipelineJobRequest(input_kind="text", source_value="ioc hxxp://evil.example", check_warnings=False),
+        PipelineJobRequest(
+            input_kind="text", source_value="ioc hxxp://evil.example", check_warnings=False
+        ),
     )
     assert job_result.job_id == job_result.correlation_id
 

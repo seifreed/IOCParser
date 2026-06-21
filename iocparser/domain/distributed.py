@@ -93,24 +93,34 @@ class QueueEnvelope:
     submitted_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def __post_init__(self) -> None:
-        queue_backend = _require_str(self.queue_backend, field="queue_backend", non_empty=True).strip().lower()
-        queue_name = _require_str(self.queue_name, field="queue_name", non_empty=True).strip()
-        object.__setattr__(
-            self, "queue_backend", queue_backend
+        queue_backend = (
+            _require_str(self.queue_backend, field="queue_backend", non_empty=True).strip().lower()
         )
+        queue_name = _require_str(self.queue_name, field="queue_name", non_empty=True).strip()
+        object.__setattr__(self, "queue_backend", queue_backend)
         object.__setattr__(self, "queue_name", queue_name)
         object.__setattr__(
-            self, "schema_version", _require_str(self.schema_version, field="schema_version", non_empty=True)
+            self,
+            "schema_version",
+            _require_str(self.schema_version, field="schema_version", non_empty=True),
         )
         object.__setattr__(
-            self, "submitted_at", _require_str(self.submitted_at, field="submitted_at", non_empty=True)
+            self,
+            "submitted_at",
+            _require_str(self.submitted_at, field="submitted_at", non_empty=True),
         )
-        object.__setattr__(self, "attempts", _require_int(self.attempts, field="attempts", non_negative=True))
         object.__setattr__(
-            self, "max_attempts", _require_int(self.max_attempts, field="max_attempts", non_negative=True)
+            self, "attempts", _require_int(self.attempts, field="attempts", non_negative=True)
+        )
+        object.__setattr__(
+            self,
+            "max_attempts",
+            _require_int(self.max_attempts, field="max_attempts", non_negative=True),
         )
         if self.idempotency_key is not None:
-            object.__setattr__(self, "idempotency_key", _require_str(self.idempotency_key, field="idempotency_key"))
+            object.__setattr__(
+                self, "idempotency_key", _require_str(self.idempotency_key, field="idempotency_key")
+            )
         if self.max_attempts <= 0:
             raise RetryCounterError
 
@@ -169,6 +179,8 @@ class QueueEnvelope:
             schema_version=cast("str", payload.get("schema_version", PIPELINE_JOB_SCHEMA_VERSION)),
             submitted_at=cast("str", payload.get("submitted_at", datetime.now(UTC).isoformat())),
         )
+
+
 @dataclass(frozen=True)
 class QueueReceipt:
     """Opaque handle returned by queue adapters for ack/nack operations."""
@@ -179,10 +191,22 @@ class QueueReceipt:
     message_id: str
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "queue_backend", _require_str(self.queue_backend, field="queue_backend").strip().lower())
-        object.__setattr__(self, "queue_name", _require_str(self.queue_name, field="queue_name").strip())
-        object.__setattr__(self, "receipt_id", _require_str(self.receipt_id, field="receipt_id").strip())
-        object.__setattr__(self, "message_id", _require_str(self.message_id, field="message_id").strip())
+        object.__setattr__(
+            self,
+            "queue_backend",
+            _require_str(self.queue_backend, field="queue_backend").strip().lower(),
+        )
+        object.__setattr__(
+            self, "queue_name", _require_str(self.queue_name, field="queue_name").strip()
+        )
+        object.__setattr__(
+            self, "receipt_id", _require_str(self.receipt_id, field="receipt_id").strip()
+        )
+        object.__setattr__(
+            self, "message_id", _require_str(self.message_id, field="message_id").strip()
+        )
+
+
 @dataclass(frozen=True)
 class DistributedJobRecord:
     """Persisted distributed job lifecycle record."""
@@ -211,34 +235,64 @@ class DistributedJobRecord:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "job_id", _require_str(self.job_id, field="job_id").strip())
-        object.__setattr__(self, "correlation_id", _require_str(self.correlation_id, field="correlation_id").strip())
-        object.__setattr__(self, "queue_backend", _require_str(self.queue_backend, field="queue_backend").strip().lower())
-        object.__setattr__(self, "queue_name", _require_str(self.queue_name, field="queue_name").strip())
-        object.__setattr__(self, "input_kind", _require_str(self.input_kind, field="input_kind").strip())
-        object.__setattr__(self, "source_value", _require_str(self.source_value, field="source_value").strip())
-        object.__setattr__(self, "status", _require_str(self.status, field="status").strip())
-        object.__setattr__(self, "attempts", _require_int(self.attempts, field="attempts", non_negative=True))
         object.__setattr__(
-            self, "max_attempts", _require_int(self.max_attempts, field="max_attempts", non_negative=True)
+            self,
+            "correlation_id",
+            _require_str(self.correlation_id, field="correlation_id").strip(),
+        )
+        object.__setattr__(
+            self,
+            "queue_backend",
+            _require_str(self.queue_backend, field="queue_backend").strip().lower(),
+        )
+        object.__setattr__(
+            self, "queue_name", _require_str(self.queue_name, field="queue_name").strip()
+        )
+        object.__setattr__(
+            self, "input_kind", _require_str(self.input_kind, field="input_kind").strip()
+        )
+        object.__setattr__(
+            self, "source_value", _require_str(self.source_value, field="source_value").strip()
+        )
+        object.__setattr__(self, "status", _require_str(self.status, field="status").strip())
+        object.__setattr__(
+            self, "attempts", _require_int(self.attempts, field="attempts", non_negative=True)
+        )
+        object.__setattr__(
+            self,
+            "max_attempts",
+            _require_int(self.max_attempts, field="max_attempts", non_negative=True),
         )
         if self.idempotency_key is not None:
             object.__setattr__(
-                self, "idempotency_key", _require_str(self.idempotency_key, field="idempotency_key").strip()
+                self,
+                "idempotency_key",
+                _require_str(self.idempotency_key, field="idempotency_key").strip(),
             )
         if self.run_id is not None:
             object.__setattr__(self, "run_id", _require_int(self.run_id, field="run_id"))
         if self.submitted_at:
-            object.__setattr__(self, "submitted_at", _require_str(self.submitted_at, field="submitted_at").strip())
+            object.__setattr__(
+                self, "submitted_at", _require_str(self.submitted_at, field="submitted_at").strip()
+            )
         if self.started_at is not None:
-            object.__setattr__(self, "started_at", _require_str(self.started_at, field="started_at").strip())
+            object.__setattr__(
+                self, "started_at", _require_str(self.started_at, field="started_at").strip()
+            )
         if self.completed_at is not None:
-            object.__setattr__(self, "completed_at", _require_str(self.completed_at, field="completed_at").strip())
+            object.__setattr__(
+                self, "completed_at", _require_str(self.completed_at, field="completed_at").strip()
+            )
         if self.dead_lettered_at is not None:
             object.__setattr__(
-                self, "dead_lettered_at", _require_str(self.dead_lettered_at, field="dead_lettered_at").strip()
+                self,
+                "dead_lettered_at",
+                _require_str(self.dead_lettered_at, field="dead_lettered_at").strip(),
             )
         if self.receipt_id is not None:
-            object.__setattr__(self, "receipt_id", _require_str(self.receipt_id, field="receipt_id").strip())
+            object.__setattr__(
+                self, "receipt_id", _require_str(self.receipt_id, field="receipt_id").strip()
+            )
 
     def to_record(self) -> dict[str, object]:
         return {
@@ -283,15 +337,35 @@ class DeadLetterRecord:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "job_id", _require_str(self.job_id, field="job_id").strip())
-        object.__setattr__(self, "correlation_id", _require_str(self.correlation_id, field="correlation_id").strip())
-        object.__setattr__(self, "queue_backend", _require_str(self.queue_backend, field="queue_backend").strip().lower())
-        object.__setattr__(self, "queue_name", _require_str(self.queue_name, field="queue_name").strip())
-        object.__setattr__(self, "source_value", _require_str(self.source_value, field="source_value").strip())
-        object.__setattr__(self, "attempts", _require_int(self.attempts, field="attempts", non_negative=True))
         object.__setattr__(
-            self, "max_attempts", _require_int(self.max_attempts, field="max_attempts", non_negative=True)
+            self,
+            "correlation_id",
+            _require_str(self.correlation_id, field="correlation_id").strip(),
         )
-        object.__setattr__(self, "dead_lettered_at", _require_str(self.dead_lettered_at, field="dead_lettered_at").strip())
+        object.__setattr__(
+            self,
+            "queue_backend",
+            _require_str(self.queue_backend, field="queue_backend").strip().lower(),
+        )
+        object.__setattr__(
+            self, "queue_name", _require_str(self.queue_name, field="queue_name").strip()
+        )
+        object.__setattr__(
+            self, "source_value", _require_str(self.source_value, field="source_value").strip()
+        )
+        object.__setattr__(
+            self, "attempts", _require_int(self.attempts, field="attempts", non_negative=True)
+        )
+        object.__setattr__(
+            self,
+            "max_attempts",
+            _require_int(self.max_attempts, field="max_attempts", non_negative=True),
+        )
+        object.__setattr__(
+            self,
+            "dead_lettered_at",
+            _require_str(self.dead_lettered_at, field="dead_lettered_at").strip(),
+        )
 
     def to_record(self) -> dict[str, object]:
         return {
@@ -323,10 +397,22 @@ class TelemetryEvent:
     def __post_init__(self) -> None:
         object.__setattr__(self, "name", _require_str(self.name, field="name").strip())
         object.__setattr__(self, "job_id", _require_str(self.job_id, field="job_id").strip())
-        object.__setattr__(self, "correlation_id", _require_str(self.correlation_id, field="correlation_id").strip())
-        object.__setattr__(self, "queue_backend", _require_str(self.queue_backend, field="queue_backend").strip().lower())
-        object.__setattr__(self, "queue_name", _require_str(self.queue_name, field="queue_name").strip())
-        object.__setattr__(self, "emitted_at", _require_str(self.emitted_at, field="emitted_at").strip())
+        object.__setattr__(
+            self,
+            "correlation_id",
+            _require_str(self.correlation_id, field="correlation_id").strip(),
+        )
+        object.__setattr__(
+            self,
+            "queue_backend",
+            _require_str(self.queue_backend, field="queue_backend").strip().lower(),
+        )
+        object.__setattr__(
+            self, "queue_name", _require_str(self.queue_name, field="queue_name").strip()
+        )
+        object.__setattr__(
+            self, "emitted_at", _require_str(self.emitted_at, field="emitted_at").strip()
+        )
 
     def to_record(self) -> dict[str, object]:
         return {

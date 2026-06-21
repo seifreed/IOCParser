@@ -57,6 +57,7 @@ def _dedup_urls(urls: list[str]) -> list[str]:
             result.append(url)
     return result
 
+
 UNC_HOST_PATTERN = re.compile(
     r"(?<!\\)\\\\+([A-Z][A-Z0-9.\-]{2,252})(?:\\\\+[^\\\s]+)*", re.IGNORECASE
 )
@@ -193,9 +194,7 @@ class NetworkHeuristicPolicy:
         # A URL's userinfo (scheme://user:pass@host) makes the password/user + host look
         # like an email; drop those so credentials in URLs are not reported as email IOCs.
         # Real emails after a URL are safe: a path/query/whitespace delimiter breaks the run.
-        valid_emails = [
-            email for email in valid_emails if not _is_url_userinfo_email(email, text)
-        ]
+        valid_emails = [email for email in valid_emails if not _is_url_userinfo_email(email, text)]
         if defang:
             valid_emails = [email.replace("@", "[@]").replace(".", "[.]") for email in valid_emails]
         return dedup_case_insensitive(valid_emails)

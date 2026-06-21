@@ -321,7 +321,9 @@ def test_download_once_preserves_original_error_when_session_close_fails(
     )
 
     with pytest.raises(RuntimeError, match="download failed"):
-        downloader._download_once("https://example.test/file", urlparse("https://example.test/file"), tmp_path, 1)
+        downloader._download_once(
+            "https://example.test/file", urlparse("https://example.test/file"), tmp_path, 1
+        )
 
 
 def test_download_once_keeps_successful_download_when_session_close_fails(
@@ -363,7 +365,9 @@ def test_download_once_keeps_successful_download_when_session_close_fails(
     )
 
     caplog.clear()
-    path = downloader._download_once("https://example.test/file", urlparse("https://example.test/file"), tmp_path, 1)
+    path = downloader._download_once(
+        "https://example.test/file", urlparse("https://example.test/file"), tmp_path, 1
+    )
     assert Path(path).read_bytes() == b"abc"
     assert downloader.download_metadata()["input_size"] == 3
     assert "Failed to close download session after success" in caplog.text
@@ -568,7 +572,9 @@ def test_redirect_to_private_host_is_revalidated_and_blocked(monkeypatch) -> Non
 
     def fake_get(self, url, **_kwargs):
         del self
-        return _FakeRedirectResponse(is_redirect=True, location="http://127.0.0.1/internal", url=url)
+        return _FakeRedirectResponse(
+            is_redirect=True, location="http://127.0.0.1/internal", url=url
+        )
 
     monkeypatch.setattr(requests.Session, "get", fake_get)
     with pytest.raises(BlockedURLError):
@@ -663,7 +669,9 @@ def test_redirect_close_failure_does_not_abort_following_redirect(
         return responses.pop(0)
 
     monkeypatch.setattr(requests.Session, "get", fake_get)
-    monkeypatch.setattr(RequestsURLDownloader, "_assert_host_allowed", lambda self, parsed_url: None)
+    monkeypatch.setattr(
+        RequestsURLDownloader, "_assert_host_allowed", lambda self, parsed_url: None
+    )
     caplog.clear()
     response, final_url = downloader._open_validated(
         "http://93.184.216.34/start",

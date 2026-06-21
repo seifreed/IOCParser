@@ -147,9 +147,7 @@ class SQLAlchemyDistributedJobService:
             model = unit.session.execute(stmt).scalar_one_or_none()
             return model_record(model) if model is not None else None
         finally:
-            close_and_log(
-                unit, logger=logger, message="Close failed while reading idempotency key"
-            )
+            close_and_log(unit, logger=logger, message="Close failed while reading idempotency key")
 
     def list_jobs(
         self, *, limit: int = 50, statuses: tuple[str, ...] = (), queue_backend: str | None = None
@@ -160,7 +158,9 @@ class SQLAlchemyDistributedJobService:
             models = list(unit.session.execute(stmt).scalars().all())
             return [model_record(model) for model in models]
         finally:
-            close_and_log(unit, logger=logger, message="Close failed while listing distributed jobs")
+            close_and_log(
+                unit, logger=logger, message="Close failed while listing distributed jobs"
+            )
 
     def mark_running(
         self, *, job_id: str, attempts: int, receipt_id: str
@@ -319,4 +319,6 @@ class SQLAlchemyDistributedJobService:
             )
             raise
         finally:
-            close_and_log(unit, logger=logger, message="Close failed while transitioning distributed job")
+            close_and_log(
+                unit, logger=logger, message="Close failed while transitioning distributed job"
+            )

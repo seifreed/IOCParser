@@ -151,8 +151,7 @@ class PersistenceClient:
             date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
             source_kind=validated_optional_str(options.get("source_kind"), field="source_kind"),
             source_value=validated_optional_str(options.get("source_value"), field="source_value"),
-            ioc_type=validated_ioc_type_filters(options.get("ioc_type"))
-            or None,
+            ioc_type=validated_ioc_type_filters(options.get("ioc_type")) or None,
             # parse_string_filters accepts a comma-separated string as well as a pre-split
             # tuple; a bare string like severity="high"/tags="foo" otherwise became
             # tuple("high")=('h','i','g','h'), corrupting the filter into single characters.
@@ -196,8 +195,7 @@ class PersistenceClient:
             date_to=validated_iso_datetime(optional_str(options.get("date_to"))),
             source_kind=validated_optional_str(options.get("source_kind"), field="source_kind"),
             source_value=validated_optional_str(options.get("source_value"), field="source_value"),
-            ioc_type=validated_ioc_type_filters(options.get("ioc_type"))
-            or None,
+            ioc_type=validated_ioc_type_filters(options.get("ioc_type")) or None,
             severity=validated_severity_values(parse_string_filters(options.get("severity"))),
             tags=parse_string_filters(options.get("tags")),
             exclude_tags=parse_string_filters(options.get("exclude_tags")),
@@ -227,14 +225,10 @@ class PersistenceClient:
         )
 
     def export_run(self, *, run_id: int) -> PersistedRunExport:
-        return self._typed_service.export_run(
-            run_id=validated_required_id(run_id, field="run_id")
-        )
+        return self._typed_service.export_run(run_id=validated_required_id(run_id, field="run_id"))
 
     def delete_run(self, *, run_id: int) -> bool:
-        return self._typed_service.delete_run(
-            run_id=validated_required_id(run_id, field="run_id")
-        )
+        return self._typed_service.delete_run(run_id=validated_required_id(run_id, field="run_id"))
 
     def diff_runs(self, *, left_run_id: int, right_run_id: int) -> PersistedRunDiff:
         return self._typed_service.diff_runs(

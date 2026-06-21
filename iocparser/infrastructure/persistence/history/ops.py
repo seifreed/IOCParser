@@ -45,6 +45,8 @@ from iocparser.infrastructure.persistence_support import (
 from iocparser.infrastructure.persistence_uow import create_engine_for_uri
 
 _typed_row = typed_row
+
+
 @contextmanager
 def _managed_session(db_uri: str) -> Iterator[Session]:
     """Create, migrate, and safely dispose a SQLAlchemy engine, yielding a Session."""
@@ -55,6 +57,8 @@ def _managed_session(db_uri: str) -> Iterator[Session]:
             yield session
     finally:
         engine.dispose()
+
+
 @contextmanager
 def _managed_connection(db_uri: str) -> Iterator[Connection]:
     """Create, migrate, and safely dispose a SQLAlchemy engine, yielding a Connection."""
@@ -65,6 +69,8 @@ def _managed_connection(db_uri: str) -> Iterator[Connection]:
             yield connection
     finally:
         engine.dispose()
+
+
 INVALID_HISTORY_ARCHIVE = "invalid history archive"
 AMBIGUOUS_LEGACY_HISTORY_ARCHIVE = "ambiguous legacy history archive"
 HISTORY_ARCHIVE_ID_KEY = "__history_archive_id__"
@@ -89,13 +95,19 @@ HistoryModelType = (
     | type[DistributedJobModel]
     | type[DeadLetterJobModel]
 )
+
+
 def _string_key_mapping(mapping: Mapping[object, object]) -> dict[str, object]:
     return {key: value for key, value in mapping.items() if isinstance(key, str)}
+
+
 def _normalized_ioc_type(value: str) -> str:
     try:
         return ioc_type_name(IOCType.from_name(value))
     except ValueError:
         return value.strip().lower()
+
+
 def _json_object(raw_value: str) -> dict[str, object]:
     try:
         decoded: object = json.loads(raw_value or "{}")
@@ -104,6 +116,8 @@ def _json_object(raw_value: str) -> dict[str, object]:
     if not isinstance(decoded, dict):
         raise JSONShapeError("object")
     return _string_key_mapping(decoded)
+
+
 def _is_int_like(value: object) -> bool:
     if isinstance(value, bool):
         return False
@@ -113,9 +127,13 @@ def _is_int_like(value: object) -> bool:
         stripped = value.lstrip("-")
         return stripped.isdigit() and len(stripped) > 0
     return False
+
+
 def _json_int_map(raw_value: str) -> dict[str, int]:
     decoded = _json_object(raw_value)
     return {key: int(value) for key, value in decoded.items() if _is_int_like(value)}  # type: ignore[call-overload]
+
+
 def _payload_fingerprint(payload: Mapping[str, object]) -> str:
     filtered_payload = {
         key: value
@@ -124,8 +142,11 @@ def _payload_fingerprint(payload: Mapping[str, object]) -> str:
     }
     encoded = json.dumps(filtered_payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
 def _select_rows(session: Session, model: HistoryModelType) -> list[dict[str, object]]:
     return [_row_dict(row) for row in session.execute(select(model)).scalars().all()]
+
 
 def _archive_id(payload: dict[str, object]) -> str:
     raw_value = payload.get(HISTORY_ARCHIVE_ID_KEY)
@@ -137,12 +158,16 @@ def _archive_id(payload: dict[str, object]) -> str:
             f"{origin_id.strip()}:{_payload_fingerprint(payload)}".encode()
         ).hexdigest()
     return f"legacy:{_payload_fingerprint(payload)}"
+
+
 def _is_legacy_archive(payload: dict[str, object]) -> bool:
     raw_archive_id = payload.get(HISTORY_ARCHIVE_ID_KEY)
     raw_origin_id = payload.get(HISTORY_ORIGIN_ID_KEY)
     has_archive_id = isinstance(raw_archive_id, str) and raw_archive_id.strip()
     has_origin_id = isinstance(raw_origin_id, str) and raw_origin_id.strip()
     return not has_archive_id and not has_origin_id
+
+
 def _has_legacy_archive_collision(session: Session, *, archive_id: str) -> bool:
     for raw_json in session.execute(select(BatchJobModel.config_json)).scalars().all():
         marker = _json_import_marker(raw_json)
@@ -198,16 +223,13 @@ def _payload_rows(payload: dict[str, object], key: str) -> list[dict[str, object
     return rows
 
 
-
-
-
-
-
 def _same_origin_archive(session: Session, payload: dict[str, object]) -> bool:
     raw_origin_id = payload.get(HISTORY_ORIGIN_ID_KEY)
     if not isinstance(raw_origin_id, str) or not raw_origin_id.strip():
         return False
     return _history_origin_id(session) == raw_origin_id.strip()
+
+
 def _normalized_text(value: object, *, default: str) -> str:
     if value is None:
         return default
@@ -216,10 +238,13 @@ def _normalized_text(value: object, *, default: str) -> str:
     stripped = value.strip()
     return stripped or default
 
+
 def _public_batch_job_config(raw_config_json: object) -> dict[str, object]:
     config = _json_object(str(raw_config_json or "{}"))
     config.pop(HISTORY_IMPORT_MARKER_KEY, None)
     return config
+
+
 def _json_with_import_marker(
     raw_json: object,
     *,
@@ -233,15 +258,23 @@ def _json_with_import_marker(
             "original_id": original_id,
         }
     return json.dumps(payload, sort_keys=True)
+
+
 def _json_without_import_marker(raw_json: object) -> str:
     payload = _json_object(str(raw_json or "{}"))
     payload.pop(HISTORY_IMPORT_MARKER_KEY, None)
     return json.dumps(payload, sort_keys=True)
+
+
 def _json_import_marker(raw_json: object) -> dict[str, object] | None:
     marker = _json_object(str(raw_json or "{}")).get(HISTORY_IMPORT_MARKER_KEY)
     return marker if isinstance(marker, dict) else None
+
+
 def _distributed_internal_job_id(*, job_id: str, archive_id: str) -> str:
     return f"{job_id}#history:{archive_id}"
+
+
 def _public_job_id(model: DistributedJobModel | DeadLetterJobModel) -> str:
     payload = _json_object(model.payload_json or "{}")
     marker = _json_import_marker(model.payload_json or "{}")
@@ -250,11 +283,6 @@ def _public_job_id(model: DistributedJobModel | DeadLetterJobModel) -> str:
     if isinstance(original_job_id, str) and original_job_id.strip() and marker is not None:
         return original_job_id
     return model.job_id
-
-
-
-
-
 
 
 def _row_dict(model: HistoryModel) -> dict[str, object]:
@@ -384,6 +412,8 @@ def _row_dict(model: HistoryModel) -> dict[str, object]:
         "payload_json": _json_without_import_marker(model.payload_json),
         "dead_lettered_at": model.dead_lettered_at.isoformat(),
     }
+
+
 def export_history(db_uri: str) -> dict[str, object]:
     with _managed_session(db_uri) as session:
         origin_id = _history_origin_id(session)
@@ -406,11 +436,14 @@ def export_history(db_uri: str) -> dict[str, object]:
             HISTORY_ARCHIVE_ID_KEY: archive_id,
             **payload,
         }
+
+
 def archive_history(db_uri: str, output_path: str) -> str:
     path = Path(output_path).expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(export_history(db_uri), indent=2, sort_keys=True), encoding="utf-8")
     return str(path)
+
 
 def _history_compaction_sql(dialect_name: str, table_names: tuple[str, ...]) -> list[str]:
     """Per-dialect space reclamation: SQLite VACUUM, MySQL/MariaDB OPTIMIZE TABLE, else no-op."""
@@ -420,18 +453,23 @@ def _history_compaction_sql(dialect_name: str, table_names: tuple[str, ...]) -> 
         return ["OPTIMIZE TABLE " + ", ".join(f"`{name}`" for name in table_names)]
     return []
 
+
 def compact_history(db_uri: str) -> None:
     with _managed_connection(db_uri) as connection:
         table_names = tuple(inspect(connection).get_table_names())
         dialect_name = connection.engine.dialect.name
         for statement in _history_compaction_sql(dialect_name, table_names):
             connection.exec_driver_sql(statement)
+
+
 def retain_history(db_uri: str, *, days: int, statuses: tuple[str, ...] = ()) -> int:
     cutoff = (datetime.now(UTC) - timedelta(days=max(0, days))).isoformat()
     with _managed_session(db_uri) as session:
         deleted = prune_runs(session, before=cutoff, statuses=statuses)
         session.commit()
         return deleted
+
+
 def list_failed_batches(db_uri: str, *, limit: int = 20) -> list[BatchJobSummary]:
     safe_limit = max(0, limit)
     with _managed_session(db_uri) as session:
@@ -446,6 +484,8 @@ def list_failed_batches(db_uri: str, *, limit: int = 20) -> list[BatchJobSummary
             .all()
         )
         return [_batch_job_summary(session, job) for job in jobs]
+
+
 def list_failed_batch_items(db_uri: str, *, batch_job_id: int) -> list[FailedBatchItem]:
     with _managed_session(db_uri) as session:
         return [
@@ -459,6 +499,8 @@ def list_failed_batch_items(db_uri: str, *, batch_job_id: int) -> list[FailedBat
             )
             for item in load_failed_batch_items(session, batch_job_id=batch_job_id)
         ]
+
+
 def list_batch_jobs(
     db_uri: str, *, limit: int = 20, statuses: tuple[str, ...] = ()
 ) -> list[BatchJobSummary]:
@@ -473,6 +515,8 @@ def list_batch_jobs(
             stmt = stmt.where(BatchJobModel.status.in_(statuses))
         jobs = session.execute(stmt).scalars().all()
         return [_batch_job_summary(session, job) for job in jobs]
+
+
 def get_batch_job(db_uri: str, *, batch_job_id: int) -> BatchJobDetail | None:
     with _managed_session(db_uri) as session:
         job = session.get(BatchJobModel, batch_job_id)
@@ -493,6 +537,8 @@ def get_batch_job(db_uri: str, *, batch_job_id: int) -> BatchJobDetail | None:
             metrics=_json_object(job.metrics_json or "{}"),
             failed_item_count=len(load_failed_batch_items(session, batch_job_id=job.id)),
         )
+
+
 def list_batch_runs(db_uri: str, *, batch_job_id: int) -> list[PersistedRunSummary]:
     with _managed_session(db_uri) as session:
         stmt = (
@@ -501,6 +547,8 @@ def list_batch_runs(db_uri: str, *, batch_job_id: int) -> list[PersistedRunSumma
             .order_by(RunModel.started_at.asc(), RunModel.id.asc())
         )
         return [build_summary(session, run) for run in session.execute(stmt).scalars().all()]
+
+
 def _batch_job_summary(session: Session, job: BatchJobModel) -> BatchJobSummary:
     return BatchJobSummary(
         batch_job_id=job.id,

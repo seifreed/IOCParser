@@ -85,7 +85,11 @@ def _existing_source(session: Session, row: dict[str, object]) -> SourceModel | 
                 legacy_url_value_clause(value),
             )
         )
-        stmt = stmt.where(or_(*clauses)) if clauses else stmt.where(func.trim(SourceModel.value) == value)
+        stmt = (
+            stmt.where(or_(*clauses))
+            if clauses
+            else stmt.where(func.trim(SourceModel.value) == value)
+        )
         candidates = session.execute(stmt).scalars().all()
         for candidate in candidates:
             candidate_identity = _source_identity(
@@ -121,7 +125,19 @@ def _existing_ioc(session: Session, row: dict[str, object]) -> IOCModel | None:
 
 
 def _batch_job_signature(row: dict[str, object]) -> tuple[object, ...]:
-    return (str(row.get("source_kind", "")), row.get("started_at"), row.get("finished_at"), int_from_row(row.get("total_inputs"), default=0) or 0, int_from_row(row.get("successful_inputs"), default=0) or 0, int_from_row(row.get("failed_inputs"), default=0) or 0, int_from_row(row.get("retry_attempt"), default=0) or 0, _normalized_text(row.get("status"), default="queued"), _normalized_text(row.get("config_json"), default="{}"), _normalized_text(row.get("error_summary_json"), default="{}"), _normalized_text(row.get("metrics_json"), default="{}"))
+    return (
+        str(row.get("source_kind", "")),
+        row.get("started_at"),
+        row.get("finished_at"),
+        int_from_row(row.get("total_inputs"), default=0) or 0,
+        int_from_row(row.get("successful_inputs"), default=0) or 0,
+        int_from_row(row.get("failed_inputs"), default=0) or 0,
+        int_from_row(row.get("retry_attempt"), default=0) or 0,
+        _normalized_text(row.get("status"), default="queued"),
+        _normalized_text(row.get("config_json"), default="{}"),
+        _normalized_text(row.get("error_summary_json"), default="{}"),
+        _normalized_text(row.get("metrics_json"), default="{}"),
+    )
 
 
 def _run_ioc_signature(session: Session, *, run_id: int) -> tuple[tuple[int, str, str, str], ...]:
@@ -312,10 +328,10 @@ def _import_sources(session: Session, rows: list[dict[str, object]]) -> tuple[in
         if kind == "url":
             typed["value"] = str(typed.get("value", "")).strip()
             typed["original_url"] = typed.get("original_url") or typed.get("value")
-            typed["normalized_url"] = normalize_url_value(str(typed.get("normalized_url", ""))) or normalize_url_value(str(typed.get("value", "")))
-        typed["dedup_hash"] = source_dedup_hash(
-            kind, str(typed.get("value", ""))
-        )
+            typed["normalized_url"] = normalize_url_value(
+                str(typed.get("normalized_url", ""))
+            ) or normalize_url_value(str(typed.get("value", "")))
+        typed["dedup_hash"] = source_dedup_hash(kind, str(typed.get("value", "")))
         existing = _existing_source(session, typed)
         if existing is None:
             source = SourceModel(**{key: value for key, value in typed.items() if key != "id"})
@@ -673,7 +689,13 @@ def _import_distributed_jobs(
         typed = typed_row(row)
         if not all(
             isinstance(value := typed.get(key), str) and value.strip()
-            for key in ("correlation_id", "queue_backend", "queue_name", "input_kind", "source_value")
+            for key in (
+                "correlation_id",
+                "queue_backend",
+                "queue_name",
+                "input_kind",
+                "source_value",
+            )
         ) or not isinstance(typed.get("submitted_at"), datetime):
             continue
         typed["job_id"] = _normalized_text(typed.get("job_id"), default="")

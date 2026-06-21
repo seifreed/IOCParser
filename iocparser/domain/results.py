@@ -70,6 +70,8 @@ def _require_str(value: object, *, field: str) -> str:
     if not isinstance(value, str):
         raise TypeValidationError(field, "string-like", value)
     return value
+
+
 @dataclass(frozen=True)
 class IOCEvidence:
     """Context snippet showing where an IOC was found."""
@@ -85,6 +87,8 @@ class IOCEvidence:
         ):
             raise TypeValidationError("line_number", "int-like", self.line_number)
         object.__setattr__(self, "source", _require_str(self.source, field="source"))
+
+
 @dataclass(frozen=True)
 class IOC:
     """Normalized IOC value object."""
@@ -138,6 +142,8 @@ class IOC:
                 for evidence in self.evidence
             ],
         }
+
+
 @dataclass(frozen=True)
 class WarningMatch:
     """IOC entry associated with a warning list."""
@@ -152,6 +158,8 @@ class WarningMatch:
         record["warning_list"] = self.warning_list
         record["description"] = self.description
         return record
+
+
 @dataclass(frozen=True)
 class ExtractionResult:
     """Normalized extraction output shared by application and adapters."""

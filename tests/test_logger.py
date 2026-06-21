@@ -262,9 +262,7 @@ class TestSetupLogger:
         logger = setup_logger(name="test_stderr_default", console=True)
 
         console_handler = next(
-            handler
-            for handler in logger.handlers
-            if isinstance(handler, logging.StreamHandler)
+            handler for handler in logger.handlers if isinstance(handler, logging.StreamHandler)
         )
         assert console_handler.stream is sys.stderr
 

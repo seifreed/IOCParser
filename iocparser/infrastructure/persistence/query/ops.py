@@ -164,9 +164,7 @@ def _apply_optional_ioc_filters(
     if query.tags:
         tag_filters = [_tag_search_clause(tag) for tag in normalize_tokens(query.tags)]
         if tag_filters:
-            stmt = stmt.where(
-                or_(*tag_filters) if query.tag_mode == "any" else and_(*tag_filters)
-            )
+            stmt = stmt.where(or_(*tag_filters) if query.tag_mode == "any" else and_(*tag_filters))
     for tag in query.exclude_tags:
         normalized_tag = tag.strip().lower()
         if normalized_tag:
@@ -225,6 +223,8 @@ def search_iocs_page(query: IOCSearchPageQuery) -> PersistedIOCSearchPage:
         )
     finally:
         unit_of_work.close()
+
+
 def _date_to_clauses(date_to: str | None) -> list[ClauseElement]:
     # A date-only "YYYY-MM-DD" parsed to midnight with `<=` would drop runs created
     # later that day, so a date-only upper bound is inclusive of the whole day
@@ -251,11 +251,17 @@ def _run_filter_clauses(
     clauses.extend(_date_to_clauses(date_to))
     clauses.extend([SourceModel.kind == normalized_kind] if normalized_kind else [])
     clauses.extend(
-        [source_value_clause(source_kind=normalized_kind or source_kind, source_value=normalized_value)]
+        [
+            source_value_clause(
+                source_kind=normalized_kind or source_kind, source_value=normalized_value
+            )
+        ]
         if normalized_value
         else []
     )
     return tuple(clauses)
+
+
 def _order_run_query_stmt[SelectT: (RunSelect, SearchSelect)](
     stmt: SelectT, *, sort_by: str
 ) -> SelectT:
@@ -269,8 +275,11 @@ def _order_run_query_stmt[SelectT: (RunSelect, SearchSelect)](
             RunModel.id.desc(),
         )
     return stmt.order_by(RunModel.started_at.desc(), RunModel.id.desc())
+
+
 def _escaped_like_value(normalized_value: str) -> str:
     return normalized_value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
 
 def _tag_search_clause(normalized_tag: str) -> ClauseElement:
     # tags_search is delimiter-wrapped (see build_tags_search), so an exact
@@ -279,6 +288,7 @@ def _tag_search_clause(normalized_tag: str) -> ClauseElement:
     escaped = _escaped_like_value(normalized_tag)
     pattern = f"%{TAG_SEARCH_DELIMITER}{escaped}{TAG_SEARCH_DELIMITER}%"
     return RunIOCModel.tags_search.like(pattern, escape="\\")
+
 
 def _apply_search_backend(
     stmt: SearchSelect,
@@ -307,6 +317,7 @@ def _apply_search_backend(
     return stmt.where(
         IOCModel.value_search.like(f"%{_escaped_like_value(normalized_value)}%", escape="\\")
     )
+
 
 def _coerce_count(value: object) -> int:
     if isinstance(value, bool):

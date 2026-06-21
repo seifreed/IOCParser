@@ -194,7 +194,9 @@ def runs_input(options: QueryRunsOptions) -> QueryRunsInput:
             "date_from": validated_iso_datetime(optional_str(options.get("date_from"))),
             "date_to": validated_iso_datetime(optional_str(options.get("date_to"))),
             "source_kind": validated_optional_str(options.get("source_kind"), field="source_kind"),
-            "source_value": validated_optional_str(options.get("source_value"), field="source_value"),
+            "source_value": validated_optional_str(
+                options.get("source_value"), field="source_value"
+            ),
             "sort_by": validated_run_sort(optional_str(options.get("sort_by")) or "newest"),
         }
     )
@@ -271,9 +273,7 @@ def validated_ioc_type_filters(value: object | None) -> tuple[str, ...]:
             if not all(isinstance(item, str) for item in value):
                 raise TypeError
             normalized = [
-                ioc_type_name(ioc_type)
-                for item in value
-                for ioc_type in parse_ioc_types(item)
+                ioc_type_name(ioc_type) for item in value for ioc_type in parse_ioc_types(item)
             ]
         elif not isinstance(value, str):
             raise TypeError

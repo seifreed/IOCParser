@@ -450,6 +450,34 @@ def test_worker_service_concurrent_positive_result():
     assert w.run_forever(max_cycles=2) == 4
 
 
+def test_worker_pool_capped_at_inflight_capacity(monkeypatch):
+    """Pool size must not exceed the processor's max_queue_size in-flight cap.
+
+    Regression: with max_workers > max_queue_size, surplus worker threads trip the
+    processor's reservation guard (RuntimeError backpressure), which process_next treats
+    as an unhandled error and dead-letters -- losing a job that was never processed.
+    run_forever must size its ThreadPoolExecutor at min(max_workers, max_queue_size).
+    """
+    captured: dict[str, object] = {}
+    from concurrent.futures import ThreadPoolExecutor as _RealPool
+
+    def _spy_pool(*args, **kwargs):
+        captured["max_workers"] = kwargs.get("max_workers")
+        return _RealPool(*args, **kwargs)
+
+    monkeypatch.setattr("iocparser.worker_service.ThreadPoolExecutor", _spy_pool)
+    svc = _SimpleNamespace(
+        process_next=lambda *_args, **_kwargs: None,
+        limits=_SimpleNamespace(max_workers=8, max_queue_size=2),
+    )
+    w = DistributedWorkerService(
+        service=svc, queue_name="cap", poll_interval_seconds=0.0, max_messages_per_cycle=1
+    )
+    assert w.concurrency == 8
+    w.run_forever(max_cycles=1)
+    assert captured["max_workers"] == 2
+
+
 def test_worker_service_survives_run_once_exception():
     """Concurrent loop must surface run_once worker exceptions."""
     svc = _SimpleNamespace(

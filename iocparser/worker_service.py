@@ -83,6 +83,25 @@ class DistributedWorkerService:
             raise TypeError(f"invalid literal for int(): {raw_workers!r}")
         return max(1, int(raw_workers))
 
+    def _inflight_capacity(self) -> int:
+        """Backpressure threshold the processor enforces (its max in-flight reservations).
+
+        The processor's reservation guard raises once ``max_queue_size`` jobs are
+        concurrently in flight. Running more worker threads than that cap makes the
+        surplus jobs hit backpressure inside ``process_next``, which treats the raised
+        RuntimeError as an unhandled error and dead-letters a job that was never actually
+        processed. The pool is sized to this cap so the worker never trips its own guard.
+        Falls back to ``concurrency`` when no usable cap is exposed (e.g. a stub service).
+        """
+        processor = getattr(self.service, "processor", None)
+        limits = getattr(processor, "limits", None)
+        if limits is None:
+            limits = getattr(self.service, "limits", None)
+        raw_cap = getattr(limits, "max_queue_size", None)
+        if isinstance(raw_cap, bool) or not isinstance(raw_cap, int) or raw_cap <= 0:
+            return self.concurrency
+        return raw_cap
+
     def _process_one(self) -> bool:
         return self.service.process_next(queue_name=self.queue_name) is not None
 
@@ -110,7 +129,16 @@ class DistributedWorkerService:
     ) -> int:
         if max_cycles is not None and max_cycles <= 0:
             return 0
-        workers = self.concurrency
+        requested_workers = self.concurrency
+        workers = min(requested_workers, self._inflight_capacity())
+        if workers < requested_workers:
+            logger.info(
+                "Capping worker pool at %s to honor the max_queue_size in-flight guard "
+                "(requested max_workers=%s); surplus workers would otherwise dead-letter "
+                "unprocessed jobs as backpressure errors",
+                workers,
+                requested_workers,
+            )
         cycles = processed = 0
         if workers <= 1:
             while stop_event is None or not stop_event.is_set():

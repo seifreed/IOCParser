@@ -982,7 +982,7 @@ def test_distributed_persistence_rolls_back_and_single_import_lookup(
 
 
 def test_history_private_edges_with_real_models(tmp_path) -> None:
-    from iocparser.infrastructure.persistence.history import ops
+    from iocparser.infrastructure.persistence.history import import_ops, ops
     from iocparser.infrastructure.persistence_batch import BatchJobModel, FailedBatchItemModel
     from iocparser.infrastructure.persistence_models import IOCModel
     from iocparser.infrastructure.persistence_schema import (
@@ -1038,7 +1038,7 @@ def test_history_private_edges_with_real_models(tmp_path) -> None:
                 "error_summary_json": '{"RuntimeError": 1}',
                 "metrics_json": '{"duration_ms": 5}',
             }
-            assert ops._batch_job_signature(batch_row)[0] == "url"
+            assert import_ops._batch_job_signature(batch_row)[0] == "url"
 
             failed = FailedBatchItemModel(
                 batch_job_id=batch.id,
@@ -1091,7 +1091,7 @@ def test_history_private_edges_with_real_models(tmp_path) -> None:
             session.add(ioc)
             session.flush()
             assert (
-                ops._existing_ioc(
+                import_ops._existing_ioc(
                     session,
                     {
                         "ioc_type": "domains",
@@ -1104,7 +1104,7 @@ def test_history_private_edges_with_real_models(tmp_path) -> None:
                 == ioc
             )
             assert (
-                ops._existing_run(
+                import_ops._existing_run(
                     session,
                     {
                         "started_at": now,
@@ -1154,7 +1154,7 @@ def test_history_private_edges_with_real_models(tmp_path) -> None:
             session.add(same_origin_distributed)
             session.flush()
             assert (
-                ops._existing_distributed_job(
+                import_ops._existing_distributed_job(
                     session,
                     {"id": 10, "job_id": "same-origin-job"},
                     archive_id="archive",
@@ -1173,7 +1173,7 @@ def test_history_private_edges_with_real_models(tmp_path) -> None:
             session.add(mismatched_dead)
             session.flush()
             assert (
-                ops._existing_dead_letter_job(
+                import_ops._existing_dead_letter_job(
                     session,
                     {
                         "id": 11,
@@ -1206,7 +1206,7 @@ def test_history_private_edges_with_real_models(tmp_path) -> None:
             session.add(matching_dead)
             session.flush()
             assert (
-                ops._existing_dead_letter_job(
+                import_ops._existing_dead_letter_job(
                     session,
                     {
                         "id": 12,
@@ -1234,7 +1234,7 @@ def test_history_private_edges_with_real_models(tmp_path) -> None:
 
 
 def test_history_import_skip_and_same_origin_batch_paths() -> None:
-    from iocparser.infrastructure.persistence.history import ops
+    from iocparser.infrastructure.persistence.history import import_ops, ops
 
     now = datetime.now(UTC)
     row = {
@@ -1270,7 +1270,7 @@ def test_history_import_skip_and_same_origin_batch_paths() -> None:
         def flush(self) -> None:
             raise AssertionError("existing same-origin batch should be reused")
 
-    inserted, batch_map = ops._import_batch_jobs(
+    inserted, batch_map = import_ops._import_batch_jobs(
         BatchSession(),
         [row],
         archive_id="archive",
@@ -1279,7 +1279,7 @@ def test_history_import_skip_and_same_origin_batch_paths() -> None:
     assert inserted == 0
     assert batch_map == {5: 103}
 
-    inserted_runs, run_map = ops._import_runs(
+    inserted_runs, run_map = import_ops._import_runs(
         SimpleNamespace(),
         [{"id": 1, "source_id": 55}],
         archive_id="archive",
@@ -1296,7 +1296,7 @@ def test_history_import_skip_and_same_origin_batch_paths() -> None:
     assert run_map == {}
 
     assert (
-        ops._import_run_iocs(
+        import_ops._import_run_iocs(
             SimpleNamespace(),
             [{"run_id": 1, "ioc_id": 2}],
             run_map={},
@@ -1305,7 +1305,7 @@ def test_history_import_skip_and_same_origin_batch_paths() -> None:
         == 0
     )
     assert (
-        ops._import_failed_batch_items(SimpleNamespace(), [{"batch_job_id": 3}], batch_map={}) == 0
+        import_ops._import_failed_batch_items(SimpleNamespace(), [{"batch_job_id": 3}], batch_map={}) == 0
     )
 
 
@@ -1449,7 +1449,7 @@ def test_strict_coverage_infrastructure_edge_helpers(tmp_path) -> None:
 
 
 def test_history_import_updates_stale_ioc_search_value(tmp_path) -> None:
-    from iocparser.infrastructure.persistence.history import ops
+    from iocparser.infrastructure.persistence.history import import_ops, ops
     from iocparser.infrastructure.persistence_models import IOCModel
     from iocparser.infrastructure.persistence_repository_support import normalize_ioc_search
 
@@ -1468,7 +1468,7 @@ def test_history_import_updates_stale_ioc_search_value(tmp_path) -> None:
             session.add(ioc)
             session.flush()
 
-            inserted, ioc_map = ops._import_iocs(
+            inserted, ioc_map = import_ops._import_iocs(
                 session,
                 [
                     {
@@ -1721,7 +1721,7 @@ def test_batch_listings_break_started_at_ties_deterministically(tmp_path) -> Non
     so which rows survived a LIMIT (and their order) was engine-defined when
     timestamps collided. The id tiebreaker makes the cutoff deterministic.
     """
-    from iocparser.infrastructure.persistence.history import ops
+    from iocparser.infrastructure.persistence.history import import_ops, ops
     from iocparser.infrastructure.persistence_batch import BatchJobModel
 
     db_uri = _fresh_db(tmp_path, "batch-ties.db")

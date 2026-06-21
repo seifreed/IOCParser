@@ -172,6 +172,9 @@ ignore = [
 "iocparser/infrastructure/extractor_base.py" = ["SLF001"]
 "iocparser/infrastructure/persistence_distributed.py" = ["PLR0913"]
 "iocparser/infrastructure/persistence/history/ops.py" = ["PLR0913"]
+# import_ops.py holds the history-import machinery split out of ops.py; the
+# multi-argument _existing_*/_import_* helpers carry ops.py's existing PLR0913 ignore.
+"iocparser/infrastructure/persistence/history/import_ops.py" = ["PLR0913"]
 "iocparser/interfaces/ports_persistence.py" = ["PLR0913"]
 "iocparser/adapters/renderers_stix.py" = ["SLF001"]
 "tests/test_distributed_pipeline_surface.py" = ["C901", "N802", "N803"]

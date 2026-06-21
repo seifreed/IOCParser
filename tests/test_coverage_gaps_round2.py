@@ -154,7 +154,7 @@ class TestHistoryHelpers:
         assert isinstance(result["started_at"], datetime)
 
     def test_source_identity_url(self) -> None:
-        from iocparser.infrastructure.persistence.history.ops import _source_identity
+        from iocparser.infrastructure.persistence.history.import_ops import _source_identity
 
         result = _source_identity(
             {
@@ -166,7 +166,7 @@ class TestHistoryHelpers:
         assert result[0] == "url"
 
     def test_source_identity_file(self) -> None:
-        from iocparser.infrastructure.persistence.history.ops import _source_identity
+        from iocparser.infrastructure.persistence.history.import_ops import _source_identity
 
         result = _source_identity({"kind": "file", "value": "test.pdf"})
         assert result == ("file", "test.pdf")

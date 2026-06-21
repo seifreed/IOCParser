@@ -44,7 +44,11 @@ class STIXOutputRenderer(OutputRenderer):
             digits = "".join(char for char in refang_ioc(value) if char in "0123456789")
             if not digits:
                 return ""
-            return f"[autonomous-system:number = {digits}]"
+            # Normalize away leading zeros: the STIX pattern grammar rejects integer
+            # literals with leading zeros (e.g. "042"), and a single such value would
+            # raise InvalidValueError while constructing the Indicator, aborting the
+            # whole bundle and dropping every other valid object with it.
+            return f"[autonomous-system:number = {int(digits)}]"
 
         def _cidr_builder(value: str) -> str:
             # CIDR covers both address families; pick the matching SCO so an IPv6

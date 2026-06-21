@@ -151,6 +151,27 @@ def test_stix_render_skips_non_ascii_digit_asn_without_aborting_bundle() -> None
     assert chr(0x661) not in rendered
 
 
+def test_stix_asn_with_leading_zeros_does_not_abort_bundle() -> None:
+    """Regression: an ASN whose digits have leading zeros (e.g. ``AS042``) must
+    normalize to a bare integer. The STIX pattern grammar rejects integer literals
+    with leading zeros, so the old builder emitted ``[autonomous-system:number = 042]``,
+    which raised InvalidValueError while constructing the Indicator and aborted
+    serialization of the entire bundle, dropping every other valid object."""
+    renderer = STIXOutputRenderer()
+    indicator = renderer._build_indicator(IOCType.ASN, "AS042", None)
+
+    assert indicator is not None
+    assert indicator.pattern == "[autonomous-system:number = 42]"
+
+    result = ExtractionResult(
+        iocs=(IOC.from_raw("domains", "good.example"), IOC.from_raw("asn", "AS042"))
+    )
+    rendered = renderer.render(result)
+
+    assert "good.example" in rendered
+    assert "[autonomous-system:number = 42]" in rendered
+
+
 def test_diff_jsonl_marks_added_and_removed() -> None:
     """JSONL run-diff output must distinguish added from removed records.
 

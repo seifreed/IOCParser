@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from iocparser.interfaces.ports_extraction import (
+    BatchItemOutcome,
     DownloadMetadataProvider,
     FileBatchExecutor,
     FileWriter,
@@ -29,6 +30,7 @@ from iocparser.interfaces.ports_pipeline import (
 )
 
 __all__ = [
+    "BatchItemOutcome",
     "ContentDigester",
     "DistributedJobService",
     "DownloadMetadataProvider",

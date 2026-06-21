@@ -280,7 +280,7 @@ def test_extract_from_url_raises_cleanup_errors_after_success(tmp_path: Path) ->
         )
 
 
-def test_extract_from_files_returns_empty_result_for_partial_failures(tmp_path: Path) -> None:
+def test_extract_from_files_reports_error_for_partial_failures(tmp_path: Path) -> None:
     existing_file = tmp_path / "existing.txt"
     existing_file.write_text("IOC URL: https://ok.example/path", encoding="utf-8")
     missing_file = tmp_path / "missing.txt"
@@ -307,8 +307,14 @@ def test_extract_from_files_returns_empty_result_for_partial_failures(tmp_path: 
         batch_executor=ThreadPoolFileBatchExecutor(max_workers=1),
     )
 
-    assert results[str(existing_file)].grouped_iocs() == {"urls": ["https://ok.example/path"]}
-    assert results[str(missing_file)] == ExtractionResult()
+    ok_outcome = results[str(existing_file)]
+    assert ok_outcome.result.grouped_iocs() == {"urls": ["https://ok.example/path"]}
+    assert ok_outcome.error is None
+    # Regression: a failed file must carry its error, not be mislabeled a zero-IOC success.
+    failed_outcome = results[str(missing_file)]
+    assert failed_outcome.result == ExtractionResult()
+    assert failed_outcome.error is not None
+    assert str(missing_file) in failed_outcome.error
 
 
 def test_persist_run_commits_on_success() -> None:

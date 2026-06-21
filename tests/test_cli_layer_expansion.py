@@ -1001,6 +1001,61 @@ def test_process_multiple_duplicate_files_isolates_extraction_errors(
     assert all(entry.warning_iocs == {} for entry in bad_entries)
 
 
+def test_process_multiple_parallel_files_records_extraction_error(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Regression: a per-file failure on the default parallel (distinct-paths) batch
+    path must be recorded as an error, not silently swallowed into a zero-IOC
+    "success". The thread-pool executor previously replaced a SourceProcessingError
+    with an empty result and no message, so a corrupt file was indistinguishable from
+    one that yielded no IOCs -- inconsistent with the serial and URL-batch paths.
+    """
+    from iocparser.application import use_cases
+
+    good_file = tmp_path / "good.txt"
+    bad_file = tmp_path / "bad.txt"
+    good_file.write_text("IOC URL: https://good.example.com/path\n", encoding="utf-8")
+    bad_file.write_text("this file will fail during extraction\n", encoding="utf-8")
+    reader = MagicTextSourceReader()
+
+    # The parallel executor handler calls the application-level extract_from_file.
+    def fake_extract_from_file(input_data, *, reader, extractor_engine, warning_service):
+        del reader, extractor_engine, warning_service
+        if input_data.file_path == str(bad_file):
+            raise SourceProcessingError(str(bad_file), "boom")
+        return ExtractionResult(iocs=(IOC.from_raw("urls", "https://good.example.com/path"),))
+
+    monkeypatch.setattr(use_cases, "extract_from_file", fake_extract_from_file)
+
+    # Distinct paths -> parallel executor path (the one that swallowed the error).
+    results = cli_processing.process_multiple_files(
+        [good_file, bad_file],
+        reader=reader,
+        warning_service=None,
+        request=cli_processing.MultiFileProcessingRequest(
+            file_type=None,
+            defang=False,
+            check_warnings=False,
+            force_update=False,
+            include_types=(),
+            exclude_types=(),
+            streaming=False,
+            chunk_size=1024 * 1024,
+            overlap=1024,
+            max_workers=2,
+        ),
+    )
+
+    (good_entry,) = [e for e in results.entries if e.source_value == str(good_file)]
+    (bad_entry,) = [e for e in results.entries if e.source_value == str(bad_file)]
+    assert good_entry.normal_iocs == {"urls": ["https://good.example.com/path"]}
+    assert good_entry.error_message is None
+    assert bad_entry.normal_iocs == {}
+    assert bad_entry.error_message is not None
+    assert str(bad_file) in bad_entry.error_message
+
+
 def test_dispatch_execute_and_use_case_edge_branches() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--value")

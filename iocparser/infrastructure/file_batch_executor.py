@@ -7,7 +7,7 @@ from typing import TypeVar
 from iocparser.domain.models import ExtractionResult
 from iocparser.errors import SourceNotFoundError, SourceProcessingError
 from iocparser.infrastructure.logger import get_logger
-from iocparser.interfaces.ports import FileBatchExecutor
+from iocparser.interfaces.ports import BatchItemOutcome, FileBatchExecutor
 
 logger = get_logger(__name__)
 
@@ -26,17 +26,20 @@ class ThreadPoolFileBatchExecutor(FileBatchExecutor):
         *,
         handler: Callable[[TBatchRequest], ExtractionResult],
         key_for: Callable[[TBatchRequest], str],
-    ) -> dict[str, ExtractionResult]:
-        results: dict[str, ExtractionResult] = {}
+    ) -> dict[str, BatchItemOutcome]:
+        results: dict[str, BatchItemOutcome] = {}
         request_items = [(request, key_for(request)) for request in requests]
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             future_map = {executor.submit(handler, request): key for request, key in request_items}
             for future in concurrent.futures.as_completed(future_map):
                 source_key = future_map[future]
                 try:
-                    results[source_key] = future.result()
-                except (SourceNotFoundError, SourceProcessingError):
-                    results[source_key] = ExtractionResult()
+                    results[source_key] = BatchItemOutcome(future.result())
+                except (SourceNotFoundError, SourceProcessingError) as exc:
+                    # Isolate the per-file failure but preserve its message so the
+                    # caller records it (matching the serial path) instead of
+                    # mislabeling the failed file as a zero-IOC success.
+                    results[source_key] = BatchItemOutcome(ExtractionResult(), str(exc))
                 except (KeyboardInterrupt, SystemExit):
                     raise
                 except Exception:

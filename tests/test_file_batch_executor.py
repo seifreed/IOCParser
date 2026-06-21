@@ -25,7 +25,8 @@ class TestFileBatchExecutorRegression:
         )
 
         assert executor.max_workers == 1
-        assert results["key1"].iocs[0].canonical_value() == "ok.test"
+        assert results["key1"].result.iocs[0].canonical_value() == "ok.test"
+        assert results["key1"].error is None
 
     def test_logs_exception_on_unexpected_failure(self, caplog):
         """Regression: except Exception must not silently swallow errors."""
@@ -57,7 +58,9 @@ class TestFileBatchExecutorRegression:
             key_for=lambda _: "key1",
         )
 
-        assert results["key1"] == ExtractionResult()
+        assert results["key1"].result == ExtractionResult()
+        assert results["key1"].error is not None
+        assert "missing.txt" in results["key1"].error
 
     def test_known_processing_errors_still_yield_empty_results(self):
         executor = ThreadPoolFileBatchExecutor(max_workers=1)
@@ -71,7 +74,9 @@ class TestFileBatchExecutorRegression:
             key_for=lambda _: "key1",
         )
 
-        assert results["key1"] == ExtractionResult()
+        assert results["key1"].result == ExtractionResult()
+        assert results["key1"].error is not None
+        assert "broken.txt" in results["key1"].error
 
     def test_results_returned_in_input_order_not_completion_order(self):
         """Regression: results must be keyed in input order, not thread-completion order,

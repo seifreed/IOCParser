@@ -20,6 +20,7 @@ from iocparser.domain.models import (
 )
 from iocparser.errors import SourceNotFoundError, SourceProcessingError, ValidationError
 from iocparser.interfaces.ports import (
+    BatchItemOutcome,
     FileBatchExecutor,
     IOCExtractionEngine,
     TemporaryResourceCleaner,
@@ -176,7 +177,7 @@ def extract_from_files(
     extractor_engine: IOCExtractionEngine,
     batch_executor: FileBatchExecutor,
     warning_service: WarningListService | None = None,
-) -> dict[str, ExtractionResult]:
+) -> dict[str, BatchItemOutcome]:
     """Extract IOCs from multiple files in parallel."""
     return batch_executor.execute(
         requests,

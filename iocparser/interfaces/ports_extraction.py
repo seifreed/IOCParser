@@ -1,11 +1,25 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from typing import Protocol, TypeVar
 
 from iocparser.domain.models import IOC, ExtractionOptions, ExtractionResult
 
 TBatchRequest = TypeVar("TBatchRequest")
+
+
+@dataclass(frozen=True)
+class BatchItemOutcome:
+    """Per-item result of a batch execution.
+
+    ``error`` is None on success and carries the failure message when the item
+    failed, so a file that errored (e.g. a corrupt PDF) is distinguishable from
+    one that legitimately produced zero IOCs.
+    """
+
+    result: ExtractionResult
+    error: str | None = None
 
 
 class TextSourceReader(Protocol):
@@ -50,8 +64,8 @@ class FileBatchExecutor(Protocol):
         *,
         handler: Callable[[TBatchRequest], ExtractionResult],
         key_for: Callable[[TBatchRequest], str],
-    ) -> dict[str, ExtractionResult]:
-        """Execute a batch of file requests and map them to extraction results."""
+    ) -> dict[str, BatchItemOutcome]:
+        """Execute a batch of file requests and map them to per-item outcomes."""
 
 
 class OutputRenderer(Protocol):

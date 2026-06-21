@@ -40,7 +40,7 @@ from iocparser.errors import (
 from iocparser.infrastructure.file_batch_executor import ThreadPoolFileBatchExecutor
 from iocparser.infrastructure.http_download import RequestsURLDownloader
 from iocparser.infrastructure.logger import get_logger
-from iocparser.interfaces.ports import TextSourceReader, WarningListService
+from iocparser.interfaces.ports import BatchItemOutcome, TextSourceReader, WarningListService
 
 BatchResults = BatchResultsCollection
 GroupedRawIocs = dict[str, list[str | dict[str, str]]]
@@ -99,7 +99,7 @@ class ExtractFromFilesFunc(Protocol):
         extractor_engine: object,
         batch_executor: object,
         warning_service: WarningListService | None,
-    ) -> dict[str, ExtractionResult]: ...
+    ) -> dict[str, BatchItemOutcome]: ...
 
 
 class StreamingExtractorProto(Protocol):
@@ -478,8 +478,14 @@ def _process_parallel_files(
         batch_executor=_thread_pool_batch_executor(max_workers=request.max_workers),
         warning_service=warning_service if request.check_warnings else None,
     )
-    for path, result in extracted_results.items():
-        _add_result(results, item_key=path, source_value=path, result=result)
+    for path, outcome in extracted_results.items():
+        _add_result(
+            results,
+            item_key=path,
+            source_value=path,
+            result=outcome.result,
+            error_message=outcome.error,
+        )
     return results
 
 

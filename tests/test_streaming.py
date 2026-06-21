@@ -1,5 +1,3 @@
-from tests.streaming_helpers import extract_from_stream
-
 #!/usr/bin/env python3
 
 """
@@ -28,6 +26,7 @@ from iocparser.infrastructure.streaming import (
     extract_iocs_from_large_file,
     stream_iocs_from_file,
 )
+from tests.streaming_helpers import extract_from_stream
 
 
 def _get_file_extraction_result(

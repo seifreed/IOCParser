@@ -286,18 +286,25 @@ def register_custom_ioc_type(
         tags=normalize_tokens(tags),
         stix_pattern=stix_pattern,
     )
-    # Drop aliases this type owned in a prior registration; otherwise an alias removed
-    # in a re-registration (e.g. a reloaded plugin) keeps resolving and can falsely
-    # block a different type from claiming it. Serialized so concurrent registrations
-    # don't iterate the alias dict while another thread mutates it.
+    # Touch only the aliases that actually change. The old path deleted EVERY owned alias
+    # then re-added them, leaving a window (even under the lock) where a surviving alias was
+    # transiently absent -- and the lock-free readers (resolve_custom_ioc_type on the
+    # from_name hot path) could observe that gap and raise ValueError for a registered
+    # alias. Leaving unchanged aliases untouched removes the window without locking readers;
+    # each remaining del/add is one atomic dict op with valid intermediate states. Assign
+    # the type before adding aliases so a new alias never points to a missing type.
+    new_alias_set = set(definition.aliases)
     with _registry_lock:
         for stale_alias in [
-            alias for alias, owner in _custom_ioc_aliases.items() if owner == normalized
+            alias
+            for alias, owner in _custom_ioc_aliases.items()
+            if owner == normalized and alias not in new_alias_set
         ]:
             del _custom_ioc_aliases[stale_alias]
         _custom_ioc_types[normalized] = definition
         for alias in definition.aliases:
-            _custom_ioc_aliases[alias] = normalized
+            if _custom_ioc_aliases.get(alias) != normalized:
+                _custom_ioc_aliases[alias] = normalized
     return IOCTypeName(normalized)
 
 

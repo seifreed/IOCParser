@@ -124,9 +124,13 @@ def test_domain_and_application_modules_stay_small_enough_to_review() -> None:
     # silently shadowed and resolved to the alias owner), extracted into a
     # _validate_custom_ioc_type_name helper to keep register_custom_ioc_type under the
     # C901 complexity cap. Real correctness logic, not formatting growth.
+    # 374 -> 382: register_custom_ioc_type now mutates only the aliases that actually
+    # change (instead of delete-all-then-re-add), closing a race where lock-free readers
+    # observed a surviving alias transiently absent and raised ValueError. Thread-safety
+    # fix, not formatting growth.
     file_overrides = {
         IOCPARSER_ROOT / "domain" / "distributed.py": 430,
-        IOCPARSER_ROOT / "domain" / "enums.py": 374,
+        IOCPARSER_ROOT / "domain" / "enums.py": 382,
     }
     for directory, limit in limits.items():
         for path in directory.glob("*.py"):

@@ -502,6 +502,44 @@ def test_register_custom_ioc_type_rejects_name_colliding_with_existing_alias() -
     assert get_custom_ioc_type("claimed_handle").severity == "high"
 
 
+def test_concurrent_resolve_during_re_registration_never_spuriously_raises() -> None:
+    """Regression: register_custom_ioc_type deleted every alias it owned then re-added
+    them while holding the lock, but the readers (resolve_custom_ioc_type / from_name)
+    are lock-free, so a concurrent resolve could observe an unchanged alias transiently
+    absent and raise ValueError for a permanently-registered alias. The writer now only
+    touches aliases that actually change, so a surviving alias is never momentarily gone.
+    """
+    import threading
+
+    from iocparser.domain.enums import IOCType, resolve_custom_ioc_type
+
+    aliases = tuple(f"race_alias_{index}" for index in range(200))
+    register_custom_ioc_type("race_owner", base_type=IOCType.URL, aliases=aliases)
+
+    errors: list[str] = []
+
+    def re_register() -> None:
+        for _ in range(50):
+            register_custom_ioc_type("race_owner", base_type=IOCType.URL, aliases=aliases)
+
+    def resolve() -> None:
+        for _ in range(4000):
+            try:
+                resolve_custom_ioc_type("race_alias_100")
+            except ValueError as exc:
+                errors.append(str(exc))
+                return
+
+    threads = [threading.Thread(target=re_register)]
+    threads += [threading.Thread(target=resolve) for _ in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert errors == [], f"alias resolution raced re-registration: {errors[:3]}"
+
+
 def test_malformed_urls_do_not_break_source_normalization() -> None:
     source = Source.from_raw("url", "http://[::1")
 

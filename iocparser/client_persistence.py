@@ -31,7 +31,7 @@ from iocparser.domain.models import (
     PersistedRunsPage,
     PersistedRunSummary,
 )
-from iocparser.errors import ValidationError
+from iocparser.errors import InvalidFieldError, ValidationError
 from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
 from iocparser.shared_utils import parse_string_filters
 
@@ -73,7 +73,7 @@ def validated_severity_values(values: tuple[str, ...]) -> tuple[str, ...]:
     normalized: list[str] = []
     for value in values:
         if not isinstance(value, str):
-            raise ValidationError(f"Invalid severity: {value}")
+            raise InvalidFieldError("severity", value)
         severity = validated_min_severity(value)
         if severity is not None:
             normalized.append(severity)

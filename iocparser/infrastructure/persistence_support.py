@@ -17,7 +17,12 @@ from iocparser.domain.models import (
     classify_ioc,
 )
 from iocparser.domain.sources import normalize_url_value
-from iocparser.errors import InvalidJSONError, JSONShapeError, ValidationError
+from iocparser.errors import (
+    InvalidJSONError,
+    JSONShapeError,
+    TypeValidationError,
+    ValidationError,
+)
 from iocparser.infrastructure.persistence_schema import IOCModel, RunIOCModel, RunModel, SourceModel
 
 INVALID_DATETIME_FILTER = (
@@ -51,7 +56,7 @@ def _evidence_from_json(raw_value: str) -> tuple[IOCEvidence, ...]:
             continue
         line_number_raw = entry.get("line_number")
         if isinstance(line_number_raw, bool):
-            raise TypeError(f"Expected line_number to be int, got {type(line_number_raw).__name__}")
+            raise TypeValidationError("line_number", "int", line_number_raw)
         line_number = line_number_raw if isinstance(line_number_raw, int) else None
         excerpt = entry.get("excerpt")
         source = entry.get("source")
@@ -142,9 +147,9 @@ def legacy_url_value_clause(value: str) -> ClauseElement:
 
 def source_value_clause(*, source_kind: str | None, source_value: str) -> ClauseElement:
     if source_kind is not None and not isinstance(source_kind, str):
-        raise TypeError(f"Expected source_kind to be string-like, got {type(source_kind).__name__}")
+        raise TypeValidationError("source_kind", "string-like", source_kind)
     if not isinstance(source_value, str):
-        raise TypeError(f"Expected source_value to be string-like, got {type(source_value).__name__}")
+        raise TypeValidationError("source_value", "string-like", source_value)
     normalized_kind = source_kind.strip().lower() if source_kind is not None else ""
     exact_value = source_value.strip()
     if normalized_kind != "url":

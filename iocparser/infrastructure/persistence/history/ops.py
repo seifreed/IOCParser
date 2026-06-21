@@ -16,7 +16,7 @@ from iocparser.domain.enums import IOCType, ioc_type_name
 from iocparser.domain.jobs import BatchJobDetail, BatchJobSummary, FailedBatchItem
 from iocparser.domain.models import PersistedRunSummary
 from iocparser.domain.sources import normalize_url_value
-from iocparser.errors import InvalidJSONError, JSONShapeError
+from iocparser.errors import InvalidJSONError, JSONShapeError, TypeValidationError
 from iocparser.infrastructure.persistence.history.row_values import (
     bool_from_row,
     int_from_row,
@@ -279,7 +279,7 @@ def _normalized_text(value: object, *, default: str) -> str:
     if value is None:
         return default
     if not isinstance(value, str):
-        raise TypeError(f"Expected string, got {type(value).__name__}")
+        raise TypeValidationError(None, "string", value)
     stripped = value.strip()
     return stripped or default
 def _batch_job_signature(row: dict[str, object]) -> tuple[object, ...]:

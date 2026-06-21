@@ -4,7 +4,7 @@ import os
 from configparser import ConfigParser
 from pathlib import Path
 
-from iocparser.errors import SourceNotFoundError
+from iocparser.errors import SourceNotFoundError, TypeValidationError
 from iocparser.runtime_config import find_default_config_paths, load_ini_sections
 from iocparser.shared_utils import FALSE_BOOL_VALUES, TRUE_BOOL_VALUES
 
@@ -187,7 +187,7 @@ def str_or_none(value: object) -> str | None:
     if value is None:
         return None
     if not isinstance(value, str):
-        raise TypeError(f"Expected string value, got {type(value).__name__}")
+        raise TypeValidationError(None, "string value", value)
     stripped = value.strip()
     return stripped or None
 

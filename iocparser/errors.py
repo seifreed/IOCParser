@@ -117,6 +117,49 @@ class InvalidJSONError(ValueError):
         super().__init__(f"Invalid JSON {kind}")
 
 
+class InvalidFieldError(ValidationError):
+    """Raised when a named field carries an unacceptable value."""
+
+    def __init__(self, field: str, value: object) -> None:
+        self.field = field
+        self.value = value
+        super().__init__(f"Invalid {field}: {value}")
+
+
+class UnsupportedFloatArgumentError(TypeError):
+    """Raised when a float-coercible argument has an unsupported type."""
+
+    def __init__(self, name: str, value: object) -> None:
+        self.name = name
+        super().__init__(f"Unsupported float argument type for {name}: {type(value).__name__}")
+
+
+class InvalidFloatArgumentError(ValidationError):
+    """Raised when a float-coercible argument cannot be parsed."""
+
+    def __init__(self, name: str, value: object) -> None:
+        self.name = name
+        self.value = value
+        super().__init__(f"Invalid float argument for {name}: {value!r}")
+
+
+class InvalidWorkerConfigError(ValidationError):
+    """Raised when a worker config file cannot be loaded or parsed."""
+
+    def __init__(self, config_path: object, reason: object) -> None:
+        self.config_path = config_path
+        self.reason = reason
+        super().__init__(f"Invalid worker config file {config_path}: {reason}")
+
+
+class IntLiteralError(TypeError):
+    """Raised when a value cannot be interpreted as an integer literal."""
+
+    def __init__(self, raw_value: object) -> None:
+        self.raw_value = raw_value
+        super().__init__(f"invalid literal for int(): {raw_value!r}")
+
+
 class FileSizeError(ValidationError):
     """Exception raised when file size exceeds limits."""
 

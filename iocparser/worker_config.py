@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from iocparser.domain.pipeline import ResourceLimits
-from iocparser.errors import ValidationError
+from iocparser.errors import InvalidWorkerConfigError
 from iocparser.worker_config_support import (
     bool_env,
     float_env,
@@ -80,7 +80,7 @@ class WorkerServiceConfig:
         try:
             file_values = load_worker_file_values(resolved_path)
         except (configparser.Error, ValueError) as exc:
-            raise ValidationError(f"Invalid worker config file {resolved_path}: {exc}") from exc
+            raise InvalidWorkerConfigError(resolved_path, exc) from exc
         poll_interval_default = _non_negative_float_or_default(
             float_or(file_values["poll_interval_seconds"], 1.0), 1.0
         )

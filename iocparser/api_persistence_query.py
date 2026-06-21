@@ -34,7 +34,7 @@ from iocparser.domain.models import (
     ioc_type_name,
 )
 from iocparser.domain.type_filters import parse_ioc_types
-from iocparser.errors import ValidationError
+from iocparser.errors import InvalidFieldError, ValidationError
 from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
 from iocparser.interfaces.ports import OutputRenderer
 from iocparser.plugins import get_renderer
@@ -249,7 +249,7 @@ def _validated_choice(value: str, *, valid: AbstractSet[str], error: str) -> str
 
 def _require_str(value: object, *, field: str) -> str:
     if not isinstance(value, str):
-        raise ValidationError(f"Invalid {field}: {value}")
+        raise InvalidFieldError(field, value)
     return value
 
 

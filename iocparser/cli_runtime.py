@@ -22,7 +22,7 @@ from iocparser.cli_runtime_defaults import (
 )
 from iocparser.cli_runtime_defaults import parse_http_mapping as _parse_http_mapping
 from iocparser.config import AppConfig, load_config
-from iocparser.errors import ValidationError
+from iocparser.errors import InvalidFloatArgumentError, UnsupportedFloatArgumentError
 from iocparser.infrastructure.extraction import MagicTextSourceReader, RequestsURLDownloader
 from iocparser.infrastructure.runtime import LocalFileWriter, get_logger, setup_logger
 from iocparser.infrastructure.warninglists import MISPWarningLists
@@ -88,15 +88,15 @@ def _optional_float_arg(args: argparse.Namespace, name: str) -> float | None:
     if value is None:
         return None
     if isinstance(value, bool):
-        raise TypeError(f"Unsupported float argument type for {name}: {type(value).__name__}")
+        raise UnsupportedFloatArgumentError(name, value)
     if isinstance(value, (int, float)):
         return float(value)
     if isinstance(value, str):
         try:
             return float(value.strip())
         except ValueError as exc:
-            raise ValidationError(f"Invalid float argument for {name}: {value!r}") from exc
-    raise TypeError(f"Unsupported float argument type for {name}: {type(value).__name__}")
+            raise InvalidFloatArgumentError(name, value) from exc
+    raise UnsupportedFloatArgumentError(name, value)
 
 def downloader_for_args(args: argparse.Namespace) -> RequestsURLDownloader:
     header_items: object = getattr(args, "header", None)

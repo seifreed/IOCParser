@@ -8,7 +8,7 @@ from typing import ClassVar
 
 from iocparser.domain.models import ExtractionResult
 from iocparser.domain.pipeline import RESULT_SCHEMA_VERSION
-from iocparser.errors import JSONShapeError
+from iocparser.errors import MISSING_VALUE, JSONShapeError, TypeValidationError
 from iocparser.interfaces.ports import OutputRenderer
 from iocparser.rendering_support import (
     group_canonical_by_type,
@@ -18,13 +18,13 @@ from iocparser.rendering_support import (
 
 def _require_str(value: object, *, field: str) -> str:
     if not isinstance(value, str):
-        raise TypeError(f"Expected {field} to be string, got {type(value).__name__}")
+        raise TypeValidationError(field, "string", value)
     return value
 
 
 def _csv_field(record: dict[str, object], field: str) -> str:
     if field not in record:
-        raise TypeError(f"Expected {field} to be string, got missing")
+        raise TypeValidationError(field, "string", MISSING_VALUE)
     return _require_str(record[field], field=field)
 
 
@@ -40,7 +40,7 @@ def _csv_warning_field(record: dict[str, object], field: str) -> str:
     if not has_warning_shape and field not in record:
         return ""
     if field not in record:
-        raise TypeError(f"Expected {field} to be string, got missing")
+        raise TypeValidationError(field, "string", MISSING_VALUE)
     return _require_str(record[field], field=field)
 
 
@@ -49,13 +49,13 @@ def _csv_line_number(entry: dict[str, object]) -> str:
     if line_number is None:
         return ""
     if isinstance(line_number, bool) or not isinstance(line_number, int):
-        raise TypeError(f"Expected line_number to be int, got {type(line_number).__name__}")
+        raise TypeValidationError("line_number", "int", line_number)
     return str(line_number)
 
 
 def _warning_field(warning: Mapping[str, object], field: str) -> str:
     if field not in warning:
-        raise TypeError(f"Expected {field} to be string, got missing")
+        raise TypeValidationError(field, "string", MISSING_VALUE)
     return _require_str(warning[field], field=field)
 
 
@@ -181,7 +181,8 @@ def record_string_list(record: dict[str, object], key: str) -> tuple[str, ...]:
     values: list[str] = []
     for value in raw_value:
         if not isinstance(value, str):
-            raise TypeError(f"Expected {key} entries to be string, got {type(value).__name__}")
+            subject = f"{key} entries"
+            raise TypeValidationError(subject, "string", value)
         values.append(value)
     return tuple(values)
 

@@ -8,7 +8,7 @@ from typing import TypedDict, cast
 
 from iocparser.cli_args_values import int_value
 from iocparser.domain.pipeline import BATCH_REPORT_SCHEMA_VERSION
-from iocparser.errors import JSONShapeError
+from iocparser.errors import JSONShapeError, TypeValidationError
 from iocparser.shared_utils import parse_bool_token
 
 
@@ -75,8 +75,8 @@ def bool_value(value: object, *, default: bool = False) -> bool:
         parsed = parse_bool_token(value)
         if parsed is not None:
             return parsed
-        raise TypeError(f"Expected boolean-compatible value, got {type(value).__name__}")
-    raise TypeError(f"Expected boolean-compatible value, got {type(value).__name__}")
+        raise TypeValidationError(None, "boolean-compatible value", value)
+    raise TypeValidationError(None, "boolean-compatible value", value)
 
 
 def _json_dict(path: Path) -> dict[str, object]:
@@ -261,7 +261,7 @@ def build_batch_report(context: BatchReportContext) -> BatchReport:
 def _set_batch_item_string(item: BatchItemReport, key: str, value: object) -> bool:
     def require_string(field: str) -> str:
         if not isinstance(value, str):
-            raise TypeError(f"Expected {field} to be string, got {type(value).__name__}")
+            raise TypeValidationError(field, "string", value)
         return value
 
     if key == "url":

@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 from iocparser.distributed_pipeline import DistributedPipelineService
+from iocparser.errors import IntLiteralError
 from iocparser.infrastructure.queueing import create_queue_adapter
 from iocparser.infrastructure.runtime.service_builders import telemetry_sink_for_worker_mode
 from iocparser.pipeline_worker import PipelineWorker
@@ -80,7 +81,7 @@ class DistributedWorkerService:
         limits = getattr(self.service, "limits", None)
         raw_workers = getattr(limits, "max_workers", 1)
         if isinstance(raw_workers, bool):
-            raise TypeError(f"invalid literal for int(): {raw_workers!r}")
+            raise IntLiteralError(raw_workers)
         return max(1, int(raw_workers))
 
     def _inflight_capacity(self) -> int:

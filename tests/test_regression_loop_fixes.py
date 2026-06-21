@@ -1476,3 +1476,47 @@ def test_defanged_domain_with_real_subdomain_is_extracted() -> None:
     ):
         iocs, _ = extraction.extract_iocs_from_text(sample)
         assert iocs.get("domains") == [expected], (sample, iocs.get("domains"))
+
+
+def test_extract_result_from_text_rejects_non_str_at_boundary() -> None:
+    """The public text API must fail loudly on a non-str instead of leaking deep.
+
+    Regression: extract_iocs_from_text(None) crashed with an opaque
+    "object of type 'NoneType' has no len()" raised inside the extractor engine,
+    rather than a clear boundary error. The primary entry point now type-guards
+    text_content while valid strings still extract normally.
+    """
+    import pytest
+
+    from iocparser import extraction
+    from iocparser.errors import TypeValidationError
+
+    for bad in (None, 123, ["evil.com"]):
+        with pytest.raises(TypeValidationError):
+            extraction.extract_iocs_from_text(bad)  # type: ignore[arg-type]
+        with pytest.raises(TypeValidationError):
+            extraction.extract_result_from_text(bad)  # type: ignore[arg-type]
+
+    iocs, _ = extraction.extract_iocs_from_text(
+        "connect to http://mail.evil.com/a now", defang=False
+    )
+    assert iocs.get("domains") == ["mail.evil.com"]
+
+
+def test_search_persisted_iocs_rejects_non_str_value(tmp_path) -> None:
+    """A non-str search value must raise ValidationError, not a raw TypeError.
+
+    Regression: search_persisted_iocs(value=123) leaked
+    "expected string or bytes-like object, got 'int'" from the regex layer, while
+    value=None / value='' already raised a clean ValidationError. The boundary now
+    rejects any non-str consistently.
+    """
+    import pytest
+
+    from iocparser import persistence
+    from iocparser.errors import ValidationError
+
+    db_uri = f"sqlite:///{tmp_path / 'search.db'}"
+    for bad in (123, ["evil.com"], object()):
+        with pytest.raises(ValidationError):
+            persistence.search_persisted_iocs(db_uri=db_uri, value=bad)  # type: ignore[arg-type]

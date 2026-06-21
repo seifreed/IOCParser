@@ -204,6 +204,10 @@ def runs_input(options: QueryRunsOptions) -> QueryRunsInput:
 
 def search_input(value: str, options: SearchPersistedIOCOptions) -> SearchPersistedIOCsInput:
     reject_unknown_options(options, _SEARCH_OPTION_KEYS, context="IOC search")
+    # A non-str value would otherwise leak a raw TypeError from the regex layer,
+    # unlike the empty/None case which already raises a clean ValidationError.
+    if not isinstance(value, str):
+        raise ValidationError(INVALID_EMPTY_SEARCH_QUERY_ERROR.format(value=value))
     return SearchPersistedIOCsInput(
         value=value,
         limit=validated_non_negative_int(options.get("limit", 50), field="limit"),

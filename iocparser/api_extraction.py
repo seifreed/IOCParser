@@ -7,7 +7,7 @@ from iocparser.application.contracts import ExtractFileInput, ExtractTextInput, 
 from iocparser.application.use_cases import extract_from_file, extract_from_text, extract_from_url
 from iocparser.client_extraction import build_extraction_options
 from iocparser.domain.models import ExtractionOptions, ExtractionResult
-from iocparser.errors import FileExistenceError
+from iocparser.errors import FileExistenceError, TypeValidationError
 from iocparser.infrastructure.extraction import (
     DefaultIOCExtractionEngine,
     MagicTextSourceReader,
@@ -210,6 +210,10 @@ def extract_result_from_text(
     only: str | None = None,
     exclude: str | None = None,
 ) -> ExtractionResult:
+    # Trust-boundary guard: a non-str here would otherwise crash deep in the
+    # extractor engine (len(text_content)) with an opaque "NoneType has no len()".
+    if not isinstance(text_content, str):
+        raise TypeValidationError("text_content", "string", text_content)
     return extract_text_result(
         text_content,
         check_warnings=check_warnings,

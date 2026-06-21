@@ -8,6 +8,7 @@ from typing import ClassVar
 
 from iocparser.domain.models import ExtractionResult
 from iocparser.domain.pipeline import RESULT_SCHEMA_VERSION
+from iocparser.errors import JSONShapeError
 from iocparser.interfaces.ports import OutputRenderer
 from iocparser.rendering_support import (
     group_canonical_by_type,
@@ -195,5 +196,5 @@ def record_dict_list(record: dict[str, object], key: str) -> list[dict[str, obje
 def json_object(raw_value: str) -> dict[str, object]:
     decoded: object = json.loads(raw_value)
     if not isinstance(decoded, dict):
-        raise ValueError("Expected JSON object")
+        raise JSONShapeError("object")
     return {key: value for key, value in decoded.items() if isinstance(key, str)}

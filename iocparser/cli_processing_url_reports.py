@@ -8,6 +8,7 @@ from typing import TypedDict, cast
 
 from iocparser.cli_args_values import int_value
 from iocparser.domain.pipeline import BATCH_REPORT_SCHEMA_VERSION
+from iocparser.errors import JSONShapeError
 from iocparser.shared_utils import parse_bool_token
 
 
@@ -81,7 +82,7 @@ def bool_value(value: object, *, default: bool = False) -> bool:
 def _json_dict(path: Path) -> dict[str, object]:
     payload: object = loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
-        raise ValueError("Expected JSON object")
+        raise JSONShapeError("object")
     normalized: dict[str, object] = {}
     for key, value in payload.items():
         if not isinstance(key, str):

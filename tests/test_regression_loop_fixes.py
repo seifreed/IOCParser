@@ -466,7 +466,7 @@ def test_worker_extract_result_expands_home_file_path(
 def test_history_json_object_rejects_invalid_payloads() -> None:
     with pytest.raises(ValueError, match="Invalid JSON object"):
         _json_object("{bad")
-    with pytest.raises(ValueError, match="Expected JSON object"):
+    with pytest.raises(TypeError, match="Expected JSON object"):
         _json_object("[]")
 
 

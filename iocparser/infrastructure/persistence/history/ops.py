@@ -16,6 +16,7 @@ from iocparser.domain.enums import IOCType, ioc_type_name
 from iocparser.domain.jobs import BatchJobDetail, BatchJobSummary, FailedBatchItem
 from iocparser.domain.models import PersistedRunSummary
 from iocparser.domain.sources import normalize_url_value
+from iocparser.errors import InvalidJSONError, JSONShapeError
 from iocparser.infrastructure.persistence.history.row_values import (
     bool_from_row,
     int_from_row,
@@ -110,9 +111,9 @@ def _json_object(raw_value: str) -> dict[str, object]:
     try:
         decoded: object = json.loads(raw_value or "{}")
     except json.JSONDecodeError as exc:
-        raise ValueError("Invalid JSON object") from exc
+        raise InvalidJSONError("object") from exc
     if not isinstance(decoded, dict):
-        raise ValueError("Expected JSON object")
+        raise JSONShapeError("object")
     return _string_key_mapping(decoded)
 def _is_int_like(value: object) -> bool:
     if isinstance(value, bool):

@@ -101,6 +101,22 @@ class RetryCounterError(ValueError):
         super().__init__("max_attempts must be a valid retry counter")
 
 
+class JSONShapeError(TypeError):
+    """Raised when decoded JSON is not the expected container type."""
+
+    def __init__(self, expected: str) -> None:
+        self.expected = expected
+        super().__init__(f"Expected JSON {expected}")
+
+
+class InvalidJSONError(ValueError):
+    """Raised when a JSON document cannot be parsed into the expected container."""
+
+    def __init__(self, kind: str) -> None:
+        self.kind = kind
+        super().__init__(f"Invalid JSON {kind}")
+
+
 class FileSizeError(ValidationError):
     """Exception raised when file size exceeds limits."""
 

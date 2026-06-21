@@ -228,7 +228,7 @@ def test_cli_processing_url_helper_parsing_and_plugin_builder() -> None:
     payload_path = Path("tmp-url-batch-report.json")
     payload_path.write_text(json.dumps(["bad"]), encoding="utf-8")
     try:
-        with pytest.raises(ValueError, match="Expected JSON object"):
+        with pytest.raises(TypeError, match="Expected JSON object"):
             _json_dict(payload_path)
     finally:
         payload_path.unlink()
@@ -518,13 +518,13 @@ def test_persistence_helper_functions_cover_conversion_edges() -> None:
     downloader.last_download_metadata = {1: "one", "two": 2}
     assert downloader.download_metadata() == {"two": 2}
 
-    with pytest.raises(ValueError, match="Expected JSON object"):
+    with pytest.raises(TypeError, match="Expected JSON object"):
         record_json_object("[]")
     with pytest.raises(ValueError, match="Invalid JSON object"):
         record_json_object("{bad")
     assert _json_int_map(json.dumps({"a": "2"})) == {"a": 2}
     assert _json_int_map(json.dumps({"a": True, "b": "bad", "c": "-3"})) == {"c": -3}
-    with pytest.raises(ValueError, match="Expected JSON array"):
+    with pytest.raises(TypeError, match="Expected JSON array"):
         _json_list("{}")
     with pytest.raises(ValueError, match="Invalid JSON array"):
         _json_list("{bad")
@@ -567,7 +567,7 @@ def test_persistence_helper_functions_cover_conversion_edges() -> None:
 
 
 def test_persistence_history_and_page_query_helpers_cover_remaining_branches() -> None:
-    with pytest.raises(ValueError, match="Expected JSON object"):
+    with pytest.raises(TypeError, match="Expected JSON object"):
         history_json_object("[]")
     with pytest.raises(ValueError, match="Invalid JSON object"):
         history_json_object("{bad")
@@ -913,7 +913,7 @@ def test_renderers_cover_custom_stix_and_record_helpers() -> None:
         _record_string_list({"tags": [1]}, "tags")
     with pytest.raises(TypeError, match="Expected value to be string"):
         format_warning_item({"value": object(), "warning_list": "wl"})
-    with pytest.raises(ValueError, match="Expected JSON object"):
+    with pytest.raises(TypeError, match="Expected JSON object"):
         renderer_json_object("[]")
 
 

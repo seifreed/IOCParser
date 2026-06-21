@@ -17,7 +17,7 @@ from iocparser.domain.models import (
     classify_ioc,
 )
 from iocparser.domain.sources import normalize_url_value
-from iocparser.errors import ValidationError
+from iocparser.errors import InvalidJSONError, JSONShapeError, ValidationError
 from iocparser.infrastructure.persistence_schema import IOCModel, RunIOCModel, RunModel, SourceModel
 
 INVALID_DATETIME_FILTER = (
@@ -38,9 +38,9 @@ def _json_list(raw_value: str) -> list[object]:
     try:
         decoded: object = json.loads(raw_value)
     except json.JSONDecodeError as exc:
-        raise ValueError("Invalid JSON array") from exc
+        raise InvalidJSONError("array") from exc
     if not isinstance(decoded, list):
-        raise ValueError("Expected JSON array")
+        raise JSONShapeError("array")
     return list(decoded)
 
 

@@ -10,6 +10,7 @@ from iocparser.domain.models import (
     DistributedJobRecord,
     PipelineErrorInfo,
 )
+from iocparser.errors import InvalidJSONError, JSONShapeError
 from iocparser.infrastructure.persistence_schema import DeadLetterJobModel, DistributedJobModel
 
 HISTORY_IMPORT_MARKER_KEY = "__history_import__"
@@ -23,9 +24,9 @@ def _json_object(raw_value: str) -> dict[str, object]:
     try:
         decoded = cast("object", json.loads(raw_value or "{}"))
     except json.JSONDecodeError as exc:
-        raise ValueError("Invalid JSON object") from exc
+        raise InvalidJSONError("object") from exc
     if not isinstance(decoded, dict):
-        raise ValueError("Expected JSON object")
+        raise JSONShapeError("object")
     return {name: value for name, value in decoded.items() if isinstance(name, str)}
 
 

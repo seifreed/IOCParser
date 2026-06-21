@@ -56,6 +56,41 @@ class ValidationError(IOCParserError):
     """Exception raised for input validation errors."""
 
 
+_OMIT_GOT = object()
+
+
+class TypeValidationError(TypeError):
+    """Raised at a trust boundary when a value fails an isinstance/shape guard.
+
+    The message is assembled here so call sites pass structured arguments instead
+    of inline f-strings. Pass ``subject`` for an "Expected {subject} to be …" lead
+    (or None for "Expected {expected} …"); omit ``value`` for no "got" suffix,
+    otherwise the runtime type name of ``value`` is appended.
+    """
+
+    def __init__(
+        self, subject: str | None, expected: str, value: object = _OMIT_GOT
+    ) -> None:
+        head = f"Expected {subject} to be {expected}" if subject else f"Expected {expected}"
+        message = head if value is _OMIT_GOT else f"{head}, got {type(value).__name__}"
+        super().__init__(message)
+
+
+class NonNegativeValueError(ValueError):
+    """Raised when a numeric field that must be non-negative is negative."""
+
+    def __init__(self, field: str) -> None:
+        self.field = field
+        super().__init__(f"Expected {field} to be non-negative")
+
+
+class RetryCounterError(ValueError):
+    """Raised when ``max_attempts`` is not a usable retry counter."""
+
+    def __init__(self) -> None:
+        super().__init__("max_attempts must be a valid retry counter")
+
+
 class FileSizeError(ValidationError):
     """Exception raised when file size exceeds limits."""
 

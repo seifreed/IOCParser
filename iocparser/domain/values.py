@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 
 from iocparser.domain.enums import HASH_IOC_TYPES, IOCType, IOCTypeName, get_custom_ioc_type
 from iocparser.domain.sources import normalize_netloc
+from iocparser.errors import TypeValidationError
 from iocparser.shared_utils import refang_ioc
 
 
@@ -17,7 +18,7 @@ class IndicatorValue:
 
     def __post_init__(self) -> None:
         if not isinstance(self.raw, str):
-            raise TypeError(f"Expected raw to be string-like, got {type(self.raw).__name__}")
+            raise TypeValidationError("raw", "string-like", self.raw)
 
     def canonical(self) -> str:
         """Return the normalized wire value."""

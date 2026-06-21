@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from urllib.parse import urlsplit, urlunsplit
 
 from iocparser.domain.enums import SourceKind
+from iocparser.errors import TypeValidationError
 
 
 def normalize_url_value(value: str | None) -> str | None:
@@ -36,7 +37,7 @@ def normalize_netloc(netloc: str) -> str:
 
 def _require_str(value: object, *, field: str) -> str:
     if not isinstance(value, str):
-        raise TypeError(f"Expected {field} to be string-like, got {type(value).__name__}")
+        raise TypeValidationError(field, "string-like", value)
     return value
 
 

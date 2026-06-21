@@ -7,15 +7,16 @@ from datetime import datetime
 from iocparser.domain.enums import ioc_type_name
 from iocparser.domain.pipeline import RESULT_SCHEMA_VERSION
 from iocparser.domain.results import ExtractionResult
+from iocparser.errors import TypeValidationError
 
 
 def _require_str(value: object, *, field: str, non_empty: bool = False) -> str:
     if not isinstance(value, str):
-        raise TypeError(f"Expected {field} to be string-like, got {type(value).__name__}")
+        raise TypeValidationError(field, "string-like", value)
     if non_empty:
         stripped = value.strip()
         if not stripped:
-            raise TypeError(f"Expected {field} to be non-empty string-like")
+            raise TypeValidationError(field, "non-empty string-like")
         return stripped
     return value
 

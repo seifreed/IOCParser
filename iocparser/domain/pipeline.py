@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from iocparser.domain.results import ExtractionResult
+from iocparser.errors import TypeValidationError
 
 RESULT_SCHEMA_VERSION = "1.0"
 BATCH_REPORT_SCHEMA_VERSION = "1.0"
@@ -12,13 +13,13 @@ PIPELINE_JOB_SCHEMA_VERSION = "1.0"
 
 def _require_int(value: object, *, field: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
-        raise TypeError(f"Expected {field} to be int, got {type(value).__name__}")
+        raise TypeValidationError(field, "int", value)
     return value
 
 
 def _require_number(value: object, *, field: str) -> int | float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise TypeError(f"Expected {field} to be numeric, got {type(value).__name__}")
+        raise TypeValidationError(field, "numeric", value)
     return value
 
 
@@ -119,15 +120,15 @@ class PipelineJobRequest:
     def __post_init__(self) -> None:
         def _require_str(value: object, *, field: str) -> str:
             if not isinstance(value, str):
-                raise TypeError(f"Expected {field} to be string-like, got {type(value).__name__}")
+                raise TypeValidationError(field, "string-like", value)
             stripped = value.strip()
             if not stripped:
-                raise TypeError(f"Expected {field} to be non-empty string-like")
+                raise TypeValidationError(field, "non-empty string-like")
             return stripped
 
         def _require_bool(value: object, *, field: str) -> bool:
             if not isinstance(value, bool):
-                raise TypeError(f"Expected {field} to be bool, got {type(value).__name__}")
+                raise TypeValidationError(field, "bool", value)
             return value
 
         object.__setattr__(
@@ -184,10 +185,10 @@ class PipelineJobResult:
     def __post_init__(self) -> None:
         def _require_str(value: object, *, field: str) -> str:
             if not isinstance(value, str):
-                raise TypeError(f"Expected {field} to be string-like, got {type(value).__name__}")
+                raise TypeValidationError(field, "string-like", value)
             stripped = value.strip()
             if not stripped:
-                raise TypeError(f"Expected {field} to be non-empty string-like")
+                raise TypeValidationError(field, "non-empty string-like")
             return stripped
 
         object.__setattr__(

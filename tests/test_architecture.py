@@ -105,7 +105,9 @@ def test_domain_and_application_modules_stay_small_enough_to_review() -> None:
         # 350 -> 355 for register_custom_ioc_type's severity validation: a custom type
         # registered with an unrecognized severity (e.g. "critical") is now rejected
         # instead of being stored and silently dropped by min_severity filtering.
-        IOCPARSER_ROOT / "domain": 355,
+        # 355 -> 356 for the shared iocparser.errors.TypeValidationError import that
+        # replaces enums.py's inline isinstance-guard messages (TRY003 cleanup).
+        IOCPARSER_ROOT / "domain": 356,
         # 270 -> 272 for the benign-redelivery guard in distributed_use_cases.py: a
         # transient mark_completed/mark_failed/requeue failure now marks the job handled
         # so the message redelivers instead of dead-lettering succeeded/retryable work.

@@ -9,6 +9,7 @@ from iocparser.domain.pipeline import (
     PipelineErrorInfo,
     PipelineJobRequest,
 )
+from iocparser.errors import NonNegativeValueError, RetryCounterError, TypeValidationError
 from iocparser.shared_utils import parse_bool_token
 
 DISTRIBUTED_JOB_SCHEMA_VERSION = "1.0"
@@ -61,20 +62,20 @@ def _bool_from_payload(payload: dict[str, object], key: str, default: bool) -> b
 
 def _require_str(value: object, *, field: str, non_empty: bool = False) -> str:
     if not isinstance(value, str):
-        raise TypeError(f"Expected {field} to be string-like, got {type(value).__name__}")
+        raise TypeValidationError(field, "string-like", value)
     if non_empty:
         stripped = value.strip()
         if not stripped:
-            raise TypeError(f"Expected {field} to be non-empty string-like")
+            raise TypeValidationError(field, "non-empty string-like")
         return stripped
     return value
 
 
 def _require_int(value: object, *, field: str, non_negative: bool = False) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
-        raise TypeError(f"Expected {field} to be int-like, got {type(value).__name__}")
+        raise TypeValidationError(field, "int-like", value)
     if non_negative and value < 0:
-        raise ValueError(f"Expected {field} to be non-negative")
+        raise NonNegativeValueError(field)
     return value
 
 
@@ -111,7 +112,7 @@ class QueueEnvelope:
         if self.idempotency_key is not None:
             object.__setattr__(self, "idempotency_key", _require_str(self.idempotency_key, field="idempotency_key"))
         if self.max_attempts <= 0:
-            raise ValueError("max_attempts must be a valid retry counter")
+            raise RetryCounterError
 
     def to_record(self) -> dict[str, object]:
         return {

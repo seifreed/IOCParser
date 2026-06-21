@@ -11,6 +11,7 @@ from iocparser.domain.enums import (
     ioc_type_name,
 )
 from iocparser.domain.values import IndicatorValue, indicator_value_for
+from iocparser.errors import TypeValidationError
 from iocparser.shared_utils import normalize_tokens
 
 INVALID_ANALYST_SORT_BY_ERROR = "Invalid sort_by: {value}"
@@ -67,7 +68,7 @@ def classify_ioc(
 
 def _require_str(value: object, *, field: str) -> str:
     if not isinstance(value, str):
-        raise TypeError(f"Expected {field} to be string-like, got {type(value).__name__}")
+        raise TypeValidationError(field, "string-like", value)
     return value
 @dataclass(frozen=True)
 class IOCEvidence:
@@ -82,7 +83,7 @@ class IOCEvidence:
         if self.line_number is not None and (
             isinstance(self.line_number, bool) or not isinstance(self.line_number, int)
         ):
-            raise TypeError(f"Expected line_number to be int-like, got {type(self.line_number).__name__}")
+            raise TypeValidationError("line_number", "int-like", self.line_number)
         object.__setattr__(self, "source", _require_str(self.source, field="source"))
 @dataclass(frozen=True)
 class IOC:

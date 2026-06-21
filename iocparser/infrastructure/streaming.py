@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import BinaryIO, TextIO, cast
 
 from iocparser.errors import IOCFileNotFoundError
-from iocparser.infrastructure.file_parser import detect_bom_encoding, wrap_binary_stream_for_bom
+from iocparser.infrastructure.file_parser import detect_bom_encoding
 from iocparser.infrastructure.logger import get_logger
 from iocparser.infrastructure.streaming_chunks import decode_chunk, read_chunks_with_prefix
 from iocparser.infrastructure.streaming_matching import should_keep_ioc
@@ -292,45 +292,6 @@ class StreamingIOCExtractor:
 
         list(_iter_chunks())
         return dict(all_iocs)
-
-    def extract_from_stream(
-        self,
-        stream: BinaryIO | TextIO,
-        is_text: bool = True,
-    ) -> Iterator[dict[str, list[str]]]:
-        """
-        Extract IOCs from a stream in real-time.
-
-        Args:
-            stream: Input stream to process
-            is_text: Whether the stream contains text
-
-        Yields:
-            Dictionaries of extracted IOCs as they're found
-        """
-        logger.info("Starting streaming extraction from stream")
-        stream_obj: BinaryIO | TextIO = stream
-        stream_obj, is_text = wrap_binary_stream_for_bom(stream_obj, is_text=is_text)
-
-        # Reset seen IOCs for new stream
-        self.seen_iocs.clear()
-        seen_iocs: dict[str, set[str]] = defaultdict(set)
-
-        try:
-            for chunk, prefix_length, is_final in read_chunks_with_prefix(
-                file_obj=stream_obj,
-                chunk_size=self.chunk_size,
-                overlap=self.overlap,
-                progress_callback=self.progress_callback,
-                is_text=is_text,
-            ):
-                unique_iocs = self._extract_unique_from_chunk(
-                    chunk, prefix_length, is_final, seen_iocs=seen_iocs
-                )
-                if unique_iocs:
-                    yield unique_iocs
-        finally:
-            self.seen_iocs.clear()
 
     def extract_from_mmap(
         self,

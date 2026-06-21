@@ -11,6 +11,7 @@ from iocparser.infrastructure.file_readers import MagicTextSourceReader
 from iocparser.infrastructure.http_download import RequestsURLDownloader
 from iocparser.infrastructure.streaming import ParallelStreamingExtractor, StreamingIOCExtractor
 from tests.http_server_helpers import LocalHTTPTextServer
+from tests.streaming_helpers import extract_from_stream
 
 
 class PlainTextHtmlReader(MagicTextSourceReader):
@@ -125,7 +126,7 @@ def test_streaming_extractors_cover_buffer_and_parallel_fallbacks(tmp_path: Path
     assert chunks
 
     with text_file.open(encoding="utf-8") as handle:
-        yielded = list(extractor.extract_from_stream(handle, is_text=False))
+        yielded = list(extract_from_stream(extractor, handle, is_text=False))
     assert yielded
 
     progress_values: list[int] = []

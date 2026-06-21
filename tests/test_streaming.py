@@ -1,3 +1,5 @@
+from tests.streaming_helpers import extract_from_stream
+
 #!/usr/bin/env python3
 
 """
@@ -611,7 +613,7 @@ class TestStreamingIOCExtractor:
 
         stream = io.StringIO(SAMPLE_IOC_TEXT)
 
-        chunks = list(extractor.extract_from_stream(stream, is_text=True))
+        chunks = list(extract_from_stream(extractor, stream, is_text=True))
 
         assert len(chunks) >= 1
 
@@ -637,7 +639,7 @@ class TestStreamingIOCExtractor:
         extractor = StreamingIOCExtractor(chunk_size=96, overlap=64, defang=False)
 
         collected: dict[str, list[str]] = defaultdict(list)
-        for chunk in extractor.extract_from_stream(io.StringIO(text), is_text=True):
+        for chunk in extract_from_stream(extractor, io.StringIO(text), is_text=True):
             for ioc_type, ioc_list in chunk.items():
                 collected[ioc_type].extend(ioc_list)
 
@@ -692,7 +694,7 @@ class TestStreamingIOCExtractor:
 
         stream = io.BytesIO(SAMPLE_IOC_TEXT.encode("utf-8"))
 
-        chunks = list(extractor.extract_from_stream(stream, is_text=False))
+        chunks = list(extract_from_stream(extractor, stream, is_text=False))
 
         assert len(chunks) >= 1
 
@@ -705,7 +707,7 @@ class TestStreamingIOCExtractor:
 
         stream = io.BytesIO("https://evil.example/path".encode("utf-16"))
 
-        chunks = list(extractor.extract_from_stream(stream, is_text=False))
+        chunks = list(extract_from_stream(extractor, stream, is_text=False))
         combined: dict[str, list[str]] = defaultdict(list)
         for chunk in chunks:
             for key, values in chunk.items():
@@ -735,7 +737,7 @@ class TestStreamingIOCExtractor:
         extractor = StreamingIOCExtractor(chunk_size=200, defang=False)
         stream = io.BufferedReader(NonSeekableRaw("https://evil.example/path".encode("utf-16")))
 
-        chunks = list(extractor.extract_from_stream(stream, is_text=False))
+        chunks = list(extract_from_stream(extractor, stream, is_text=False))
         combined: dict[str, list[str]] = defaultdict(list)
         for chunk in chunks:
             for key, values in chunk.items():
@@ -754,8 +756,8 @@ class TestStreamingIOCExtractor:
         stream1 = io.StringIO("Domain: test.com\nIP: 192.168.1.1")
         stream2 = io.StringIO("Domain: test.com\nIP: 192.168.1.1")
 
-        chunks1 = list(extractor.extract_from_stream(stream1, is_text=True))
-        chunks2 = list(extractor.extract_from_stream(stream2, is_text=True))
+        chunks1 = list(extract_from_stream(extractor, stream1, is_text=True))
+        chunks2 = list(extract_from_stream(extractor, stream2, is_text=True))
 
         # Both should have found IOCs since state was cleared
         assert len(chunks1) >= 0  # May be empty if no IOCs in small chunks
@@ -1575,9 +1577,11 @@ class TestStreamingExceptionHandling:
                 raise io.UnsupportedOperation("tell not supported")
 
         with pytest.raises(OSError, match="Simulated read error"):
-            list(extractor.extract_from_stream(ErrorStream(), is_text=True))
+            list(extract_from_stream(extractor, ErrorStream(), is_text=True))
 
-        chunks = list(extractor.extract_from_stream(io.StringIO("https://stale.example"), is_text=True))
+        chunks = list(
+            extract_from_stream(extractor, io.StringIO("https://stale.example"), is_text=True)
+        )
         collected = [value for chunk in chunks for values in chunk.values() for value in values]
         assert "https://stale.example" in collected
 
@@ -1705,7 +1709,7 @@ class TestStreamingUnsupportedOperations:
         def collect(stream):
             extractor = StreamingIOCExtractor(chunk_size=32, overlap=8)
             found: dict[str, set[str]] = defaultdict(set)
-            for grouped in extractor.extract_from_stream(stream, is_text=False):
+            for grouped in extract_from_stream(extractor, stream, is_text=False):
                 for ioc_type, values in grouped.items():
                     found[ioc_type].update(values)
             return found

@@ -206,6 +206,32 @@ def _separate_fingerprints_from_md5(iocs: dict[str, list[str]]) -> None:
         del iocs["md5"]
 
 
+def _drop_domain_filenames(iocs: dict[str, list[str]]) -> None:
+    """Drop filename candidates that are really domains/hosts.
+
+    The filename extension list includes ``com`` (legacy DOS executables), which
+    also matches the ``.com`` TLD, so every ``foo.com`` domain was double-emitted
+    as a spurious filename. A token already recognised as a domain/host is not a
+    file; keep it only under its network type. Domains are defanged (``[.]``) while
+    filenames stay raw, so refang for the comparison.
+    """
+    filenames = iocs.get("filenames")
+    if not filenames:
+        return
+    domain_values = {
+        value.replace("[.]", ".").lower()
+        for type_name in ("domains", "hosts")
+        for value in iocs.get(type_name) or ()
+    }
+    if not domain_values:
+        return
+    remaining = [name for name in filenames if name.lower() not in domain_values]
+    if remaining:
+        iocs["filenames"] = remaining
+    else:
+        del iocs["filenames"]
+
+
 class ExtractorBase:
     """Shared helper methods for IOC extraction."""
 
@@ -417,6 +443,7 @@ class ExtractionAggregateMixin:
                 iocs[ioc_type] = results
 
         _separate_fingerprints_from_md5(iocs)
+        _drop_domain_filenames(iocs)
         return iocs
 
 

@@ -308,6 +308,22 @@ class TestNetworkExtractors:
         result = self.extractor.extract_mac_addresses("Cisco MAC: AABB.CCDD.EEFF")
         assert result == ["aa:bb:cc:dd:ee:ff"]
 
+    def test_com_domain_not_emitted_as_filename(self):
+        """A ``.com`` domain must not be double-reported as a filename.
+
+        Regression: ``com`` is in the filename extension list (legacy DOS
+        executables), but it also matches the ``.com`` TLD, so every ``foo.com``
+        domain was spuriously duplicated into ``filenames``.
+        """
+        result = self.extractor.extract_all("visit evil-domain.com and host sub.bad.com")
+        assert "evil-domain.com" in result.get("domains", [])
+        assert "evil-domain.com" not in result.get("filenames", [])
+        assert "sub.bad.com" not in result.get("filenames", [])
+        # Genuine files (including a ``.com`` infix) are still extracted.
+        files = self.extractor.extract_all("drop payload.com.exe and report.docx")
+        assert "payload.com.exe" in files.get("filenames", [])
+        assert "report.docx" in files.get("filenames", [])
+
 
 class TestEmailAndCommunication:
     """Test email and communication IOC extraction."""

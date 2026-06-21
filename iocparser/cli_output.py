@@ -237,15 +237,23 @@ def _build_diff_payload(
         "compared_to_previous_source_run_id": diff.compared_to_previous_source_run_id,
         "added_counts": diff.added_counts,
         "removed_counts": diff.removed_counts,
+        # The added/removed row lists include warning-list matches, so the warning
+        # counts must be emitted alongside the normal counts for the totals to
+        # reconcile with the rows (a warning-only diff otherwise showed "0 added"
+        # while listing added indicators). Mirrors PersistedRunDiff.to_dict().
+        "added_warning_counts": diff.added_warning_counts,
+        "removed_warning_counts": diff.removed_warning_counts,
         "added": added_records,
         "removed": removed_records,
     }
     if diff_only == "added":
         payload.pop("removed")
         payload.pop("removed_counts")
+        payload.pop("removed_warning_counts")
     elif diff_only == "removed":
         payload.pop("added")
         payload.pop("added_counts")
+        payload.pop("added_warning_counts")
     return payload, added_records, removed_records
 
 
@@ -295,6 +303,10 @@ def save_diff_output(
     if diff_only != "removed":
         lines.extend(["## Added Counts", ""])
         lines.extend(f"- {ioc_type}: {count}" for ioc_type, count in diff.added_counts.items())
+        lines.extend(
+            f"- {ioc_type} (warning): {count}"
+            for ioc_type, count in diff.added_warning_counts.items()
+        )
         lines.append("")
     if diff_only in {"all", "added"}:
         lines.extend(["## Added", ""])
@@ -307,6 +319,10 @@ def save_diff_output(
     if diff_only != "added":
         lines.extend(["## Removed Counts", ""])
         lines.extend(f"- {ioc_type}: {count}" for ioc_type, count in diff.removed_counts.items())
+        lines.extend(
+            f"- {ioc_type} (warning): {count}"
+            for ioc_type, count in diff.removed_warning_counts.items()
+        )
         lines.append("")
     if diff_only in {"all", "removed"}:
         lines.extend(["## Removed", ""])

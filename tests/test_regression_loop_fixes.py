@@ -31,6 +31,7 @@ from iocparser.domain.models import (
     IOCEvidence,
     IOCType,
     PersistedRunDiff,
+    WarningMatch,
 )
 from iocparser.domain.pipeline import PipelineErrorInfo, PipelineJobRequest, ResourceLimits
 from iocparser.infrastructure.extraction import IOCExtractor
@@ -195,6 +196,34 @@ def test_diff_jsonl_marks_added_and_removed() -> None:
     rows = [json.loads(line) for line in output.splitlines()]
     changes = {(row["raw_value"], row["change"]) for row in rows}
     assert changes == {("beta.example", "added"), ("alpha.example", "removed")}
+
+
+def test_diff_payload_counts_reconcile_with_rows_including_warnings() -> None:
+    """Regression: the diff added/removed COUNTS excluded warning-list matches while
+    the rendered added/removed ROWS include them, so a consumer trusting the counts
+    as the row summary was off by the number of warnings (a warning-only diff reported
+    "0 added" while listing added indicators). The payload now also emits
+    added/removed_warning_counts so totals reconcile with the rows.
+    """
+    warning = WarningMatch(
+        ioc=IOC.from_raw("ips", "8.8.8.8"), warning_list="misp", description="public dns"
+    )
+    diff = PersistedRunDiff(
+        left_run_id=1,
+        right_run_id=2,
+        added=ExtractionResult(
+            iocs=(IOC.from_raw("domains", "good.example"),), warnings=(warning,)
+        ),
+        removed=ExtractionResult(),
+    )
+    payload, added_records, _removed_records = _build_diff_payload(diff, "all")
+
+    total_added = sum(payload["added_counts"].values()) + sum(
+        payload["added_warning_counts"].values()
+    )
+    assert total_added == len(added_records) == 2
+    # A warning-only diff must not report zero added.
+    assert sum(payload["added_warning_counts"].values()) == 1
 
 
 class _FixedDigester:

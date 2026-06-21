@@ -200,26 +200,6 @@ def fallback_section_title(section_key: str) -> str:
     return section_key.replace("_", " ").title()
 
 
-def prepare_json_payload(
-    data: Mapping[str, Sequence[SectionValue]],
-    warning_iocs: Mapping[str, Sequence[dict[str, str]]],
-) -> dict[str, object]:
-    payload: dict[str, object] = {}
-    for key, value in data.items():
-        if key != "hashes":
-            str_values = [item for item in value if isinstance(item, str)]
-            dict_values = [item for item in value if isinstance(item, dict)]
-            if str_values and not dict_values:
-                payload[key] = sorted(str_values)
-                continue
-        payload[key] = list(value)
-    if warning_iocs:
-        payload["warning_list_matches"] = {
-            key: list(values) for key, values in warning_iocs.items()
-        }
-    return payload
-
-
 def serialize_pretty_json(payload: Mapping[str, object]) -> str:
     return json.dumps(payload, indent=4, sort_keys=True)
 

@@ -17,7 +17,7 @@ from iocparser.cli_processing_support import BatchResultsCollection
 from iocparser.errors import SourceNotFoundError, SourceProcessingError
 from iocparser.infrastructure.persistence_ioc_repository import SQLAlchemyIOCRepository
 from iocparser.infrastructure.persistence_source_repository import SQLAlchemySourceRepository
-from iocparser.rendering_support import prepare_json_payload, serialize_pretty_json
+from iocparser.rendering_support import serialize_pretty_json
 from iocparser.shared_utils import _dedup_key, deduplicate_iocs
 from tests.coverage_helpers import fresh_db
 
@@ -303,36 +303,6 @@ class TestSourceRepositorySavepointRetry:
 
 
 class TestPrepareJsonPayload:
-    def test_string_only_section_sorted(self) -> None:
-        data = {"domains": ["z.com", "a.com", "m.com"]}
-        payload = prepare_json_payload(data, {})
-        assert payload["domains"] == ["a.com", "m.com", "z.com"]
-
-    def test_dict_section_preserved(self) -> None:
-        data = {"md5": [{"value": "abc", "extra": "x"}]}
-        payload = prepare_json_payload(data, {})
-        assert payload["md5"] == [{"value": "abc", "extra": "x"}]
-
-    def test_mixed_section_not_sorted(self) -> None:
-        data = {"ips": ["1.1.1.1", {"value": "2.2.2.2"}]}
-        payload = prepare_json_payload(data, {})
-        assert payload["ips"] == ["1.1.1.1", {"value": "2.2.2.2"}]
-
-    def test_hashes_key_always_list(self) -> None:
-        data = {"hashes": ["aaa", "bbb"]}
-        payload = prepare_json_payload(data, {})
-        assert payload["hashes"] == ["aaa", "bbb"]
-
-    def test_warning_iocs_included(self) -> None:
-        data = {"domains": ["ok.com"]}
-        warnings = {"domains": [{"value": "bad.com", "warning_list": "test"}]}
-        payload = prepare_json_payload(data, warnings)
-        assert "warning_list_matches" in payload
-
-    def test_empty_warnings_not_included(self) -> None:
-        payload = prepare_json_payload({"domains": ["ok.com"]}, {})
-        assert "warning_list_matches" not in payload
-
     def test_serialize_pretty_json(self) -> None:
         result = serialize_pretty_json({"a": 1})
         assert '"a": 1' in result

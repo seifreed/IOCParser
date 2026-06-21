@@ -57,7 +57,11 @@ PATTERNS: dict[str, Pattern[str]] = {
         # otherwise ::ffff:192.168.1.1 or the NAT64 prefix 64:ff9b::192.168.1.1
         # is truncated at the first dotted octet. ipaddress validation downstream
         # discards anything this broad prefix over-matches.
-        r"(?<![0-9a-zA-Z])(?:[0-9a-fA-F]{1,4}:|:){2,}"
+        # The hextet-prefix repetition is bounded ({2,7}, since a valid embedded-
+        # IPv4 IPv6 has at most 6 hextet groups plus one "::" colon before the
+        # dotted tail): an unbounded {2,} let a long colon run ("1:1:1:...") drive
+        # O(n^2) backtracking (32 KB -> ~13 s) when the IPv4 tail never completed.
+        r"(?<![0-9a-zA-Z])(?:[0-9a-fA-F]{1,4}:|:){2,7}"
         r"[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(?![0-9a-zA-Z])|"
         # Full format
         r"(?<![0-9a-zA-Z])(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}(?![0-9a-zA-Z])|"

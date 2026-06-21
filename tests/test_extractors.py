@@ -194,6 +194,25 @@ class TestNetworkExtractors:
         assert "64:ff9b::192.168.1.1" in result
         assert "64:ff9b::192" not in result
 
+    def test_extract_ipv6_embedded_ipv4_is_not_redos(self):
+        """Regression: a long colon run with no valid IPv4 tail must extract in
+        linear time. The embedded-IPv4 branch used an unbounded ``{2,}`` hextet
+        prefix, so ``"1:" * n`` drove O(n^2) backtracking (32 KB -> ~13 s); the
+        prefix is now bounded to ``{2,7}`` (the max colon tokens a valid embedded-
+        IPv4 IPv6 can have). Real embedded-IPv4 forms must still extract.
+        """
+        import time
+
+        adversarial = "1:" * 40000 + "x"
+        start = time.perf_counter()
+        self.extractor.extract_ipv6(adversarial)
+        elapsed = time.perf_counter() - start
+        assert elapsed < 2.0, f"ipv6 extraction took {elapsed:.2f}s on adversarial input"
+
+        result = self.extractor.extract_ipv6("tail ::ffff:192.168.1.1 and 64:ff9b::10.0.0.1")
+        assert "::ffff:192.168.1.1" in result
+        assert "64:ff9b::10.0.0.1" in result
+
     def test_extract_urls(self):
         """Test URL extraction."""
         text = """

@@ -98,7 +98,10 @@ class TestStreamingIOCExtractor:
         extractor = StreamingIOCExtractor()
 
         assert extractor.chunk_size == 1024 * 1024  # 1MB
-        assert extractor.overlap == 1024  # 1KB
+        # The 1 KB default overlap is floored to the boundary-IOC cap so long URLs
+        # (up to the extractor's 2048-char path cap) straddling a chunk boundary are
+        # re-presented in full to the next chunk instead of being silently dropped.
+        assert extractor.overlap == 4096
         assert extractor.extractor.defang is True
         assert extractor.progress_callback is None
         assert isinstance(extractor.seen_iocs, defaultdict)
@@ -146,6 +149,38 @@ class TestStreamingIOCExtractor:
 
         # evil.com appears twice in the source but must be de-duplicated to one entry.
         assert sorted(iocs.get("domains", [])) == ["also-bad.net", "evil.com"]
+
+    def test_long_url_straddling_chunk_boundary_is_not_dropped(self):
+        """Regression: an IOC longer than the configured overlap that straddles a
+        chunk boundary was silently dropped -- should_keep_ioc defers a boundary
+        match to the next chunk, but the carried overlap (1 KB default) was shorter
+        than the URL so the next chunk could not re-present it in full. The effective
+        overlap is now floored to the boundary-IOC cap, so the value is recovered.
+        """
+        chunk_size = 8192
+        long_url = "http://malicious-c2.example/" + ("a" * 1465) + "/beacon"
+        assert len(long_url) == 1500  # exceeds the old 1 KB overlap
+        # Position the URL so ~1292 bytes precede the first chunk boundary (more than
+        # the old 1 KB overlap, less than the 4 KB floor) and the rest spill into the
+        # next chunk -- the exact straddle the old overlap could not recover.
+        url_start = chunk_size - 1292
+        content = ("x" * (url_start - 1)) + " " + long_url + " trailing"
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as handle:
+            handle.write(content)
+            path = handle.name
+        try:
+            extractor = StreamingIOCExtractor(chunk_size=chunk_size, defang=False)
+            assert extractor.overlap == 4096  # floored above the URL length
+            urls = extractor.extract_from_file(path).get("urls", [])
+
+            broken = StreamingIOCExtractor(chunk_size=chunk_size, defang=False)
+            broken.overlap = 1024  # simulate the pre-fix overlap
+            dropped = broken.extract_from_file(path).get("urls", [])
+        finally:
+            Path(path).unlink()
+
+        assert long_url in urls
+        assert long_url not in dropped  # proves the floor is what recovers it
 
     def test_decode_chunk_with_bytes(self):
         """

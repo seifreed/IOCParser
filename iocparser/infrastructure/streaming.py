@@ -26,6 +26,14 @@ from iocparser.infrastructure.utils import deduplicate_iocs_with_state
 
 logger = get_logger(__name__)
 
+# Floor for the effective chunk overlap. A value straddling a chunk boundary is
+# deferred to the next chunk and recovered only if the carried overlap is at least
+# as long as the value; a shorter overlap silently drops it. The longest extractable
+# IOC is a URL, whose path the extractor caps at 2048 chars, so this floor (path cap
+# plus scheme/host/port/userinfo headroom) guarantees boundary recovery for every
+# realistic IOC. The default 1 KB overlap was below this and dropped long boundary URLs.
+_BOUNDARY_IOC_LENGTH_CAP = 4096
+
 
 def _aligned_utf8_chunk_end(
     mmapped_file: mmap.mmap,
@@ -76,6 +84,13 @@ class StreamingIOCExtractor:
         self.chunk_size = max(1, chunk_size)
         # The chunk/dedup design assumes overlap < chunk_size; a larger overlap re-scans
         # whole chunk bodies and double-counts IOCs. Clamp to keep the invariant.
+        # Also floor a non-zero overlap at the boundary-IOC cap so a long value (e.g. a
+        # 1-2 KB URL) straddling a chunk boundary is re-presented in full and not dropped.
+        # Only when the chunk is large enough to hold the cap with room to spare -- for a
+        # small chunk a long IOC cannot fit anyway, and flooring would force a near-total
+        # re-scan. overlap=0 keeps the explicit no-overlap opt-out.
+        if overlap > 0 and self.chunk_size - 1 >= _BOUNDARY_IOC_LENGTH_CAP:
+            overlap = max(overlap, _BOUNDARY_IOC_LENGTH_CAP)
         self.overlap = max(0, min(overlap, self.chunk_size - 1))
         from iocparser.infrastructure.extraction import IOCExtractor
 

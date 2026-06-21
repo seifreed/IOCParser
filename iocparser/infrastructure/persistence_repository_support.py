@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from iocparser.domain.enums import ioc_type_name
 from iocparser.domain.models import ExtractionResult
+from iocparser.errors import TypeValidationError
 from iocparser.infrastructure.persistence_models import IOCModel, RunIOCModel, RunModel, SourceModel
 from iocparser.shared_utils import refang_ioc
 
@@ -286,7 +287,7 @@ def string_metadata_value(metadata: dict[str, int | str | None], key: str, defau
     if raw_value is None:
         return default
     if not isinstance(raw_value, str):
-        raise TypeError(f"Expected {key} to be string, got {type(raw_value).__name__}")
+        raise TypeValidationError(key, "string", raw_value)
     stripped = raw_value.strip()
     return stripped or default
 

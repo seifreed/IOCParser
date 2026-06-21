@@ -28,6 +28,7 @@ from iocparser.domain.models import (
     PersistedRunQueryHit,
     PersistedRunSummary,
 )
+from iocparser.errors import TypeValidationError
 from iocparser.interfaces.ports import FileWriter
 
 
@@ -100,7 +101,7 @@ def print_batch_report(report: Mapping[str, object], *, stream: TextIO | None = 
     # not corrupt the machine output (JSONL/JSON/CSV/STIX) piped to stdout.
     out = stream if stream is not None else sys.stdout
     if not all(isinstance(key, str) for key in report):
-        raise TypeError("Expected batch report keys to be strings")
+        raise TypeValidationError(None, "batch report keys to be strings")
     schema_version = str(report.get("schema_version", "")).strip()
     if schema_version:
         out.write(f"Batch report schema\t{schema_version}" + "\n")
@@ -111,16 +112,16 @@ def print_batch_report(report: Mapping[str, object], *, stream: TextIO | None = 
     failures = report.get("failures", {})
     if isinstance(failures, dict) and failures:
         if not all(isinstance(key, str) for key in failures):
-            raise TypeError("Expected batch report failure keys to be strings")
+            raise TypeValidationError(None, "batch report failure keys to be strings")
         if not all(isinstance(value, str) for value in failures.values()):
-            raise TypeError("Expected batch report failure values to be strings")
+            raise TypeValidationError(None, "batch report failure values to be strings")
         for item, error in sorted(failures.items()):
             out.write(f"  FAIL\t{item}\t{error}" + "\n")
     error_groups = report.get("error_groups", {})
     if isinstance(error_groups, dict) and error_groups:
         out.write("Failure groups" + "\n")
         if not all(isinstance(key, str) for key in error_groups):
-            raise TypeError("Expected batch report error group keys to be strings")
+            raise TypeValidationError(None, "batch report error group keys to be strings")
         for error_type, count in sorted(
             (key, _int_value(value)) for key, value in error_groups.items()
         ):
@@ -129,7 +130,7 @@ def print_batch_report(report: Mapping[str, object], *, stream: TextIO | None = 
     if isinstance(phase_timings, dict) and phase_timings:
         out.write("Phase timings (ms)" + "\n")
         if not all(isinstance(key, str) for key in phase_timings):
-            raise TypeError("Expected batch report phase timing keys to be strings")
+            raise TypeValidationError(None, "batch report phase timing keys to be strings")
         for phase, value in sorted(
             (key, _int_value(val)) for key, val in phase_timings.items()
         ):
@@ -138,7 +139,7 @@ def print_batch_report(report: Mapping[str, object], *, stream: TextIO | None = 
     if isinstance(metrics, dict) and metrics:
         out.write("Batch metrics" + "\n")
         if not all(isinstance(key, str) for key in metrics):
-            raise TypeError("Expected batch report metric keys to be strings")
+            raise TypeValidationError(None, "batch report metric keys to be strings")
         for name, value in sorted(metrics.items()):
             out.write(f"  {name}\t{value}" + "\n")
 
@@ -147,7 +148,7 @@ def save_batch_report(
     report: Mapping[str, object], output_path: str | None, *, file_writer: FileWriter
 ) -> None:
     if not all(isinstance(key, str) for key in report):
-        raise TypeError("Expected batch report keys to be strings")
+        raise TypeValidationError(None, "batch report keys to be strings")
     payload = dict(report)
     content = json.dumps(payload, indent=2, sort_keys=True)
     if output_path == "-":

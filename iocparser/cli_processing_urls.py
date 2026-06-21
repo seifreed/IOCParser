@@ -28,7 +28,7 @@ from iocparser.cli_processing_url_reports import (
     public_batch_report,
 )
 from iocparser.domain.models import FailedBatchItem
-from iocparser.errors import FileExistenceError, ValidationError
+from iocparser.errors import FileExistenceError, TypeValidationError, ValidationError
 from iocparser.infrastructure.file_parser import decode_file_bytes
 from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
 from iocparser.interfaces.ports import TextSourceReader, URLDownloader, WarningListService
@@ -84,7 +84,7 @@ def _matches_retry_error_filters(
 
 def _require_str(value: object, *, field: str) -> str:
     if not isinstance(value, str):
-        raise TypeError(f"Expected {field} to be string, got {type(value).__name__}")
+        raise TypeValidationError(field, "string", value)
     return value
 
 

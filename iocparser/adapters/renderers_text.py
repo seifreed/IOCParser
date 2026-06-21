@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import ClassVar
 
 from iocparser.domain.models import ExtractionResult
+from iocparser.errors import TypeValidationError
 from iocparser.interfaces.ports import OutputRenderer
 from iocparser.rendering_support import (
     SECTION_ORDER,
@@ -15,7 +16,7 @@ from iocparser.shared_utils import refang_ioc
 
 def _require_str(value: object, *, field: str) -> str:
     if not isinstance(value, str):
-        raise TypeError(f"Expected {field} to be string, got {type(value).__name__}")
+        raise TypeValidationError(field, "string", value)
     return value
 
 

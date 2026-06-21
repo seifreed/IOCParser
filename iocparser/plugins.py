@@ -19,7 +19,7 @@ from iocparser.domain.models import (
     register_custom_ioc_type,
 )
 from iocparser.domain.type_filters import parse_ioc_types
-from iocparser.errors import ValidationError
+from iocparser.errors import TypeValidationError, ValidationError
 from iocparser.infrastructure.warninglists_service import MISPWarningListService
 from iocparser.interfaces.ports import OutputRenderer, WarningListService
 
@@ -197,14 +197,14 @@ def _string_tuple(value: object) -> tuple[str, ...]:
     items: list[str] = []
     for item in value:
         if not isinstance(item, str):
-            raise TypeError(f"Expected string values, got {type(item).__name__}")
+            raise TypeValidationError(None, "string values", item)
         items.append(item)
     return tuple(items)
 
 
 def _require_str_field(value: object, *, field: str) -> str:
     if not isinstance(value, str):
-        raise TypeError(f"Expected {field} to be string, got {type(value).__name__}")
+        raise TypeValidationError(field, "string", value)
     return value
 
 

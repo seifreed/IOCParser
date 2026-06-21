@@ -22,6 +22,7 @@ from iocparser.cli_args import (
 from iocparser.cli_args_values import validated_stix_types
 from iocparser.config import AppConfig
 from iocparser.domain.models import ExtractionResult, PersistOptions, Source
+from iocparser.errors import MISSING_VALUE, TypeValidationError
 from iocparser.infrastructure.file_readers import detect_file_type
 from iocparser.infrastructure.logger import get_logger
 from iocparser.infrastructure.persistence import SQLAlchemyUnitOfWork
@@ -306,13 +307,13 @@ def _write(text: str, stream: TextIO | None = None) -> None:
 
 def _require_str(value: object, *, field: str) -> str:
     if not isinstance(value, str):
-        raise TypeError(f"Expected {field} to be string, got {type(value).__name__}")
+        raise TypeValidationError(field, "string", value)
     return value
 
 
 def _warning_field(warning: dict[str, str], field: str) -> str:
     if field not in warning:
-        raise TypeError(f"Expected {field} to be string, got missing")
+        raise TypeValidationError(field, "string", MISSING_VALUE)
     return _require_str(warning[field], field=field)
 
 

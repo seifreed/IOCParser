@@ -9,7 +9,7 @@ from iocparser import cli_output as _cli_output
 from iocparser.cli_processing_support import BatchResultsCollection, GroupedIocs, GroupedWarnings
 from iocparser.config import AppConfig
 from iocparser.domain.models import PersistOptions
-from iocparser.errors import ValidationError
+from iocparser.errors import TypeValidationError, ValidationError
 from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
 from iocparser.interfaces.ports import PersistenceQueryService
 from iocparser.shared_utils import normalize_metadata_values
@@ -241,7 +241,7 @@ def fallback_str(metadata: Mapping[str, object] | None, key: str, default: str) 
     if value is None:
         return default
     if not isinstance(value, str):
-        raise TypeError(f"Expected {key} to be string, got {type(value).__name__}")
+        raise TypeValidationError(key, "string", value)
     stripped = value.strip()
     return stripped or default
 

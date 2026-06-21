@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import suppress
 from datetime import UTC, datetime
 
+from iocparser.errors import TypeValidationError
 from iocparser.shared_utils import TRUE_BOOL_VALUES
 
 INT_FIELD_DEFAULTS: dict[str, int | None] = {
@@ -41,7 +42,7 @@ def bool_from_row(value: object, *, default: bool = False) -> bool:
         return value
     if isinstance(value, int) and value in {0, 1}:
         return bool(value)
-    raise TypeError(f"Expected boolean-compatible value, got {type(value).__name__}")
+    raise TypeValidationError(None, "boolean-compatible value", value)
 
 
 def int_from_row(value: object, *, default: int | None = None) -> int | None:

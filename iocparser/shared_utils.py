@@ -5,7 +5,7 @@ from collections.abc import Callable, Iterable, Mapping
 from threading import Lock
 from typing import Protocol
 
-from iocparser.errors import ValidationError
+from iocparser.errors import TypeValidationError, ValidationError
 
 
 def lazy_singleton[T](holder: list[T], lock: Lock, factory: Callable[[], T]) -> T:
@@ -70,7 +70,7 @@ def normalize_tokens(items: Iterable[str]) -> tuple[str, ...]:
     normalized: list[str] = []
     for item in items:
         if not isinstance(item, str):
-            raise TypeError(f"Expected token to be string, got {type(item).__name__}")
+            raise TypeValidationError("token", "string", item)
         stripped = item.strip()
         if stripped:
             normalized.append(stripped.lower())
@@ -84,7 +84,8 @@ def normalize_metadata_values(metadata: Mapping[str, object]) -> dict[str, int |
         if (isinstance(value, int) and not isinstance(value, bool)) or isinstance(value, str) or value is None:
             normalized[key] = value
             continue
-        raise TypeError(f"Expected metadata value for {key} to be int/string/None, got {type(value).__name__}")
+        subject = f"metadata value for {key}"
+        raise TypeValidationError(subject, "int/string/None", value)
     return normalized
 
 

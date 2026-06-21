@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import Engine, Inspector, text
 
+from iocparser.errors import TypeValidationError
 from iocparser.infrastructure.migration_revisions.rev_0005_fts_metrics import (
     apply as apply_rev_0005,
 )
@@ -55,7 +56,7 @@ def _coerce_version_row(row: object | None) -> int:
     if row is None:
         return 0
     if isinstance(row, bool):
-        raise TypeError(f"Expected schema version row to be int-like, got {type(row).__name__}")
+        raise TypeValidationError(None, "schema version row to be int-like", row)
     if isinstance(row, int):
         return row
     if isinstance(row, str):

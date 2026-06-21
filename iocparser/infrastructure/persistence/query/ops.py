@@ -19,6 +19,7 @@ from iocparser.domain.models import (
     PersistedRunsPage,
     PersistedRunSummary,
 )
+from iocparser.errors import TypeValidationError
 from iocparser.infrastructure.persistence.history import (
     compact_history as _compact_history,
 )
@@ -301,7 +302,7 @@ def _apply_search_backend(
 
 def _coerce_count(value: object) -> int:
     if isinstance(value, bool):
-        raise TypeError(f"Expected count to be int-compatible, got {type(value).__name__}")
+        raise TypeValidationError("count", "int-compatible", value)
     if isinstance(value, int):
         return value
     if isinstance(value, str):

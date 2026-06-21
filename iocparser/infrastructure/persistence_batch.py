@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
+from iocparser.errors import TypeValidationError
 from iocparser.infrastructure.persistence_schema import Base, RunModel
 from iocparser.infrastructure.persistence_support import normalized_source_filter
 
@@ -40,7 +41,7 @@ def _dict_report_value(payload: dict[str, object], key: str) -> dict[str, object
         return {}
     if isinstance(raw_value, dict):
         return {name: value for name, value in raw_value.items() if isinstance(name, str)}
-    raise TypeError(f"Expected {key} to be dict, got {type(raw_value).__name__}")
+    raise TypeValidationError(key, "dict", raw_value)
 
 
 def _report_string_value(
@@ -48,14 +49,14 @@ def _report_string_value(
 ) -> str:
     raw_value = payload.get(key, default)
     if not isinstance(raw_value, str):
-        raise TypeError(f"Expected {key} to be string, got {type(raw_value).__name__}")
+        raise TypeValidationError(key, "string", raw_value)
     stripped = raw_value.strip()
     return stripped or default
 
 
 def _failed_items(items: object) -> list[dict[str, object]]:
     if not isinstance(items, list):
-        raise TypeError(f"Expected items to be list, got {type(items).__name__}")
+        raise TypeValidationError("items", "list", items)
     failed: list[dict[str, object]] = []
     for item in items:
         if isinstance(item, dict) and _report_string_value(item, "status").lower() == "failed":
@@ -112,7 +113,7 @@ def create_batch_job(
 ) -> int:
     """Persist a batch job aggregate and attach its runs and failures."""
     if not isinstance(source_kind, str) or not source_kind.strip():
-        raise TypeError("Expected source_kind to be non-empty string")
+        raise TypeValidationError("source_kind", "non-empty string")
     source_kind = normalized_source_filter(source_kind)
     items = report.get("items", [])
     failures = _failed_items(items)

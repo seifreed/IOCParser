@@ -1151,6 +1151,27 @@ def test_history_export_import_compact_and_retain(
         restore_history(restored_db, str(invalid_archive))
 
 
+def test_history_maintenance_ops_log_their_side_effects(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """archive (writes a file), compact (rewrites the store) and retain (deletes rows)
+    are admin ops with real side effects; each must leave a log trail. retain is
+    destructive — pruning history with no log used to be completely silent."""
+    db_uri = f"sqlite:///{tmp_path / 'maint.sqlite'}"
+    _persist_result(db_uri, source_value="old.txt", ioc_value="old.example", status="failed")
+
+    logger_name = "iocparser.infrastructure.persistence.history.ops"
+    with caplog.at_level("INFO", logger=logger_name):
+        archive_history(db_uri, str(tmp_path / "maint-archive.json"))
+        compact_persisted_history(db_uri=db_uri)
+        pruned = retain_persisted_history(db_uri=db_uri, days=0, statuses="failed")
+
+    assert pruned >= 1
+    assert "Archived history to" in caplog.text
+    assert "Compacted history store" in caplog.text
+    assert f"Retention pruned {pruned} run(s)" in caplog.text
+
+
 def test_import_persisted_history_rejects_non_mapping_payload(tmp_path: Path) -> None:
     """A non-dict payload used to surface a cryptic AttributeError ('str'/'list' object
     has no attribute 'get') from the use case. The public API must reject it up front with

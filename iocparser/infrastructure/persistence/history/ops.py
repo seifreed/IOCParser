@@ -16,6 +16,7 @@ from iocparser.domain.enums import IOCType, ioc_type_name
 from iocparser.domain.jobs import BatchJobDetail, BatchJobSummary, FailedBatchItem
 from iocparser.domain.models import PersistedRunSummary
 from iocparser.errors import InvalidJSONError, JSONShapeError, TypeValidationError
+from iocparser.infrastructure.logger import get_logger
 from iocparser.infrastructure.persistence.history.row_values import (
     typed_row,
 )
@@ -45,6 +46,8 @@ from iocparser.infrastructure.persistence_support import (
 from iocparser.infrastructure.persistence_uow import create_engine_for_uri
 
 _typed_row = typed_row
+
+logger = get_logger(__name__)
 
 
 @contextmanager
@@ -442,6 +445,7 @@ def archive_history(db_uri: str, output_path: str) -> str:
     path = Path(output_path).expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(export_history(db_uri), indent=2, sort_keys=True), encoding="utf-8")
+    logger.info("Archived history to %s", path)
     return str(path)
 
 
@@ -458,8 +462,14 @@ def compact_history(db_uri: str) -> None:
     with _managed_connection(db_uri) as connection:
         table_names = tuple(inspect(connection).get_table_names())
         dialect_name = connection.engine.dialect.name
-        for statement in _history_compaction_sql(dialect_name, table_names):
+        statements = _history_compaction_sql(dialect_name, table_names)
+        for statement in statements:
             connection.exec_driver_sql(statement)
+        logger.info(
+            "Compacted history store (%s): ran %s reclamation statement(s)",
+            dialect_name,
+            len(statements),
+        )
 
 
 def retain_history(db_uri: str, *, days: int, statuses: tuple[str, ...] = ()) -> int:
@@ -467,6 +477,12 @@ def retain_history(db_uri: str, *, days: int, statuses: tuple[str, ...] = ()) ->
     with _managed_session(db_uri) as session:
         deleted = prune_runs(session, before=cutoff, statuses=statuses)
         session.commit()
+        logger.info(
+            "Retention pruned %s run(s) older than %s (statuses=%s)",
+            deleted,
+            cutoff,
+            statuses or "all",
+        )
         return deleted
 
 

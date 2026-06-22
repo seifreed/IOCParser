@@ -162,6 +162,8 @@ class STIXOutputRenderer(OutputRenderer):
             pattern=pattern,
             pattern_type="stix",
             pattern_version="2.1",
+            created=self.now,
+            modified=self.now,
             valid_from=self.now,
             description=None,
             indicator_types=["malicious-activity"],

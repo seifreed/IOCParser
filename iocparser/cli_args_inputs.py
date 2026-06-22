@@ -58,6 +58,9 @@ def has_input_args(args: argparse.Namespace) -> bool:
     retain_days: object = getattr(args, "retain_days", None)
     batch_job: object = getattr(args, "batch_job", None)
     batch_runs: object = getattr(args, "batch_runs", None)
+    # --retry-batch-job is parsed as int (a job id), so it must be probed by identity
+    # like the other int inputs; get_optional_str_arg would reject the int value.
+    retry_batch_job: object = getattr(args, "retry_batch_job", None)
     return bool(
         get_optional_str_arg(args, "file")
         or get_optional_str_arg(args, "url")
@@ -66,7 +69,7 @@ def has_input_args(args: argparse.Namespace) -> bool:
         or get_optional_str_arg(args, "directory")
         or get_optional_str_arg(args, "url_file")
         or get_optional_str_arg(args, "retry_failed_from")
-        or get_optional_str_arg(args, "retry_batch_job")
+        or retry_batch_job is not None
         or get_bool_arg(args, "stdin")
         or get_bool_arg(args, "list_runs")
         or get_optional_str_arg(args, "search_ioc")

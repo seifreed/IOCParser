@@ -20,6 +20,7 @@ from iocparser.domain.models import (
     PersistedRunSummary,
 )
 from iocparser.errors import TypeValidationError
+from iocparser.infrastructure.logger import get_logger
 from iocparser.infrastructure.persistence.history import (
     compact_history as _compact_history,
 )
@@ -75,6 +76,8 @@ from iocparser.infrastructure.persistence_support import (
 )
 from iocparser.interfaces.ports import PersistenceQueryService
 from iocparser.shared_utils import normalize_tokens
+
+logger = get_logger(__name__)
 
 RUN_NOT_FOUND_TEMPLATE = "Run not found: {run_id}"
 PREVIOUS_RUN_NOT_FOUND_TEMPLATE = "No previous run found for source of run {run_id}"
@@ -640,6 +643,10 @@ class SQLAlchemyPersistenceService(PersistenceQueryService):
         try:
             deleted = delete_run(unit_of_work.session, run_id)
             unit_of_work.commit()
+            logger.info(
+                "Deleted run %s" if deleted else "Delete requested for unknown run %s",
+                run_id,
+            )
             return deleted
         finally:
             unit_of_work.close()
@@ -665,6 +672,7 @@ class SQLAlchemyPersistenceService(PersistenceQueryService):
                 statuses=statuses,
             )
             unit_of_work.commit()
+            logger.info("Pruned %s run(s)", deleted)
             return deleted
         finally:
             unit_of_work.close()

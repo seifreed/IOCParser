@@ -1172,6 +1172,27 @@ def test_history_maintenance_ops_log_their_side_effects(
     assert f"Retention pruned {pruned} run(s)" in caplog.text
 
 
+def test_delete_and_prune_runs_log_destructive_actions(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Deleting a run and pruning runs are destructive admin ops that must leave a log
+    trail, including the no-op (unknown run id) case."""
+    db_uri = f"sqlite:///{tmp_path / 'destructive.sqlite'}"
+    _persist_result(db_uri, source_value="doomed.txt", ioc_value="doomed.example")
+    run_id = query_persisted_runs(db_uri=db_uri, limit=10).items[0].run_id
+    client = PersistenceClient(db_uri)
+
+    logger_name = "iocparser.infrastructure.persistence.query.ops"
+    with caplog.at_level("INFO", logger=logger_name):
+        assert client.delete_run(run_id=run_id) is True
+        assert client.delete_run(run_id=run_id) is False
+        pruned = client.prune_runs()
+
+    assert f"Deleted run {run_id}" in caplog.text
+    assert f"Delete requested for unknown run {run_id}" in caplog.text
+    assert f"Pruned {pruned} run(s)" in caplog.text
+
+
 def test_import_persisted_history_rejects_non_mapping_payload(tmp_path: Path) -> None:
     """A non-dict payload used to surface a cryptic AttributeError ('str'/'list' object
     has no attribute 'get') from the use case. The public API must reject it up front with

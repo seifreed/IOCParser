@@ -1,9 +1,32 @@
 from __future__ import annotations
 
 import os
+import os.path
 from collections.abc import Iterator
 
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def expanduser_honors_home(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make ``~`` expansion follow the ``HOME`` env var on every platform.
+
+    Many tests redirect ``~`` by monkeypatching ``HOME`` to a tmp dir. POSIX
+    ``expanduser`` honors ``HOME``, but Windows ``ntpath.expanduser`` uses
+    ``USERPROFILE``/``HOMEDRIVE``+``HOMEPATH`` and ignores ``HOME``, so those tests
+    expanded ``~`` to the real profile and failed only on Windows. Reading ``HOME``
+    at call time (``pathlib.Path.expanduser`` delegates here) keeps the behavior
+    identical across OSes; it is a no-op on POSIX, which already honors ``HOME``.
+    """
+    real_expanduser = os.path.expanduser
+
+    def expanduser(path: str) -> str:
+        home = os.environ.get("HOME")
+        if home and isinstance(path, str) and (path == "~" or path[:2] in ("~/", "~\\")):
+            return home + path[1:]
+        return real_expanduser(path)
+
+    monkeypatch.setattr(os.path, "expanduser", expanduser)
 
 
 @pytest.fixture(autouse=True)

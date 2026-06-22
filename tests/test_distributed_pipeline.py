@@ -83,9 +83,13 @@ def test_idempotency_key_for_uses_injected_digester() -> None:
         digester=digester,
     )
 
+    # The digester receives the OS-normalized path (Path("/tmp/sample.txt") renders
+    # with backslashes on Windows), so compare against that rather than the raw POSIX
+    # literal to stay platform-independent.
+    expected_path = str(Path("/tmp/sample.txt").expanduser())
     assert len(key) == 64
     assert changed_options_key != key
-    assert digester.calls == [("file", "/tmp/sample.txt"), ("file", "/tmp/sample.txt")]
+    assert digester.calls == [("file", expected_path), ("file", expected_path)]
 
 
 def test_idempotency_key_for_file_expands_user_home(

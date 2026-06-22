@@ -1675,6 +1675,37 @@ def test_cli_schema_commands_and_history_io(tmp_path: Path, capsys) -> None:
     assert "baseline" in capsys.readouterr().out
 
 
+def test_cli_negative_retain_days_rejected_and_does_not_wipe_history(tmp_path: Path) -> None:
+    """Regression: a negative --retain-days must be rejected, not silently delete everything.
+
+    retain_history clamps days to 0 (cutoff == now), so an unvalidated negative value
+    pruned the entire history. The public API rejected it but the CLI handler did not.
+    """
+    db_uri = f"sqlite:///{tmp_path / 'retain.sqlite'}"
+    _persist_result(db_uri, source_value="keep.txt", ioc_value="keep.example")
+    config = load_config(True, db_uri, None)
+    writer = _Writer()
+
+    args = SimpleNamespace(
+        schema_version=False,
+        migrate=False,
+        validate_schema=False,
+        export_history=None,
+        archive_history=None,
+        import_history=None,
+        restore_history=None,
+        compact_history=False,
+        retain_days=-5,
+        prune_status=None,
+        list_failed_batches=False,
+        batch_limit=20,
+    )
+    with pytest.raises(ValidationError, match="Invalid days"):
+        handle_schema_commands(args, config, file_writer=writer)
+    # The history must be untouched after the rejected request.
+    assert query_persisted_runs(db_uri=db_uri, limit=10).total >= 1
+
+
 def test_cli_schema_validation_errors_and_noop() -> None:
     writer = _Writer()
     config = load_config(True, None, None)

@@ -10,7 +10,10 @@ from sqlalchemy.engine import Engine
 
 from iocparser import cli_args as _cli_args
 from iocparser import cli_output as _cli_output
-from iocparser.api_persistence_query import validated_non_negative_int
+from iocparser.api_persistence_query import (
+    validated_non_negative_days,
+    validated_non_negative_int,
+)
 from iocparser.application.contracts import ListFailedBatchesInput, RetainHistoryInput
 from iocparser.application.maintenance_use_cases import (
     compact_persisted_history as uc_compact_persisted_history,
@@ -143,7 +146,10 @@ def _handle_history_maintenance(args: argparse.Namespace, config: AppConfig) -> 
     if retain_days is not None:
         deleted = uc_retain_persisted_history(
             RetainHistoryInput(
-                days=_cli_args.int_arg_value(retain_days, "retain-days"),
+                # Reject a negative --retain-days at the CLI boundary like the public API
+                # does; retain_history clamps it to 0 (cutoff == now), which would silently
+                # delete the ENTIRE history instead of erroring on invalid input.
+                days=validated_non_negative_days(retain_days),
                 statuses=_cli_args.parse_string_filters(
                     _cli_args.namespace_value(args, "prune_status")
                 ),

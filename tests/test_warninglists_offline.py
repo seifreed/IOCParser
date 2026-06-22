@@ -473,3 +473,85 @@ def test_warninglist_lookup_helpers_cover_url_substring_and_invalid_inputs(tmp_p
 
     assert warning_lists._extract_domain_from_url("http://[::1") is None
     assert warning_lists._check_cidr("203.0.113.10", [None, "203.0.113.0/24"]) is True
+
+
+def test_matching_attribute_name_rejects_dict_with_non_string_name() -> None:
+    """A {'name': <non-str>} matching-attribute entry must raise, not coerce.
+
+    Hermetic coverage for warninglists_types.matching_attribute_name's dict
+    branch, previously exercised only by live MISP data whose download flakes
+    in CI on a GitHub rate limit.
+    """
+    from iocparser.errors import TypeValidationError
+    from iocparser.infrastructure.warninglists_types import matching_attribute_name
+
+    assert matching_attribute_name("domain") == "domain"
+    assert matching_attribute_name({"name": "hostname"}) == "hostname"
+    with pytest.raises(TypeValidationError):
+        matching_attribute_name({"name": 123})
+
+
+def test_email_domain_in_warning_list_checks_extracted_domain(tmp_path: Path) -> None:
+    """_email_domain_in_warning_list must look up the extracted domain.
+
+    Hermetic coverage for warninglists_matching line that delegates to
+    check_value(domain, 'domains') once an email yields a non-empty domain.
+    """
+    warning_lists = OfflineWarningLists(tmp_path)
+    warning_lists.warning_lists = {
+        "bad-domains": {
+            "name": "Bad Domains",
+            "type": "string",
+            "matching_attributes": ["domain", "hostname"],
+            "list": ["phish.example"],
+        }
+    }
+    warning_lists._preprocess_lists()
+    matched, _info = warning_lists._email_domain_in_warning_list("victim@phish.example")
+    assert matched is True
+    unmatched, info = warning_lists._email_domain_in_warning_list("victim@clean.example")
+    assert unmatched is False
+    assert info is None
+
+
+def test_regex_warning_list_parses_slash_delimited_flags(tmp_path: Path) -> None:
+    """`/body/flags` regex entries must parse m/s/x flags and reject bad flags.
+
+    Hermetic coverage for warninglists_preprocess regex-flag parsing (the m/s/x
+    branches and the invalid-flags early return), previously only reached by
+    live MISP regex lists.
+    """
+    warning_lists = OfflineWarningLists(tmp_path)
+    warning_lists.warning_lists = {
+        "regex-flags": {
+            "name": "Regex Flags",
+            "type": "regex",
+            "matching_attributes": ["domain"],
+            # /body/msx exercises the MULTILINE + DOTALL + VERBOSE branches and
+            # the success return; /bad/9 has non-alpha flags and hits the early
+            # return; /skip/g exercises the ignored-"g"-flag continue branch.
+            "list": [r"/evil\.example/msx", r"/other\.example/9", r"/skip\.example/g"],
+        }
+    }
+    warning_lists._preprocess_lists()
+    matched, _info = warning_lists.check_value("evil.example", "domains")
+    assert matched is True
+
+
+def test_check_regex_type_treats_timeout_as_no_match(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A regex match that times out must be swallowed as 'no match', not raised.
+
+    Hermetic coverage for warninglists_match_checks' TimeoutError branch: the
+    `regex` engine's per-match timeout firing on a catastrophic warning-list
+    pattern must not abort the run.
+    """
+    import logging
+
+    from iocparser.infrastructure import warninglists_match_checks as match_checks
+
+    def _raise_timeout(*_args: object, **_kwargs: object) -> bool:
+        raise TimeoutError
+
+    monkeypatch.setattr(match_checks.regex, "search", _raise_timeout)
+    result = match_checks.check_regex_type(lambda: logging.getLogger("test"), "value", [r"(a+)+$"])
+    assert result is False

@@ -58,6 +58,7 @@ def test_reclaim_ignores_file_vanishing_before_rename(
     _processing_file(tmp_path, stale=True)
 
     def _missing_rename(self: Path, target: object) -> Path:
+        del self, target
         raise FileNotFoundError
 
     monkeypatch.setattr(Path, "rename", _missing_rename)

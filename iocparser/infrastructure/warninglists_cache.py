@@ -153,7 +153,7 @@ class WarningListCacheMixin:
         self.warning_lists = {}
         partial_refresh_failed = False
         try:
-            current_logger.warning("Updating MISP warning lists from GitHub repository...")
+            current_logger.info("Updating MISP warning lists from GitHub repository...")
             list_directories = self._fetch_list_directories()
             current_logger.info("Downloading %s MISP warning lists...", len(list_directories))
             warning_lists, failed_downloads = self._download_warning_lists(list_directories)

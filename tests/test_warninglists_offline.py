@@ -179,19 +179,27 @@ def test_safe_unlink_ignores_unlink_errors(tmp_path: Path) -> None:
     assert directory.exists()
 
 
-def test_update_warning_lists_downloads_from_local_server_and_writes_cache(tmp_path: Path) -> None:
+def test_update_warning_lists_downloads_from_local_server_and_writes_cache(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     warning_lists = OfflineWarningLists(tmp_path)
     payloads = GOOD_BAD_DOMAIN_PAYLOADS
 
     with (
         WarningListServer(["good-domains", "bad-domains"], payloads) as base_url,
         patched_github_bases(base_url),
+        caplog.at_level("INFO", logger="iocparser.infrastructure.warninglists"),
     ):
         warning_lists._update_warning_lists()
 
     assert "good-domains" in warning_lists.warning_lists
     assert warning_lists.cache_file.exists()
     assert warning_lists.cache_metadata_file.exists()
+    # The start-of-update announcement is normal status, not a warning: a successful
+    # refresh must not emit a WARNING-level record (which would pollute the warning stream).
+    update_records = [r for r in caplog.records if r.getMessage().startswith("Updating MISP")]
+    assert update_records, "expected the update-start announcement to be logged"
+    assert all(record.levelname == "INFO" for record in update_records)
 
 
 def test_partial_download_keeps_fallback_but_stamps_cache_stale(tmp_path: Path) -> None:

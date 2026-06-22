@@ -8,6 +8,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from iocparser.domain.sources import normalize_url_value
+from iocparser.infrastructure.logger import get_logger
 from iocparser.infrastructure.persistence.history.ops import (
     AMBIGUOUS_LEGACY_HISTORY_ARCHIVE,
     INVALID_HISTORY_ARCHIVE,
@@ -56,6 +57,8 @@ from iocparser.infrastructure.persistence_support import (
     legacy_url_value_clause,
     normalized_source_filter,
 )
+
+logger = get_logger(__name__)
 
 
 def _source_identity(row: dict[str, object]) -> tuple[object, ...]:
@@ -852,6 +855,10 @@ def import_history(db_uri: str, payload: dict[str, object]) -> dict[str, int]:
             ),
         }
         session.commit()
+        logger.info(
+            "Imported history: %s",
+            ", ".join(f"{name}={count}" for name, count in counts.items()),
+        )
         return counts
 
 

@@ -2494,6 +2494,34 @@ def test_import_history_remaps_foreign_keys_on_primary_key_collision(tmp_path: P
     assert exported.result.grouped_iocs() == {"domains": ["imported.example"]}
 
 
+def test_import_history_logs_summary(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    """History import is an admin/restore path that previously produced no logs at all.
+    A successful import must record a summary line so the operation is observable."""
+    source_db_uri = f"sqlite:///{tmp_path / 'log-source.sqlite'}"
+    target_db_uri = f"sqlite:///{tmp_path / 'log-target.sqlite'}"
+
+    persist_results(
+        PersistResultsRequest(
+            config=load_config(True, source_db_uri, None),
+            source_kind="file",
+            source_value="logged.txt",
+            normal_iocs={"domains": ["logged.example"]},
+            warning_iocs={},
+            options=PersistOptions(
+                defang=False, check_warnings=False, force_update=False, output_format="json"
+            ),
+            tool_version="5.0.0",
+        )
+    )
+
+    with caplog.at_level("INFO", logger="iocparser.infrastructure.persistence.history.import_ops"):
+        import_history_raw(target_db_uri, export_persisted_history(db_uri=source_db_uri))
+
+    assert "Imported history:" in caplog.text
+    assert "sources=1" in caplog.text
+    assert "runs=1" in caplog.text
+
+
 def test_persist_results_reads_home_file_metadata(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

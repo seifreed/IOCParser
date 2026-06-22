@@ -1710,3 +1710,32 @@ def test_streaming_does_not_emit_truncated_boundary_fragments(tmp_path) -> None:
         assert not any(a != b and b.startswith(a) for a in urls for b in urls), urls
         ips = streamed.get("ips", [])
         assert not any(a != b and b.endswith(a) for a in ips for b in ips), ips
+
+
+def test_record_failed_url_logs_warning(caplog: pytest.LogCaptureFixture) -> None:
+    """A URL that fails during batch processing must surface in the logs, not only
+    in the per-item report — otherwise a failed URL in a large batch is invisible."""
+    from iocparser.cli_processing_urls import record_failed_url
+
+    failures: dict[str, str] = {}
+    run_metadata_map: dict[str, dict[str, int | str]] = {}
+    item_reports: list = []
+
+    with caplog.at_level("WARNING", logger="iocparser.cli_processing_urls"):
+        record_failed_url(
+            "item-1",
+            1,
+            "https://malware.example/payload",
+            RuntimeError("download exploded"),
+            occurrence=1,
+            retry_report=None,
+            retry_batch_job=None,
+            db_uri=None,
+            failures=failures,
+            run_metadata_map=run_metadata_map,
+            item_reports=item_reports,
+        )
+
+    assert failures["item-1"] == "download exploded"
+    assert "Batch URL failed for https://malware.example/payload" in caplog.text
+    assert "download exploded" in caplog.text

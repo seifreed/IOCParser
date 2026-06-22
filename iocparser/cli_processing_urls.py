@@ -30,11 +30,14 @@ from iocparser.cli_processing_url_reports import (
 from iocparser.domain.models import FailedBatchItem
 from iocparser.errors import FileExistenceError, TypeValidationError, ValidationError
 from iocparser.infrastructure.file_parser import decode_file_bytes
+from iocparser.infrastructure.logger import get_logger
 from iocparser.infrastructure.persistence import SQLAlchemyPersistenceService
 from iocparser.interfaces.ports import TextSourceReader, URLDownloader, WarningListService
 from iocparser.pipeline_errors import classify_pipeline_exception
 
 BatchResults = BatchResultsCollection
+
+logger = get_logger(__name__)
 
 __all__ = [
     "BatchItemReport",
@@ -336,6 +339,7 @@ def _record_failed_url(
     item_reports: list[BatchItemReport],
 ) -> None:
     classified = classify_pipeline_exception(exc)
+    logger.warning("Batch URL failed for %s: %s", url, exc)
     failures[item_key] = str(exc)
     run_metadata_map[item_key] = {
         "duration_ms": 0,

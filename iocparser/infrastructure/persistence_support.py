@@ -119,14 +119,14 @@ def _url_filter_variants(value: str) -> tuple[str, ...]:
     parsed = urlsplit(normalized)
     variants = [normalized]
     if not parsed.query and not parsed.fragment:
+        # normalize_url_value guarantees a non-empty path ("/" minimum), so the path is
+        # always one of these three cases.
         if parsed.path.endswith("/") and parsed.path != "/":
             variants.append(urlunsplit(parsed._replace(path=parsed.path.rstrip("/"))))
         elif parsed.path == "/":
             variants.append(urlunsplit(parsed._replace(path="")))
-        elif parsed.path:
-            variants.append(urlunsplit(parsed._replace(path=f"{parsed.path}/")))
         else:
-            variants.append(urlunsplit(parsed._replace(path="/")))
+            variants.append(urlunsplit(parsed._replace(path=f"{parsed.path}/")))
     return tuple(dict.fromkeys(variants))
 
 

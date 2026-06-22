@@ -11,11 +11,24 @@ def is_valid_match_boundary(ioc_type: str, haystack: str, start: int, end: int) 
     if ioc_type == "urls":
         if start > 0 and haystack[start - 1].isalnum():
             return False
-        return not (end < len(haystack) and haystack[end] in "/._-?&=%")
+        # A trailing alphanumeric continues the host/path, so a match ending there is a
+        # truncated prefix of a longer URL straddling the chunk boundary, not a complete
+        # IOC. Without this check (the domains/emails branches have it) fragments such as
+        # "http://bad.exa" survived because the next char "m" was not in the symbol set.
+        return not (
+            end < len(haystack) and (haystack[end].isalnum() or haystack[end] in "/._-?&=%")
+        )
     if ioc_type == "emails":
         if start > 0 and (haystack[start - 1].isalnum() or haystack[start - 1] in "._-@"):
             return False
         return not (end < len(haystack) and (haystack[end].isalnum() or haystack[end] in "._-@"))
+    if ioc_type in {"ips", "cidr"}:
+        # An adjacent digit or dot means the match is a sub-token of a longer dotted
+        # address (e.g. "3.0.113.45" found inside "203.0.113.45" when a chunk cut "20|3"),
+        # so it is a boundary artifact rather than a real IOC.
+        if start > 0 and (haystack[start - 1].isdigit() or haystack[start - 1] == "."):
+            return False
+        return not (end < len(haystack) and (haystack[end].isdigit() or haystack[end] == "."))
     return True
 
 

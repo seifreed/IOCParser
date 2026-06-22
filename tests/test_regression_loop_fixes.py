@@ -1671,3 +1671,42 @@ def test_legitimate_domains_not_emitted_as_filenames() -> None:
     iocs, _ = extraction.extract_iocs_from_text("badsite.com", defang=False)
     assert iocs.get("domains") == ["badsite.com"]
     assert not iocs.get("filenames")
+
+
+def test_streaming_does_not_emit_truncated_boundary_fragments(tmp_path) -> None:
+    """Streaming output must equal non-streaming, with no truncated IOC fragments.
+
+    Regression: is_valid_match_boundary accepted a URL match whose next char was
+    alphanumeric (the urls branch lacked the .isalnum() guard the domains/emails
+    branches had), and IPs had no boundary check at all. So a chunk boundary cutting
+    "http://bad.example-bad.org/payload" left prefix fragments ("http://bad.exa", ...)
+    and "203.0.113.45" leaked "3.0.113.45" — none deduped against the full value,
+    making streaming output diverge from non-streaming with garbage partial IOCs.
+    """
+    from iocparser.infrastructure.extraction import IOCExtractor
+    from iocparser.infrastructure.streaming import StreamingIOCExtractor
+
+    doc = (
+        "Report: contact evil-c2.example-bad.com at 203.0.113.45 hash "
+        "d41d8cd98f00b204e9800998ecf8427e url http://bad.example-bad.org/payload "
+        "CVE-2021-44228 email ops@badcorp.io "
+    ) * 60
+    path = tmp_path / "big.txt"
+    path.write_text(doc)
+
+    # Compare against the same raw extractor non-streamed (no warning-list separation
+    # on either side), so the only variable is chunking.
+    baseline = IOCExtractor(defang=False).extract_all(doc)
+    baseline_counts = {k: len(v) for k, v in baseline.items() if v}
+
+    for chunk_size, overlap in ((256, 64), (200, 48), (300, 80)):
+        streamed = StreamingIOCExtractor(
+            chunk_size=chunk_size, overlap=overlap, defang=False
+        ).extract_from_file(str(path))
+        streamed_counts = {k: len(v) for k, v in streamed.items() if v}
+        assert streamed_counts == baseline_counts, (chunk_size, overlap, streamed_counts)
+        # No URL is a truncated prefix of another, no IP is a sub-token of another.
+        urls = streamed.get("urls", [])
+        assert not any(a != b and b.startswith(a) for a in urls for b in urls), urls
+        ips = streamed.get("ips", [])
+        assert not any(a != b and b.endswith(a) for a in ips for b in ips), ips

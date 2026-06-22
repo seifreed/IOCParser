@@ -28,13 +28,6 @@ def _csv_field(record: dict[str, object], field: str) -> str:
     return _require_str(record[field], field=field)
 
 
-def _csv_optional_field(record: dict[str, object], field: str) -> str:
-    value = record.get(field, "")
-    if value == "":
-        return ""
-    return _require_str(value, field=field)
-
-
 def _csv_warning_field(record: dict[str, object], field: str) -> str:
     has_warning_shape = "warning_list" in record or "description" in record
     if not has_warning_shape and field not in record:

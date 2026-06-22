@@ -100,6 +100,33 @@ def test_csv_line_numbers_stay_aligned_with_evidence_excerpts() -> None:
     assert row["line_numbers"] == "10,30"
 
 
+def test_csv_field_rejects_missing_required_field() -> None:
+    """_csv_field must raise on a record missing a required column, not emit blank."""
+    import pytest
+
+    from iocparser.adapters.renderers_json import _csv_field
+    from iocparser.errors import TypeValidationError
+
+    assert _csv_field({"type": "domains"}, "type") == "domains"
+    with pytest.raises(TypeValidationError):
+        _csv_field({}, "type")
+
+
+def test_csv_line_number_blank_when_absent() -> None:
+    """Evidence without a line number renders an empty line_numbers cell, not 'None'."""
+    import csv
+    import io
+
+    from iocparser.domain.models import IOCEvidence
+
+    evidence = (IOCEvidence(excerpt="only-excerpt"),)  # line_number defaults to None
+    result = ExtractionResult(iocs=(IOC.from_raw("domains", "evil.example", evidence=evidence),))
+    row = next(csv.DictReader(io.StringIO(CSVOutputRenderer().render(result))))
+
+    assert row["evidence"] == "only-excerpt"
+    assert row["line_numbers"] == ""
+
+
 def test_stix_renderer_can_be_written_to_disk(tmp_path: Path) -> None:
     output_file = tmp_path / "rendered" / "bundle.json"
     output_file.parent.mkdir(parents=True, exist_ok=True)

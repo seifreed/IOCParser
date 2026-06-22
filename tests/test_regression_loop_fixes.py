@@ -1589,3 +1589,57 @@ def test_search_persisted_iocs_rejects_non_str_value(tmp_path) -> None:
     for bad in (123, ["evil.com"], object()):
         with pytest.raises(ValidationError):
             persistence.search_persisted_iocs(db_uri=db_uri, value=bad)  # type: ignore[arg-type]
+
+
+def test_retry_batch_job_is_recognized_as_input() -> None:
+    """--retry-batch-job N must count as an input, not crash has_input_args.
+
+    Regression: the flag is parsed as int (a job id), but has_input_args probed it
+    with get_optional_str_arg, which rejects a non-str and raised
+    "retry_batch_job requires a string value" on every `--retry-batch-job N`
+    invocation -- making the feature entirely unusable.
+    """
+    from iocparser.cli_args import create_argument_parser, has_input_args
+
+    args = create_argument_parser().parse_args(["--retry-batch-job", "42"])
+    assert args.retry_batch_job == 42
+    assert has_input_args(args) is True
+
+    no_input = create_argument_parser().parse_args([])
+    assert has_input_args(no_input) is False
+
+
+def test_max_evidence_rejects_negative() -> None:
+    """--max-evidence must reject a negative count instead of silently zeroing it.
+
+    Regression: --max-evidence was type=int, so `-5` parsed fine and the domain
+    cap clamped it via max(0, n) to 0, silently dropping all evidence. It now uses
+    the same non-negative validator as --overlap and errors at the CLI boundary.
+    """
+    from iocparser.cli_args import create_argument_parser
+
+    parser = create_argument_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["-f", "x.txt", "--max-evidence", "-5"])
+    assert parser.parse_args(["-f", "x.txt", "--max-evidence", "0"]).max_evidence == 0
+
+
+def test_stix_indicator_timestamps_are_bundle_stable() -> None:
+    """Every Indicator in a bundle shares the renderer's single timestamp.
+
+    Regression: the Indicator was built without created/modified, so stix2
+    auto-stamped each one with a fresh datetime.now(), yielding non-deterministic,
+    per-indicator timestamps -- unlike the CVE Vulnerability path which pins
+    self.now. created/modified/valid_from are now all self.now.
+    """
+    renderer = STIXOutputRenderer()
+    indicators = [
+        json.loads(renderer._build_indicator(IOCType.IP, "1.2.3.4", None).serialize()),
+        json.loads(renderer._build_indicator(IOCType.DOMAIN, "evil.com", None).serialize()),
+    ]
+    stamp = renderer.now.strftime("%Y-%m-%dT%H:%M:%S")
+    for indicator in indicators:
+        assert indicator["type"] == "indicator"
+        assert indicator["created"] == indicator["modified"]
+        assert indicator["created"].startswith(stamp)
+        assert indicator["valid_from"] == indicator["created"]

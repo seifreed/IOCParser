@@ -95,7 +95,9 @@ def _add_processing_arguments(parser: argparse.ArgumentParser) -> None:
         help="Sort analyst-facing output",
     )
     parser.add_argument(
-        "--max-evidence", type=int, help="Limit the number of evidence excerpts per IOC"
+        "--max-evidence",
+        type=_non_negative_int,
+        help="Limit the number of evidence excerpts per IOC",
     )
     parser.add_argument(
         "--streaming", action="store_true", help="Use streaming extraction for file inputs"

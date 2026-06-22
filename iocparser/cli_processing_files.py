@@ -441,6 +441,7 @@ def _process_duplicate_files(
         except (KeyboardInterrupt, SystemExit):
             raise
         except (FileExistenceError, FileProcessingError) as exc:
+            logger.warning("Batch file failed for %s: %s", source_value, exc)
             normal_iocs, warning_iocs = {}, {}
             error_message = str(exc)
         except ValidationError:
@@ -577,6 +578,7 @@ def process_multiple_files_payload(
             except (KeyboardInterrupt, SystemExit):
                 raise
             except (FileExistenceError, FileProcessingError) as exc:
+                logger.warning("Batch file failed for %s: %s", source_value, exc)
                 results.add(
                     item_key=item_key,
                     source_value=source_value,

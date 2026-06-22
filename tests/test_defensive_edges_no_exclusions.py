@@ -1586,6 +1586,37 @@ def test_duplicate_file_processing_interrupts_and_generic_errors(
         )
 
 
+def test_duplicate_file_processing_logs_known_file_errors(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog,
+) -> None:
+    """A known per-file error skips the file but must still be logged, otherwise a
+    failed file in a large batch leaves no trace in the logs."""
+    import iocparser.cli_processing_files as files
+    from iocparser.errors import FileProcessingError
+
+    sample = tmp_path / "sample.txt"
+    sample.write_text("payload", encoding="utf-8")
+    request = files.MultiFileProcessingRequest()
+
+    monkeypatch.setattr(
+        files,
+        "process_file",
+        lambda *_args, **_kwargs: _raise(FileProcessingError("sample.txt", "corrupt")),
+    )
+    with caplog.at_level("WARNING", logger="iocparser.cli_processing_files"):
+        results = files._process_duplicate_files(
+            [sample],
+            reader=SimpleNamespace(),
+            warning_service=None,
+            request=request,
+        )
+
+    assert results.entries[0].normal_iocs == {}
+    assert f"Batch file failed for {sample}" in caplog.text
+
+
 def test_duplicate_file_processing_propagates_validation_errors(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1759,7 +1790,9 @@ def test_batch_listings_break_started_at_ties_deterministically(tmp_path) -> Non
     assert listed_ids == expected
 
 
-def test_plugin_multi_file_batch_survives_single_file_failure(tmp_path, monkeypatch) -> None:
+def test_plugin_multi_file_batch_survives_single_file_failure(
+    tmp_path, monkeypatch, caplog
+) -> None:
     """A configured-plugin -m batch must skip a failing file, not abort the run.
 
     Regression: the plugin branch of process_multiple_files_payload had no
@@ -1796,12 +1829,19 @@ def test_plugin_multi_file_batch_survives_single_file_failure(tmp_path, monkeypa
             args, reader=SimpleNamespace(), warning_service=None
         )
 
-    # Both a domain file error and an unexpected error skip only the bad file.
-    for failure in (FileProcessingError("bad.txt", "corrupt"), RuntimeError("plugin blew up")):
-        payload = run_with(failure)
-        extracted = {value for values in payload.normal_iocs.values() for value in values}
-        assert "1.2.3.4" in extracted
-        assert "5.6.7.8" in extracted
+    # Both a domain file error and an unexpected error skip only the bad file,
+    # and the skipped file is logged (otherwise it is invisible in a large batch).
+    with caplog.at_level("WARNING", logger="iocparser.cli_processing_files"):
+        payload = run_with(FileProcessingError("bad.txt", "corrupt"))
+    extracted = {value for values in payload.normal_iocs.values() for value in values}
+    assert "1.2.3.4" in extracted
+    assert "5.6.7.8" in extracted
+    assert f"Batch file failed for {bad}" in caplog.text
+
+    payload = run_with(RuntimeError("plugin blew up"))
+    extracted = {value for values in payload.normal_iocs.values() for value in values}
+    assert "1.2.3.4" in extracted
+    assert "5.6.7.8" in extracted
 
     # Interrupts must not be swallowed by the per-file guard.
     with pytest.raises(KeyboardInterrupt):

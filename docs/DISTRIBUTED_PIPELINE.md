@@ -21,7 +21,7 @@ Use another backend explicitly when your platform already standardizes on it.
 - `sqs`
 - `celery`
 
-Create the adapter through `iocparser.create_queue_adapter(...)` or use `DistributedPipelineClient`.
+Create the adapter through `pipeline.create_queue_adapter(...)` or use `pipeline.DistributedPipelineClient`.
 
 ## Lifecycle
 
@@ -50,16 +50,16 @@ Infra/runtime limits should also be enforced by the orchestrator or container ru
 ## Example
 
 ```python
-from iocparser import DistributedPipelineClient, PipelineJobRequest
+from iocparser import pipeline
 
-client = DistributedPipelineClient(
+client = pipeline.DistributedPipelineClient(
     db_uri="sqlite:///iocparser.db",
     queue_backend="filesystem",
     queue_path=".iocparser-queue",
 )
 
 job = client.submit(
-    PipelineJobRequest(
+    pipeline.PipelineJobRequest(
         input_kind="text",
         source_value="See hxxp://evil.example",
         persist=True,

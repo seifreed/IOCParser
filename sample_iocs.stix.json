@@ -1,0 +1,74 @@
+{
+    "id": "bundle--a0d53ca6-1a04-4525-b536-364be03aa6ec",
+    "objects": [
+        {
+            "created": "2026-06-22T20:12:20.594481Z",
+            "id": "indicator--01dc03ed-bd5c-4b54-977c-029266fdc403",
+            "indicator_types": [
+                "malicious-activity"
+            ],
+            "modified": "2026-06-22T20:12:20.594481Z",
+            "name": "domains indicator",
+            "pattern": "[domain-name:value = 'evil-domain.com']",
+            "pattern_type": "stix",
+            "pattern_version": "2.1",
+            "spec_version": "2.1",
+            "type": "indicator",
+            "valid_from": "2026-06-22T20:12:20.594481Z"
+        },
+        {
+            "created": "2026-06-22T20:12:20.594481Z",
+            "id": "indicator--064e97f3-c047-4d59-8b8e-9a6401890eec",
+            "indicator_types": [
+                "malicious-activity"
+            ],
+            "modified": "2026-06-22T20:12:20.594481Z",
+            "name": "ips indicator",
+            "pattern": "[ipv4-addr:value = '10.0.0.5']",
+            "pattern_type": "stix",
+            "pattern_version": "2.1",
+            "spec_version": "2.1",
+            "type": "indicator",
+            "valid_from": "2026-06-22T20:12:20.594481Z",
+            "x_warning_description": "Event contains one or more entries part of the private network CIDR blocks (RFC 1918)",
+            "x_warning_list": "List of RFC 1918 CIDR blocks"
+        },
+        {
+            "created": "2026-06-22T20:12:20.594481Z",
+            "id": "indicator--e43ad604-22c7-4821-8736-db33648d5353",
+            "indicator_types": [
+                "malicious-activity"
+            ],
+            "modified": "2026-06-22T20:12:20.594481Z",
+            "name": "ips indicator",
+            "pattern": "[ipv4-addr:value = '192.168.0.0']",
+            "pattern_type": "stix",
+            "pattern_version": "2.1",
+            "spec_version": "2.1",
+            "type": "indicator",
+            "valid_from": "2026-06-22T20:12:20.594481Z",
+            "x_warning_description": "Event contains one or more entries part of the private network CIDR blocks (RFC 1918)",
+            "x_warning_list": "List of RFC 1918 CIDR blocks"
+        },
+        {
+            "created": "2026-06-22T20:12:20.594481Z",
+            "id": "indicator--ff77e367-a5c8-4b7d-80ec-c55e54d37aef",
+            "indicator_types": [
+                "malicious-activity"
+            ],
+            "modified": "2026-06-22T20:12:20.594481Z",
+            "name": "ips indicator",
+            "pattern": "[ipv4-addr:value = '198.51.100.23']",
+            "pattern_type": "stix",
+            "pattern_version": "2.1",
+            "spec_version": "2.1",
+            "type": "indicator",
+            "valid_from": "2026-06-22T20:12:20.594481Z",
+            "x_warning_description": "Event contains one or more entries part of the Special Use IPv4 Addresses CIDR blocks (RFC 5735)",
+            "x_warning_list": "List of RFC 5735 CIDR blocks"
+        }
+    ],
+    "type": "bundle",
+    "x_iocparser_format": "stix",
+    "x_iocparser_schema_version": "1.0"
+}

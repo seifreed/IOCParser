@@ -1094,12 +1094,31 @@ def test_hostname_type_warning_lists_match() -> None:
 
     Only string/regex/cidr list types were indexed, so the 19 shipped
     hostname-type lists were inert and never flagged a value.
-    """
-    from iocparser.infrastructure.warninglists_service import MISPWarningListService
 
-    warning_lists = MISPWarningListService()._get_lists(force_update=False)
+    Built from a hermetic in-memory fixture (not a live MISP download) so the
+    regression can never flake on a GitHub API rate limit in CI: the original
+    body called ``_get_lists(force_update=False)``, which fell back to a network
+    fetch when no cache existed and returned an empty set on HTTP 403, failing
+    the assertion for an environmental reason rather than a real regression.
+    """
+    from iocparser.infrastructure.warninglists import MISPWarningLists
+
+    warning_lists = MISPWarningLists()
+    warning_lists.warning_lists = {
+        "hostname-list": {
+            "name": "Top hostnames",
+            "type": "hostname",
+            "matching_attributes": ["domain", "hostname"],
+            "list": ["google.com"],
+        }
+    }
+    warning_lists._preprocess_lists()
     matched, _info = warning_lists.check_value("google.com", "domains")
     assert matched is True
+    # A value absent from the hostname list must not match, proving the True
+    # above comes from hostname-type indexing rather than a blanket pass.
+    unmatched, _ = warning_lists.check_value("not-listed-example.test", "domains")
+    assert unmatched is False
 
 
 def test_url_batch_file_honors_bom_and_utf16(tmp_path: Path) -> None:

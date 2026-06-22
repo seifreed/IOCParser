@@ -251,6 +251,13 @@ def persist_run(
             result=request.result,
         )
         unit_of_work.commit()
+        logger.info(
+            "Persisted run %s: %s normal IOC(s), %s warning IOC(s) in %sms",
+            run_id,
+            metadata["normal_ioc_count"],
+            metadata["warning_ioc_count"],
+            metadata["duration_ms"],
+        )
         return PersistedRun(run_id=run_id)
     except (KeyboardInterrupt, SystemExit):
         raise

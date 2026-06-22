@@ -1643,3 +1643,31 @@ def test_stix_indicator_timestamps_are_bundle_stable() -> None:
         assert indicator["created"] == indicator["modified"]
         assert indicator["created"].startswith(stamp)
         assert indicator["valid_from"] == indicator["created"]
+
+
+def test_legitimate_domains_not_emitted_as_filenames() -> None:
+    """Brand domains excluded from extraction must not leak as .com filenames.
+
+    Regression: _drop_domain_filenames reconciled filenames only against *extracted*
+    domains/hosts and early-returned when none were found. Known-legitimate sites
+    (google.com, microsoft.com, ...) are excluded from domain extraction, so they
+    left domain_values empty and slipped through as bogus filename IOCs (the .com
+    TLD collides with the legacy DOS executable extension). They are now dropped by
+    the same legitimacy test that excluded them, while genuine .com files survive.
+    """
+    from iocparser import extraction
+
+    for legit in ("google.com", "microsoft.com", "amazon.com", "apple.com"):
+        iocs, _ = extraction.extract_iocs_from_text(legit, defang=False)
+        assert not iocs.get("filenames"), (legit, iocs.get("filenames"))
+
+    iocs, _ = extraction.extract_iocs_from_text(
+        "Download from microsoft.com then run payload.dll", defang=False
+    )
+    assert "microsoft.com" not in (iocs.get("filenames") or [])
+    assert iocs.get("filenames") == ["payload.dll"]
+
+    # A real domain not on the brand list is still extracted normally.
+    iocs, _ = extraction.extract_iocs_from_text("badsite.com", defang=False)
+    assert iocs.get("domains") == ["badsite.com"]
+    assert not iocs.get("filenames")

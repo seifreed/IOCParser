@@ -15,6 +15,7 @@ from re import Pattern
 from tqdm import tqdm
 
 from iocparser.infrastructure.extractor_base_runtime_support import (
+    ExtractorReferenceData,
     build_reference_data,
     clean_defanged,
     defang_dotted,
@@ -132,6 +133,31 @@ class DomainValidationPolicy:
             and all(part for part in parts)
         )
 
+    def is_legitimate_domain(
+        self,
+        domain: str,
+        *,
+        legitimate_domains: set[str],
+        legitimate_with_subdomains: set[str],
+    ) -> bool:
+        """True when ``domain`` is excluded from extraction as a known-legitimate site.
+
+        Mirrors the legitimacy branch of ``is_valid`` exactly: an exact list member, or
+        a non-suspicious subdomain of one. A suspicious subdomain (e.g. ``evil.google.com``)
+        stays a real IOC and so returns False, matching ``is_valid`` keeping it.
+        """
+        domain_lower = domain.lower()
+        if domain_lower in legitimate_domains or domain_lower in legitimate_with_subdomains:
+            return True
+        matching_suffixes = [
+            legit for legit in legitimate_domains if domain_lower.endswith("." + legit)
+        ]
+        if matching_suffixes:
+            longest_suffix = max(matching_suffixes, key=len)
+            subdomain = domain_lower.removesuffix("." + longest_suffix)
+            return not any(keyword in subdomain for keyword in self.suspicious_subdomain_keywords)
+        return False
+
 
 DEFAULT_HASH_VALIDATION_POLICY = HashValidationPolicy(
     min_unique_chars=MIN_HASH_UNIQUE_CHARS,
@@ -206,7 +232,9 @@ def _separate_fingerprints_from_md5(iocs: dict[str, list[str]]) -> None:
         del iocs["md5"]
 
 
-def _drop_domain_filenames(iocs: dict[str, list[str]]) -> None:
+def _drop_domain_filenames(
+    iocs: dict[str, list[str]], reference_data: ExtractorReferenceData
+) -> None:
     """Drop filename candidates that are really domains/hosts.
 
     The filename extension list includes ``com`` (legacy DOS executables), which
@@ -214,6 +242,11 @@ def _drop_domain_filenames(iocs: dict[str, list[str]]) -> None:
     as a spurious filename. A token already recognised as a domain/host is not a
     file; keep it only under its network type. Domains are defanged (``[.]``) while
     filenames stay raw, so refang for the comparison.
+
+    Known-legitimate sites (``google.com``, ``microsoft.com``, ...) are excluded
+    from domain extraction, so they never reach ``domain_values`` and would slip
+    through here as bogus ``.com`` filenames; drop them by the same legitimacy test
+    that excluded them. Genuine ``.com`` executables not on the brand list survive.
     """
     filenames = iocs.get("filenames")
     if not filenames:
@@ -223,9 +256,19 @@ def _drop_domain_filenames(iocs: dict[str, list[str]]) -> None:
         for type_name in ("domains", "hosts")
         for value in iocs.get(type_name) or ()
     }
-    if not domain_values:
-        return
-    remaining = [name for name in filenames if name.lower() not in domain_values]
+    policy = DEFAULT_DOMAIN_VALIDATION_POLICY
+    legitimate_domains = reference_data.legitimate_domains
+    legitimate_with_subdomains = reference_data.legitimate_with_subdomains
+
+    def is_domain_not_file(name: str) -> bool:
+        candidate = name.replace("[.]", ".").lower()
+        return candidate in domain_values or policy.is_legitimate_domain(
+            candidate,
+            legitimate_domains=legitimate_domains,
+            legitimate_with_subdomains=legitimate_with_subdomains,
+        )
+
+    remaining = [name for name in filenames if not is_domain_not_file(name)]
     if remaining:
         iocs["filenames"] = remaining
     else:
@@ -395,6 +438,8 @@ class ExtractorBase:
 class ExtractionAggregateMixin:
     """Aggregate extraction methods into a single result."""
 
+    reference_data: ExtractorReferenceData
+
     def _extract_single_type(
         self,
         ioc_type: str,
@@ -443,7 +488,7 @@ class ExtractionAggregateMixin:
                 iocs[ioc_type] = results
 
         _separate_fingerprints_from_md5(iocs)
-        _drop_domain_filenames(iocs)
+        _drop_domain_filenames(iocs, self.reference_data)
         return iocs
 
 

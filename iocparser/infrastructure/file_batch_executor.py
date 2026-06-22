@@ -38,7 +38,10 @@ class ThreadPoolFileBatchExecutor(FileBatchExecutor):
                 except (SourceNotFoundError, SourceProcessingError) as exc:
                     # Isolate the per-file failure but preserve its message so the
                     # caller records it (matching the serial path) instead of
-                    # mislabeling the failed file as a zero-IOC success.
+                    # mislabeling the failed file as a zero-IOC success. Log it too,
+                    # otherwise a failed file in a large batch is invisible in the logs
+                    # (the per-item outcome is the only other trace of it).
+                    logger.warning("Batch item failed for %s: %s", source_key, exc)
                     results[source_key] = BatchItemOutcome(ExtractionResult(), str(exc))
                 except (KeyboardInterrupt, SystemExit):
                     raise

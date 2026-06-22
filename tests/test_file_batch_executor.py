@@ -46,21 +46,26 @@ class TestFileBatchExecutorRegression:
         assert "Batch processing failed" in caplog.text
         assert "RuntimeError: boom" in caplog.text
 
-    def test_known_file_errors_still_yield_empty_results(self):
+    def test_known_file_errors_still_yield_empty_results(self, caplog):
         executor = ThreadPoolFileBatchExecutor(max_workers=1)
 
         def missing_handler(_):
             raise SourceNotFoundError("missing.txt")
 
-        results = executor.execute(
-            requests=["item"],
-            handler=missing_handler,
-            key_for=lambda _: "key1",
-        )
+        with caplog.at_level(
+            logging.WARNING, logger="iocparser.infrastructure.file_batch_executor"
+        ):
+            results = executor.execute(
+                requests=["item"],
+                handler=missing_handler,
+                key_for=lambda _: "key1",
+            )
 
         assert results["key1"].result == ExtractionResult()
         assert results["key1"].error is not None
         assert "missing.txt" in results["key1"].error
+        assert "Batch item failed for key1" in caplog.text
+        assert "missing.txt" in caplog.text
 
     def test_known_processing_errors_still_yield_empty_results(self):
         executor = ThreadPoolFileBatchExecutor(max_workers=1)

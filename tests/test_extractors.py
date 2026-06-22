@@ -219,20 +219,37 @@ class TestNetworkExtractors:
         that include ``.``/``-``/``/``. A long separator run with no satisfying suffix
         (e.g. ``"a-a-a..."``) drove O(n^2) backtracking, so a ~200 KB single line hung
         extraction for minutes. The repetitions are now length-bounded -> linear.
+
+        Asserts LINEAR scaling rather than an absolute wall-clock budget: a hard time
+        limit is flaky on slow/loaded CI runners (it has tripped at ~5-6s for genuinely
+        linear work), whereas super-linear growth with input size is the actual ReDoS
+        signature and is independent of machine speed.
         """
         import time
 
-        adversarial_inputs = [
-            "a@" + ".a" * 40000,  # emails / filenames host
-            "a" + "-a" * 40000 + "!",  # mutex / service_names / filenames
-            "a." * 40000 + "!",  # filenames / docker_images base
-            "a" + "/a" * 40000 + "!",  # docker_images namespace
+        builders = [
+            lambda n: "a@" + ".a" * n,  # emails / filenames host
+            lambda n: "a" + "-a" * n + "!",  # mutex / service_names / filenames
+            lambda n: "a." * n + "!",  # filenames / docker_images base
+            lambda n: "a" + "/a" * n + "!",  # docker_images namespace
         ]
-        for payload in adversarial_inputs:
+
+        def _elapsed(payload: str) -> float:
             start = time.perf_counter()
             self.extractor.extract_all(payload)
-            elapsed = time.perf_counter() - start
-            assert elapsed < 5.0, f"extract_all took {elapsed:.2f}s on a {len(payload)}-char input"
+            return time.perf_counter() - start
+
+        base_reps, scale = 5000, 4
+        for build in builders:
+            base = _elapsed(build(base_reps))
+            big = _elapsed(build(base_reps * scale))
+            # Linear work grows ~scale (4x); O(n^2) backtracking grows ~scale**2 (16x).
+            # Allow 2x headroom over linear plus an absolute slack for timing noise on
+            # tiny measurements -- still far below the quadratic blowup it must catch.
+            assert big < base * (scale * 2) + 0.5, (
+                f"super-linear scaling on a {len(build(base_reps * scale))}-char input: "
+                f"{base:.3f}s -> {big:.3f}s"
+            )
 
         # Valid IOCs of the affected types still extract.
         result = self.extractor.extract_all(
